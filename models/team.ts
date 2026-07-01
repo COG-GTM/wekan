@@ -1,78 +1,70 @@
 import { Mongo } from 'meteor/mongo';
 import { ReactiveCache } from '/imports/reactiveCache';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
-const Org = new Mongo.Collection('org');
+const Team = new Mongo.Collection('team');
 
 /**
- * A Organization in Wekan. A Enterprise in Trello.
+ * A Team in Wekan. Organization in Trello.
  */
-Org.attachSchema(
+Team.attachSchema(
   new SimpleSchema({
-    orgDisplayName: {
+    teamDisplayName: {
       /**
-       * the name to display for the organization
+       * the name to display for the team
        */
       type: String,
       optional: true,
     },
-    orgDesc: {
+    teamDesc: {
       /**
-       * the description the organization
+       * the description the team
        */
       type: String,
       optional: true,
       max: 190,
     },
-    orgShortName: {
+    teamShortName: {
       /**
-       * short name of the organization
+       * short name of the team
        */
       type: String,
       optional: true,
       max: 255,
     },
-    orgAutoAddUsersWithDomainName: {
+    teamWebsite: {
       /**
-       * automatically add users with domain name
+       * website of the team
        */
       type: String,
       optional: true,
       max: 255,
     },
-    orgWebsite: {
+    teamIsActive: {
       /**
-       * website of the organization
-       */
-      type: String,
-      optional: true,
-      max: 255,
-    },
-    orgIsActive: {
-      /**
-       * status of the organization
+       * status of the team
        */
       type: Boolean,
       optional: true,
     },
-    orgSharedTemplates: {
+    teamSharedTemplates: {
       /**
-       * #5850: members may drag personal Template Boards onto this org to share
-       * (per-org form of "Shared Templates for Organizations"). Off by default.
+       * #5850: members may drag personal Template Boards onto this team to share
+       * (per-team form of "Shared Templates for Teams"). Off by default.
        */
       type: Boolean,
       optional: true,
     },
-    orgPropagateMembersToBoards: {
+    teamPropagateMembersToBoards: {
       /**
-       * #4737: add this org's members to the boards that list this org. Off by default.
+       * #4737: add this team's members to the boards that list this team. Off by default.
        */
       type: Boolean,
       optional: true,
     },
-    orgSyncMembersFromAuth: {
+    teamSyncMembersFromAuth: {
       /**
-       * #4737: this org's membership is maintained by the authentication
+       * #4737: this team's membership is maintained by the authentication
        * provider's group/membership sync (LDAP, OAuth2/OIDC, SAML, etc.). Off by default.
        */
       type: Boolean,
@@ -80,7 +72,7 @@ Org.attachSchema(
     },
     createdAt: {
       /**
-       * creation date of the organization
+       * creation date of the team
        */
       type: Date,
       // eslint-disable-next-line consistent-return
@@ -108,4 +100,4 @@ Org.attachSchema(
   }),
 );
 
-export default Org;
+export default Team;

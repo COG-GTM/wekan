@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor';
+import { check, Match } from 'meteor/check';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TrelloCreator } from './trelloCreator';
 import { WekanCreator } from './wekanCreator';
@@ -11,17 +12,18 @@ import { getMembersToMap } from './wekanmapper';
 
 // Parse an uploaded .xlsx (base64) into the row-array shape the CsvCreator
 // consumes (board[0] is the header row). Excel import reuses the CSV creator.
-async function parseXlsxToRows(excelBase64) {
+async function parseXlsxToRows(excelBase64: string) {
   // eslint-disable-next-line global-require
   const ExcelJS = require('@wekanteam/exceljs');
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(Buffer.from(excelBase64, 'base64'));
   const worksheet = workbook.worksheets[0];
-  const rows = [];
+  const rows: any[] = [];
   if (worksheet) {
-    worksheet.eachRow(row => {
+    // `row` is an exceljs Row (untyped require), hence `any`.
+    worksheet.eachRow((row: any) => {
       // row.values is 1-indexed (index 0 is empty); normalize to strings.
-      rows.push(row.values.slice(1).map(v => (v == null ? '' : String(v))));
+      rows.push(row.values.slice(1).map((v: any) => (v == null ? '' : String(v))));
     });
   }
   return rows;
@@ -58,16 +60,19 @@ Meteor.methods({
       case 'excel':
         // board = { excelBase64 }; parse it into rows and reuse the CSV creator.
         check(board, Object);
-        importedBoard = await parseXlsxToRows(board.excelBase64);
+        // `board` was narrowed to `object` by check(); the excel payload holds
+        // a dynamic `excelBase64` field, read through `any`.
+        importedBoard = await parseXlsxToRows((board as any).excelBase64);
         creator = new CsvCreator(data);
         break;
       default:
         // NextCloud Deck / OpenProject / GitHub / GitLab / Gitea / Forgejo:
         // normalize the platform's JSON to the common Kanboard shape and reuse
         // the Kanboard creator.
-        if (EXTERNAL_PARSERS[importSource]) {
+        const externalParser = (EXTERNAL_PARSERS as Record<string, (board: any) => any>)[importSource];
+        if (externalParser) {
           check(board, Match.OneOf(Object, Array));
-          importedBoard = EXTERNAL_PARSERS[importSource](board);
+          importedBoard = externalParser(board);
           creator = new KanboardCreator(data);
         }
         break;
@@ -107,15 +112,18 @@ Meteor.methods({
     }
 
     const data = await exporter.build();
-    const additionalData = {};
+    const additionalData: { [key: string]: any } = {};
 
     //get the members to map
-    const membersMapping = getMembersToMap(data);
+    // NOTE: getMembersToMap is async, but this call is intentionally left
+    // un-awaited to preserve the existing runtime behavior; typed `any` so the
+    // pre-existing usage below compiles.
+    const membersMapping: any = getMembersToMap(data);
 
     //now mirror the mapping done in finishImport in client/components/import/import.js:
     if (membersMapping) {
-      const mappingById = {};
-      membersMapping.forEach(member => {
+      const mappingById: { [key: string]: any } = {};
+      membersMapping.forEach((member: any) => {
         if (member.wekanId) {
           mappingById[member.id] = member.wekanId;
         }
