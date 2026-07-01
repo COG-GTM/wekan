@@ -18,7 +18,7 @@ import { refreshCloudStorageFromSettings, testCloudConnection } from '/models/li
 
 // Secret fields per cloud provider — never published to the client and only
 // overwritten when a non-empty replacement value is supplied.
-const CLOUD_SECRET_FIELDS = {
+const CLOUD_SECRET_FIELDS: Record<string, string[]> = {
   [STORAGE_NAME_S3]: ['secretAccessKey'],
   [STORAGE_NAME_AZURE]: ['accountKey', 'connectionString'],
   [STORAGE_NAME_GCS]: ['credentials'],
@@ -27,7 +27,7 @@ const CLOUD_SECRET_FIELDS = {
 // Mask secret fields in a settings document before returning it to the client,
 // replacing each secret with '' and adding a boolean `<field>Set` marker so the
 // admin UI can show that a value exists without revealing it.
-function maskStorageSecrets(settings) {
+function maskStorageSecrets(settings: WekanDocumentField) {
   if (!settings || !settings.storageConfig) {
     return settings;
   }
@@ -45,7 +45,7 @@ function maskStorageSecrets(settings) {
   return masked;
 }
 
-function parseNonNegativeInt(value, fallback = 0) {
+function parseNonNegativeInt(value: WekanDocumentField, fallback = 0) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed < 0) {
     return fallback;
@@ -53,7 +53,7 @@ function parseNonNegativeInt(value, fallback = 0) {
   return parsed;
 }
 
-async function countCollectionDocumentsSafe(db, collectionName) {
+async function countCollectionDocumentsSafe(db: WekanDocumentField, collectionName: string) {
   try {
     const exists = await db.listCollections({ name: collectionName }, { nameOnly: true }).toArray();
     if (!Array.isArray(exists) || exists.length === 0) {
@@ -65,7 +65,7 @@ async function countCollectionDocumentsSafe(db, collectionName) {
   }
 }
 
-async function countByStorageSafe(db, collectionName, storageName) {
+async function countByStorageSafe(db: WekanDocumentField, collectionName: string, storageName: string) {
   try {
     const exists = await db.listCollections({ name: collectionName }, { nameOnly: true }).toArray();
     if (!Array.isArray(exists) || exists.length === 0) {
@@ -91,7 +91,7 @@ async function countByStorageSafe(db, collectionName, storageName) {
   }
 }
 
-function highestCount(...counts) {
+function highestCount(...counts: WekanDocumentField[]) {
   return counts.reduce((max, value) => Math.max(max, Number(value) || 0), 0);
 }
 
@@ -101,7 +101,7 @@ function highestCount(...counts) {
 // FileStoreStrategyFactory.getFileStrategy() and the bulk-move source matcher.
 // This must NOT count every metadata document, because the `attachments`
 // collection holds metadata for filesystem- and cloud-stored files too.
-async function countGridFsStoredSafe(db, collectionName) {
+async function countGridFsStoredSafe(db: WekanDocumentField, collectionName: string) {
   try {
     const exists = await db.listCollections({ name: collectionName }, { nameOnly: true }).toArray();
     if (!Array.isArray(exists) || exists.length === 0) {
@@ -135,7 +135,7 @@ async function countGridFsStoredSafe(db, collectionName) {
 
 // Build a direct-connection URL to a specific replica set member, stripping replicaSet
 // routing so the driver connects to exactly the given host (required for compact on secondaries).
-function buildDirectNodeUrl(mongoUrl, targetHostPort) {
+function buildDirectNodeUrl(mongoUrl: string, targetHostPort: string) {
   const protoEnd = mongoUrl.indexOf('://');
   const withoutProto = protoEnd !== -1 ? mongoUrl.slice(protoEnd + 3) : mongoUrl;
   const firstSlash = withoutProto.indexOf('/');
@@ -153,8 +153,8 @@ function buildDirectNodeUrl(mongoUrl, targetHostPort) {
   return `mongodb://${auth}${targetHostPort}${dbPath}?${params.toString()}`;
 }
 
-async function compactCollectionsOnNode(nodeDb, candidates, force = false) {
-  const results = {};
+async function compactCollectionsOnNode(nodeDb: WekanDocumentField, candidates: string[], force = false) {
+  const results: Record<string, string> = {};
   for (const collName of candidates) {
     try {
       const exists = await nodeDb.listCollections({ name: collName }, { nameOnly: true }).toArray();
@@ -184,7 +184,7 @@ Meteor.methods({
       throw new Meteor.Error('not-authorized', 'Admin access required');
     }
 
-    let settings = await AttachmentStorageSettings.findOneAsync({});
+    let settings: WekanDocumentField = await AttachmentStorageSettings.findOneAsync({});
     if (!settings) {
       settings = {
         defaultStorage: STORAGE_NAME_FILESYSTEM,
@@ -470,12 +470,12 @@ Meteor.methods({
       'cfs.avatars.filerecord',
     ];
 
-    const allResults = {};
+    const allResults: Record<string, WekanDocumentField> = {};
 
     // Compact secondaries first (best practice: keep primary available during compaction)
     try {
       const rsStatus = await db.admin().command({ replSetGetStatus: 1 });
-      const secondaries = (rsStatus.members || []).filter(m => m.state === 2);
+      const secondaries = (rsStatus.members || []).filter((m: WekanDocumentField) => m.state === 2);
 
       if (secondaries.length > 0 && process.env.MONGO_URL) {
         const { MongoClient } = MongoInternals.NpmModules.mongodb.module;
@@ -510,7 +510,7 @@ Meteor.methods({
     return allResults;
   },
 
-  async updateAttachmentStorageSettings(settings) {
+  async updateAttachmentStorageSettings(settings: WekanDocumentField) {
     check(settings, Object);
 
     if (!this.userId) {
@@ -523,9 +523,9 @@ Meteor.methods({
     }
 
     // Strip MongoDB metadata fields before saving
-    const { _id, createdAt, updatedAt, createdBy, updatedBy, ...cleanSettings } = settings;
+    const { _id, createdAt, updatedAt, createdBy, updatedBy, ...cleanSettings } = settings as WekanDocumentField;
 
-    const existing = (await AttachmentStorageSettings.findOneAsync({})) || {};
+    const existing: WekanDocumentField = (await AttachmentStorageSettings.findOneAsync({})) || {};
     const existingConfig = existing.storageConfig || {};
 
     // Merge storageConfig: keep known providers, and for cloud providers
@@ -533,7 +533,7 @@ Meteor.methods({
     // real secret, only a "set" marker) so saving other fields can't wipe it.
     if (cleanSettings.storageConfig) {
       const incoming = cleanSettings.storageConfig;
-      const merged = {};
+      const merged: Record<string, WekanDocumentField> = {};
 
       ['filesystem', 'gridfs'].forEach(key => {
         if (incoming[key] !== undefined) {
@@ -596,7 +596,7 @@ Meteor.methods({
     return settings ? settings.getDefaultStorage() : STORAGE_NAME_FILESYSTEM;
   },
 
-  async setDefaultAttachmentStorage(storageName) {
+  async setDefaultAttachmentStorage(storageName: string) {
     check(storageName, String);
 
     if (!this.userId) {
@@ -632,7 +632,7 @@ Meteor.methods({
 
   // Test connectivity to a cloud provider. `config` is the provider config from
   // the admin form; blank secrets fall back to the stored value.
-  async testAttachmentCloudConnection(provider, config) {
+  async testAttachmentCloudConnection(provider: string, config: WekanDocumentField) {
     check(provider, String);
     check(config, Object);
 
@@ -647,12 +647,12 @@ Meteor.methods({
       throw new Meteor.Error('invalid-storage', 'Invalid storage backend');
     }
 
-    const existing = (await AttachmentStorageSettings.findOneAsync({})) || {};
+    const existing: WekanDocumentField = (await AttachmentStorageSettings.findOneAsync({})) || {};
     const prevCfg = (existing.storageConfig && existing.storageConfig[provider]) || {};
     const effectiveCfg = { ...prevCfg, ...config };
     (CLOUD_SECRET_FIELDS[provider] || []).forEach(field => {
       delete effectiveCfg[`${field}Set`];
-      if (!config[field]) {
+      if (!(config as WekanDocumentField)[field]) {
         effectiveCfg[field] = prevCfg[field] || '';
       }
     });

@@ -216,6 +216,15 @@ declare const WebApp: { handlers: WekanDocumentField };
 declare const check: typeof import('meteor/check').check;
 declare const Match: typeof import('meteor/check').Match;
 
+// Some Wekan board-permission helpers are referenced in server model code as
+// ambient globals guarded by `typeof helper === 'function'` (they are not
+// imported there, so at runtime the guard is what decides whether they run).
+// Declaring them keeps those guarded references type-checkable.
+declare const allowIsBoardMemberWithWriteAccess: (
+  userId: string,
+  board: WekanDocumentField,
+) => boolean;
+
 // Meteor exposes every loaded package at runtime on the global `Package` object
 // (e.g. `Package.meteor.Meteor`, `Package.mongo.Mongo`). @types/meteor already
 // declares a global `namespace Package` for the build-time package API, so the
