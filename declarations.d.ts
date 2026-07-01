@@ -553,6 +553,7 @@ interface AccountsTemplatesStatic {
   // Reactive form/login state; `form.keys` holds the current field values and is
   // wrapped in a Proxy by layouts to react to state changes.
   state: { form: { keys: { [key: string]: any } }; [key: string]: any };
+  logout(): void;
 }
 
 // Modal manager (client), implemented in client/lib/modal.ts and used by

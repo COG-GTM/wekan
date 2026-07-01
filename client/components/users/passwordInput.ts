@@ -1,8 +1,10 @@
 import { TAPi18n } from '/imports/i18n';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 
-Template.passwordInput.onRendered(function() {
+Template.passwordInput.onRendered(function(this: Blaze.TemplateInstance) {
   const template = this;
-  const input = template.find('input.password-field');
+  const input = template.find('input.password-field') as HTMLInputElement;
   const label = template.find('label');
 
   // Set the dynamic id and name based on the field _id
@@ -28,9 +30,9 @@ Template.passwordInput.onRendered(function() {
 });
 
 Template.passwordInput.events({
-  'click .password-toggle-btn'(event, template) {
+  'click .password-toggle-btn'(event: JQuery.TriggeredEvent, template: Blaze.TemplateInstance) {
     event.preventDefault();
-    const input = template.find('input.password-field');
+    const input = template.find('input.password-field') as HTMLInputElement;
     const eyeIcon = template.find('.eye-icon');
     const eyeSlashIcon = template.find('.eye-slash-icon');
 

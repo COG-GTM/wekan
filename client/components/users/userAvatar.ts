@@ -4,9 +4,11 @@ import { avatarUpdateCounter } from '/client/components/users/avatarUpdateCounte
 import Avatars from '/models/avatars';
 import Presences from '/models/presences';
 import { Utils } from '/client/lib/utils';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 
 Template.userAvatar.helpers({
-  userData() {
+  userData(this: any) {
     const user = ReactiveCache.getUser(this.userId, {
       fields: {
         profile: 1,
@@ -16,7 +18,7 @@ Template.userAvatar.helpers({
     return user;
   },
 
-  avatarUrl() {
+  avatarUrl(this: any) {
     const user = ReactiveCache.getUser(this.userId, { fields: { profile: 1 } });
     const base = (user && user.profile && user.profile.avatarUrl) || '';
     if (!base) return '';
@@ -31,7 +33,7 @@ Template.userAvatar.helpers({
     return base;
   },
 
-  memberType() {
+  memberType(this: any) {
     const user = ReactiveCache.getUser(this.userId);
     if (!user) return '';
 
@@ -65,18 +67,18 @@ Template.userAvatar.helpers({
 });
 
 Template.userAvatarInitials.helpers({
-  initials() {
+  initials(this: any) {
     const user = ReactiveCache.getUser(this.userId);
     return user && user.getInitials();
   },
 
-  viewPortWidth() {
+  viewPortWidth(this: any) {
     const user = ReactiveCache.getUser(this.userId);
     return ((user && user.getInitials().length) || 1) * 12;
   },
 });
 
-Template.boardOrgRow.onCreated(function () {
+Template.boardOrgRow.onCreated(function (this: BoardRowInstance) {
   this.error = new ReactiveVar('');
   this.loading = new ReactiveVar(false);
   this.findOrgsOptions = new ReactiveVar({});
@@ -88,39 +90,39 @@ Template.boardOrgRow.onCreated(function () {
   });
 });
 
-Template.boardOrgRow.onRendered(function () {
+Template.boardOrgRow.onRendered(function (this: BoardRowInstance) {
   this.loading.set(false);
 });
 
 Template.boardOrgRow.helpers({
   isLoading() {
-    return Template.instance().loading.get();
+    return (Template.instance() as BoardRowInstance).loading.get();
   },
-  orgData() {
+  orgData(this: any) {
     return ReactiveCache.getOrg(this.orgId);
   },
 });
 
 Template.boardOrgRow.events({
-  'keyup input'(event, tpl) {
+  'keyup input'(event: JQuery.TriggeredEvent, tpl: BoardRowInstance) {
     tpl.error.set('');
   },
   'click .js-manage-board-removeOrg': Popup.open('removeBoardOrg'),
 });
 
 Template.boardOrgName.helpers({
-  orgName() {
+  orgName(this: any) {
     const org = ReactiveCache.getOrg(this.orgId);
     return org && org.orgDisplayName;
   },
 
-  orgViewPortWidth() {
+  orgViewPortWidth(this: any) {
     const org = ReactiveCache.getOrg(this.orgId);
     return ((org && org.orgDisplayName.length) || 1) * 12;
   },
 });
 
-Template.boardTeamRow.onCreated(function () {
+Template.boardTeamRow.onCreated(function (this: BoardRowInstance) {
   this.error = new ReactiveVar('');
   this.loading = new ReactiveVar(false);
   this.findOrgsOptions = new ReactiveVar({});
@@ -132,33 +134,33 @@ Template.boardTeamRow.onCreated(function () {
   });
 });
 
-Template.boardTeamRow.onRendered(function () {
+Template.boardTeamRow.onRendered(function (this: BoardRowInstance) {
   this.loading.set(false);
 });
 
 Template.boardTeamRow.helpers({
   isLoading() {
-    return Template.instance().loading.get();
+    return (Template.instance() as BoardRowInstance).loading.get();
   },
-  teamData() {
+  teamData(this: any) {
     return ReactiveCache.getTeam(this.teamId);
   },
 });
 
 Template.boardTeamRow.events({
-  'keyup input'(event, tpl) {
+  'keyup input'(event: JQuery.TriggeredEvent, tpl: BoardRowInstance) {
     tpl.error.set('');
   },
   'click .js-manage-board-removeTeam': Popup.open('removeBoardTeam'),
 });
 
 Template.boardTeamName.helpers({
-  teamName() {
+  teamName(this: any) {
     const team = ReactiveCache.getTeam(this.teamId);
     return team && team.teamDisplayName;
   },
 
-  teamViewPortWidth() {
+  teamViewPortWidth(this: any) {
     const team = ReactiveCache.getTeam(this.teamId);
     return ((team && team.teamDisplayName.length) || 1) * 12;
   },
@@ -166,7 +168,7 @@ Template.boardTeamName.helpers({
 
 // #5850: row showing a single board email-domain share, with a remove affordance.
 Template.boardDomainRow.helpers({
-  domainViewPortWidth() {
+  domainViewPortWidth(this: any) {
     return ((this.domain && this.domain.length) || 1) * 12;
   },
 });
@@ -177,14 +179,15 @@ Template.boardDomainRow.events({
   'click .js-manage-board-removeDomain': Popup.open('removeBoardDomain'),
 });
 
-Template.changeAvatarPopup.onCreated(function () {
+Template.changeAvatarPopup.onCreated(function (this: ChangeAvatarPopupInstance) {
   this.error = new ReactiveVar('');
   this.avatarUpdateCounter = new ReactiveVar(0);  // Trigger to force helper re-evaluation
   // Whether an admin has blocked avatar uploads (Admin Panel > Attachments >
   // Transfer limits). Default false (avatars enabled); when true the upload
   // option is hidden and the upload is also rejected server-side.
   this.avatarUploadBlocked = new ReactiveVar(false);
-  Meteor.call('isAvatarUploadBlocked', (err, blocked) => {
+  // err/blocked: any — untyped Meteor method callback (Meteor.Error / method return).
+  Meteor.call('isAvatarUploadBlocked', (err: any, blocked: any) => {
     if (!err) this.avatarUploadBlocked.set(blocked === true);
   });
   Meteor.subscribe('my-avatars');
@@ -192,42 +195,43 @@ Template.changeAvatarPopup.onCreated(function () {
 
 Template.changeAvatarPopup.helpers({
   error() {
-    return Template.instance().error;
+    return (Template.instance() as ChangeAvatarPopupInstance).error;
   },
   avatarUploadBlocked() {
-    return Template.instance().avatarUploadBlocked.get();
+    return (Template.instance() as ChangeAvatarPopupInstance).avatarUploadBlocked.get();
   },
   uploadedAvatars() {
-    Template.instance().avatarUpdateCounter.get();  // Create dependency on update counter
+    (Template.instance() as ChangeAvatarPopupInstance).avatarUpdateCounter.get();  // Create dependency on update counter
     const ret = ReactiveCache.getAvatars({ userId: Meteor.userId() }, {}, true);
     return ret;
   },
-  avatarLink() {
+  avatarLink(this: any) {
     if (this && typeof this.link === 'function') {
       return this.link();
     }
     return '';
   },
-  isSelected() {
-    Template.instance().avatarUpdateCounter.get();  // Create dependency on update counter
+  isSelected(this: any) {
+    (Template.instance() as ChangeAvatarPopupInstance).avatarUpdateCounter.get();  // Create dependency on update counter
     const userProfile = ReactiveCache.getCurrentUser().profile;
     const avatarUrl = userProfile && userProfile.avatarUrl;
     const currentAvatarUrl = this.link && typeof this.link === 'function' ? this.link() : '';
     // Normalize URLs by removing query parameters for comparison
     // (they may be added for boardId but shouldn't affect selection comparison)
-    const normalizeUrl = (url) => url ? url.split('?')[0] : '';
+    const normalizeUrl = (url: string) => url ? url.split('?')[0] : '';
     return normalizeUrl(avatarUrl) === normalizeUrl(currentAvatarUrl);
   },
   noAvatarUrl() {
-    Template.instance().avatarUpdateCounter.get();  // Create dependency on update counter
+    (Template.instance() as ChangeAvatarPopupInstance).avatarUpdateCounter.get();  // Create dependency on update counter
     const userProfile = ReactiveCache.getCurrentUser().profile;
     const avatarUrl = userProfile && userProfile.avatarUrl;
     return !avatarUrl;
   },
 });
 
-function changeAvatarSetAvatar(tpl, avatarUrl) {
-  Meteor.call('setAvatarUrl', avatarUrl, (err) => {
+function changeAvatarSetAvatar(tpl: ChangeAvatarPopupInstance, avatarUrl: string) {
+  // err: any — untyped Meteor.call rejection (Meteor.Error).
+  Meteor.call('setAvatarUrl', avatarUrl, (err: any) => {
     if (err) {
       tpl.error.set(err.reason || 'Error setting avatar');
     } else {
@@ -243,22 +247,24 @@ function changeAvatarSetAvatar(tpl, avatarUrl) {
 }
 
 Template.changeAvatarPopup.events({
-  'click .js-upload-avatar'(event, tpl) {
+  'click .js-upload-avatar'(event: JQuery.TriggeredEvent, tpl: ChangeAvatarPopupInstance) {
     tpl.$('.js-upload-avatar-input').click();
   },
-  async 'change .js-upload-avatar-input'(event, tpl) {
-    if (event.currentTarget.files && event.currentTarget.files[0]) {
+  async 'change .js-upload-avatar-input'(event: JQuery.TriggeredEvent, tpl: ChangeAvatarPopupInstance) {
+    const inputEl = event.currentTarget as HTMLInputElement;
+    if (inputEl.files && inputEl.files[0]) {
       const uploader = await Avatars.insertAsync(
         {
-          file: event.currentTarget.files[0],
+          file: inputEl.files[0],
           chunkSize: 'dynamic',
         },
         false,
       );
-      uploader.on('error', (error, fileData) => {
+      // error/fileData/fileRef: any — ostrio:files uploader event payloads are untyped.
+      uploader.on('error', (error: any, fileData: any) => {
         tpl.error.set(error.reason);
       });
-      uploader.on('uploaded', (error, fileRef) => {
+      uploader.on('uploaded', (error: any, fileRef: any) => {
         if (!error) {
           // Trigger a re-evaluation of helpers to show new uploaded avatar
           const counter = tpl.avatarUpdateCounter.get();
@@ -272,7 +278,7 @@ Template.changeAvatarPopup.events({
       uploader.start();
     }
   },
-  'click .js-select-avatar'(event, tpl) {
+  'click .js-select-avatar'(this: any, event: JQuery.TriggeredEvent, tpl: ChangeAvatarPopupInstance) {
     event.preventDefault();
     event.stopPropagation();
     if (this && typeof this.link === 'function') {
@@ -280,12 +286,12 @@ Template.changeAvatarPopup.events({
       changeAvatarSetAvatar(tpl, avatarUrl);
     }
   },
-  'click .js-select-initials'(event, tpl) {
+  'click .js-select-initials'(event: JQuery.TriggeredEvent, tpl: ChangeAvatarPopupInstance) {
     event.preventDefault();
     event.stopPropagation();
     changeAvatarSetAvatar(tpl, '');
   },
-  'click .js-delete-avatar': Popup.afterConfirm('deleteAvatar', async function() {
+  'click .js-delete-avatar': Popup.afterConfirm('deleteAvatar', async function(this: any) {
     // Inside the each loop, 'this' is the avatar object
     const avatarId = this._id;
     if (avatarId) {
@@ -296,20 +302,20 @@ Template.changeAvatarPopup.events({
 });
 
 Template.cardMemberPopup.helpers({
-  user() {
+  user(this: any) {
     return ReactiveCache.getUser(this.userId);
   },
 });
 
 Template.cardMemberPopup.events({
-  'click .js-remove-member'() {
+  'click .js-remove-member'(this: any) {
     ReactiveCache.getCard(this.cardId).unassignMember(this.userId);
     Popup.back();
   },
   'click .js-edit-profile': Popup.open('editProfile'),
 });
 
-Template.adminChangeAvatarPopup.onCreated(function () {
+Template.adminChangeAvatarPopup.onCreated(function (this: AdminChangeAvatarPopupInstance) {
   this.error = new ReactiveVar('');
   this.avatarUpdateCounter = new ReactiveVar(0);
   const userId = this.data._id || (this.data.user && this.data.user._id);
@@ -321,39 +327,39 @@ Template.adminChangeAvatarPopup.onCreated(function () {
 
 Template.adminChangeAvatarPopup.helpers({
   error() {
-    return Template.instance().error;
+    return (Template.instance() as AdminChangeAvatarPopupInstance).error;
   },
-  userId() {
-    const instance = Template.instance();
+  userId(this: any) {
+    const instance = Template.instance() as AdminChangeAvatarPopupInstance;
     return instance.targetUserId || (this._id || (this.user && this.user._id));
   },
-  userData() {
+  userData(this: any) {
     return this.user || this;
   },
-  uploadedAvatars() {
-    Template.instance().avatarUpdateCounter.get();
-    const instance = Template.instance();
+  uploadedAvatars(this: any) {
+    (Template.instance() as AdminChangeAvatarPopupInstance).avatarUpdateCounter.get();
+    const instance = Template.instance() as AdminChangeAvatarPopupInstance;
     const userId = instance.targetUserId || (this._id || (this.user && this.user._id));
     if (!userId) return [];
     const ret = ReactiveCache.getAvatars({ userId: userId }, {}, true);
     return ret;
   },
-  avatarLink() {
+  avatarLink(this: any) {
     if (this && typeof this.link === 'function') {
       return this.link();
     }
     return '';
   },
   currentEditingUser() {
-    Template.instance().avatarUpdateCounter.get();
-    const instance = Template.instance();
+    (Template.instance() as AdminChangeAvatarPopupInstance).avatarUpdateCounter.get();
+    const instance = Template.instance() as AdminChangeAvatarPopupInstance;
     const userId = instance.targetUserId;
     if (!userId) return null;
     return ReactiveCache.getUser(userId);
   },
-  isSelected() {
-    Template.instance().avatarUpdateCounter.get();
-    const instance = Template.instance();
+  isSelected(this: any) {
+    (Template.instance() as AdminChangeAvatarPopupInstance).avatarUpdateCounter.get();
+    const instance = Template.instance() as AdminChangeAvatarPopupInstance;
     const userId = instance.targetUserId;
     if (!userId) return false;
     const user = ReactiveCache.getUser(userId);
@@ -361,12 +367,12 @@ Template.adminChangeAvatarPopup.helpers({
     const userProfile = user.profile;
     const avatarUrl = userProfile && userProfile.avatarUrl;
     const currentAvatarUrl = this.link && typeof this.link === 'function' ? this.link() : '';
-    const normalizeUrl = (url) => url ? url.split('?')[0] : '';
+    const normalizeUrl = (url: string) => url ? url.split('?')[0] : '';
     return normalizeUrl(avatarUrl) === normalizeUrl(currentAvatarUrl);
   },
   noAvatarUrl() {
-    Template.instance().avatarUpdateCounter.get();
-    const instance = Template.instance();
+    (Template.instance() as AdminChangeAvatarPopupInstance).avatarUpdateCounter.get();
+    const instance = Template.instance() as AdminChangeAvatarPopupInstance;
     const userId = instance.targetUserId;
     if (!userId) return true;
     const user = ReactiveCache.getUser(userId);
@@ -377,13 +383,14 @@ Template.adminChangeAvatarPopup.helpers({
   },
 });
 
-function adminChangeAvatarSetAvatar(tpl, avatarUrl) {
+function adminChangeAvatarSetAvatar(tpl: AdminChangeAvatarPopupInstance, avatarUrl: string) {
   const userId = tpl.targetUserId || (Template.currentData()._id || (Template.currentData().user && Template.currentData().user._id));
   if (!userId) {
     console.error('Cannot set avatar: no userId found');
     return;
   }
-  Meteor.call('adminSetAvatarUrl', userId, avatarUrl, (err) => {
+  // err: any — untyped Meteor.call rejection (Meteor.Error).
+  Meteor.call('adminSetAvatarUrl', userId, avatarUrl, (err: any) => {
     if (err) {
       tpl.error.set(err.reason || 'Error setting avatar');
     } else {
@@ -397,15 +404,16 @@ function adminChangeAvatarSetAvatar(tpl, avatarUrl) {
 }
 
 Template.adminChangeAvatarPopup.events({
-  'click .js-upload-avatar'(event, tpl) {
+  'click .js-upload-avatar'(event: JQuery.TriggeredEvent, tpl: AdminChangeAvatarPopupInstance) {
     tpl.$('.js-upload-avatar-input').click();
   },
-  async 'change .js-upload-avatar-input'(event, tpl) {
-    if (event.currentTarget.files && event.currentTarget.files[0]) {
+  async 'change .js-upload-avatar-input'(this: any, event: JQuery.TriggeredEvent, tpl: AdminChangeAvatarPopupInstance) {
+    const inputEl = event.currentTarget as HTMLInputElement;
+    if (inputEl.files && inputEl.files[0]) {
       const userId = tpl.targetUserId || (this._id || (this.user && this.user._id));
       const uploader = await Avatars.insertAsync(
         {
-          file: event.currentTarget.files[0],
+          file: inputEl.files[0],
           chunkSize: 'dynamic',
           meta: {
             adminUploadForUserId: userId,
@@ -413,10 +421,11 @@ Template.adminChangeAvatarPopup.events({
         },
         false,
       );
-      uploader.on('error', (error, fileData) => {
+      // error/fileData/fileRef: any — ostrio:files uploader event payloads are untyped.
+      uploader.on('error', (error: any, fileData: any) => {
         tpl.error.set(error.reason);
       });
-      uploader.on('uploaded', (error, fileRef) => {
+      uploader.on('uploaded', (error: any, fileRef: any) => {
         if (!error) {
           const counter = tpl.avatarUpdateCounter.get();
           tpl.avatarUpdateCounter.set(counter + 1);
@@ -429,7 +438,7 @@ Template.adminChangeAvatarPopup.events({
       uploader.start();
     }
   },
-  'click .js-select-avatar'(event, tpl) {
+  'click .js-select-avatar'(this: any, event: JQuery.TriggeredEvent, tpl: AdminChangeAvatarPopupInstance) {
     event.preventDefault();
     event.stopPropagation();
     if (this && typeof this.link === 'function') {
@@ -437,12 +446,12 @@ Template.adminChangeAvatarPopup.events({
       adminChangeAvatarSetAvatar(tpl, avatarUrl);
     }
   },
-  'click .js-select-initials'(event, tpl) {
+  'click .js-select-initials'(event: JQuery.TriggeredEvent, tpl: AdminChangeAvatarPopupInstance) {
     event.preventDefault();
     event.stopPropagation();
     adminChangeAvatarSetAvatar(tpl, '');
   },
-  'click .js-delete-avatar': Popup.afterConfirm('deleteAvatar', async function() {
+  'click .js-delete-avatar': Popup.afterConfirm('deleteAvatar', async function(this: any) {
     // Inside the each loop, 'this' is the avatar object
     const avatarId = this._id;
     if (avatarId) {
@@ -451,3 +460,25 @@ Template.adminChangeAvatarPopup.events({
     Popup.back();
   }),
 });
+
+// findOrgsOptions holds a dynamic Mongo selector; targetUserId is a resolved
+// user id (string|undefined) — both `any` because their shapes come from the
+// data context / subscriptions rather than a local type.
+interface BoardRowInstance extends Blaze.TemplateInstance {
+  error: ReactiveVar<string>;
+  loading: ReactiveVar<boolean>;
+  findOrgsOptions: ReactiveVar<any>;
+  page: ReactiveVar<number>;
+}
+
+interface ChangeAvatarPopupInstance extends Blaze.TemplateInstance {
+  error: ReactiveVar<string>;
+  avatarUpdateCounter: ReactiveVar<number>;
+  avatarUploadBlocked: ReactiveVar<boolean>;
+}
+
+interface AdminChangeAvatarPopupInstance extends Blaze.TemplateInstance {
+  error: ReactiveVar<string>;
+  avatarUpdateCounter: ReactiveVar<number>;
+  targetUserId: any;
+}

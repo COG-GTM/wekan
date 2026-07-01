@@ -4,6 +4,8 @@ import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
 import AccountSettings from '/models/accountSettings';
 import Users from '/models/users';
 import { Utils } from '/client/lib/utils';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 
 Template.headerUserBar.events({
   'click .js-open-header-member-menu': Popup.open('memberMenu'),
@@ -51,7 +53,7 @@ Template.memberMenuPopup.helpers({
 });
 
 Template.memberMenuPopup.events({
-  'click .js-open-bookmarks'(e) {
+  'click .js-open-bookmarks'(e: JQuery.TriggeredEvent) {
     e.preventDefault();
     if (Utils.isMiniScreen()) {
       FlowRouter.go('bookmarks');
@@ -79,16 +81,17 @@ Template.memberMenuPopup.events({
   'click .js-notifications-drawer-toggle'() {
     Session.set('showNotificationsDrawer', !Session.get('showNotificationsDrawer'));
   },
-  'click .js-toggle-grey-icons'(event) {
+  'click .js-toggle-grey-icons'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const currentUser = ReactiveCache.getCurrentUser();
     if (!currentUser || !Meteor.userId()) return;
     const current = (currentUser.profile && currentUser.profile.GreyIcons) || false;
-    Meteor.call('toggleGreyIcons', (err) => {
+    // err: any — untyped Meteor.call rejection (Meteor.Error).
+    Meteor.call('toggleGreyIcons', (err: any) => {
       if (err && process.env.DEBUG === 'true') console.error('toggleGreyIcons error', err);
     });
   },
-  'click .js-logout'(event) {
+  'click .js-logout'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
 
     AccountsTemplates.logout();
@@ -99,7 +102,7 @@ Template.memberMenuPopup.events({
 });
 
 Template.invitePeoplePopup.events({
-  'click a.js-toggle-board-choose'(event){
+  'click a.js-toggle-board-choose'(event: JQuery.TriggeredEvent){
     let target = $(event.target);
     if (!target.hasClass('js-toggle-board-choose')) {
       target = target.parent();
@@ -108,26 +111,28 @@ Template.invitePeoplePopup.events({
     $(`#${checkboxId} .materialCheckBox`).toggleClass('is-checked');
     $(`#${checkboxId}`).toggleClass('is-checked');
   },
-  'click button.js-email-invite'(event){
-    const emails = $('#email-to-invite')
-      .val()
+  'click button.js-email-invite'(event: JQuery.TriggeredEvent){
+    const emails = ($('#email-to-invite')
+      .val() as string)
       .toLowerCase()
       .trim()
       .split('\n')
       .join(',')
       .split(',');
-    const boardsToInvite = [];
+    // boardsToInvite: any[] — jQuery .data('id') values are untyped.
+    const boardsToInvite: any[] = [];
     $('.js-toggle-board-choose .materialCheckBox.is-checked').each(function() {
       boardsToInvite.push($(this).data('id'));
     });
-    const validEmails = [];
+    const validEmails: string[] = [];
     emails.forEach(email => {
       if (email && /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(email.trim())) {
         validEmails.push(email.trim());
       }
     });
     if (validEmails.length) {
-      Meteor.call('sendInvitation', validEmails, boardsToInvite, (_, rc) => {
+      // _/rc: any — untyped Meteor method callback (Meteor.Error / return code).
+      Meteor.call('sendInvitation', validEmails, boardsToInvite, (_: any, rc: any) => {
         if (rc == 0) {
           let divInfos = document.getElementById("invite-people-infos");
           if(divInfos && divInfos !== undefined){
@@ -146,7 +151,7 @@ Template.invitePeoplePopup.events({
   },
 });
 
-Template.editProfilePopup.onCreated(function() {
+Template.editProfilePopup.onCreated(function(this: Blaze.TemplateInstance) {
   Meteor.subscribe('setting');
   this.subscribe('accountSettings');
 });
@@ -167,15 +172,15 @@ Template.editProfilePopup.helpers({
 });
 
 Template.editProfilePopup.events({
-  submit(event, templateInstance) {
+  submit(event: JQuery.TriggeredEvent, templateInstance: Blaze.TemplateInstance) {
     event.preventDefault();
-    const fullname = templateInstance.find('.js-profile-fullname').value.trim();
-    const username = templateInstance.find('.js-profile-username').value.trim();
-    const initials = templateInstance.find('.js-profile-initials').value.trim();
-    const email = templateInstance.find('.js-profile-email').value.trim();
+    const fullname = (templateInstance.find('.js-profile-fullname') as HTMLInputElement).value.trim();
+    const username = (templateInstance.find('.js-profile-username') as HTMLInputElement).value.trim();
+    const initials = (templateInstance.find('.js-profile-initials') as HTMLInputElement).value.trim();
+    const email = (templateInstance.find('.js-profile-email') as HTMLInputElement).value.trim();
     let isChangeUserName = false;
     let isChangeEmail = false;
-    Users.update(Meteor.userId(), {
+    Users.update(Meteor.userId()!, {
       $set: {
         'profile.fullname': fullname,
         'profile.initials': initials,
@@ -190,7 +195,8 @@ Template.editProfilePopup.events({
         username,
         email.toLowerCase(),
         Meteor.userId(),
-        function(error) {
+        // error: any — untyped Meteor.call rejection (Meteor.Error).
+        function(error: any) {
           const usernameMessageElement = templateInstance.$('.username-taken');
           const emailMessageElement = templateInstance.$('.email-taken');
           if (error) {
@@ -210,7 +216,8 @@ Template.editProfilePopup.events({
         },
       );
     } else if (isChangeUserName) {
-      Meteor.call('setUsername', username, Meteor.userId(), function(error) {
+      // error: any — untyped Meteor.call rejection (Meteor.Error).
+      Meteor.call('setUsername', username, Meteor.userId(), function(error: any) {
         const messageElement = templateInstance.$('.username-taken');
         if (error) {
           messageElement.show();
@@ -220,8 +227,9 @@ Template.editProfilePopup.events({
         }
       });
     } else if (isChangeEmail) {
+      // error: any — untyped Meteor.call rejection (Meteor.Error).
       Meteor.call('setEmail', email.toLowerCase(), Meteor.userId(), function(
-        error,
+        error: any,
       ) {
         const messageElement = templateInstance.$('.email-taken');
         if (error) {
@@ -237,7 +245,8 @@ Template.editProfilePopup.events({
     Popup.back();
 
     // Use secure server method for self-deletion
-    Meteor.call('removeUser', Meteor.userId(), (error, result) => {
+    // error/result: any — untyped Meteor method callback (Meteor.Error / return).
+    Meteor.call('removeUser', Meteor.userId(), (error: any, result: any) => {
       if (error) {
         if (process.env.DEBUG === 'true') {
           console.error('Error removing user:', error);
@@ -255,7 +264,7 @@ Template.editProfilePopup.events({
 
 // XXX For some reason the useraccounts autofocus isnt working in this case.
 // See https://github.com/meteor-useraccounts/core/issues/384
-Template.changePasswordPopup.onRendered(function() {
+Template.changePasswordPopup.onRendered(function(this: Blaze.TemplateInstance) {
   $('.at-pwd-form').show();
   this.find('#at-field-current_password').focus();
 });
@@ -273,12 +282,12 @@ Template.changeLanguagePopup.helpers({
       });
   },
 
-  isCurrentLanguage() {
+  isCurrentLanguage(this: any) {
     return this.tag === TAPi18n.getLanguage();
   },
 
-  languageFlag() {
-    const flagMap = {
+  languageFlag(this: any) {
+    const flagMap: Record<string, string> = {
       'en': '🇺🇸', 'es': '🇪🇸', 'fr': '🇫🇷', 'de': '🇩🇪', 'it': '🇮🇹', 'pt': '🇵🇹', 'ru': '🇷🇺',
       'ja': '🇯🇵', 'ko': '🇰🇷', 'zh': '🇨🇳', 'ar': '🇸🇦', 'hi': '🇮🇳', 'th': '🇹🇭', 'vi': '🇻🇳',
       'tr': '🇹🇷', 'pl': '🇵🇱', 'nl': '🇳🇱', 'sv': '🇸🇪', 'da': '🇩🇰', 'no': '🇳🇴', 'fi': '🇫🇮',
@@ -303,15 +312,15 @@ Template.changeLanguagePopup.helpers({
 });
 
 Template.changeLanguagePopup.events({
-  'click .js-set-language'(event) {
-    Users.update(Meteor.userId(), {
+  'click .js-set-language'(this: any, event: JQuery.TriggeredEvent) {
+    Users.update(Meteor.userId()!, {
       $set: {
         'profile.language': this.tag,
       },
     });
     // setLanguage is async; surface a failed load instead of silently leaving
     // the UI in English (#5756).
-    Promise.resolve(TAPi18n.setLanguage(this.tag)).catch(error => {
+    Promise.resolve(TAPi18n.setLanguage(this.tag)).catch((error: any) => {
       // eslint-disable-next-line no-console
       console.error(`Failed to switch language to ${this.tag}:`, error);
     });
@@ -338,7 +347,7 @@ Template.changeSettingsPopup.helpers({
       return window.localStorage.getItem('limitToShowCardsCount');
     }
   },
-  weekDays(startDay) {
+  weekDays(startDay: number) {
     return [
       TAPi18n.__('sunday'),
       TAPi18n.__('monday'),
@@ -362,9 +371,9 @@ Template.changeSettingsPopup.helpers({
 });
 
 Template.changeSettingsPopup.events({
-  'keypress/paste #show-cards-count-at'() {
+  'keypress/paste #show-cards-count-at'(event: JQuery.TriggeredEvent) {
     let keyCode = event.keyCode;
-    let charCode = String.fromCharCode(keyCode);
+    let charCode = String.fromCharCode(keyCode!);
     let regex = new RegExp('[-0-9]');
     let ret = regex.test(charCode);
     return ret;
@@ -382,14 +391,14 @@ Template.changeSettingsPopup.events({
   'click .js-rescue-card-description'() {
     Meteor.call('toggleRescueCardDescription')
     },
-  'click .js-apply-user-settings'(event, templateInstance) {
+  'click .js-apply-user-settings'(event: JQuery.TriggeredEvent, templateInstance: Blaze.TemplateInstance) {
     event.preventDefault();
     let minLimit = parseInt(
-      templateInstance.$('#show-cards-count-at').val(),
+      templateInstance.$('#show-cards-count-at').val() as string,
       10,
     );
     const startDay = parseInt(
-      templateInstance.$('#start-day-of-week').val(),
+      templateInstance.$('#start-day-of-week').val() as string,
       10,
     );
     const currentUser = ReactiveCache.getCurrentUser();
@@ -400,14 +409,14 @@ Template.changeSettingsPopup.events({
       if (currentUser) {
         Meteor.call('changeLimitToShowCardsCount', minLimit);
       } else {
-        window.localStorage.setItem('limitToShowCardsCount', minLimit);
+        window.localStorage.setItem('limitToShowCardsCount', String(minLimit));
       }
     }
     if (!isNaN(startDay)) {
       if (currentUser) {
         Meteor.call('changeStartDayOfWeek', startDay);
       } else {
-        window.localStorage.setItem('startDayOfWeek', startDay);
+        window.localStorage.setItem('startDayOfWeek', String(startDay));
       }
     }
     Popup.back();
