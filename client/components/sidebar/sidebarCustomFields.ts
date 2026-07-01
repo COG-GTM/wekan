@@ -1,6 +1,9 @@
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
 import CustomFields from '/models/customFields';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 
 Template.customFieldsSidebar.helpers({
   customFields() {
@@ -39,7 +42,7 @@ const CURRENCY_LIST = [
   { name: 'New Zealand Dollar', code: 'NZD' },
 ];
 
-function getDropdownItems(tpl) {
+function getDropdownItems(tpl: CreateCustomFieldInstance) {
   const items = tpl.dropdownItems.get();
   Array.from(tpl.findAll('.js-field-settings-dropdown input')).forEach(
     (el, index) => {
@@ -47,14 +50,15 @@ function getDropdownItems(tpl) {
         items[index] = {
           _id: Random.id(6),
         };
-      items[index].name = el.value.trim();
+      items[index].name = (el as HTMLInputElement).value.trim();
     },
   );
   return items;
 }
 
-function getSettings(tpl) {
-  const settings = {};
+function getSettings(tpl: CreateCustomFieldInstance) {
+  // settings: the custom-field settings sub-document being assembled.
+  const settings: Record<string, any> = {};
   switch (tpl.type.get()) {
     case 'currency': {
       const currencyCode = tpl.currencyCode.get();
@@ -63,7 +67,7 @@ function getSettings(tpl) {
     }
     case 'dropdown': {
       const dropdownItems = getDropdownItems(tpl).filter(
-        item => !!item.name.trim(),
+        (item: any) => !!item.name.trim(),
       );
       settings.dropdownItems = dropdownItems;
       break;
@@ -80,7 +84,7 @@ function getSettings(tpl) {
   return settings;
 }
 
-Template.createCustomFieldPopup.onCreated(function () {
+Template.createCustomFieldPopup.onCreated(function (this: CreateCustomFieldInstance) {
   const data = Template.currentData();
   this.type = new ReactiveVar(
     data.type ? data.type : CUSTOM_FIELD_TYPES[0],
@@ -123,12 +127,12 @@ Template.createCustomFieldPopup.helpers({
     });
   },
 
-  isTypeNotSelected(type) {
-    return Template.instance().type.get() !== type;
+  isTypeNotSelected(type: any) {
+    return (Template.instance() as CreateCustomFieldInstance).type.get() !== type;
   },
 
   getCurrencyCodes() {
-    const currentCode = Template.instance().currencyCode.get();
+    const currentCode = (Template.instance() as CreateCustomFieldInstance).currencyCode.get();
 
     return CURRENCY_LIST.map(({ name, code }) => {
       return {
@@ -145,47 +149,48 @@ Template.createCustomFieldPopup.helpers({
   // nothing (so dropdown options never appeared and were lost on save). Expose
   // the ReactiveVar as a helper again so `dropdownItems.get` works.
   dropdownItems() {
-    return Template.instance().dropdownItems;
+    return (Template.instance() as CreateCustomFieldInstance).dropdownItems;
   },
 
   getDropdownItems() {
-    return getDropdownItems(Template.instance());
+    return getDropdownItems(Template.instance() as CreateCustomFieldInstance);
   },
 
   getStringtemplateFormat() {
-    return Template.instance().stringtemplateFormat.get();
+    return (Template.instance() as CreateCustomFieldInstance).stringtemplateFormat.get();
   },
 
   getStringtemplateSeparator() {
-    return Template.instance().stringtemplateSeparator.get();
+    return (Template.instance() as CreateCustomFieldInstance).stringtemplateSeparator.get();
   },
 });
 
 Template.createCustomFieldPopup.events({
-  'change .js-field-type'(evt, tpl) {
-    const value = evt.target.value;
+  'change .js-field-type'(evt: JQuery.TriggeredEvent, tpl: CreateCustomFieldInstance) {
+    const value = (evt.target as HTMLInputElement).value;
     tpl.type.set(value);
   },
-  'change .js-field-currency'(evt, tpl) {
-    const value = evt.target.value;
+  'change .js-field-currency'(evt: JQuery.TriggeredEvent, tpl: CreateCustomFieldInstance) {
+    const value = (evt.target as HTMLInputElement).value;
     tpl.currencyCode.set(value);
   },
-  'keydown .js-dropdown-item.last'(evt, tpl) {
-    if (evt.target.value.trim() && evt.keyCode === 13) {
+  'keydown .js-dropdown-item.last'(evt: JQuery.TriggeredEvent, tpl: CreateCustomFieldInstance) {
+    const target = evt.target as HTMLInputElement;
+    if (target.value.trim() && evt.keyCode === 13) {
       const items = getDropdownItems(tpl);
       tpl.dropdownItems.set(items);
-      evt.target.value = '';
+      target.value = '';
     }
   },
-  'input .js-field-stringtemplate-format'(evt, tpl) {
-    const value = evt.target.value;
+  'input .js-field-stringtemplate-format'(evt: JQuery.TriggeredEvent, tpl: CreateCustomFieldInstance) {
+    const value = (evt.target as HTMLInputElement).value;
     tpl.stringtemplateFormat.set(value);
   },
-  'input .js-field-stringtemplate-separator'(evt, tpl) {
-    const value = evt.target.value;
+  'input .js-field-stringtemplate-separator'(evt: JQuery.TriggeredEvent, tpl: CreateCustomFieldInstance) {
+    const value = (evt.target as HTMLInputElement).value;
     tpl.stringtemplateSeparator.set(value);
   },
-  'click .js-field-show-on-card'(evt) {
+  'click .js-field-show-on-card'(evt: JQuery.TriggeredEvent) {
     let $target = $(evt.target);
     if (!$target.hasClass('js-field-show-on-card')) {
       $target = $target.parent();
@@ -193,7 +198,7 @@ Template.createCustomFieldPopup.events({
     $target.find('.materialCheckBox').toggleClass('is-checked');
     $target.toggleClass('is-checked');
   },
-  'click .js-field-automatically-on-card'(evt) {
+  'click .js-field-automatically-on-card'(evt: JQuery.TriggeredEvent) {
     let $target = $(evt.target);
     if (!$target.hasClass('js-field-automatically-on-card')) {
       $target = $target.parent();
@@ -201,7 +206,7 @@ Template.createCustomFieldPopup.events({
     $target.find('.materialCheckBox').toggleClass('is-checked');
     $target.toggleClass('is-checked');
   },
-  'click .js-field-always-on-card'(evt) {
+  'click .js-field-always-on-card'(evt: JQuery.TriggeredEvent) {
     let $target = $(evt.target);
     if (!$target.hasClass('js-field-always-on-card')) {
       $target = $target.parent();
@@ -209,7 +214,7 @@ Template.createCustomFieldPopup.events({
     $target.find('.materialCheckBox').toggleClass('is-checked');
     $target.toggleClass('is-checked');
   },
-  'click .js-field-showLabel-on-card'(evt) {
+  'click .js-field-showLabel-on-card'(evt: JQuery.TriggeredEvent) {
     let $target = $(evt.target);
     if (!$target.hasClass('js-field-showLabel-on-card')) {
       $target = $target.parent();
@@ -217,7 +222,7 @@ Template.createCustomFieldPopup.events({
     $target.find('.materialCheckBox').toggleClass('is-checked');
     $target.toggleClass('is-checked');
   },
-  'click .js-field-show-sum-at-top-of-list'(evt) {
+  'click .js-field-show-sum-at-top-of-list'(evt: JQuery.TriggeredEvent) {
     let $target = $(evt.target);
     if (!$target.hasClass('js-field-show-sum-at-top-of-list')) {
       $target = $target.parent();
@@ -225,11 +230,12 @@ Template.createCustomFieldPopup.events({
     $target.find('.materialCheckBox').toggleClass('is-checked');
     $target.toggleClass('is-checked');
   },
-  'click .primary'(evt, tpl) {
+  'click .primary'(evt: JQuery.TriggeredEvent, tpl: CreateCustomFieldInstance) {
     evt.preventDefault();
 
-    const data = {
-      name: tpl.find('.js-field-name').value.trim(),
+    // data: any — the custom field document being built/updated below.
+    const data: any = {
+      name: (tpl.find('.js-field-name') as HTMLInputElement).value.trim(),
       type: tpl.type.get(),
       settings: getSettings(tpl),
       showOnCard: tpl.find('.js-field-show-on-card.is-checked') !== null,
@@ -256,7 +262,7 @@ Template.createCustomFieldPopup.events({
   },
   'click .js-delete-custom-field': Popup.afterConfirm(
     'deleteCustomField',
-    function() {
+    function(this: any) {
       const customField = ReactiveCache.getCustomField(this._id);
       if (customField.boardIds.length > 1) {
         CustomFields.update(customField._id, {
@@ -279,3 +285,12 @@ Template.createCustomFieldPopup.events({
     Popup.back();
   }
 });*/
+
+// The `createCustomFieldPopup` template instance and its field-config state.
+interface CreateCustomFieldInstance extends Blaze.TemplateInstance {
+  type: ReactiveVar<string>;
+  currencyCode: ReactiveVar<string>;
+  dropdownItems: ReactiveVar<any[]>;
+  stringtemplateFormat: ReactiveVar<string>;
+  stringtemplateSeparator: ReactiveVar<string>;
+}

@@ -4,16 +4,21 @@ import Lists from '/models/lists';
 import Swimlanes from '/models/swimlanes';
 import Cards from '/models/cards';
 import { Utils } from '/client/lib/utils';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
+import { Tracker } from 'meteor/tracker';
 
 const ARCHIVE_PAGE_SIZE = 30;
 const ARCHIVE_SCROLL_THRESHOLD_PX = 120;
 
 
-function throttle(func, wait) {
-  let timeoutId = null;
+// func: any — the throttled callback; timeoutId: any — a setTimeout handle.
+function throttle(func: any, wait: number) {
+  let timeoutId: any = null;
   let lastRan = 0;
 
-  return function throttled(...args) {
+  return function throttled(this: any, ...args: any[]) {
     const now = Date.now();
     const run = () => {
       lastRan = Date.now();
@@ -70,7 +75,7 @@ function getArchivedSwimlanes() {
 }
 
 
-Template.archivesSidebar.onCreated(function () {
+Template.archivesSidebar.onCreated(function (this: ArchivesSidebarInstance) {
   this.isArchiveReady = new ReactiveVar(false);
   this.activeTab = new ReactiveVar('cards');
   this.archivedCardsLimit = new ReactiveVar(ARCHIVE_PAGE_SIZE);
@@ -103,7 +108,7 @@ Template.archivesSidebar.onCreated(function () {
   });
 });
 
-Template.archivesSidebar.onRendered(function () {
+Template.archivesSidebar.onRendered(function (this: ArchivesSidebarInstance) {
   // The scrollable sidebar container is the parent element, not inside this template.
   const container = document.querySelector('.js-board-sidebar-content');
   if (!container) return;
@@ -140,7 +145,7 @@ Template.archivesSidebar.onRendered(function () {
   container.addEventListener('scroll', this.loadMoreOnScroll);
 });
 
-Template.archivesSidebar.onDestroyed(function() {
+Template.archivesSidebar.onDestroyed(function(this: ArchivesSidebarInstance) {
   if (this._scrollContainer && this.loadMoreOnScroll) {
     this._scrollContainer.removeEventListener('scroll', this.loadMoreOnScroll);
   }
@@ -148,7 +153,7 @@ Template.archivesSidebar.onDestroyed(function() {
 
 Template.archivesSidebar.helpers({
   isArchiveReady() {
-    return Template.instance().isArchiveReady;
+    return (Template.instance() as ArchivesSidebarInstance).isArchiveReady;
   },
   isBoardAdmin() {
     const user = ReactiveCache.getCurrentUser();
@@ -182,11 +187,13 @@ Template.archivesSidebar.helpers({
   },
 
   activeTab() {
-    return Template.instance().activeTab ? Template.instance().activeTab.get() : 'cards';
+    const tpl = Template.instance() as ArchivesSidebarInstance;
+    return tpl.activeTab ? tpl.activeTab.get() : 'cards';
   },
 
-  isArchiveTabActive(slug) {
-    return Template.instance().activeTab && Template.instance().activeTab.get() === slug
+  isArchiveTabActive(slug: any) {
+    const tpl = Template.instance() as ArchivesSidebarInstance;
+    return tpl.activeTab && tpl.activeTab.get() === slug
       ? 'active'
       : '';
   },
@@ -198,14 +205,15 @@ Template.archivesSidebar.helpers({
 });
 
 Template.archivesSidebar.events({
-  'click .tab-item'(e, t) {
+  // this: any — the tab data context exposes `slug`.
+  'click .tab-item'(this: any, e: JQuery.TriggeredEvent, t: ArchivesSidebarInstance) {
     const slug = e.currentTarget?.getAttribute('data-tab') || this.slug;
     if (slug) {
       t.activeTab.set(slug);
     }
   },
 
-  async 'click .js-restore-card'(evt) {
+  async 'click .js-restore-card'(this: any, evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     const data = Template.currentData() || {};
     const cardId = (this && this._id) || data._id;
@@ -238,7 +246,7 @@ Template.archivesSidebar.events({
     }
   },
 
-  'click .js-delete-card': Popup.afterConfirm('cardDelete', async function() {
+  'click .js-delete-card': Popup.afterConfirm('cardDelete', async function(this: any) {
     const cardId = this._id;
     await Cards.removeAsync(cardId);
     Popup.back();
@@ -250,7 +258,7 @@ Template.archivesSidebar.events({
     Popup.back();
   }),
 
-  async 'click .js-restore-list'(evt) {
+  async 'click .js-restore-list'(this: any, evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     const data = Template.currentData() || {};
     const listId = (this && this._id) || data._id;
@@ -285,7 +293,7 @@ Template.archivesSidebar.events({
     }
   },
 
-  'click .js-delete-list': Popup.afterConfirm('listDelete', async function() {
+  'click .js-delete-list': Popup.afterConfirm('listDelete', async function(this: any) {
     const list = Lists.findOne(this._id);
     if (list) await list.remove();
     Popup.back();
@@ -297,7 +305,7 @@ Template.archivesSidebar.events({
     Popup.back();
   }),
 
-  async 'click .js-restore-swimlane'(evt) {
+  async 'click .js-restore-swimlane'(this: any, evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     const data = Template.currentData() || {};
     const swimlaneId = (this && this._id) || data._id;
@@ -318,7 +326,7 @@ Template.archivesSidebar.events({
 
   'click .js-delete-swimlane': Popup.afterConfirm(
     'swimlaneDelete',
-    async function() {
+    async function(this: any) {
       const swimlane = Swimlanes.findOne(this._id);
       if (swimlane) await swimlane.remove();
       Popup.back();
@@ -335,7 +343,7 @@ Template.archivesSidebar.events({
   ),
 });
 
-Template.restoreArchivedCardToListPopup.onCreated(function() {
+Template.restoreArchivedCardToListPopup.onCreated(function(this: RestoreCardInstance) {
   this.selectedListId = new ReactiveVar('');
 
   this.autorun(() => {
@@ -376,17 +384,17 @@ Template.restoreArchivedCardToListPopup.helpers({
     ) || [];
   },
 
-  isSelectedList(listId) {
-    return Template.instance().selectedListId.get() === listId;
+  isSelectedList(listId: any) {
+    return (Template.instance() as RestoreCardInstance).selectedListId.get() === listId;
   },
 });
 
 Template.restoreArchivedCardToListPopup.events({
-  'change .js-select-restore-target-list'(evt, tpl) {
-    tpl.selectedListId.set(evt.currentTarget.value);
+  'change .js-select-restore-target-list'(evt: JQuery.TriggeredEvent, tpl: RestoreCardInstance) {
+    tpl.selectedListId.set((evt.currentTarget as HTMLSelectElement).value);
   },
 
-  async 'click .js-restore-card-to-list'(evt, tpl) {
+  async 'click .js-restore-card-to-list'(evt: JQuery.TriggeredEvent, tpl: RestoreCardInstance) {
     evt.preventDefault();
     const cardData = Template.currentData() || {};
     const card = Cards.findOne(cardData._id);
@@ -395,9 +403,9 @@ Template.restoreArchivedCardToListPopup.events({
       return;
     }
 
-    const listId = tpl.selectedListId.get() || evt.currentTarget
+    const listId = tpl.selectedListId.get() || ((evt.currentTarget as HTMLElement)
       .closest('.js-pop-over')
-      ?.querySelector('.js-select-restore-target-list')
+      ?.querySelector('.js-select-restore-target-list') as HTMLSelectElement | null)
       ?.value;
     if (!listId) {
       return;
@@ -425,7 +433,7 @@ Template.restoreArchivedCardToListPopup.events({
   },
 });
 
-Template.restoreArchivedListToSwimlanePopup.onCreated(function() {
+Template.restoreArchivedListToSwimlanePopup.onCreated(function(this: RestoreListInstance) {
   this.selectedSwimlaneId = new ReactiveVar('');
 
   this.autorun(() => {
@@ -466,17 +474,17 @@ Template.restoreArchivedListToSwimlanePopup.helpers({
     ) || [];
   },
 
-  isSelectedSwimlane(swimlaneId) {
-    return Template.instance().selectedSwimlaneId.get() === swimlaneId;
+  isSelectedSwimlane(swimlaneId: any) {
+    return (Template.instance() as RestoreListInstance).selectedSwimlaneId.get() === swimlaneId;
   },
 });
 
 Template.restoreArchivedListToSwimlanePopup.events({
-  'change .js-select-restore-target-swimlane'(evt, tpl) {
-    tpl.selectedSwimlaneId.set(evt.currentTarget.value);
+  'change .js-select-restore-target-swimlane'(evt: JQuery.TriggeredEvent, tpl: RestoreListInstance) {
+    tpl.selectedSwimlaneId.set((evt.currentTarget as HTMLSelectElement).value);
   },
 
-  async 'click .js-restore-list-to-swimlane'(evt, tpl) {
+  async 'click .js-restore-list-to-swimlane'(evt: JQuery.TriggeredEvent, tpl: RestoreListInstance) {
     evt.preventDefault();
     const listData = Template.currentData() || {};
     const list = Lists.findOne(listData._id);
@@ -485,9 +493,9 @@ Template.restoreArchivedListToSwimlanePopup.events({
       return;
     }
 
-    const swimlaneId = tpl.selectedSwimlaneId.get() || evt.currentTarget
+    const swimlaneId = tpl.selectedSwimlaneId.get() || ((evt.currentTarget as HTMLElement)
       .closest('.js-pop-over')
-      ?.querySelector('.js-select-restore-target-swimlane')
+      ?.querySelector('.js-select-restore-target-swimlane') as HTMLSelectElement | null)
       ?.value;
     if (!swimlaneId) {
       return;
@@ -507,4 +515,28 @@ Template.restoreArchivedListToSwimlanePopup.events({
     Popup.back();
   },
 });
+
+// The `archivesSidebar` template instance with tab/limit state and scroll wiring.
+interface ArchivesSidebarInstance extends Blaze.TemplateInstance {
+  isArchiveReady: ReactiveVar<boolean>;
+  activeTab: ReactiveVar<string>;
+  archivedCardsLimit: ReactiveVar<number>;
+  archivedListsLimit: ReactiveVar<number>;
+  archivedSwimlanesLimit: ReactiveVar<number>;
+  isLoadingMore: boolean;
+  // loadMoreOnScroll: any — a throttled scroll listener; _scrollContainer: the
+  // parent scroll element the listener is attached to.
+  loadMoreOnScroll?: any;
+  _scrollContainer?: Element;
+}
+
+// The `restoreArchivedCardToListPopup` instance (target list selection).
+interface RestoreCardInstance extends Blaze.TemplateInstance {
+  selectedListId: ReactiveVar<string>;
+}
+
+// The `restoreArchivedListToSwimlanePopup` instance (target swimlane selection).
+interface RestoreListInstance extends Blaze.TemplateInstance {
+  selectedSwimlaneId: ReactiveVar<string>;
+}
 
