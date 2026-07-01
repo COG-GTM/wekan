@@ -14,7 +14,7 @@ Triggers.before.update((userId, doc, fieldNames, modifier) => {
 });
 
 Triggers.helpers({
-  async rename(description) {
+  async rename(description: string) {
     return await Triggers.updateAsync(this._id, {
       $set: { description },
     });
@@ -36,7 +36,7 @@ Triggers.helpers({
     return ReactiveCache.getList(this.toId);
   },
 
-  findList(title) {
+  findList(title: string) {
     return ReactiveCache.getList({
       title,
     });
@@ -44,7 +44,7 @@ Triggers.helpers({
 
   labels() {
     const boardLabels = this.board().labels;
-    const cardLabels = boardLabels.filter(label => {
+    const cardLabels = boardLabels.filter((label: any) => {
       return (this.labelIds || []).includes(label._id);
     });
     return cardLabels;

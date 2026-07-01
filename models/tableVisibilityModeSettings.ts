@@ -1,6 +1,6 @@
 import { Mongo } from 'meteor/mongo';
 import { ReactiveCache } from '/imports/reactiveCache';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
 const TableVisibilityModeSettings = new Mongo.Collection('tableVisibilityModeSettings');
 
@@ -46,7 +46,7 @@ TableVisibilityModeSettings.attachSchema(
 
 TableVisibilityModeSettings.helpers({
   allowPrivateOnly() {
-    return TableVisibilityModeSettings.findOne('tableVisibilityMode-allowPrivateOnly').booleanValue;
+    return TableVisibilityModeSettings.findOne('tableVisibilityMode-allowPrivateOnly')!.booleanValue;
   },
 });
 

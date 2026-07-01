@@ -1,7 +1,7 @@
 // This collection shouldn't be manipulated directly by instead throw the
 // `UnsavedEdits` API on the client.
 import { Mongo } from 'meteor/mongo';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
 const UnsavedEditCollection = new Mongo.Collection('unsaved-edits');
 

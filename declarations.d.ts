@@ -130,6 +130,8 @@ interface SimpleSchemaStatic {
   new (schema: MongoQuery, options?: MongoQuery): object;
   extendOptions(options: string[]): void;
   _wekanExtendedOptions?: boolean;
+  // Built-in validation regexps (SimpleSchema.RegEx.Email, .Id, .Url, ...).
+  RegEx: { [name: string]: RegExp };
 }
 
 // useraccounts:core form manager, configured in config/accounts.ts.
