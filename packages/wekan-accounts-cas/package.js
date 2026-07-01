@@ -7,15 +7,15 @@ Package.describe({
 
 Package.onUse(function(api) {
   api.versionsFrom(['2.16', '3.0']);
-  api.use('ecmascript');
+  api.use('typescript');
   api.use('routepolicy', 'server');
   api.use('webapp', 'server');
   api.use('accounts-base', ['client', 'server']);
   // Export Accounts (etc) to packages using this one.
   api.imply('accounts-base', ['client', 'server']);
-  api.addFiles('cas_client.js', 'web.browser');
-  api.addFiles('cas_client_cordova.js', 'web.cordova');
-  api.addFiles('cas_server.js', 'server');
+  api.addFiles('cas_client.ts', 'web.browser');
+  api.addFiles('cas_client_cordova.ts', 'web.cordova');
+  api.addFiles('cas_server.ts', 'server');
 
 });
 

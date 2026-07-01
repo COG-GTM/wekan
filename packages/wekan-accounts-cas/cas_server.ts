@@ -3,10 +3,16 @@
 import https from 'https';
 import url from 'url';
 import xml2js from 'xml2js';
+import type { IncomingMessage, ServerResponse } from 'http';
 
 // Library
 class CAS {
-  constructor(options) {
+  private hostname: string | null;
+  private port: number;
+  private validate_path: string | null;
+  private service: string;
+
+  constructor(options: CASOptions) {
     options = options || {};
 
     if (!options.validate_url) {
@@ -31,7 +37,7 @@ class CAS {
     this.service = options.service;
   }
 
-  validate(ticket, callback) {
+  validate(ticket: string, callback: CASValidateCallback) {
     const httparams = {
       host: this.hostname,
       port: this.port,
@@ -54,7 +60,7 @@ class CAS {
         response += chunk;
       });
 
-      res.on('end', (error) => {
+      res.on('end', (error?: Error) => {
         if (error) {
           console.log('error callback');
           console.log(error);
@@ -70,7 +76,7 @@ class CAS {
                 callback({message: 'Empty response.'});
               }
               if (result['cas:serviceResponse']['cas:authenticationSuccess']) {
-                const userData = {
+                const userData: CASUserData = {
                   id: result['cas:serviceResponse']['cas:authenticationSuccess'][0]['cas:user'][0].toLowerCase(),
                 };
                 const attributes = result['cas:serviceResponse']['cas:authenticationSuccess'][0]['cas:attributes'][0];
@@ -113,22 +119,22 @@ class CAS {
 }
 ////// END OF CAS MODULE
 
-let _casCredentialTokens = {};
-let _userData = {};
+let _casCredentialTokens: Record<string, { id?: string }> = {};
+let _userData: CASUserData = {};
 
 //RoutePolicy.declare('/_cas/', 'network');
 
 // Listen to incoming OAuth http requests
-WebApp.handlers.use((req, res, next) => {
+WebApp.handlers.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
   middleware(req, res, next);
 });
 
-const middleware = (req, res, next) => {
+const middleware = (req: IncomingMessage, res: ServerResponse, next: () => void) => {
   // Make sure to catch any exceptions because otherwise we'd crash
   // the runner
-  let redirectUrl;
+  let redirectUrl: string | undefined;
   try {
-    const urlParsed = url.parse(req.url, true);
+    const urlParsed = url.parse(req.url!, true);
 
     // Getting the ticket (if it's defined in GET-params)
     // If no ticket, then request will continue down the default
@@ -138,7 +144,8 @@ const middleware = (req, res, next) => {
       next();
       return;
     }
-    const ticket = query.ticket;
+    // Query values are typed `string | string[]`; treated as `string` here.
+    const ticket = query.ticket as string;
     if (ticket == null) {
       next();
       return;
@@ -148,7 +155,8 @@ const middleware = (req, res, next) => {
     redirectUrl = serviceUrl;//.replace(/([&?])casToken=[^&]+[&]?/g, '$1').replace(/[?&]+$/g, '');
 
     // get auth token
-    const credentialToken = query.casToken;
+    // Query values are typed `string | string[]`; treated as `string` here.
+    const credentialToken = query.casToken as string;
     if (!credentialToken) {
       end(res, redirectUrl);
       return;
@@ -159,13 +167,13 @@ const middleware = (req, res, next) => {
       end(res, redirectUrl);
     });
 
-  } catch (err) {
+  } catch (err: any) { // any: caught error shape is unknown at this boundary
     console.log("account-cas: unexpected error : " + err.message);
     end(res, redirectUrl);
   }
 };
 
-const casValidate = (req, ticket, token, service, callback) => {
+const casValidate = (req: IncomingMessage, ticket: string, token: string, service: string, callback: () => void) => {
   // get configuration
   if (!Meteor.settings.cas/* || !Meteor.settings.cas.validate*/) {
     throw new Error('accounts-cas: unable to get configuration.');
@@ -183,10 +191,11 @@ const casValidate = (req, ticket, token, service, callback) => {
       console.log(err);
     } else {
       if (status) {
-        console.log(`accounts-cas: user validated ${userData.id}
+        // `userData` is always provided when `status` is true (see CAS.validate).
+        console.log(`accounts-cas: user validated ${userData!.id}
           (${JSON.stringify(userData)})`);
-        _casCredentialTokens[token] = { id: userData.id };
-        _userData = userData;
+        _casCredentialTokens[token] = { id: userData!.id };
+        _userData = userData!;
       } else {
         console.log("accounts-cas: unable to validate " + ticket);
       }
@@ -258,23 +267,24 @@ const casValidate = (req, ticket, token, service, callback) => {
   if (attrs.debug) {
     console.log(`Using user account ${JSON.stringify(user)}`);
   }
-  return { userId: user._id };
+  // `user` is guaranteed to exist here (created above when missing).
+  return { userId: user!._id };
 });
 
-const _hasCredential = (credentialToken) => {
+const _hasCredential = (credentialToken: string) => {
   return Object.prototype.hasOwnProperty.call(_casCredentialTokens, credentialToken);
 }
 
 /*
  * Retrieve token and delete it to avoid replaying it.
  */
-const _retrieveCredential = (credentialToken) => {
+const _retrieveCredential = (credentialToken: string) => {
   const result = _casCredentialTokens[credentialToken];
   delete _casCredentialTokens[credentialToken];
   return result;
 }
 
-const closePopup = (res) => {
+const closePopup = (res: ServerResponse) => {
   if (Meteor.settings.cas && Meteor.settings.cas.popup == false) {
     return;
   }
@@ -283,17 +293,38 @@ const closePopup = (res) => {
   res.end(content, 'utf-8');
 }
 
-const redirect = (res, whereTo) => {
+const redirect = (res: ServerResponse, whereTo: string | undefined) => {
   res.writeHead(302, {'Location': whereTo});
   const content = '<html><head><meta http-equiv="refresh" content="0; url='+whereTo+'" /></head><body>Redirection to <a href='+whereTo+'>'+whereTo+'</a></body></html>';
   res.end(content, 'utf-8');
   return
 }
 
-const end = (res, whereTo) => {
+const end = (res: ServerResponse, whereTo: string | undefined) => {
   if (Meteor.settings.cas && Meteor.settings.cas.popup == false) {
     redirect(res, whereTo);
   } else {
     closePopup(res);
   }
 }
+
+interface CASOptions {
+  validate_url?: string;
+  service?: string;
+  version?: string;
+}
+
+interface CASUserData {
+  id?: string;
+  [key: string]: string | undefined;
+}
+
+interface CASValidationError {
+  message: string;
+}
+
+type CASValidateCallback = (
+  err?: Error | CASValidationError,
+  status?: boolean,
+  userData?: CASUserData,
+) => void;

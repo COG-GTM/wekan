@@ -1,10 +1,10 @@
 
-function addParameterToURL(url, param){
+function addParameterToURL(url: string, param: string){
   var urlSplit = url.split('?');
   return url+(urlSplit.length>0 ? '?':'&') + param;
 }
 
-Meteor.initCas = function(callback) {
+Meteor.initCas = function(callback?: (err?: Error) => void) {
     const casTokenMatch = window.location.href.match(/[?&]casToken=([^&]+)/);
     if (casTokenMatch == null) {
         return;
@@ -25,11 +25,13 @@ Meteor.initCas = function(callback) {
     });
 }
 
-Meteor.loginWithCas = function(options, callback) {
+Meteor.loginWithCas = function(options?: LoginWithCasOptions | null, callback?: (err?: Error) => void) {
 
     var credentialToken = Random.id();
 
-    if (!Meteor.settings.public &&
+    // `Meteor.settings.public` is a dynamic settings dictionary; the cast keeps
+    // the chained `.cas` accesses typed instead of narrowing to `never`.
+    if (!(Meteor.settings.public as { [key: string]: any }) &&
         !Meteor.settings.public.cas &&
         !Meteor.settings.public.cas.loginUrl) {
         return;
@@ -48,7 +50,9 @@ Meteor.loginWithCas = function(options, callback) {
         encodeURIComponent(serviceURL)
 
     if (settings.popup == false) {
-      window.location = loginUrl;
+      // lib.dom types the `location` setter as `Location | (string & Location)`;
+      // assigning a plain URL string requires this assertion.
+      window.location = loginUrl as string & Location;
       return;
     }
 
@@ -66,7 +70,7 @@ Meteor.loginWithCas = function(options, callback) {
             // Fix for #328 - added a second test criteria (popup.closed === undefined)
             // to humour this Android quirk:
             // http://code.google.com/p/android/issues/detail?id=21061
-            var popupClosed = popup.closed || popup.closed === undefined;
+            var popupClosed = popup!.closed || popup!.closed === undefined;
         } catch (e) {
             // For some unknown reason, IE9 (and others?) sometimes (when
             // the popup closes too quickly?) throws "SCRIPT16386: No such
@@ -92,7 +96,7 @@ Meteor.loginWithCas = function(options, callback) {
     }, 100);
 };
 
-var openCenteredPopup = function(url, width, height) {
+var openCenteredPopup = function(url: string, width: number, height: number) {
   // #FIXME screenX and outerWidth are often different units on mobile screen or high DPI
     // see https://developer.mozilla.org/en-US/docs/Web/API/Window/devicePixelRatio
   var screenX = typeof window.screenX !== 'undefined'
@@ -113,7 +117,11 @@ var openCenteredPopup = function(url, width, height) {
       ',left=' + left + ',top=' + top + ',scrollbars=yes');
 
   var newwindow = window.open(url, '_blank', features);
-  if (newwindow.focus)
-    newwindow.focus();
+  if (newwindow!.focus != null)
+    newwindow!.focus();
   return newwindow;
 };
+
+interface LoginWithCasOptions {
+  redirectUrl?: string;
+}
