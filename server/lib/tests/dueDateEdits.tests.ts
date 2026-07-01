@@ -42,7 +42,8 @@ describe('dueDateEdits', function() {
     it('returns 0 for non-array input', function() {
       expect(countDueDateChanges(undefined)).to.equal(0);
       expect(countDueDateChanges(null)).to.equal(0);
-      expect(countDueDateChanges({})).to.equal(0);
+      // Deliberately non-array input to exercise the Array.isArray guard.
+      expect(countDueDateChanges({} as Parameters<typeof countDueDateChanges>[0])).to.equal(0);
     });
 
     it('tolerates falsy / malformed entries', function() {

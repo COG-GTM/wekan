@@ -6,10 +6,11 @@ import { Accounts } from 'meteor/accounts-base';
 import {
   authenticateApiRequest,
 } from '/server/routes/attachmentApi';
+import type { CaughtError } from './types';
 
 describe('attachmentApi auth context', function () {
-  let findOneAsyncStub;
-  let hashTokenStub;
+  let findOneAsyncStub: sinon.SinonStub | null;
+  let hashTokenStub: sinon.SinonStub | null;
   const envBackup = {
     HEADER_LOGIN_ID: process.env.HEADER_LOGIN_ID,
     HEADER_LOGIN_EMAIL: process.env.HEADER_LOGIN_EMAIL,
@@ -64,7 +65,7 @@ describe('attachmentApi auth context', function () {
     process.env.HEADER_LOGIN_ID = 'x-auth-user';
     process.env.HEADER_LOGIN_TRUSTED_IPS = '10.1.1.1';
 
-    let thrown;
+    let thrown: CaughtError | undefined;
     try {
       await authenticateApiRequest({
         headers: {
@@ -79,8 +80,8 @@ describe('attachmentApi auth context', function () {
     }
 
     expect(thrown).to.exist;
-    expect(thrown.error).to.equal('unauthorized');
-    expect(String(thrown.reason || thrown.message)).to.include('trusted');
+    expect(thrown!.error).to.equal('unauthorized');
+    expect(String(thrown!.reason || thrown!.message)).to.include('trusted');
   });
 
   it('falls back to legacy x-user-id + x-auth-token auth when header login is disabled', async function () {

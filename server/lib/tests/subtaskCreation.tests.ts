@@ -52,7 +52,10 @@ describe('subtask creation helpers', function() {
 
     it('tolerates a non-array ancestor argument', function() {
       expect(wouldCreateCycle('cardA', 'cardP', undefined)).to.equal(false);
-      expect(wouldCreateCycle('cardA', 'cardP', null)).to.equal(false);
+      // `null` is deliberately-invalid input for the Array.isArray guard; the
+      // source lives in /imports (out of this session's scope) so it is cast
+      // with `any` rather than widening its signature.
+      expect(wouldCreateCycle('cardA', 'cardP', null as any)).to.equal(false);
     });
   });
 
@@ -95,9 +98,12 @@ describe('subtask creation helpers', function() {
     });
 
     it('returns an empty array for missing / non-array input', function() {
-      expect(subtaskCustomFields(undefined)).to.deep.equal([]);
-      expect(subtaskCustomFields(null)).to.deep.equal([]);
-      expect(subtaskCustomFields({})).to.deep.equal([]);
+      // Deliberately-invalid inputs exercise the Array.isArray guard; the source
+      // lives in /imports (out of this session's scope) so the arguments are
+      // cast with `any` rather than widening its signature.
+      expect(subtaskCustomFields(undefined as any)).to.deep.equal([]);
+      expect(subtaskCustomFields(null as any)).to.deep.equal([]);
+      expect(subtaskCustomFields({} as any)).to.deep.equal([]);
     });
 
     it('every produced entry has value null (mirrors a normal new card)', function() {

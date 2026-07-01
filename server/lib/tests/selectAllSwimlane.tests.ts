@@ -24,7 +24,8 @@ describe('select all cards scoped to swimlane (#5623)', function() {
     { _id: 'c7', listId: 'L1' }, // missing swimlaneId field
   ];
 
-  const ids = result => result.map(c => c._id);
+  const ids = (result: ReturnType<typeof filterCardsByListAndSwimlane>) =>
+    result.map(c => c._id);
 
   describe('with a swimlaneId (swimlane context)', function() {
     it('returns only cards in that list AND swimlane, plus orphaned cards', function() {
@@ -67,8 +68,11 @@ describe('select all cards scoped to swimlane (#5623)', function() {
 
   describe('edge cases', function() {
     it('returns an empty array for non-array input', function() {
-      expect(filterCardsByListAndSwimlane(null, 'L1')).to.deep.equal([]);
-      expect(filterCardsByListAndSwimlane(undefined, 'L1')).to.deep.equal([]);
+      // Deliberately non-array input to exercise the Array.isArray guard; the
+      // source lives in /models (out of this session's scope) so the arguments
+      // are cast with `any` rather than widening its signature.
+      expect(filterCardsByListAndSwimlane(null as any, 'L1')).to.deep.equal([]);
+      expect(filterCardsByListAndSwimlane(undefined as any, 'L1')).to.deep.equal([]);
     });
 
     it('ignores null/undefined entries in the array', function() {

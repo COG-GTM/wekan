@@ -8,7 +8,7 @@ import path from 'path';
 // routes are picked up in the published API docs. Reads the source rather than
 // running the (python/esprima) generator so it works in the plain mocha runner.
 describe('dependencies REST OpenAPI annotations', function () {
-  let routes = [];
+  let routes: RouteDoc[] = [];
   let total = 0;
 
   // Read the source in a hook (not at describe-collection time) so a path/fs
@@ -70,3 +70,10 @@ describe('dependencies REST OpenAPI annotations', function () {
     expect(new Set(ids).size).to.equal(ids.length);
   });
 });
+
+// A REST route parsed out of the model source together with its JSDoc block.
+interface RouteDoc {
+  doc: string;
+  method: string;
+  routePath: string;
+}

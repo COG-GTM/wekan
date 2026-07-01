@@ -26,7 +26,7 @@ describe('ProxyBleed header-login allowlist (GHSA-jggc-qvfc-jr6x)', function () 
     'HEADER_LOGIN_TRUSTED_IPS',
     'HEADER_LOGIN_TRUSTED_PROXIES',
   ];
-  const envBackup = {};
+  const envBackup: { [key: string]: string | undefined } = {};
 
   beforeEach(function () {
     envKeys.forEach(key => {

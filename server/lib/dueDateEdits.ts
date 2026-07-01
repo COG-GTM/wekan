@@ -11,7 +11,9 @@ export const DUE_DATE_ACTIVITY_TYPE = 'a-dueAt';
 // Count how many of the given activities represent a due-date change.
 // `activities` is expected to be an array of activity documents (or any
 // array-like with a `.filter`); anything falsy yields 0.
-export function countDueDateChanges(activities: DueDateActivity[]) {
+export function countDueDateChanges(
+  activities: (DueDateActivity | null | undefined)[] | null | undefined,
+) {
   if (!Array.isArray(activities)) {
     return 0;
   }
