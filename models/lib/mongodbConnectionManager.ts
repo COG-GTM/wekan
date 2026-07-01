@@ -15,6 +15,11 @@ import { mongodbDriverManager } from './mongodbDriverManager';
  */
 
 class MongoDBConnectionManager {
+  connections: Map<string, ConnectionRecord>;
+  connectionConfigs: Map<string, any>;
+  retryAttempts: number;
+  retryDelay: number;
+
   constructor() {
     this.connections = new Map();
     this.connectionConfigs = new Map();
@@ -28,13 +33,13 @@ class MongoDBConnectionManager {
    * @param {Object} options - Connection options
    * @returns {Promise<Object>} - MongoDB connection object
    */
-  async createConnection(connectionString, options = {}) {
+  async createConnection(connectionString: string, options: any = {}) {
     const connectionId = this.generateConnectionId(connectionString);
 
     // Check if we already have a working connection
     if (this.connections.has(connectionId)) {
       const existingConnection = this.connections.get(connectionId);
-      if (existingConnection.status === 'connected') {
+      if (existingConnection && existingConnection.status === 'connected') {
         return existingConnection;
       }
     }
@@ -50,9 +55,9 @@ class MongoDBConnectionManager {
    * @param {string} connectionId - Connection identifier
    * @returns {Promise<Object>} - MongoDB connection object
    */
-  async connectWithDriverSelection(connectionString, options, connectionId) {
-    let lastError = null;
-    let currentDriver = null;
+  async connectWithDriverSelection(connectionString: string, options: any, connectionId: string) {
+    let lastError: Error | null = null;
+    let currentDriver: string | null = null;
 
     // First, try with the default driver (if we have a detected version)
     if (mongodbDriverManager.detectedVersion) {
@@ -67,11 +72,13 @@ class MongoDBConnectionManager {
       try {
         console.log(`Attempting MongoDB connection with driver: ${currentDriver} (attempt ${attempt + 1})`);
 
-        const connection = await this.connectWithDriver(currentDriver, connectionString, options);
+        // currentDriver is assigned a concrete driver name before the loop and
+        // is only ever reassigned to another string, so it is non-null here.
+        const connection = await this.connectWithDriver(currentDriver!, connectionString, options);
 
         // Record successful connection
         mongodbDriverManager.recordConnectionAttempt(
-          currentDriver,
+          currentDriver!,
           mongodbDriverManager.detectedVersion || 'unknown',
           true
         );
@@ -79,7 +86,7 @@ class MongoDBConnectionManager {
         // Store connection
         this.connections.set(connectionId, {
           connection,
-          driver: currentDriver,
+          driver: currentDriver!,
           version: mongodbDriverManager.detectedVersion || 'unknown',
           status: 'connected',
           connectionString,
@@ -113,7 +120,7 @@ class MongoDBConnectionManager {
 
         // Record failed attempt
         mongodbDriverManager.recordConnectionAttempt(
-          currentDriver,
+          currentDriver!,
           detectedVersion || 'unknown',
           false,
           error
@@ -137,7 +144,7 @@ class MongoDBConnectionManager {
    * @param {Object} options - Connection options
    * @returns {Promise<Object>} - MongoDB connection object
    */
-  async connectWithDriver(driverName, connectionString, options) {
+  async connectWithDriver(driverName: string, connectionString: string, options: any) {
     try {
       // Dynamically import the driver
       const driver = await import(driverName);
@@ -172,7 +179,7 @@ class MongoDBConnectionManager {
    * @param {string} connectionId - Connection identifier
    * @returns {Object|null} - Connection object or null
    */
-  getConnection(connectionId) {
+  getConnection(connectionId: string) {
     return this.connections.get(connectionId) || null;
   }
 
@@ -181,7 +188,7 @@ class MongoDBConnectionManager {
    * @param {string} connectionId - Connection identifier
    * @returns {Promise<boolean>} - Whether connection was closed successfully
    */
-  async closeConnection(connectionId) {
+  async closeConnection(connectionId: string) {
     const connection = this.connections.get(connectionId);
     if (connection && connection.connection) {
       try {
@@ -243,7 +250,7 @@ class MongoDBConnectionManager {
    * @param {string} connectionString - MongoDB connection string
    * @returns {string} - Unique connection ID
    */
-  generateConnectionId(connectionString) {
+  generateConnectionId(connectionString: string) {
     // Create a hash of the connection string for unique ID
     let hash = 0;
     for (let i = 0; i < connectionString.length; i++) {
@@ -259,7 +266,7 @@ class MongoDBConnectionManager {
    * @param {Object} connection - Connection object
    * @returns {string} - Connection ID
    */
-  getConnectionIdFromConnection(connection) {
+  getConnectionIdFromConnection(connection: ConnectionRecord) {
     return this.generateConnectionId(connection.connectionString);
   }
 
@@ -268,7 +275,7 @@ class MongoDBConnectionManager {
    * @param {number} ms - Milliseconds to delay
    * @returns {Promise} - Promise that resolves after delay
    */
-  delay(ms) {
+  delay(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
@@ -280,6 +287,19 @@ class MongoDBConnectionManager {
     this.connectionConfigs.clear();
     mongodbDriverManager.reset();
   }
+}
+
+// A stored, live MongoDB connection plus the metadata used to manage it. The
+// `connection` is the driver's MongoClient (loaded via dynamic import), whose
+// type is not statically known here, hence `any`.
+interface ConnectionRecord {
+  connection: any;
+  driver: string;
+  version: string;
+  status: string;
+  connectionString: string;
+  options: any;
+  createdAt: Date;
 }
 
 // Create singleton instance
