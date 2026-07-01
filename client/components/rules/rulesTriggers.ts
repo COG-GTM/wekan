@@ -1,6 +1,9 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveCache } from '/imports/reactiveCache';
 
-Template.rulesTriggers.onCreated(function () {
+Template.rulesTriggers.onCreated(function (this: RulesTriggersInstance) {
   this.showBoardTrigger = new ReactiveVar(true);
   this.showCardTrigger = new ReactiveVar(false);
   this.showChecklistTrigger = new ReactiveVar(false);
@@ -19,23 +22,23 @@ Template.rulesTriggers.helpers({
   },
 
   showBoardTrigger() {
-    return Template.instance().showBoardTrigger;
+    return (Template.instance() as RulesTriggersInstance).showBoardTrigger;
   },
 
   showCardTrigger() {
-    return Template.instance().showCardTrigger;
+    return (Template.instance() as RulesTriggersInstance).showCardTrigger;
   },
 
   showChecklistTrigger() {
-    return Template.instance().showChecklistTrigger;
+    return (Template.instance() as RulesTriggersInstance).showChecklistTrigger;
   },
 
   showScheduledTrigger() {
-    return Template.instance().showScheduledTrigger;
+    return (Template.instance() as RulesTriggersInstance).showScheduledTrigger;
   },
 
   showButtonTrigger() {
-    return Template.instance().showButtonTrigger;
+    return (Template.instance() as RulesTriggersInstance).showButtonTrigger;
   },
 
   rules() {
@@ -49,8 +52,8 @@ Template.rulesTriggers.helpers({
 });
 
 // Show only the chosen trigger category and highlight its side-menu item.
-function selectTriggerTab(tpl, active) {
-  const tabs = {
+function selectTriggerTab(tpl: RulesTriggersInstance, active: string) {
+  const tabs: Record<string, ReactiveVar<boolean>> = {
     board: tpl.showBoardTrigger,
     card: tpl.showCardTrigger,
     checklist: tpl.showChecklistTrigger,
@@ -58,7 +61,7 @@ function selectTriggerTab(tpl, active) {
     button: tpl.showButtonTrigger,
   };
   Object.keys(tabs).forEach(key => tabs[key].set(key === active));
-  const classes = {
+  const classes: Record<string, string> = {
     board: '.js-set-board-triggers',
     card: '.js-set-card-triggers',
     checklist: '.js-set-checklist-triggers',
@@ -71,19 +74,29 @@ function selectTriggerTab(tpl, active) {
 }
 
 Template.rulesTriggers.events({
-  'click .js-set-board-triggers'(event, tpl) {
+  'click .js-set-board-triggers'(event: JQuery.TriggeredEvent, tpl: RulesTriggersInstance) {
     selectTriggerTab(tpl, 'board');
   },
-  'click .js-set-card-triggers'(event, tpl) {
+  'click .js-set-card-triggers'(event: JQuery.TriggeredEvent, tpl: RulesTriggersInstance) {
     selectTriggerTab(tpl, 'card');
   },
-  'click .js-set-checklist-triggers'(event, tpl) {
+  'click .js-set-checklist-triggers'(event: JQuery.TriggeredEvent, tpl: RulesTriggersInstance) {
     selectTriggerTab(tpl, 'checklist');
   },
-  'click .js-set-scheduled-triggers'(event, tpl) {
+  'click .js-set-scheduled-triggers'(event: JQuery.TriggeredEvent, tpl: RulesTriggersInstance) {
     selectTriggerTab(tpl, 'scheduled');
   },
-  'click .js-set-button-triggers'(event, tpl) {
+  'click .js-set-button-triggers'(event: JQuery.TriggeredEvent, tpl: RulesTriggersInstance) {
     selectTriggerTab(tpl, 'button');
   },
 });
+
+// The rulesTriggers Blaze template instance carries a reactive visibility flag
+// per trigger category (only one is shown at a time).
+interface RulesTriggersInstance extends Blaze.TemplateInstance {
+  showBoardTrigger: ReactiveVar<boolean>;
+  showCardTrigger: ReactiveVar<boolean>;
+  showChecklistTrigger: ReactiveVar<boolean>;
+  showScheduledTrigger: ReactiveVar<boolean>;
+  showButtonTrigger: ReactiveVar<boolean>;
+}

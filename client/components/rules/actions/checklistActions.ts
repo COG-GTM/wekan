@@ -1,19 +1,21 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 import Actions from '/models/actions';
 import Rules from '/models/rules';
 import Triggers from '/models/triggers';
 import { Utils } from '/client/lib/utils';
 
-Template.checklistActions.onCreated(function () {
+Template.checklistActions.onCreated(function (this: Blaze.TemplateInstance) {
   this.subscribe('allRules');
 });
 
 Template.checklistActions.events({
-  'click .js-add-checklist-items-action'(event, tpl) {
+  'click .js-add-checklist-items-action'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
-    const checklistName = tpl.find('#checklist-name-3').value;
-    const checklistItems = tpl.find('#checklist-items').value;
+    const checklistName = (tpl.find('#checklist-name-3') as HTMLInputElement).value;
+    const checklistItems = (tpl.find('#checklist-items') as HTMLInputElement).value;
     const boardId = Session.get('currentBoard');
     const desc = Utils.getTriggerActionDesc(event, tpl);
     const triggerId = Triggers.insert(trigger);
@@ -31,12 +33,12 @@ Template.checklistActions.events({
       boardId,
     });
   },
-  'click .js-add-checklist-action'(event, tpl) {
+  'click .js-add-checklist-action'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
-    const actionSelected = tpl.find('#check-action').value;
-    const checklistName = tpl.find('#checklist-name').value;
+    const actionSelected = (tpl.find('#check-action') as HTMLInputElement).value;
+    const checklistName = (tpl.find('#checklist-name') as HTMLInputElement).value;
     const boardId = Session.get('currentBoard');
     const desc = Utils.getTriggerActionDesc(event, tpl);
     if (actionSelected === 'add') {
@@ -70,12 +72,12 @@ Template.checklistActions.events({
       });
     }
   },
-  'click .js-add-checkall-action'(event, tpl) {
+  'click .js-add-checkall-action'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
-    const actionSelected = tpl.find('#checkall-action').value;
-    const checklistName = tpl.find('#checklist-name2').value;
+    const actionSelected = (tpl.find('#checkall-action') as HTMLInputElement).value;
+    const checklistName = (tpl.find('#checklist-name2') as HTMLInputElement).value;
     const boardId = Session.get('currentBoard');
     const desc = Utils.getTriggerActionDesc(event, tpl);
     if (actionSelected === 'check') {
@@ -109,13 +111,13 @@ Template.checklistActions.events({
       });
     }
   },
-  'click .js-add-check-item-action'(event, tpl) {
+  'click .js-add-check-item-action'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
     const checkItemName = tpl.find('#checkitem-name');
     const checklistName = tpl.find('#checklist-name3');
-    const actionSelected = tpl.find('#check-item-action').value;
+    const actionSelected = (tpl.find('#check-item-action') as HTMLInputElement).value;
     const boardId = Session.get('currentBoard');
     const desc = Utils.getTriggerActionDesc(event, tpl);
     if (actionSelected === 'check') {

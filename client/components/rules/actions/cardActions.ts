@@ -1,19 +1,22 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 import Actions from '/models/actions';
 import { CARD_COLORS } from '/models/metadata/colors';
 import Rules from '/models/rules';
 import Triggers from '/models/triggers';
 import { Utils } from '/client/lib/utils';
 
-let cardColors;
+let cardColors: string[];
 Meteor.startup(() => {
   cardColors = CARD_COLORS;
 });
 
 // Module-level shared state so the color popup can read/write the
 // cardColorButtonValue without relying on BlazeComponent.getOpenerComponent().
-let sharedCardColorButtonValue;
+let sharedCardColorButtonValue: ReactiveVar<string>;
 
-Template.cardActions.onCreated(function () {
+Template.cardActions.onCreated(function (this: CardActionsInstance) {
   this.subscribe('allRules');
   this.cardColorButtonValue = new ReactiveVar('green');
   sharedCardColorButtonValue = this.cardColorButtonValue;
@@ -21,11 +24,11 @@ Template.cardActions.onCreated(function () {
 
 Template.cardActions.helpers({
   cardColorButton() {
-    return Template.instance().cardColorButtonValue.get();
+    return (Template.instance() as CardActionsInstance).cardColorButtonValue.get();
   },
 
   cardColorButtonText() {
-    return `color-${Template.instance().cardColorButtonValue.get()}`;
+    return `color-${(Template.instance() as CardActionsInstance).cardColorButtonValue.get()}`;
   },
 
   labels() {
@@ -40,13 +43,13 @@ Template.cardActions.helpers({
 });
 
 Template.cardActions.events({
-  'click .js-set-date-action'(event, tpl) {
+  'click .js-set-date-action'(event: JQuery.TriggeredEvent, tpl: CardActionsInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
     const triggerId = Triggers.insert(trigger);
-    const actionSelected = tpl.find('#setdate-action').value;
-    const dateFieldSelected = tpl.find('#setdate-datefield').value;
+    const actionSelected = (tpl.find('#setdate-action') as HTMLInputElement).value;
+    const dateFieldSelected = (tpl.find('#setdate-datefield') as HTMLInputElement).value;
     const boardId = Session.get('currentBoard');
     const desc = Utils.getTriggerActionDesc(event, tpl);
 
@@ -66,12 +69,12 @@ Template.cardActions.events({
     });
   },
 
-  'click .js-remove-datevalue-action'(event, tpl) {
+  'click .js-remove-datevalue-action'(event: JQuery.TriggeredEvent, tpl: CardActionsInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
     const triggerId = Triggers.insert(trigger);
-    const dateFieldSelected = tpl.find('#setdate-removedatefieldvalue')
+    const dateFieldSelected = (tpl.find('#setdate-removedatefieldvalue') as HTMLInputElement)
       .value;
     const boardId = Session.get('currentBoard');
     const desc = Utils.getTriggerActionDesc(event, tpl);
@@ -91,12 +94,12 @@ Template.cardActions.events({
       desc,
     });
   },
-  'click .js-add-label-action'(event, tpl) {
+  'click .js-add-label-action'(event: JQuery.TriggeredEvent, tpl: CardActionsInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
-    const actionSelected = tpl.find('#label-action').value;
-    const labelId = tpl.find('#label-id').value;
+    const actionSelected = (tpl.find('#label-action') as HTMLInputElement).value;
+    const labelId = (tpl.find('#label-id') as HTMLInputElement).value;
     const boardId = Session.get('currentBoard');
     const desc = Utils.getTriggerActionDesc(event, tpl);
     if (actionSelected === 'add') {
@@ -130,12 +133,12 @@ Template.cardActions.events({
       });
     }
   },
-  'click .js-add-member-action'(event, tpl) {
+  'click .js-add-member-action'(event: JQuery.TriggeredEvent, tpl: CardActionsInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
-    const actionSelected = tpl.find('#member-action').value;
-    const username = tpl.find('#member-name').value;
+    const actionSelected = (tpl.find('#member-action') as HTMLInputElement).value;
+    const username = (tpl.find('#member-name') as HTMLInputElement).value;
     const boardId = Session.get('currentBoard');
     const desc = Utils.getTriggerActionDesc(event, tpl);
     if (actionSelected === 'add') {
@@ -170,7 +173,7 @@ Template.cardActions.events({
       });
     }
   },
-  'click .js-add-removeall-action'(event, tpl) {
+  'click .js-add-removeall-action'(event: JQuery.TriggeredEvent, tpl: CardActionsInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
@@ -191,15 +194,15 @@ Template.cardActions.events({
       boardId,
     });
   },
-  'click .js-show-color-palette'(event, tpl) {
+  'click .js-show-color-palette'(event: JQuery.TriggeredEvent, tpl: CardActionsInstance) {
     const funct = Popup.open('setCardActionsColor');
-    const colorButton = tpl.find('#color-action');
+    const colorButton = tpl.find('#color-action') as HTMLInputElement;
     if (colorButton.value === '') {
       colorButton.value = 'green';
     }
     funct.call(this, event);
   },
-  'click .js-set-color-action'(event, tpl) {
+  'click .js-set-color-action'(event: JQuery.TriggeredEvent, tpl: CardActionsInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
@@ -220,25 +223,25 @@ Template.cardActions.events({
       boardId,
     });
   },
-  'click .js-set-complete-action'(event, tpl) {
+  'click .js-set-complete-action'(event: JQuery.TriggeredEvent, tpl: CardActionsInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
     const boardId = Session.get('currentBoard');
     const desc = Utils.getTriggerActionDesc(event, tpl);
-    const actionType = tpl.find('#complete-action').value;
+    const actionType = (tpl.find('#complete-action') as HTMLInputElement).value;
     const triggerId = Triggers.insert(trigger);
     const actionId = Actions.insert({ actionType, boardId, desc });
     Rules.insert({ title: ruleName, triggerId, actionId, boardId });
   },
-  'click .js-set-reldate-action'(event, tpl) {
+  'click .js-set-reldate-action'(event: JQuery.TriggeredEvent, tpl: CardActionsInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
     const boardId = Session.get('currentBoard');
     const desc = Utils.getTriggerActionDesc(event, tpl);
-    const dateField = tpl.find('#reldate-datefield').value;
-    const days = parseInt(tpl.find('#reldate-days').value, 10) || 0;
+    const dateField = (tpl.find('#reldate-datefield') as HTMLInputElement).value;
+    const days = parseInt((tpl.find('#reldate-days') as HTMLInputElement).value, 10) || 0;
     const triggerId = Triggers.insert(trigger);
     const actionId = Actions.insert({
       actionType: 'setDateRelative',
@@ -251,7 +254,7 @@ Template.cardActions.events({
   },
 });
 
-Template.setCardActionsColorPopup.onCreated(function () {
+Template.setCardActionsColorPopup.onCreated(function (this: SetCardActionsColorPopupInstance) {
   this.currentColor = new ReactiveVar(
     sharedCardColorButtonValue.get()
   );
@@ -263,17 +266,30 @@ Template.setCardActionsColorPopup.helpers({
     return cardColors.map(color => ({ color, name: '' }));
   },
 
-  isSelected(color) {
-    return Template.instance().currentColor.get() === color;
+  isSelected(color: string) {
+    return (Template.instance() as SetCardActionsColorPopupInstance).currentColor.get() === color;
   },
 });
 
 Template.setCardActionsColorPopup.events({
-  'click .js-palette-color'(event, tpl) {
+  'click .js-palette-color'(event: JQuery.TriggeredEvent, tpl: SetCardActionsColorPopupInstance) {
     tpl.currentColor.set(Template.currentData().color);
   },
-  'click .js-submit'(event, tpl) {
+  'click .js-submit'(event: JQuery.TriggeredEvent, tpl: SetCardActionsColorPopupInstance) {
     tpl.colorButtonValue.set(tpl.currentColor.get());
     Popup.back();
   },
 });
+
+// The cardActions Blaze template instance carries the currently-chosen card
+// colour for the "set colour" action button.
+interface CardActionsInstance extends Blaze.TemplateInstance {
+  cardColorButtonValue: ReactiveVar<string>;
+}
+
+// The colour-palette popup instance: the colour highlighted in the popup and a
+// shared reference back to the cardActions button value it writes on submit.
+interface SetCardActionsColorPopupInstance extends Blaze.TemplateInstance {
+  currentColor: ReactiveVar<string>;
+  colorButtonValue: ReactiveVar<string>;
+}

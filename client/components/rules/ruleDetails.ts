@@ -1,6 +1,8 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 import { ReactiveCache } from '/imports/reactiveCache';
 
-Template.ruleDetails.onCreated(function () {
+Template.ruleDetails.onCreated(function (this: Blaze.TemplateInstance) {
   this.subscribe('allRules');
   this.subscribe('allTriggers');
   this.subscribe('allActions');

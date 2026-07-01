@@ -1,3 +1,6 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
 import Papa from 'papaparse';
@@ -8,8 +11,8 @@ import Triggers from '/models/triggers';
 const RULES_FORMAT = 'wekan-rules-1.0.0';
 const STRIP_FIELDS = ['_id', 'boardId', 'createdAt', 'modifiedAt', 'updatedAt'];
 
-function stripDoc(doc) {
-  const out = {};
+function stripDoc(doc: Record<string, any>) {
+  const out: Record<string, any> = {};
   Object.keys(doc || {}).forEach(key => {
     if (!STRIP_FIELDS.includes(key)) out[key] = doc[key];
   });
@@ -17,24 +20,24 @@ function stripDoc(doc) {
 }
 
 // Build a portable, board-independent list of rules from the CURRENT board.
-function collectBoardRules(boardId) {
+function collectBoardRules(boardId: string) {
   let rules = ReactiveCache.getRules({ boardId });
   const selected = Session.get('selectedRuleIds') || [];
   if (selected.length) {
-    rules = rules.filter(r => selected.includes(r._id));
+    rules = rules.filter((r: { _id: string }) => selected.includes(r._id));
   }
   return rules
-    .map(rule => {
+    .map((rule: { title: string; triggerId: string; actionId: string }) => {
       const trigger = ReactiveCache.getTrigger(rule.triggerId);
       const action = ReactiveCache.getAction(rule.actionId);
       if (!trigger || !action) return null;
       return { title: rule.title, trigger: stripDoc(trigger), action: stripDoc(action) };
     })
-    .filter(Boolean);
+    .filter(Boolean) as RuleEntry[];
 }
 
 // Insert an array of {title, trigger, action} onto the given target board.
-function importRules(rulesArray, boardId) {
+function importRules(rulesArray: RuleEntry[], boardId: string) {
   let count = 0;
   (rulesArray || []).forEach(entry => {
     if (!entry || !entry.trigger || !entry.action) return;
@@ -46,7 +49,7 @@ function importRules(rulesArray, boardId) {
   return count;
 }
 
-function download(filename, text, mime) {
+function download(filename: string, text: string, mime: string) {
   const blob = new Blob([text], { type: `${mime};charset=utf-8` });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -59,7 +62,7 @@ function download(filename, text, mime) {
 }
 
 // --- CSV (round-trippable) --------------------------------------------------
-function rulesToCsv(rulesArray) {
+function rulesToCsv(rulesArray: RuleEntry[]) {
   const rows = rulesArray.map(entry => {
     const { activityType, ...triggerFields } = entry.trigger || {};
     const { actionType, ...actionFields } = entry.action || {};
@@ -76,10 +79,10 @@ function rulesToCsv(rulesArray) {
   });
 }
 
-function csvToRules(text) {
+function csvToRules(text: string) {
   const parsed = Papa.parse(text.trim(), { header: true, skipEmptyLines: true });
   return (parsed.data || [])
-    .map(row => {
+    .map((row: CsvRow) => {
       let triggerFields = {};
       let actionFields = {};
       try { triggerFields = row.triggerFields ? JSON.parse(row.triggerFields) : {}; } catch (e) { triggerFields = {}; }
@@ -91,13 +94,13 @@ function csvToRules(text) {
         action: { actionType: row.actionType, ...actionFields },
       };
     })
-    .filter(Boolean);
+    .filter(Boolean) as RuleEntry[];
 }
 
 // --- Best-effort Trello Butler parser ---------------------------------------
-export function parseTrelloButler(text) {
-  const rules = [];
-  const unmapped = [];
+export function parseTrelloButler(text: string) {
+  const rules: RuleEntry[] = [];
+  const unmapped: string[] = [];
   (text || '').split('\n').map(l => l.trim()).filter(Boolean).forEach(line => {
     const added = line.toLowerCase().match(/when a card is added to list ["“](.+?)["”].*move the card to the (top|bottom)/);
     if (added) {
@@ -139,19 +142,20 @@ function mapActionType(type = '', name = '') {
   return null;
 }
 
-export function parseN8n(data) {
+// `data` is an arbitrary n8n workflow export (nodes + connections graph).
+export function parseN8n(data: any) {
   const nodes = data.nodes || [];
-  const byName = {};
-  nodes.forEach(n => { byName[n.name] = n; });
-  const rules = [];
-  const unmapped = [];
+  const byName: Record<string, any> = {};
+  nodes.forEach((n: any) => { byName[n.name] = n; });
+  const rules: RuleEntry[] = [];
+  const unmapped: string[] = [];
   const conns = data.connections || {};
   Object.keys(conns).forEach(srcName => {
     const src = byName[srcName];
     if (!src) return;
     const trig = mapTriggerType(src.type, srcName);
     const outs = (conns[srcName].main || []).flat();
-    outs.forEach(o => {
+    outs.forEach((o: any) => {
       const tgt = o && byName[o.node];
       if (!tgt) return;
       const act = mapActionType(tgt.type, tgt.name);
@@ -165,16 +169,17 @@ export function parseN8n(data) {
   return { rules, unmapped };
 }
 
-export function parseNodeRed(data) {
+// `data` is an arbitrary Node-RED flow export (array of nodes, or {flows}).
+export function parseNodeRed(data: any) {
   const nodes = Array.isArray(data) ? data : (data.flows || []);
-  const byId = {};
-  nodes.forEach(n => { byId[n.id] = n; });
-  const rules = [];
-  const unmapped = [];
-  nodes.forEach(n => {
+  const byId: Record<string, any> = {};
+  nodes.forEach((n: any) => { byId[n.id] = n; });
+  const rules: RuleEntry[] = [];
+  const unmapped: string[] = [];
+  nodes.forEach((n: any) => {
     const trig = mapTriggerType(n.type, n.name);
     if (!trig) return;
-    ((n.wires || []).flat()).forEach(tid => {
+    ((n.wires || []).flat()).forEach((tid: string) => {
       const tgt = byId[tid];
       if (!tgt) return;
       const act = mapActionType(tgt.type, tgt.name);
@@ -186,7 +191,7 @@ export function parseNodeRed(data) {
   return { rules, unmapped };
 }
 
-function parseWorkflow(text, format) {
+function parseWorkflow(text: string, format: string): { rules: RuleEntry[]; unmapped: string[]; error?: string } {
   let data;
   try { data = JSON.parse(text); } catch (e) { return { rules: [], unmapped: [], error: 'invalid JSON' }; }
   let fmt = format;
@@ -200,24 +205,24 @@ function parseWorkflow(text, format) {
 }
 
 // --- Workspace + board selection helpers ------------------------------------
-function flattenWorkspaces(nodes, depth, out) {
+function flattenWorkspaces(nodes: WorkspaceNode[], depth: number, out: WorkspaceOption[]) {
   (nodes || []).forEach(node => {
-    out.push({ id: node.id, label: `${'  '.repeat(depth)}${node.name}` });
+    out.push({ id: node.id, label: `${'  '.repeat(depth)}${node.name}` });
     if (node.children && node.children.length) flattenWorkspaces(node.children, depth + 1, out);
   });
   return out;
 }
 
-Template.rulesImportExportPopup.onCreated(function () {
+Template.rulesImportExportPopup.onCreated(function (this: RulesImportExportInstance) {
   this.message = new ReactiveVar('');
   this.selectedWorkspace = new ReactiveVar('');
-  this.selectedBoard = new ReactiveVar(Session.get('currentBoard'));
+  this.selectedBoard = new ReactiveVar<string>(Session.get('currentBoard'));
   this.subscribe('boards'); // the user's boards (also subscribed globally)
 });
 
 Template.rulesImportExportPopup.helpers({
   message() {
-    return Template.instance().message;
+    return (Template.instance() as RulesImportExportInstance).message;
   },
   workspaces() {
     const user = ReactiveCache.getCurrentUser();
@@ -225,7 +230,7 @@ Template.rulesImportExportPopup.helpers({
     return flattenWorkspaces(tree, 0, []);
   },
   boardsForImport() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as RulesImportExportInstance;
     const userId = Meteor.userId();
     const ws = tpl.selectedWorkspace.get();
     const user = ReactiveCache.getCurrentUser();
@@ -234,17 +239,17 @@ Template.rulesImportExportPopup.helpers({
       { archived: false, 'members.userId': userId },
       { sort: { title: 1 } },
     );
-    if (ws) boards = boards.filter(b => assignments[b._id] === ws);
+    if (ws) boards = boards.filter((b: { _id: string }) => assignments[b._id] === ws);
     const selectedBoard = tpl.selectedBoard.get();
-    return boards.map(b => ({ _id: b._id, title: b.title, selected: b._id === selectedBoard }));
+    return boards.map((b: { _id: string; title: string }) => ({ _id: b._id, title: b.title, selected: b._id === selectedBoard }));
   },
 });
 
-function targetBoardId(tpl) {
+function targetBoardId(tpl: RulesImportExportInstance) {
   return tpl.selectedBoard.get() || Session.get('currentBoard');
 }
 
-function reportImport(tpl, count, unmapped) {
+function reportImport(tpl: RulesImportExportInstance, count: number, unmapped?: string[]) {
   let msg = TAPi18n.__('r-import-done', { count });
   if (unmapped && unmapped.length) {
     msg += ` — ${TAPi18n.__('r-import-unmapped', { count: unmapped.length })}`;
@@ -253,10 +258,10 @@ function reportImport(tpl, count, unmapped) {
 }
 
 Template.rulesImportExportPopup.events({
-  'change .js-import-workspace'(event, tpl) {
+  'change .js-import-workspace'(event: JQuery.TriggeredEvent, tpl: RulesImportExportInstance) {
     tpl.selectedWorkspace.set(event.currentTarget.value);
   },
-  'change .js-import-board'(event, tpl) {
+  'change .js-import-board'(event: JQuery.TriggeredEvent, tpl: RulesImportExportInstance) {
     tpl.selectedBoard.set(event.currentTarget.value);
   },
   'click .js-rules-export-json'() {
@@ -268,8 +273,8 @@ Template.rulesImportExportPopup.events({
     const boardId = Session.get('currentBoard');
     download('wekan-rules.csv', rulesToCsv(collectBoardRules(boardId)), 'text/csv');
   },
-  'click .js-rules-import-json'(event, tpl) {
-    const text = tpl.find('.js-rules-import-text').value;
+  'click .js-rules-import-json'(event: JQuery.TriggeredEvent, tpl: RulesImportExportInstance) {
+    const text = (tpl.find('.js-rules-import-text') as HTMLTextAreaElement).value;
     try {
       const parsed = JSON.parse(text);
       const rulesArray = Array.isArray(parsed) ? parsed : parsed.rules;
@@ -278,21 +283,21 @@ Template.rulesImportExportPopup.events({
       tpl.message.set(String(e.message || e));
     }
   },
-  'click .js-rules-import-csv'(event, tpl) {
-    const text = tpl.find('.js-rules-import-text').value;
+  'click .js-rules-import-csv'(event: JQuery.TriggeredEvent, tpl: RulesImportExportInstance) {
+    const text = (tpl.find('.js-rules-import-text') as HTMLTextAreaElement).value;
     try {
       reportImport(tpl, importRules(csvToRules(text), targetBoardId(tpl)));
     } catch (e) {
       tpl.message.set(String(e.message || e));
     }
   },
-  'click .js-rules-import-trello'(event, tpl) {
-    const { rules, unmapped } = parseTrelloButler(tpl.find('.js-rules-import-text').value);
+  'click .js-rules-import-trello'(event: JQuery.TriggeredEvent, tpl: RulesImportExportInstance) {
+    const { rules, unmapped } = parseTrelloButler((tpl.find('.js-rules-import-text') as HTMLTextAreaElement).value);
     reportImport(tpl, importRules(rules, targetBoardId(tpl)), unmapped);
   },
-  'click .js-rules-import-workflow'(event, tpl) {
-    const format = tpl.find('.js-workflow-format').value;
-    const { rules, unmapped, error } = parseWorkflow(tpl.find('.js-rules-import-text').value, format);
+  'click .js-rules-import-workflow'(event: JQuery.TriggeredEvent, tpl: RulesImportExportInstance) {
+    const format = (tpl.find('.js-workflow-format') as HTMLSelectElement).value;
+    const { rules, unmapped, error } = parseWorkflow((tpl.find('.js-rules-import-text') as HTMLTextAreaElement).value, format);
     if (error) {
       tpl.message.set(error);
       return;
@@ -300,3 +305,42 @@ Template.rulesImportExportPopup.events({
     reportImport(tpl, importRules(rules, targetBoardId(tpl)), unmapped);
   },
 });
+
+// A portable, board-independent rule: a title plus the trigger/action documents
+// with board-specific fields stripped. The trigger/action shapes vary by
+// activityType/actionType, so they are keyed dynamically.
+interface RuleEntry {
+  title?: string;
+  trigger: Record<string, any>;
+  action: Record<string, any>;
+}
+
+// One parsed CSV row of the round-trippable export format.
+interface CsvRow {
+  title?: string;
+  triggerType?: string;
+  triggerFields?: string;
+  actionType?: string;
+  actionFields?: string;
+}
+
+// A node in the user's board-workspaces tree (from user.profile).
+interface WorkspaceNode {
+  id: string;
+  name: string;
+  children?: WorkspaceNode[];
+}
+
+// A flattened workspace entry for the import target dropdown.
+interface WorkspaceOption {
+  id: string;
+  label: string;
+}
+
+// The rulesImportExport popup instance: the status message plus the currently
+// selected import-target workspace and board.
+interface RulesImportExportInstance extends Blaze.TemplateInstance {
+  message: ReactiveVar<string>;
+  selectedWorkspace: ReactiveVar<string>;
+  selectedBoard: ReactiveVar<string>;
+}

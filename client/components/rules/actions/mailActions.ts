@@ -1,13 +1,15 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 import Actions from '/models/actions';
 import Rules from '/models/rules';
 import Triggers from '/models/triggers';
 import { Utils } from '/client/lib/utils';
 
 Template.mailActions.events({
-  'click .js-mail-action'(event, tpl) {
-    const emailTo = tpl.find('#email-to').value;
-    const emailSubject = tpl.find('#email-subject').value;
-    const emailMsg = tpl.find('#email-msg').value;
+  'click .js-mail-action'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
+    const emailTo = (tpl.find('#email-to') as HTMLInputElement).value;
+    const emailSubject = (tpl.find('#email-subject') as HTMLInputElement).value;
+    const emailMsg = (tpl.find('#email-msg') as HTMLInputElement).value;
     const data = Template.currentData();
     const trigger = data.triggerVar.get();
     const ruleName = data.ruleName.get();

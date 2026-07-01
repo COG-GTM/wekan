@@ -338,6 +338,30 @@ interface WekanConnectRouter {
   options(path: string, ...handlers: WekanConnectHandler[]): WekanConnectRouter;
 }
 
+// papaparse ships no bundled types and @types/papaparse is not installed. Only
+// the two methods the rules import/export uses are declared: parse() to read a
+// CSV string into rows (header mode yields objects keyed by column) and
+// unparse() to serialise rows back to CSV. The row shape is caller-defined.
+declare module 'papaparse' {
+  interface ParseConfig {
+    header?: boolean;
+    skipEmptyLines?: boolean | 'greedy';
+  }
+  interface ParseResult<T> {
+    data: T[];
+    errors: any[];
+    meta: any;
+  }
+  interface UnparseConfig {
+    columns?: string[];
+  }
+  function parse<T = any>(input: string, config?: ParseConfig): ParseResult<T>;
+  function unparse(data: any[], config?: UnparseConfig): string;
+  const Papa: { parse: typeof parse; unparse: typeof unparse };
+  export default Papa;
+  export { parse, unparse };
+}
+
 // meteor/reywood:publish-composite — declarative publication of related cursors
 // (no bundled types). The publish callback is bound to a Meteor.Subscription and
 // returns a tree of find()/children specs (or an array to clear the client).
@@ -685,7 +709,10 @@ interface PopupStatic {
   // Blaze template used to render popups, and the live Blaze view (or null).
   template: any;
   current: any;
-  open(name: string): (this: any, evt: Event, options?: { dataContextIfCurrentDataIsUndefined?: any }) => void;
+  // The returned handler is invoked from Blaze event maps and called directly by
+  // app code; `evt` is a DOM Event or a jQuery event depending on the call site,
+  // so it is `any` (the popup opener treats it generically).
+  open(name: string): (this: any, evt: any, options?: { dataContextIfCurrentDataIsUndefined?: any }) => void;
   afterConfirm(name: string, action: (...args: any[]) => void): (this: any, evt: Event, tpl?: any) => void;
   isOpen(): boolean;
   back(n?: number): void;

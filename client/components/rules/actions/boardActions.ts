@@ -1,3 +1,5 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
 import Actions from '/models/actions';
@@ -5,7 +7,7 @@ import Rules from '/models/rules';
 import Triggers from '/models/triggers';
 import { Utils } from '/client/lib/utils';
 
-Template.boardActions.onCreated(function () {
+Template.boardActions.onCreated(function (this: Blaze.TemplateInstance) {
   this.subscribe('boards');
 });
 
@@ -38,13 +40,13 @@ Template.boardActions.helpers({
 });
 
 Template.boardActions.events({
-  'click .js-create-card-action'(event, tpl) {
+  'click .js-create-card-action'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
-    const cardName = tpl.find('#card-name').value;
-    const listName = tpl.find('#list-name').value;
-    const swimlaneName = tpl.find('#swimlane-name2').value;
+    const cardName = (tpl.find('#card-name') as HTMLInputElement).value;
+    const listName = (tpl.find('#list-name') as HTMLInputElement).value;
+    const swimlaneName = (tpl.find('#swimlane-name2') as HTMLInputElement).value;
     const boardId = Session.get('currentBoard');
     const desc = Utils.getTriggerActionDesc(event, tpl);
     const triggerId = Triggers.insert(trigger);
@@ -63,11 +65,11 @@ Template.boardActions.events({
       boardId,
     });
   },
-  'click .js-add-swimlane-action'(event, tpl) {
+  'click .js-add-swimlane-action'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
-    const swimlaneName = tpl.find('#swimlane-name').value;
+    const swimlaneName = (tpl.find('#swimlane-name') as HTMLInputElement).value;
     const boardId = Session.get('currentBoard');
     const desc = Utils.getTriggerActionDesc(event, tpl);
     const triggerId = Triggers.insert(trigger);
@@ -84,15 +86,15 @@ Template.boardActions.events({
       boardId,
     });
   },
-  'click .js-add-spec-move-action'(event, tpl) {
+  'click .js-add-spec-move-action'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
-    const actionSelected = tpl.find('#move-spec-action').value;
-    const swimlaneName = tpl.find('#swimlaneName').value || '*';
-    const listName = tpl.find('#listName').value || '*';
+    const actionSelected = (tpl.find('#move-spec-action') as HTMLInputElement).value;
+    const swimlaneName = (tpl.find('#swimlaneName') as HTMLInputElement).value || '*';
+    const listName = (tpl.find('#listName') as HTMLInputElement).value || '*';
     const boardId = Session.get('currentBoard');
-    const destBoardId = tpl.find('#board-id').value;
+    const destBoardId = (tpl.find('#board-id') as HTMLInputElement).value;
     const desc = Utils.getTriggerActionDesc(event, tpl);
     if (actionSelected === 'top') {
       const triggerId = Triggers.insert(trigger);
@@ -127,13 +129,13 @@ Template.boardActions.events({
       });
     }
   },
-  'click .js-add-gen-move-action'(event, tpl) {
+  'click .js-add-gen-move-action'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const desc = Utils.getTriggerActionDesc(event, tpl);
     const boardId = Session.get('currentBoard');
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
-    const actionSelected = tpl.find('#move-gen-action').value;
+    const actionSelected = (tpl.find('#move-gen-action') as HTMLInputElement).value;
     const actionType =
       actionSelected === 'bottom' ? 'moveCardToBottom' : 'moveCardToTop';
     // Insert the rule on the server (see server/rulesButton.js → rules.createRule)
@@ -146,13 +148,13 @@ Template.boardActions.events({
       desc,
     });
   },
-  'click .js-add-arch-action'(event, tpl) {
+  'click .js-add-arch-action'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const desc = Utils.getTriggerActionDesc(event, tpl);
     const boardId = Session.get('currentBoard');
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
-    const actionSelected = tpl.find('#arch-action').value;
+    const actionSelected = (tpl.find('#arch-action') as HTMLInputElement).value;
     if (actionSelected === 'archive') {
       const triggerId = Triggers.insert(trigger);
       const actionId = Actions.insert({
@@ -182,14 +184,14 @@ Template.boardActions.events({
       });
     }
   },
-  'click .js-link-card-action'(event, tpl) {
+  'click .js-link-card-action'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
-    const swimlaneName = tpl.find('#swimlaneName-link').value || '*';
-    const listName = tpl.find('#listName-link').value || '*';
+    const swimlaneName = (tpl.find('#swimlaneName-link') as HTMLInputElement).value || '*';
+    const listName = (tpl.find('#listName-link') as HTMLInputElement).value || '*';
     const boardId = Session.get('currentBoard');
-    const destBoardId = tpl.find('#board-id-link').value;
+    const destBoardId = (tpl.find('#board-id-link') as HTMLInputElement).value;
     const desc = Utils.getTriggerActionDesc(event, tpl);
     const triggerId = Triggers.insert(trigger);
     const actionId = Actions.insert({
@@ -206,14 +208,14 @@ Template.boardActions.events({
       boardId,
     });
   },
-  'click .js-sort-list-action'(event, tpl) {
+  'click .js-sort-list-action'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
     const boardId = Session.get('currentBoard');
     const desc = Utils.getTriggerActionDesc(event, tpl);
-    const listName = tpl.find('#sort-list-name').value || '*';
-    const sortField = tpl.find('#sort-field').value;
+    const listName = (tpl.find('#sort-list-name') as HTMLInputElement).value || '*';
+    const sortField = (tpl.find('#sort-field') as HTMLInputElement).value;
     const triggerId = Triggers.insert(trigger);
     const actionId = Actions.insert({
       actionType: 'sortList',
@@ -224,14 +226,14 @@ Template.boardActions.events({
     });
     Rules.insert({ title: ruleName, triggerId, actionId, boardId });
   },
-  'click .js-move-all-cards-action'(event, tpl) {
+  'click .js-move-all-cards-action'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const data = Template.currentData();
     const ruleName = data.ruleName.get();
     const trigger = data.triggerVar.get();
     const boardId = Session.get('currentBoard');
     const desc = Utils.getTriggerActionDesc(event, tpl);
-    const fromListName = tpl.find('#moveall-from-list').value || '*';
-    const listName = tpl.find('#moveall-to-list').value || '*';
+    const fromListName = (tpl.find('#moveall-from-list') as HTMLInputElement).value || '*';
+    const listName = (tpl.find('#moveall-to-list') as HTMLInputElement).value || '*';
     const triggerId = Triggers.insert(trigger);
     const actionId = Actions.insert({
       actionType: 'moveAllCardsInList',

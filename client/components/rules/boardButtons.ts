@@ -1,3 +1,5 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 import Rules from '/models/rules';
 
 // Renders the board's "board button" rules in the board header and runs one
@@ -6,7 +8,7 @@ import Rules from '/models/rules';
 // view reads it from the published `rules` collection alone — the schemaless
 // `triggers` collection's documents do not reach the client over the board
 // subscription in this Meteor 3 setup.
-Template.boardButtons.onCreated(function () {
+Template.boardButtons.onCreated(function (this: Blaze.TemplateInstance) {
   this.autorun(() => {
     const boardId = Session.get('currentBoard');
     if (boardId) this.subscribe('boardRules', boardId);
@@ -31,7 +33,7 @@ Template.boardButtons.helpers({
 });
 
 Template.boardButtons.events({
-  'click .js-run-board-button'(event) {
+  'click .js-run-board-button'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const ruleId = event.currentTarget.getAttribute('data-rule-id');
     Meteor.call('rules.runButton', ruleId);

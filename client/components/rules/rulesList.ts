@@ -1,3 +1,6 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveCache } from '/imports/reactiveCache';
 import Actions from '/models/actions';
 import Rules from '/models/rules';
@@ -5,18 +8,18 @@ import Triggers from '/models/triggers';
 
 function boardRuleIds() {
   const boardId = Session.get('currentBoard');
-  return ReactiveCache.getRules({ boardId }).map(r => r._id);
+  return ReactiveCache.getRules({ boardId }).map((r: { _id: string }) => r._id);
 }
 
-function getSelected() {
-  return Session.get('selectedRuleIds') || [];
+function getSelected(): string[] {
+  return (Session.get('selectedRuleIds') as string[]) || [];
 }
 
-function setSelected(ids) {
+function setSelected(ids: string[]) {
   Session.set('selectedRuleIds', ids);
 }
 
-Template.rulesList.onCreated(function () {
+Template.rulesList.onCreated(function (this: RulesListInstance) {
   this.autorun(() => {
     const boardId = Session.get('currentBoard');
     if (boardId) this.subscribe('boardRules', boardId);
@@ -33,16 +36,16 @@ Template.rulesList.helpers({
     const user = ReactiveCache.getCurrentUser();
     return user && (user.isAdmin || user.isBoardAdmin);
   },
-  isSelected() {
+  isSelected(this: { _id: string }) {
     return getSelected().includes(this._id);
   },
-  isEditing() {
-    return Template.instance().editingRuleId.get() === this._id;
+  isEditing(this: { _id: string }) {
+    return (Template.instance() as RulesListInstance).editingRuleId.get() === this._id;
   },
 });
 
 Template.rulesList.events({
-  'change .js-rule-select'(event) {
+  'change .js-rule-select'(event: JQuery.TriggeredEvent) {
     const ruleId = event.currentTarget.getAttribute('data-rule-id');
     const selected = new Set(getSelected());
     if (event.currentTarget.checked) {
@@ -59,7 +62,7 @@ Template.rulesList.events({
     setSelected([]);
   },
   'click .js-rules-delete-selected'() {
-    getSelected().forEach(ruleId => {
+    getSelected().forEach((ruleId: string) => {
       const rule = ReactiveCache.getRule(ruleId);
       if (rule) {
         Rules.remove(rule._id);
@@ -71,10 +74,10 @@ Template.rulesList.events({
   },
   'click .js-rules-export-selected': Popup.open('rulesImportExport'),
   // Inline rename of a rule.
-  'click .js-edit-rule'(event, tpl) {
+  'click .js-edit-rule'(this: { _id: string }, event: JQuery.TriggeredEvent, tpl: RulesListInstance) {
     tpl.editingRuleId.set(this._id);
   },
-  'keydown .js-edit-rule-input'(event, tpl) {
+  'keydown .js-edit-rule-input'(this: { _id: string }, event: JQuery.TriggeredEvent, tpl: RulesListInstance) {
     if (event.key === 'Enter') {
       const title = event.currentTarget.value.trim();
       if (title) Rules.update(this._id, { $set: { title } });
@@ -83,9 +86,15 @@ Template.rulesList.events({
       tpl.editingRuleId.set(null);
     }
   },
-  'blur .js-edit-rule-input'(event, tpl) {
+  'blur .js-edit-rule-input'(this: { _id: string }, event: JQuery.TriggeredEvent, tpl: RulesListInstance) {
     const title = event.currentTarget.value.trim();
     if (title) Rules.update(this._id, { $set: { title } });
     tpl.editingRuleId.set(null);
   },
 });
+
+// The rulesList Blaze template instance carries the id of the rule currently
+// being inline-renamed (or null when none is being edited).
+interface RulesListInstance extends Blaze.TemplateInstance {
+  editingRuleId: ReactiveVar<string | null>;
+}
