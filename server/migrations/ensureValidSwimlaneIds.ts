@@ -16,7 +16,7 @@ import Lists from '/models/lists';
 import Swimlanes from '/models/swimlanes';
 
 // Helper collection to track migrations - must be defined first
-const Migrations = new Mongo.Collection('migrations');
+const Migrations = new Mongo.Collection<MigrationRecord>('migrations');
 
 // DISABLED: This migration now runs from Admin Panel / Cron / Run All Migrations
 // Instead of running automatically on startup
@@ -44,7 +44,7 @@ export const MIGRATION_VERSION = 1;
 /**
  * Get or create a "Rescued Data" swimlane for a board
  */
-async function getOrCreateRescuedSwimlane(boardId) {
+async function getOrCreateRescuedSwimlane(boardId: string) {
     const board = await Boards.findOneAsync(boardId);
     if (!board) return null;
 
@@ -124,7 +124,7 @@ async function getOrCreateRescuedSwimlane(boardId) {
       }
 
       if (defaultSwimlane) {
-        await Cards.updateAsync(card._id, {
+        await Cards.updateAsync(card._id!, {
           $set: { swimlaneId: defaultSwimlane._id },
         });
         fixedCount++;
@@ -147,14 +147,14 @@ async function getOrCreateRescuedSwimlane(boardId) {
         { swimlaneId: { $exists: false } },
         { swimlaneId: null },
       ],
-    }).fetchAsync();
+    } as Parameters<typeof Lists.find>[0]).fetchAsync();
 
     console.log(`Found ${listsWithoutSwimlane.length} lists without swimlaneId`);
 
     for (const list of listsWithoutSwimlane) {
       // Set to empty string for backward compatibility
       // (lists can be shared across swimlanes)
-      await Lists.updateAsync(list._id, {
+      await Lists.updateAsync(list._id!, {
         $set: { swimlaneId: '' },
       });
       fixedCount++;
@@ -181,7 +181,7 @@ async function getOrCreateRescuedSwimlane(boardId) {
         const rescuedSwimlane = await getOrCreateRescuedSwimlane(card.boardId);
 
         if (rescuedSwimlane) {
-          await Cards.updateAsync(card._id, {
+          await Cards.updateAsync(card._id!, {
             $set: { swimlaneId: rescuedSwimlane._id },
           });
           rescuedCount++;
@@ -276,7 +276,7 @@ async function getOrCreateRescuedSwimlane(boardId) {
       console.log('Migration results:');
       console.log(`- Fixed ${cardResults.fixedCount} cards without swimlaneId`);
       console.log(`- Fixed ${listResults.fixedCount} lists without swimlaneId`);
-      console.log(`- Rescued ${rescueResults.rescuedCount} orphaned cards`);
+      console.log(`- Rescued ${rescueResults!.rescuedCount} orphaned cards`);
 
       // Record migration completion
       await Migrations.upsertAsync(
@@ -289,7 +289,7 @@ async function getOrCreateRescuedSwimlane(boardId) {
             results: {
               cardsFixed: cardResults.fixedCount,
               listsFixed: listResults.fixedCount,
-              cardsRescued: rescueResults.rescuedCount,
+              cardsRescued: rescueResults!.rescuedCount,
             },
           },
         }
@@ -301,7 +301,7 @@ async function getOrCreateRescuedSwimlane(boardId) {
         success: true,
         cardsFixed: cardResults.fixedCount,
         listsFixed: listResults.fixedCount,
-        cardsRescued: rescueResults.rescuedCount,
+        cardsRescued: rescueResults!.rescuedCount,
       };
     } catch (error) {
       console.error(`Migration ${MIGRATION_NAME} failed:`, error);
@@ -332,7 +332,7 @@ Meteor.startup(() => {
     console.log('Migration results:');
     console.log(`- Fixed ${cardResults.fixedCount} cards without swimlaneId`);
     console.log(`- Fixed ${listResults.fixedCount} lists without swimlaneId`);
-    console.log(`- Rescued ${rescueResults.rescuedCount} orphaned cards`);
+    console.log(`- Rescued ${rescueResults!.rescuedCount} orphaned cards`);
 
     // Record migration completion
     Migrations.upsert(
@@ -345,7 +345,7 @@ Meteor.startup(() => {
           results: {
             cardsFixed: cardResults.fixedCount,
             listsFixed: listResults.fixedCount,
-            cardsRescued: rescueResults.rescuedCount,
+            cardsRescued: rescueResults!.rescuedCount,
           },
         },
       }
@@ -365,3 +365,12 @@ Meteor.startup(() => {
   }
 });
 */
+
+interface MigrationRecord {
+  _id?: string;
+  name?: string;
+  version: number;
+  completedAt?: Date;
+  results?: WekanDocumentField;
+  [field: string]: WekanDocumentField;
+}

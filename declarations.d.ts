@@ -582,6 +582,17 @@ type WekanSchemaValue = any;
 // in /imports/reactiveCache). Aliased so document interfaces avoid a bare `any`.
 type WekanDocumentField = any;
 
+// A loosely-typed document as returned by the untyped ReactiveCache interop
+// layer (its getters resolve to WekanQueryResult = any). Server migrations and
+// routes iterate these results with array helpers (filter/map/forEach/...);
+// typing the callback element as this shape gives those callbacks a concrete
+// parameter type instead of an implicit `any`, while its index signature keeps
+// dynamic per-record field access available.
+interface WekanReactiveDocument {
+  _id?: string;
+  [field: string]: WekanDocumentField;
+}
+
 // The SimpleSchema validation context bound to `this` inside a field's
 // autoValue()/custom() callbacks.
 interface WekanSchemaValidationContext {

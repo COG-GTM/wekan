@@ -27,6 +27,10 @@ import Attachments from '/models/attachments';
 import { generateUniversalAttachmentUrl, isUniversalFileUrl } from '/models/lib/universalUrlGenerator';
 
 class ComprehensiveBoardMigration {
+  name: string;
+  version: number;
+  migrationSteps: string[];
+
   constructor() {
     this.name = 'comprehensive-board-migration';
     this.version = 1;
@@ -42,7 +46,7 @@ class ComprehensiveBoardMigration {
   /**
    * Check if migration is needed for a board
    */
-  async needsMigration(boardId) {
+  async needsMigration(boardId: string) {
     try {
       const board = await ReactiveCache.getBoard(boardId);
       if (!board) return false;
@@ -65,8 +69,8 @@ class ComprehensiveBoardMigration {
   /**
    * Detect all migration issues in a board
    */
-  async detectMigrationIssues(boardId) {
-    const issues = [];
+  async detectMigrationIssues(boardId: string) {
+    const issues: MigrationIssue[] = [];
 
     try {
       const cards = await ReactiveCache.getCards({ boardId });
@@ -74,7 +78,7 @@ class ComprehensiveBoardMigration {
       const swimlanes = await ReactiveCache.getSwimlanes({ boardId });
 
       // Issue 1: Cards with missing swimlaneId
-      const cardsWithoutSwimlane = cards.filter(card => !card.swimlaneId);
+      const cardsWithoutSwimlane = cards.filter((card: WekanReactiveDocument) => !card.swimlaneId);
       if (cardsWithoutSwimlane.length > 0) {
         issues.push({
           type: 'cards_without_swimlane',
@@ -84,7 +88,7 @@ class ComprehensiveBoardMigration {
       }
 
       // Issue 2: Cards with missing listId
-      const cardsWithoutList = cards.filter(card => !card.listId);
+      const cardsWithoutList = cards.filter((card: WekanReactiveDocument) => !card.listId);
       if (cardsWithoutList.length > 0) {
         issues.push({
           type: 'cards_without_list',
@@ -94,7 +98,7 @@ class ComprehensiveBoardMigration {
       }
 
       // Issue 3: Lists without swimlaneId (shared lists)
-      const sharedLists = lists.filter(list => !list.swimlaneId || list.swimlaneId === '');
+      const sharedLists = lists.filter((list: WekanReactiveDocument) => !list.swimlaneId || list.swimlaneId === '');
       if (sharedLists.length > 0) {
         issues.push({
           type: 'shared_lists',
@@ -105,11 +109,11 @@ class ComprehensiveBoardMigration {
 
       // Issue 4: Cards with mismatched listId/swimlaneId
       const listSwimlaneMap = new Map();
-      lists.forEach(list => {
+      lists.forEach((list: WekanReactiveDocument) => {
         listSwimlaneMap.set(list._id, list.swimlaneId || '');
       });
 
-      const mismatchedCards = cards.filter(card => {
+      const mismatchedCards = cards.filter((card: WekanReactiveDocument) => {
         if (!card.listId || !card.swimlaneId) return false;
         const listSwimlaneId = listSwimlaneMap.get(card.listId);
         return listSwimlaneId && listSwimlaneId !== card.swimlaneId;
@@ -124,8 +128,8 @@ class ComprehensiveBoardMigration {
       }
 
       // Issue 5: Empty lists (lists with no cards)
-      const emptyLists = lists.filter(list => {
-        const listCards = cards.filter(card => card.listId === list._id);
+      const emptyLists = lists.filter((list: WekanReactiveDocument) => {
+        const listCards = cards.filter((card: WekanReactiveDocument) => card.listId === list._id);
         return listCards.length === 0;
       });
 
@@ -152,7 +156,7 @@ class ComprehensiveBoardMigration {
   /**
    * Execute the comprehensive migration for a board
    */
-  async executeMigration(boardId, progressCallback = null) {
+  async executeMigration(boardId: string, progressCallback: OverallProgressCallback | null = null) {
     try {
       if (process.env.DEBUG === 'true') {
         console.log(`Starting comprehensive board migration for board ${boardId}`);
@@ -163,7 +167,7 @@ class ComprehensiveBoardMigration {
         throw new Error(`Board ${boardId} not found`);
       }
 
-      const results = {
+      const results: ComprehensiveMigrationResults = {
         boardId,
         steps: {},
         totalCardsProcessed: 0,
@@ -176,7 +180,7 @@ class ComprehensiveBoardMigration {
       let currentStep = 0;
 
       // Helper function to update progress
-      const updateProgress = (stepName, stepProgress, stepStatus, stepDetails = null) => {
+      const updateProgress = (stepName: string, stepProgress: number, stepStatus: string, stepDetails: MigrationStepDetails | null = null) => {
         currentStep++;
         const overallProgress = Math.round((currentStep / totalSteps) * 100);
 
@@ -288,7 +292,7 @@ class ComprehensiveBoardMigration {
   /**
    * Step 1: Analyze board structure
    */
-  async analyzeBoardStructure(boardId) {
+  async analyzeBoardStructure(boardId: string) {
     const issues = await this.detectMigrationIssues(boardId);
     return {
       issues,
@@ -300,19 +304,19 @@ class ComprehensiveBoardMigration {
   /**
    * Step 2: Fix orphaned cards (cards with missing swimlaneId or listId)
    */
-  async fixOrphanedCards(boardId, progressCallback = null) {
+  async fixOrphanedCards(boardId: string, progressCallback: MigrationProgressCallback | null = null) {
     const cards = await ReactiveCache.getCards({ boardId });
     const swimlanes = await ReactiveCache.getSwimlanes({ boardId });
     const lists = await ReactiveCache.getLists({ boardId });
 
     let cardsFixed = 0;
-    const defaultSwimlane = swimlanes.find(s => s.title === 'Default') || swimlanes[0];
+    const defaultSwimlane = swimlanes.find((s: WekanReactiveDocument) => s.title === 'Default') || swimlanes[0];
     const totalCards = cards.length;
 
     for (let i = 0; i < cards.length; i++) {
       const card = cards[i];
       let needsUpdate = false;
-      const updates = {};
+      const updates: CardUpdateFields = {};
 
       // Fix missing swimlaneId
       if (!card.swimlaneId) {
@@ -324,7 +328,7 @@ class ComprehensiveBoardMigration {
       if (!card.listId) {
         // Find or create a default list for this swimlane
         const swimlaneId = updates.swimlaneId || card.swimlaneId;
-        let defaultList = lists.find(list =>
+        let defaultList = lists.find((list: WekanReactiveDocument) =>
           list.swimlaneId === swimlaneId && list.title === 'Default'
         );
 
@@ -370,7 +374,7 @@ class ComprehensiveBoardMigration {
   /**
    * Step 3: Convert shared lists to per-swimlane lists
    */
-  async convertSharedListsToPerSwimlane(boardId, progressCallback = null) {
+  async convertSharedListsToPerSwimlane(boardId: string, progressCallback: MigrationProgressCallback | null = null) {
     const cards = await ReactiveCache.getCards({ boardId });
     const lists = await ReactiveCache.getLists({ boardId });
     const swimlanes = await ReactiveCache.getSwimlanes({ boardId });
@@ -380,7 +384,7 @@ class ComprehensiveBoardMigration {
 
     // Group cards by swimlaneId
     const cardsBySwimlane = new Map();
-    cards.forEach(card => {
+    cards.forEach((card: WekanReactiveDocument) => {
       if (!cardsBySwimlane.has(card.swimlaneId)) {
         cardsBySwimlane.set(card.swimlaneId, []);
       }
@@ -401,12 +405,12 @@ class ComprehensiveBoardMigration {
       }
 
       // Get existing lists for this swimlane
-      const existingLists = lists.filter(list => list.swimlaneId === swimlaneId);
-      const existingListTitles = new Set(existingLists.map(list => list.title));
+      const existingLists = lists.filter((list: WekanReactiveDocument) => list.swimlaneId === swimlaneId);
+      const existingListTitles = new Set(existingLists.map((list: WekanReactiveDocument) => list.title));
 
       // Group cards by their current listId
       const cardsByListId = new Map();
-      swimlaneCards.forEach(card => {
+      swimlaneCards.forEach((card: WekanReactiveDocument) => {
         if (!cardsByListId.has(card.listId)) {
           cardsByListId.set(card.listId, []);
         }
@@ -415,7 +419,7 @@ class ComprehensiveBoardMigration {
 
       // For each listId used by cards in this swimlane
       for (const [listId, cardsInList] of cardsByListId) {
-        const originalList = lists.find(l => l._id === listId);
+        const originalList = lists.find((l: WekanReactiveDocument) => l._id === listId);
         if (!originalList) continue;
 
         // Check if this list's swimlaneId matches the card's swimlaneId
@@ -426,11 +430,11 @@ class ComprehensiveBoardMigration {
         }
 
         // Check if we already have a list with the same title in this swimlane
-        let targetList = existingLists.find(list => list.title === originalList.title);
+        let targetList = existingLists.find((list: WekanReactiveDocument) => list.title === originalList.title);
 
         if (!targetList) {
           // Create a new list for this swimlane
-          const newListData = {
+          const newListData: ListCreationData = {
             title: originalList.title,
             boardId: boardId,
             swimlaneId: swimlaneId,
@@ -475,10 +479,10 @@ class ComprehensiveBoardMigration {
   /**
    * Step 4: Ensure all lists are per-swimlane
    */
-  async ensurePerSwimlaneLists(boardId) {
+  async ensurePerSwimlaneLists(boardId: string) {
     const lists = await ReactiveCache.getLists({ boardId });
     const swimlanes = await ReactiveCache.getSwimlanes({ boardId });
-    const defaultSwimlane = swimlanes.find(s => s.title === 'Default') || swimlanes[0];
+    const defaultSwimlane = swimlanes.find((s: WekanReactiveDocument) => s.title === 'Default') || swimlanes[0];
 
     let listsProcessed = 0;
 
@@ -501,14 +505,14 @@ class ComprehensiveBoardMigration {
   /**
    * Step 5: Cleanup empty lists (lists with no cards)
    */
-  async cleanupEmptyLists(boardId) {
+  async cleanupEmptyLists(boardId: string) {
     const lists = await ReactiveCache.getLists({ boardId });
     const cards = await ReactiveCache.getCards({ boardId });
 
     let listsRemoved = 0;
 
     for (const list of lists) {
-      const listCards = cards.filter(card => card.listId === list._id);
+      const listCards = cards.filter((card: WekanReactiveDocument) => card.listId === list._id);
 
       if (listCards.length === 0) {
         // Remove empty list
@@ -527,17 +531,17 @@ class ComprehensiveBoardMigration {
   /**
    * Step 6: Validate migration
    */
-  async validateMigration(boardId) {
+  async validateMigration(boardId: string) {
     const issues = await this.detectMigrationIssues(boardId);
     const cards = await ReactiveCache.getCards({ boardId });
     const lists = await ReactiveCache.getLists({ boardId });
 
     // Check that all cards have valid swimlaneId and listId
-    const validCards = cards.filter(card => card.swimlaneId && card.listId);
+    const validCards = cards.filter((card: WekanReactiveDocument) => card.swimlaneId && card.listId);
     const invalidCards = cards.length - validCards.length;
 
     // Check that all lists have swimlaneId
-    const validLists = lists.filter(list => list.swimlaneId && list.swimlaneId !== '');
+    const validLists = lists.filter((list: WekanReactiveDocument) => list.swimlaneId && list.swimlaneId !== '');
     const invalidLists = lists.length - validLists.length;
 
     return {
@@ -670,7 +674,7 @@ class ComprehensiveBoardMigration {
   /**
    * Get migration status for a board
    */
-  async getMigrationStatus(boardId) {
+  async getMigrationStatus(boardId: string) {
     try {
       const board = await ReactiveCache.getBoard(boardId);
       if (!board) {
@@ -706,7 +710,7 @@ export const comprehensiveBoardMigration = new ComprehensiveBoardMigration();
 
 // Meteor methods
 Meteor.methods({
-  async 'comprehensiveBoardMigration.check'(boardId) {
+  async 'comprehensiveBoardMigration.check'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -716,7 +720,7 @@ Meteor.methods({
     return await comprehensiveBoardMigration.getMigrationStatus(boardId);
   },
 
-  async 'comprehensiveBoardMigration.execute'(boardId) {
+  async 'comprehensiveBoardMigration.execute'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -739,7 +743,7 @@ Meteor.methods({
     return await comprehensiveBoardMigration.executeMigration(boardId);
   },
 
-  async 'comprehensiveBoardMigration.needsMigration'(boardId) {
+  async 'comprehensiveBoardMigration.needsMigration'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -749,7 +753,7 @@ Meteor.methods({
     return await comprehensiveBoardMigration.needsMigration(boardId);
   },
 
-  async 'comprehensiveBoardMigration.detectIssues'(boardId) {
+  async 'comprehensiveBoardMigration.detectIssues'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -785,3 +789,58 @@ Meteor.methods({
     return await comprehensiveBoardMigration.fixAttachmentUrls();
   }
 });
+
+interface MigrationIssue {
+  type: string;
+  count: number;
+  description: string;
+}
+
+interface MigrationStepDetails {
+  [key: string]: WekanDocumentField;
+}
+
+interface MigrationProgressData {
+  overallProgress: number;
+  currentStep: number;
+  totalSteps: number;
+  stepName: string;
+  stepProgress: number;
+  stepStatus: string;
+  stepDetails: MigrationStepDetails | null;
+  boardId: string;
+}
+
+type OverallProgressCallback = (progressData: MigrationProgressData) => void;
+type MigrationProgressCallback = (progress: number, status: string) => void;
+
+interface ComprehensiveMigrationResults {
+  boardId: string;
+  steps: { [step: string]: WekanDocumentField };
+  totalCardsProcessed: number;
+  totalListsProcessed: number;
+  totalListsCreated: number;
+  errors: WekanDocumentField[];
+}
+
+interface CardUpdateFields {
+  swimlaneId?: string;
+  listId?: string;
+}
+
+interface ListCreationData {
+  title: string;
+  boardId: string;
+  swimlaneId: string;
+  sort: number;
+  archived: boolean;
+  createdAt: Date;
+  modifiedAt: Date;
+  type: string;
+  color?: string;
+  wipLimit?: WekanDocumentField;
+  wipLimitEnabled?: boolean;
+  wipLimitSoft?: boolean;
+  starred?: boolean;
+  collapsed?: boolean;
+}

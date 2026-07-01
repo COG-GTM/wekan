@@ -15,12 +15,15 @@ import Lists from '/models/lists';
 import Cards from '/models/cards';
 import Swimlanes from '/models/swimlanes';
 
-function getTranslatedString(key, fallback, options) {
+function getTranslatedString(key: string, fallback: string, options?: Parameters<typeof TAPi18n.__>[1]) {
   const translated = TAPi18n.__(key, options);
   return typeof translated === 'string' ? translated : fallback;
 }
 
 class RestoreAllArchivedMigration {
+  name: string;
+  version: number;
+
   constructor() {
     this.name = 'restoreAllArchived';
     this.version = 1;
@@ -29,7 +32,7 @@ class RestoreAllArchivedMigration {
   /**
    * Check if migration is needed for a board
    */
-  async needsMigration(boardId) {
+  async needsMigration(boardId: string) {
     try {
       const archivedSwimlanes = await ReactiveCache.getSwimlanes({ boardId, archived: true });
       const archivedLists = await ReactiveCache.getLists({ boardId, archived: true });
@@ -45,7 +48,7 @@ class RestoreAllArchivedMigration {
   /**
    * Execute the migration
    */
-  async executeMigration(boardId) {
+  async executeMigration(boardId: string) {
     try {
       const results = {
         swimlanesRestored: 0,
@@ -86,7 +89,7 @@ class RestoreAllArchivedMigration {
 
       // Restore all archived lists and fix missing swimlaneId
       for (const list of archivedLists) {
-        const updateFields = {
+        const updateFields: RestoreArchivedUpdateFields = {
           archived: false,
           updatedAt: new Date()
         };
@@ -94,7 +97,7 @@ class RestoreAllArchivedMigration {
         // Fix missing swimlaneId
         if (!list.swimlaneId) {
           // Try to find a suitable swimlane or use default
-          let targetSwimlane = activeSwimlanes.find(s => !s.archived);
+          let targetSwimlane = activeSwimlanes.find((s: WekanReactiveDocument) => !s.archived);
 
           if (!targetSwimlane) {
             // No active swimlane found, create default
@@ -133,7 +136,7 @@ class RestoreAllArchivedMigration {
 
       // Restore all archived cards and fix missing IDs
       for (const card of archivedCards) {
-        const updateFields = {
+        const updateFields: RestoreArchivedUpdateFields = {
           archived: false,
           updatedAt: new Date()
         };
@@ -143,11 +146,11 @@ class RestoreAllArchivedMigration {
         // Fix missing listId
         if (!card.listId) {
           // Find or create a default list
-          let targetList = allLists.find(l => !l.archived);
+          let targetList = allLists.find((l: WekanReactiveDocument) => !l.archived);
 
           if (!targetList) {
             // No active list found, create one
-            const defaultSwimlane = allSwimlanes.find(s => !s.archived) || allSwimlanes[0];
+            const defaultSwimlane = allSwimlanes.find((s: WekanReactiveDocument) => !s.archived) || allSwimlanes[0];
 
             const listId = await Lists.insertAsync({
               title: getTranslatedString('default', 'Default'),
@@ -157,7 +160,7 @@ class RestoreAllArchivedMigration {
               createdAt: new Date(),
               updatedAt: new Date(),
               archived: false
-            });
+            } as Parameters<typeof Lists.insertAsync>[0]);
             targetList = await ReactiveCache.getList(listId);
           }
 
@@ -169,17 +172,17 @@ class RestoreAllArchivedMigration {
         if (!card.swimlaneId) {
           // Try to get swimlaneId from the card's list
           if (card.listId || updateFields.listId) {
-            const cardList = allLists.find(l => l._id === (updateFields.listId || card.listId));
+            const cardList = allLists.find((l: WekanReactiveDocument) => l._id === (updateFields.listId || card.listId));
             if (cardList && cardList.swimlaneId) {
               updateFields.swimlaneId = cardList.swimlaneId;
             } else {
               // Fall back to first available swimlane
-              const defaultSwimlane = allSwimlanes.find(s => !s.archived) || allSwimlanes[0];
+              const defaultSwimlane = allSwimlanes.find((s: WekanReactiveDocument) => !s.archived) || allSwimlanes[0];
               updateFields.swimlaneId = defaultSwimlane._id;
             }
           } else {
             // Fall back to first available swimlane
-            const defaultSwimlane = allSwimlanes.find(s => !s.archived) || allSwimlanes[0];
+            const defaultSwimlane = allSwimlanes.find((s: WekanReactiveDocument) => !s.archived) || allSwimlanes[0];
             updateFields.swimlaneId = defaultSwimlane._id;
           }
           needsFix = true;
@@ -227,7 +230,7 @@ const restoreAllArchivedMigration = new RestoreAllArchivedMigration();
 
 // Register Meteor methods
 Meteor.methods({
-  async 'restoreAllArchived.needsMigration'(boardId) {
+  async 'restoreAllArchived.needsMigration'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -237,7 +240,7 @@ Meteor.methods({
     return await restoreAllArchivedMigration.needsMigration(boardId);
   },
 
-  async 'restoreAllArchived.execute'(boardId) {
+  async 'restoreAllArchived.execute'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -257,7 +260,7 @@ Meteor.methods({
 
     // Only board admins can run migrations
     const isBoardAdmin = board.members && board.members.some(
-      member => member.userId === this.userId && member.isAdmin
+      (member: WekanReactiveDocument) => member.userId === this.userId && member.isAdmin
     );
 
     if (!isBoardAdmin && !user.isAdmin) {
@@ -269,3 +272,10 @@ Meteor.methods({
 });
 
 export default restoreAllArchivedMigration;
+
+interface RestoreArchivedUpdateFields {
+  archived: boolean;
+  updatedAt: Date;
+  swimlaneId?: string;
+  listId?: string;
+}

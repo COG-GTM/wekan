@@ -11,6 +11,9 @@ import Users from '/models/users';
 import { generateUniversalAvatarUrl, cleanFileUrl, extractFileIdFromUrl, isUniversalFileUrl } from '/models/lib/universalUrlGenerator';
 
 class FixAvatarUrlsMigration {
+  name: string;
+  version: number;
+
   constructor() {
     this.name = 'fixAvatarUrls';
     this.version = 1;
@@ -19,14 +22,14 @@ class FixAvatarUrlsMigration {
   /**
    * Check if migration is needed for a board
    */
-  async needsMigration(boardId) {
+  async needsMigration(boardId: string) {
     // Get all users who are members of this board
     const board = await ReactiveCache.getBoard(boardId);
     if (!board || !board.members) {
       return false;
     }
 
-    const memberIds = board.members.map(m => m.userId);
+    const memberIds = board.members.map((m: WekanReactiveDocument) => m.userId);
     const users = await ReactiveCache.getUsers({ _id: { $in: memberIds } });
     
     for (const user of users) {
@@ -44,7 +47,7 @@ class FixAvatarUrlsMigration {
   /**
    * Execute the migration for a board
    */
-  async execute(boardId) {
+  async execute(boardId: string) {
     // Get all users who are members of this board
     const board = await ReactiveCache.getBoard(boardId);
     if (!board || !board.members) {
@@ -54,7 +57,7 @@ class FixAvatarUrlsMigration {
       };
     }
 
-    const memberIds = board.members.map(m => m.userId);
+    const memberIds = board.members.map((m: WekanReactiveDocument) => m.userId);
     const users = await ReactiveCache.getUsers({ _id: { $in: memberIds } });
     let avatarsFixed = 0;
 
@@ -131,7 +134,7 @@ export const fixAvatarUrlsMigration = new FixAvatarUrlsMigration();
 
 // Meteor method
 Meteor.methods({
-  async 'fixAvatarUrls.execute'(boardId) {
+  async 'fixAvatarUrls.execute'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -151,7 +154,7 @@ Meteor.methods({
 
     // Only board admins can run migrations
     const isBoardAdmin = board.members && board.members.some(
-      member => member.userId === this.userId && member.isAdmin
+      (member: WekanReactiveDocument) => member.userId === this.userId && member.isAdmin
     );
 
     if (!isBoardAdmin && !user.isAdmin) {
@@ -161,7 +164,7 @@ Meteor.methods({
     return await fixAvatarUrlsMigration.execute(boardId);
   },
 
-  async 'fixAvatarUrls.needsMigration'(boardId) {
+  async 'fixAvatarUrls.needsMigration'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
