@@ -158,6 +158,7 @@ Template.boardHeaderBar.events({
         console.warn('Sidebar not available, trying alternative approach');
       }
       // Try to trigger the sidebar through the global Blaze helper
+      // as any — _globalHelpers is a Blaze internal not exposed in its types.
       if (typeof Blaze !== 'undefined' && (Blaze as any)._globalHelpers && (Blaze as any)._globalHelpers.Sidebar) {
         const blazeSidebar = (Blaze as any)._globalHelpers.Sidebar();
         if (blazeSidebar && typeof blazeSidebar.toggle === 'function') {

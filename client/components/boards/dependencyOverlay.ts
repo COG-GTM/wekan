@@ -47,6 +47,7 @@ Template.dependencyOverlay.onCreated(function (this: DependencyOverlayInstance) 
   };
 
   this.recompute = () => {
+    // as any — isDestroyed is a runtime property on Blaze.View not in its types.
     if (this._overlayDestroyed || !this.view || (this.view as any).isDestroyed) {
       return;
     }

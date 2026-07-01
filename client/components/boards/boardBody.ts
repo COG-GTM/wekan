@@ -938,6 +938,8 @@ Template.calendarView.onRendered(function (this: Blaze.TemplateInstance) {
 
   this.autorun(function () {
     const calendarEl = document.getElementById('calendar-view');
+    // as any — _wekanCalendar is a FullCalendar instance stashed on the DOM
+    // element at runtime (see calendarView below); not part of HTMLElement.
     if (calendarEl && (calendarEl as any)._wekanCalendar) {
       (calendarEl as any)._wekanCalendar.refetchEvents();
     }
