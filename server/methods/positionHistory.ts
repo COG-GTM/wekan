@@ -13,7 +13,7 @@ Meteor.methods({
   /**
    * Track original position for a swimlane
    */
-  async 'positionHistory.trackSwimlane'(swimlaneId) {
+  async 'positionHistory.trackSwimlane'(swimlaneId: string) {
     check(swimlaneId, String);
 
     if (!this.userId) {
@@ -36,7 +36,7 @@ Meteor.methods({
   /**
    * Track original position for a list
    */
-  async 'positionHistory.trackList'(listId) {
+  async 'positionHistory.trackList'(listId: string) {
     check(listId, String);
 
     if (!this.userId) {
@@ -59,7 +59,7 @@ Meteor.methods({
   /**
    * Track original position for a card
    */
-  async 'positionHistory.trackCard'(cardId) {
+  async 'positionHistory.trackCard'(cardId: string) {
     check(cardId, String);
 
     if (!this.userId) {
@@ -82,7 +82,7 @@ Meteor.methods({
   /**
    * Get original position for a swimlane
    */
-  async 'positionHistory.getSwimlaneOriginalPosition'(swimlaneId) {
+  async 'positionHistory.getSwimlaneOriginalPosition'(swimlaneId: string) {
     check(swimlaneId, String);
 
     if (!this.userId) {
@@ -105,7 +105,7 @@ Meteor.methods({
   /**
    * Get original position for a list
    */
-  async 'positionHistory.getListOriginalPosition'(listId) {
+  async 'positionHistory.getListOriginalPosition'(listId: string) {
     check(listId, String);
 
     if (!this.userId) {
@@ -128,7 +128,7 @@ Meteor.methods({
   /**
    * Get original position for a card
    */
-  async 'positionHistory.getCardOriginalPosition'(cardId) {
+  async 'positionHistory.getCardOriginalPosition'(cardId: string) {
     check(cardId, String);
 
     if (!this.userId) {
@@ -151,7 +151,7 @@ Meteor.methods({
   /**
    * Check if a swimlane has moved from its original position
    */
-  async 'positionHistory.hasSwimlaneMoved'(swimlaneId) {
+  async 'positionHistory.hasSwimlaneMoved'(swimlaneId: string) {
     check(swimlaneId, String);
 
     if (!this.userId) {
@@ -174,7 +174,7 @@ Meteor.methods({
   /**
    * Check if a list has moved from its original position
    */
-  async 'positionHistory.hasListMoved'(listId) {
+  async 'positionHistory.hasListMoved'(listId: string) {
     check(listId, String);
 
     if (!this.userId) {
@@ -197,7 +197,7 @@ Meteor.methods({
   /**
    * Check if a card has moved from its original position
    */
-  async 'positionHistory.hasCardMoved'(cardId) {
+  async 'positionHistory.hasCardMoved'(cardId: string) {
     check(cardId, String);
 
     if (!this.userId) {
@@ -220,7 +220,7 @@ Meteor.methods({
   /**
    * Get original position description for a swimlane
    */
-  async 'positionHistory.getSwimlaneDescription'(swimlaneId) {
+  async 'positionHistory.getSwimlaneDescription'(swimlaneId: string) {
     check(swimlaneId, String);
 
     if (!this.userId) {
@@ -243,7 +243,7 @@ Meteor.methods({
   /**
    * Get original position description for a list
    */
-  async 'positionHistory.getListDescription'(listId) {
+  async 'positionHistory.getListDescription'(listId: string) {
     check(listId, String);
 
     if (!this.userId) {
@@ -266,7 +266,7 @@ Meteor.methods({
   /**
    * Get original position description for a card
    */
-  async 'positionHistory.getCardDescription'(cardId) {
+  async 'positionHistory.getCardDescription'(cardId: string) {
     check(cardId, String);
 
     if (!this.userId) {
@@ -289,7 +289,7 @@ Meteor.methods({
   /**
    * Get all position history for a board
    */
-  async 'positionHistory.getBoardHistory'(boardId) {
+  async 'positionHistory.getBoardHistory'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -311,7 +311,7 @@ Meteor.methods({
   /**
    * Get position history by entity type for a board
    */
-  async 'positionHistory.getBoardHistoryByType'(boardId, entityType) {
+  async 'positionHistory.getBoardHistoryByType'(boardId: string, entityType: string) {
     check(boardId, String);
     check(entityType, String);
 

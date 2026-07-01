@@ -199,6 +199,70 @@ declare module 'i18next-sprintf-postprocessor' {
   export default sprintf;
 }
 
+// meteor/webapp — Meteor 3's connect-based HTTP router. wekan registers its REST
+// endpoints via `WebApp.handlers.<verb>(path, handler)`; @types/meteor exposes
+// `connectHandlers` but not this newer `handlers` router, so declare it with the
+// verbs the app uses. The request is a Node IncomingMessage augmented by Meteor
+// + wekan api middleware (userId/body/params), and the response is a plain
+// ServerResponse.
+declare module 'meteor/webapp' {
+  namespace WebApp {
+    const handlers: WekanConnectRouter;
+  }
+}
+
+interface WekanConnectRequest extends import('http').IncomingMessage {
+  // Populated by wekan's Authentication middleware before the REST handlers run;
+  // modelled as a plain string since every handler operates on an authenticated
+  // request (they call Authentication.checkLoggedIn / return 401 otherwise).
+  userId: string;
+  // Request body parsed by wekan's api middleware; the shape varies per route,
+  // hence `any`.
+  body?: any;
+  // Route params extracted from `:name` path segments by the connect router.
+  params: { [key: string]: string };
+  query?: { [key: string]: string | string[] | undefined };
+}
+
+type WekanConnectResponse = import('http').ServerResponse;
+
+// A wekan REST route handler. `next` is optional-by-arity: handlers commonly
+// take just (req, res). The dynamic connect `next` error is `any`.
+type WekanConnectHandler = (
+  req: WekanConnectRequest,
+  res: WekanConnectResponse,
+  next: (err?: any) => void,
+) => void | Promise<void>;
+
+interface WekanConnectRouter {
+  // connect `.use` accepts a path and/or a chain of middleware of varied
+  // arities, so its args are dynamic.
+  use(...args: any[]): WekanConnectRouter;
+  get(path: string, ...handlers: WekanConnectHandler[]): WekanConnectRouter;
+  post(path: string, ...handlers: WekanConnectHandler[]): WekanConnectRouter;
+  put(path: string, ...handlers: WekanConnectHandler[]): WekanConnectRouter;
+  delete(path: string, ...handlers: WekanConnectHandler[]): WekanConnectRouter;
+  options(path: string, ...handlers: WekanConnectHandler[]): WekanConnectRouter;
+}
+
+// meteor/wekan-accounts-lockout — brute-force account lockout package (no bundled
+// types). Configured with numeric policy bags for known/unknown users, then
+// started via `.startup()`.
+declare module 'meteor/wekan-accounts-lockout' {
+  interface AccountsLockoutUserConfig {
+    failuresBeforeLockout: number;
+    lockoutPeriod: number;
+    failureWindow: number;
+  }
+  export class AccountsLockout {
+    constructor(config: {
+      knownUsers: AccountsLockoutUserConfig;
+      unknownUsers: AccountsLockoutUserConfig;
+    });
+    startup(): void;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // App-wide globals (registered by Meteor packages / startup code)
 // ---------------------------------------------------------------------------

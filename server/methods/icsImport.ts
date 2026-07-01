@@ -13,7 +13,7 @@ import { allowIsBoardMemberWithWriteAccess } from '/server/lib/utils';
 // Shared import logic used by both the Meteor method and the REST endpoint.
 // Validates that the target list/swimlane belong to the board (no cross-board
 // writes), parses the .ics text into card shapes and inserts them.
-async function importIcsCards(userId, boardId, listId, swimlaneId, icsText) {
+async function importIcsCards(userId: string, boardId: string, listId: string, swimlaneId: string, icsText: string) {
   const list = await Lists.findOneAsync(listId);
   if (!list || list.boardId !== boardId) {
     throw new Meteor.Error('list-not-found', 'List not found on this board.');
@@ -23,9 +23,9 @@ async function importIcsCards(userId, boardId, listId, swimlaneId, icsText) {
     throw new Meteor.Error('swimlane-not-found', 'Swimlane not found on this board.');
   }
   const cardShapes = icsToCards(icsText, { boardId, listId, swimlaneId });
-  const cardIds = [];
+  const cardIds: string[] = [];
   for (const shape of cardShapes) {
-    const doc = {
+    const doc: IcsCardInsert = {
       title: shape.title,
       description: shape.description,
       boardId,
@@ -63,7 +63,7 @@ Meteor.methods({
    * @param {string} icsText    raw .ics file contents
    * @returns {{ created: number, cardIds: string[] }}
    */
-  async importIcsToBoard(boardId, listId, swimlaneId, icsText) {
+  async importIcsToBoard(boardId: string, listId: string, swimlaneId: string, icsText: string) {
     check(boardId, String);
     check(listId, String);
     check(swimlaneId, String);
@@ -129,3 +129,18 @@ WebApp.handlers.post(
     sendJsonResult(res, { code: 200, data: result });
   },
 );
+
+// Shape of the card document inserted by the .ics importer. Mirrors the Cards
+// fields this importer sets; startAt/dueAt are optional (only set when the
+// source event supplies them).
+interface IcsCardInsert {
+  title: string;
+  description: string;
+  boardId: string;
+  listId: string;
+  swimlaneId: string;
+  userId: string;
+  sort: number;
+  startAt?: Date;
+  dueAt?: Date;
+}

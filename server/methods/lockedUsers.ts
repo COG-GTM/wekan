@@ -35,8 +35,10 @@ Meteor.methods({
       }
     ).fetchAsync();
 
-    // Format the results for the UI
-    return lockedUsers.map(user => {
+    // Format the results for the UI.
+    // `user` carries the custom `services['accounts-lockout']` sub-document that
+    // @types/meteor's UserServices does not declare, hence `any`.
+    return lockedUsers.map((user: any) => {
       const email = user.emails && user.emails.length > 0 ? user.emails[0].address : 'No email';
       const remainingLockTime = Math.round((user.services['accounts-lockout'].unlockTime - currentTime) / 1000);
 
@@ -51,7 +53,7 @@ Meteor.methods({
     });
   },
 
-  async unlockUser(userId) {
+  async unlockUser(userId: string) {
     // Check if user has admin rights
     const adminId = this.userId;
     if (!adminId) {
