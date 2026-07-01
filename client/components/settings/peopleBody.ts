@@ -1,3 +1,8 @@
+import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
+import { TAPi18n } from '/imports/i18n';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { avatarUpdateCounter } from '/client/components/users/avatarUpdateCounter';
 import { InfiniteScrolling } from '/client/lib/infiniteScrolling';
@@ -15,9 +20,10 @@ const orgsPerPage = 25;
 const teamsPerPage = 25;
 const usersPerPage = 25;
 let userOrgsTeamsAction = ""; //poosible actions 'addOrg', 'addTeam', 'removeOrg' or 'removeTeam' when adding or modifying a user
-let selectedUserChkBoxUserIds = [];
+// selectedUserChkBoxUserIds: any[] — checkbox element ids (strings) of selected users.
+let selectedUserChkBoxUserIds: any[] = [];
 
-Template.people.onCreated(function () {
+Template.people.onCreated(function (this: PeopleInstance) {
   this.infiniteScrolling = new InfiniteScrolling();
 
   this.error = new ReactiveVar('');
@@ -49,7 +55,8 @@ Template.people.onCreated(function () {
 
   this.refreshUsersCount = () => {
     const query = this.findUsersOptions.get();
-    Meteor.call('getUsersCollectionCount', query, (error, count) => {
+    // error/count: any — untyped Meteor method callback.
+    Meteor.call('getUsersCollectionCount', query, (error: any, count: any) => {
       if (error) {
         console.error('Failed to load users collection count:', error);
         return;
@@ -65,7 +72,8 @@ Template.people.onCreated(function () {
 
   this.refreshOrgsCount = () => {
     const query = this.findOrgsOptions.get();
-    Meteor.call('getOrgsCollectionCount', query, (error, count) => {
+    // error/count: any — untyped Meteor method callback.
+    Meteor.call('getOrgsCollectionCount', query, (error: any, count: any) => {
       if (error) {
         console.error('Failed to load orgs collection count:', error);
         return;
@@ -81,7 +89,8 @@ Template.people.onCreated(function () {
 
   this.refreshTeamsCount = () => {
     const query = this.findTeamsOptions.get();
-    Meteor.call('getTeamsCollectionCount', query, (error, count) => {
+    // error/count: any — untyped Meteor method callback.
+    Meteor.call('getTeamsCollectionCount', query, (error: any, count: any) => {
       if (error) {
         console.error('Failed to load teams collection count:', error);
         return;
@@ -111,7 +120,7 @@ Template.people.onCreated(function () {
   };
 
   this.filterOrg = () => {
-    const value = $('#searchOrgInput').first().val();
+    const value = $('#searchOrgInput').first().val() as string;
     if (value !== '') {
       const regex = new RegExp(value, 'i');
       this.findOrgsOptions.set({
@@ -128,7 +137,7 @@ Template.people.onCreated(function () {
   };
 
   this.filterTeam = () => {
-    const value = $('#searchTeamInput').first().val();
+    const value = $('#searchTeamInput').first().val() as string;
     if (value !== '') {
       const regex = new RegExp(value, 'i');
       this.findTeamsOptions.set({
@@ -145,11 +154,12 @@ Template.people.onCreated(function () {
   };
 
   this.filterPeople = () => {
-    const value = $('#searchInput').first().val();
+    const value = $('#searchInput').first().val() as string;
     const filterType = this.userFilterType.get();
     const currentTime = Number(new Date());
 
-    let query = {};
+    // query: any — dynamically-built minimongo selector keyed by user fields.
+    let query: Record<string, any> = {};
 
     // Apply text search filter if there's a search value
     if (value !== '') {
@@ -191,7 +201,7 @@ Template.people.onCreated(function () {
     this.peoplePage.set(1);
   };
 
-  this.switchMenu = (event) => {
+  this.switchMenu = (event: any) => {
     const target = $(event.currentTarget);
     if (!target.hasClass('active')) {
       $('.side-menu li.active').removeClass('active');
@@ -207,7 +217,8 @@ Template.people.onCreated(function () {
 
       // #5850: load the domains + per-domain user counts when the tab opens.
       if ('domains-setting' === targetID) {
-        Meteor.call('getDomainsWithUserCounts', (err, res) => {
+        // err/res: any — untyped Meteor method callback.
+        Meteor.call('getDomainsWithUserCounts', (err: any, res: any) => {
           if (!err) this.domains.set(res || []);
         });
       }
@@ -215,7 +226,8 @@ Template.people.onCreated(function () {
       // When switching to locked users tab, refresh the locked users list
       if ('locked-users-setting' === targetID) {
         // Find the lockedUsersGeneral component and call refreshLockedUsers
-        const lockedUsersComponent = Blaze.getView($('.main-body')[0])._templateInstance;
+        // _templateInstance is a Blaze view internal not exposed on the typed View.
+        const lockedUsersComponent = (Blaze.getView($('.main-body')[0]) as any)._templateInstance;
         if (lockedUsersComponent && lockedUsersComponent.refreshLockedUsers) {
           lockedUsersComponent.refreshLockedUsers();
         }
@@ -269,34 +281,34 @@ Template.people.onCreated(function () {
 
 Template.people.helpers({
   loading() {
-    return Template.instance().loading;
+    return (Template.instance() as PeopleInstance).loading;
   },
   orgSetting() {
-    return Template.instance().orgSetting;
+    return (Template.instance() as PeopleInstance).orgSetting;
   },
   teamSetting() {
-    return Template.instance().teamSetting;
+    return (Template.instance() as PeopleInstance).teamSetting;
   },
   peopleSetting() {
-    return Template.instance().peopleSetting;
+    return (Template.instance() as PeopleInstance).peopleSetting;
   },
   lockedUsersSetting() {
-    return Template.instance().lockedUsersSetting;
+    return (Template.instance() as PeopleInstance).lockedUsersSetting;
   },
   rolesSetting() {
-    return Template.instance().rolesSetting;
+    return (Template.instance() as PeopleInstance).rolesSetting;
   },
   templatesSetting() {
-    return Template.instance().templatesSetting;
+    return (Template.instance() as PeopleInstance).templatesSetting;
   },
   domainSetting() {
-    return Template.instance().domainSetting;
+    return (Template.instance() as PeopleInstance).domainSetting;
   },
   domainList() {
-    return Template.instance().domains.get();
+    return (Template.instance() as PeopleInstance).domains.get();
   },
   orgList() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as PeopleInstance;
     // The 'org' publication already returns only the current page (server-side
     // limit/skip, sorted createdAt:-1). Display exactly what it published:
     // re-applying skip/limit here paginated an already-paginated set, which
@@ -319,7 +331,7 @@ Template.people.helpers({
     return orgs;
   },
   teamList() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as PeopleInstance;
     // The 'team' publication already returns only the current page (server-side
     // limit/skip, sorted createdAt:-1). Display exactly what it published:
     // re-applying skip/limit here paginated an already-paginated set, which
@@ -342,7 +354,7 @@ Template.people.helpers({
     return teams;
   },
   peopleList() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as PeopleInstance;
     // The 'people' publication already returns only the current page (server-side
     // limit/skip, sorted createdAt:-1). Display exactly what it published:
     // re-applying skip/limit here paginated an already-paginated set — that is
@@ -363,58 +375,58 @@ Template.people.helpers({
     return users;
   },
   orgNumber() {
-    return Template.instance().numberOrgs.get();
+    return (Template.instance() as PeopleInstance).numberOrgs.get();
   },
   teamNumber() {
-    return Template.instance().numberTeams.get();
+    return (Template.instance() as PeopleInstance).numberTeams.get();
   },
   peopleNumber() {
-    return Template.instance().numberPeople.get();
+    return (Template.instance() as PeopleInstance).numberPeople.get();
   },
   peopleCurrentPage() {
-    return Template.instance().peoplePage.get();
+    return (Template.instance() as PeopleInstance).peoplePage.get();
   },
   peopleTotalPages() {
-    const totalUsers = Template.instance().numberPeople.get() || 0;
+    const totalUsers = (Template.instance() as PeopleInstance).numberPeople.get() || 0;
     return Math.max(1, Math.ceil(totalUsers / usersPerPage));
   },
   hasPeoplePrevPage() {
-    return Template.instance().peoplePage.get() > 1;
+    return (Template.instance() as PeopleInstance).peoplePage.get() > 1;
   },
   hasPeopleNextPage() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as PeopleInstance;
     const totalUsers = tpl.numberPeople.get() || 0;
     const totalPages = Math.max(1, Math.ceil(totalUsers / usersPerPage));
     return tpl.peoplePage.get() < totalPages;
   },
   orgCurrentPage() {
-    return Template.instance().orgPage.get();
+    return (Template.instance() as PeopleInstance).orgPage.get();
   },
   orgTotalPages() {
-    const totalOrgs = Template.instance().numberOrgs.get() || 0;
+    const totalOrgs = (Template.instance() as PeopleInstance).numberOrgs.get() || 0;
     return Math.max(1, Math.ceil(totalOrgs / orgsPerPage));
   },
   hasOrgPrevPage() {
-    return Template.instance().orgPage.get() > 1;
+    return (Template.instance() as PeopleInstance).orgPage.get() > 1;
   },
   hasOrgNextPage() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as PeopleInstance;
     const totalOrgs = tpl.numberOrgs.get() || 0;
     const totalPages = Math.max(1, Math.ceil(totalOrgs / orgsPerPage));
     return tpl.orgPage.get() < totalPages;
   },
   teamCurrentPage() {
-    return Template.instance().teamPage.get();
+    return (Template.instance() as PeopleInstance).teamPage.get();
   },
   teamTotalPages() {
-    const totalTeams = Template.instance().numberTeams.get() || 0;
+    const totalTeams = (Template.instance() as PeopleInstance).numberTeams.get() || 0;
     return Math.max(1, Math.ceil(totalTeams / teamsPerPage));
   },
   hasTeamPrevPage() {
-    return Template.instance().teamPage.get() > 1;
+    return (Template.instance() as PeopleInstance).teamPage.get() > 1;
   },
   hasTeamNextPage() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as PeopleInstance;
     const totalTeams = tpl.numberTeams.get() || 0;
     const totalPages = Math.max(1, Math.ceil(totalTeams / teamsPerPage));
     return tpl.teamPage.get() < totalPages;
@@ -422,7 +434,7 @@ Template.people.helpers({
 });
 
 Template.people.events({
-  'scroll .main-body'(event, tpl) {
+  'scroll .main-body'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     // Orgs, teams and people all use explicit prev/next pagination (server-side
     // limit/skip driven by orgPage/teamPage/peoplePage). Infinite scroll must
     // stay disabled on those tabs so the two paging mechanisms don't fight.
@@ -433,46 +445,46 @@ Template.people.events({
       tpl.loadNextPage();
     });
   },
-  'click #searchOrgButton'(event, tpl) {
+  'click #searchOrgButton'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     tpl.filterOrg();
   },
-  'keydown #searchOrgInput'(event, tpl) {
+  'keydown #searchOrgInput'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     if (event.keyCode === 13 && !event.shiftKey) {
       tpl.filterOrg();
     }
   },
-  'click #searchTeamButton'(event, tpl) {
+  'click #searchTeamButton'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     tpl.filterTeam();
   },
-  'keydown #searchTeamInput'(event, tpl) {
+  'keydown #searchTeamInput'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     if (event.keyCode === 13 && !event.shiftKey) {
       tpl.filterTeam();
     }
   },
-  'click #searchButton'(event, tpl) {
+  'click #searchButton'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     tpl.filterPeople();
   },
   'click #addOrRemoveTeam'(){
-    document.getElementById("divAddOrRemoveTeamContainer").style.display = 'block';
+    document.getElementById("divAddOrRemoveTeamContainer")!.style.display = 'block';
   },
-  'keydown #searchInput'(event, tpl) {
+  'keydown #searchInput'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     if (event.keyCode === 13 && !event.shiftKey) {
       tpl.filterPeople();
     }
   },
-  'change #userFilterSelect'(event, tpl) {
+  'change #userFilterSelect'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     const filterType = $(event.target).val();
     tpl.userFilterType.set(filterType);
     tpl.filterPeople();
   },
-  'click .js-people-prev-page'(event, tpl) {
+  'click .js-people-prev-page'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     event.preventDefault();
     const current = tpl.peoplePage.get();
     if (current > 1) {
       tpl.peoplePage.set(current - 1);
     }
   },
-  'click .js-people-next-page'(event, tpl) {
+  'click .js-people-next-page'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     event.preventDefault();
     const totalUsers = tpl.numberPeople.get() || 0;
     const totalPages = Math.max(1, Math.ceil(totalUsers / usersPerPage));
@@ -482,27 +494,29 @@ Template.people.events({
     }
   },
   // #4737/#5850: select-all / unselect-all for an org feature column.
-  'click .js-org-feature-all'(event) {
+  'click .js-org-feature-all'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
-    const field = event.currentTarget.getAttribute('data-feature');
-    const value = event.currentTarget.getAttribute('data-value') === 'true';
+    const currentTarget = event.currentTarget as HTMLElement;
+    const field = currentTarget.getAttribute('data-feature');
+    const value = currentTarget.getAttribute('data-value') === 'true';
     Meteor.call('setAllOrgsFeature', field, value);
   },
   // #4737/#5850: select-all / unselect-all for a team feature column.
-  'click .js-team-feature-all'(event) {
+  'click .js-team-feature-all'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
-    const field = event.currentTarget.getAttribute('data-feature');
-    const value = event.currentTarget.getAttribute('data-value') === 'true';
+    const currentTarget = event.currentTarget as HTMLElement;
+    const field = currentTarget.getAttribute('data-feature');
+    const value = currentTarget.getAttribute('data-value') === 'true';
     Meteor.call('setAllTeamsFeature', field, value);
   },
-  'click .js-org-prev-page'(event, tpl) {
+  'click .js-org-prev-page'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     event.preventDefault();
     const current = tpl.orgPage.get();
     if (current > 1) {
       tpl.orgPage.set(current - 1);
     }
   },
-  'click .js-org-next-page'(event, tpl) {
+  'click .js-org-next-page'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     event.preventDefault();
     const totalOrgs = tpl.numberOrgs.get() || 0;
     const totalPages = Math.max(1, Math.ceil(totalOrgs / orgsPerPage));
@@ -511,14 +525,14 @@ Template.people.events({
       tpl.orgPage.set(current + 1);
     }
   },
-  'click .js-team-prev-page'(event, tpl) {
+  'click .js-team-prev-page'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     event.preventDefault();
     const current = tpl.teamPage.get();
     if (current > 1) {
       tpl.teamPage.set(current - 1);
     }
   },
-  'click .js-team-next-page'(event, tpl) {
+  'click .js-team-next-page'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     event.preventDefault();
     const totalTeams = tpl.numberTeams.get() || 0;
     const totalPages = Math.max(1, Math.ceil(totalTeams / teamsPerPage));
@@ -527,10 +541,11 @@ Template.people.events({
       tpl.teamPage.set(current + 1);
     }
   },
-  'click #unlockAllUsers'(event) {
+  'click #unlockAllUsers'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     if (confirm(TAPi18n.__('accounts-lockout-confirm-unlock-all'))) {
-      Meteor.call('unlockAllUsers', (error) => {
+      // error: any — untyped Meteor method callback.
+      Meteor.call('unlockAllUsers', (error: any) => {
         if (error) {
           console.error('Error unlocking all users:', error);
         } else {
@@ -559,36 +574,36 @@ Template.people.events({
   'click #newUserButton'() {
     Popup.open('newUser');
   },
-  'click a.js-org-menu'(event, tpl) {
+  'click a.js-org-menu'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     tpl.switchMenu(event);
     tpl.orgPage.set(1);
     tpl.refreshOrgsCount();
   },
-  'click a.js-team-menu'(event, tpl) {
+  'click a.js-team-menu'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     tpl.switchMenu(event);
     tpl.teamPage.set(1);
     tpl.refreshTeamsCount();
   },
-  'click a.js-people-menu'(event, tpl) {
+  'click a.js-people-menu'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     tpl.switchMenu(event);
     tpl.peoplePage.set(1);
     tpl.refreshUsersCount();
   },
-  'click a.js-locked-users-menu'(event, tpl) {
+  'click a.js-locked-users-menu'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     tpl.switchMenu(event);
   },
-  'click a.js-roles-menu'(event, tpl) {
+  'click a.js-roles-menu'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     tpl.switchMenu(event);
   },
-  'click a.js-templates-menu'(event, tpl) {
+  'click a.js-templates-menu'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     tpl.switchMenu(event);
   },
-  'click a.js-domains-menu'(event, tpl) {
+  'click a.js-domains-menu'(event: JQuery.TriggeredEvent, tpl: PeopleInstance) {
     tpl.switchMenu(event);
   },
 });
 
-Template.rolesGeneral.onCreated(function () {
+Template.rolesGeneral.onCreated(function (this: RolesGeneralInstance) {
   // Working copy of the allowed-roles set; null until the published doc loads.
   this.workingRoles = new ReactiveVar(null);
   this.autorun(() => {
@@ -603,23 +618,23 @@ Template.rolesGeneral.onCreated(function () {
 
 Template.rolesGeneral.helpers({
   roleOptions() {
-    const working = Template.instance().workingRoles.get() || [];
+    const working = (Template.instance() as RolesGeneralInstance).workingRoles.get() || [];
     // The role key doubles as the i18n key. 'board-admin' renders as
     // "Board Admin", deliberately distinct from the global Admin Panel admin.
-    return INVITE_TO_BOARD_ROLES.map((key) => ({
+    return INVITE_TO_BOARD_ROLES.map((key: any) => ({
       key,
       label: key,
       allowed: working.includes(key),
     }));
   },
   allRolesAllowed() {
-    const working = Template.instance().workingRoles.get() || [];
-    return INVITE_TO_BOARD_ROLES.every((key) => working.includes(key));
+    const working = (Template.instance() as RolesGeneralInstance).workingRoles.get() || [];
+    return INVITE_TO_BOARD_ROLES.every((key: any) => working.includes(key));
   },
 });
 
 Template.rolesGeneral.events({
-  'click a.js-toggle-role'(event, tpl) {
+  'click a.js-toggle-role'(event: JQuery.TriggeredEvent, tpl: RolesGeneralInstance) {
     event.preventDefault();
     const role = $(event.currentTarget).data('role');
     const working = (tpl.workingRoles.get() || []).slice();
@@ -631,13 +646,13 @@ Template.rolesGeneral.events({
     }
     tpl.workingRoles.set(working);
   },
-  'click a.js-toggle-all-roles'(event, tpl) {
+  'click a.js-toggle-all-roles'(event: JQuery.TriggeredEvent, tpl: RolesGeneralInstance) {
     event.preventDefault();
     const working = tpl.workingRoles.get() || [];
-    const allOn = INVITE_TO_BOARD_ROLES.every((key) => working.includes(key));
+    const allOn = INVITE_TO_BOARD_ROLES.every((key: any) => working.includes(key));
     tpl.workingRoles.set(allOn ? [] : INVITE_TO_BOARD_ROLES.slice());
   },
-  'click .js-roles-save'(event, tpl) {
+  'click .js-roles-save'(event: JQuery.TriggeredEvent, tpl: RolesGeneralInstance) {
     event.preventDefault();
     InviteToBoardRolesSettings.update(INVITE_TO_BOARD_ROLES_ID, {
       $set: { allowedRoles: tpl.workingRoles.get() || [] },
@@ -657,14 +672,14 @@ function loadSharedTemplatesScopes() {
     const raw = window.localStorage.getItem(SHARED_TEMPLATES_SCOPE_KEY);
     const arr = raw ? JSON.parse(raw) : [];
     return Array.isArray(arr)
-      ? arr.filter(s => SHARED_TEMPLATES_VALID_SCOPES.includes(s))
+      ? arr.filter((s: any) => SHARED_TEMPLATES_VALID_SCOPES.includes(s))
       : [];
-  } catch (e) {
+  } catch (e) { // e: any — localStorage/JSON.parse throws untyped errors.
     return [];
   }
 }
 
-function saveSharedTemplatesScopes(scopes) {
+function saveSharedTemplatesScopes(scopes: any) {
   try {
     window.localStorage.setItem(SHARED_TEMPLATES_SCOPE_KEY, JSON.stringify(scopes));
   } catch (e) {
@@ -672,7 +687,7 @@ function saveSharedTemplatesScopes(scopes) {
   }
 }
 
-Template.templatesGeneral.onCreated(function () {
+Template.templatesGeneral.onCreated(function (this: TemplatesGeneralInstance) {
   // Restore the previously-checked scopes (empty by default → nothing shown).
   this.selectedScopes = new ReactiveVar(loadSharedTemplatesScopes());
   // Raw rows returned by the admin-only method (one entry per user whose
@@ -682,7 +697,8 @@ Template.templatesGeneral.onCreated(function () {
 
   this.loadSharedTemplates = () => {
     this.loading.set(true);
-    Meteor.call('adminSharedTemplates', (error, result) => {
+    // error/result: any — untyped Meteor method callback.
+    Meteor.call('adminSharedTemplates', (error: any, result: any) => {
       this.loading.set(false);
       if (error) {
         console.error('Failed to load shared templates:', error);
@@ -696,25 +712,25 @@ Template.templatesGeneral.onCreated(function () {
   this.loadSharedTemplates();
 });
 
-const SCOPE_LABELS = {
+const SCOPE_LABELS: Record<string, string> = {
   organizations: 'organizations',
   teams: 'teams',
   domains: 'domains',
 };
 
 // Build the grouped structure for a single scope dimension.
-function buildScopeGroups(scope, rows) {
-  // group key -> { groupName, members: [] }
-  const groups = {};
+function buildScopeGroups(scope: any, rows: any) {
+  // groups: any — group key -> { groupName, members: [] }, keyed dynamically.
+  const groups: Record<string, any> = {};
 
-  const addToGroup = (key, name, row) => {
+  const addToGroup = (key: any, name: any, row: any) => {
     if (!groups[key]) {
       groups[key] = { groupKey: key, groupName: name, members: [] };
     }
     groups[key].members.push({
       userId: row.userId,
       label: row.fullname ? `${row.fullname} (${row.username})` : row.username,
-      templateBoards: row.templateBoards.map(b => ({
+      templateBoards: row.templateBoards.map((b: any) => ({
         title: b.title,
         boardId: b.boardId,
         slug: b.slug,
@@ -723,42 +739,42 @@ function buildScopeGroups(scope, rows) {
     });
   };
 
-  rows.forEach(row => {
+  rows.forEach((row: any) => {
     if (scope === 'organizations') {
-      (row.orgs || []).forEach(o => {
+      (row.orgs || []).forEach((o: any) => {
         if (o.orgId) addToGroup(o.orgId, o.orgDisplayName || o.orgId, row);
       });
     } else if (scope === 'teams') {
-      (row.teams || []).forEach(t => {
+      (row.teams || []).forEach((t: any) => {
         if (t.teamId) addToGroup(t.teamId, t.teamDisplayName || t.teamId, row);
       });
     } else if (scope === 'domains') {
-      (row.domains || []).forEach(d => {
+      (row.domains || []).forEach((d: any) => {
         if (d) addToGroup(d, d, row);
       });
     }
   });
 
-  return Object.values(groups).sort((a, b) =>
+  return Object.values(groups).sort((a: any, b: any) =>
     String(a.groupName).localeCompare(String(b.groupName)),
   );
 }
 
 Template.templatesGeneral.helpers({
   loading() {
-    return Template.instance().loading;
+    return (Template.instance() as TemplatesGeneralInstance).loading;
   },
-  scopeChecked(scope) {
-    return Template.instance().selectedScopes.get().includes(scope);
+  scopeChecked(scope: any) {
+    return (Template.instance() as TemplatesGeneralInstance).selectedScopes.get().includes(scope);
   },
   hasAnyScope() {
-    return Template.instance().selectedScopes.get().length > 0;
+    return (Template.instance() as TemplatesGeneralInstance).selectedScopes.get().length > 0;
   },
   scopeBlocks() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as TemplatesGeneralInstance;
     const scopes = tpl.selectedScopes.get();
     const rows = tpl.sharedTemplates.get() || [];
-    return scopes.map(scope => ({
+    return scopes.map((scope: any) => ({
       scope,
       scopeLabel: SCOPE_LABELS[scope] || scope,
       groups: buildScopeGroups(scope, rows),
@@ -767,7 +783,7 @@ Template.templatesGeneral.helpers({
 });
 
 Template.templatesGeneral.events({
-  'click a.js-toggle-template-scope'(event, tpl) {
+  'click a.js-toggle-template-scope'(event: JQuery.TriggeredEvent, tpl: TemplatesGeneralInstance) {
     event.preventDefault();
     const scope = $(event.currentTarget).data('scope');
     const current = tpl.selectedScopes.get().slice();
@@ -783,19 +799,19 @@ Template.templatesGeneral.events({
 });
 
 Template.orgRow.helpers({
-  orgData() {
+  orgData(this: any) {
     return this.org || ReactiveCache.getOrg(this.orgId);
   },
 });
 
 Template.teamRow.helpers({
-  teamData() {
+  teamData(this: any) {
     return this.team || ReactiveCache.getTeam(this.teamId);
   },
 });
 
 Template.peopleRow.helpers({
-  userData() {
+  userData(this: any) {
     // Depend on global avatar update counter to reactively update when avatars change
     avatarUpdateCounter.get();
     // Get the user ID from either this._id or this.user._id
@@ -811,7 +827,7 @@ Template.peopleRow.helpers({
     }
     return this.user || this;
   },
-  hasAvatarUrl() {
+  hasAvatarUrl(this: any) {
     // Depend on global avatar update counter to reactively update when avatars change
     avatarUpdateCounter.get();
     // Get the user ID from either this._id or this.user._id
@@ -830,7 +846,7 @@ Template.peopleRow.helpers({
     if (!user || !user.profile) return false;
     return !!user.profile.avatarUrl;
   },
-  isUserLocked() {
+  isUserLocked(this: any) {
     const user = this.user || ReactiveCache.getUser(this.userId);
     if (!user) return false;
 
@@ -849,7 +865,8 @@ Template.peopleRow.helpers({
 });
 
 // Initialize filter dropdown
-Template.people.rendered = function() {
+// `rendered` is a legacy Blaze hook not present on the typed TemplateStatic.
+(Template.people as any).rendered = function (this: any) {
   const template = this;
 
   // Set the initial value of the dropdown
@@ -860,11 +877,12 @@ Template.people.rendered = function() {
   });
 };
 
-Template.editUserPopup.onCreated(function () {
+Template.editUserPopup.onCreated(function (this: AuthMethodsInstance) {
   this.authenticationMethods = new ReactiveVar([]);
   this.errorMessage = new ReactiveVar('');
 
-  Meteor.call('getAuthenticationsEnabled', (_, result) => {
+  // _/result: any — untyped Meteor method callback.
+  Meteor.call('getAuthenticationsEnabled', (_: any, result: any) => {
     if (result) {
       // TODO : add a management of different languages
       // (ex {value: ldap, text: TAPi18n.__('ldap', {}, T9n.getLanguage() || 'en')})
@@ -872,15 +890,15 @@ Template.editUserPopup.onCreated(function () {
         { value: 'password' },
         // Gets only the authentication methods availables
         ...Object.entries(result)
-          .filter((e) => e[1])
-          .map((e) => ({ value: e[0] })),
+          .filter((e: any) => e[1])
+          .map((e: any) => ({ value: e[0] })),
       ]);
     }
   });
 });
 
 Template.editOrgPopup.helpers({
-  org() {
+  org(this: any) {
     // #6411: the popup is opened from orgRow with data context `{ org }`, so
     // prefer that exact org. Falling back to `getOrg(this.orgId)` only for the
     // older explicit-id callers — previously this helper used `this.orgId`
@@ -894,28 +912,28 @@ Template.editOrgPopup.helpers({
     return ReactiveCache.getOrg(orgId);
   },
   errorMessage() {
-    return Template.instance().errorMessage.get();
+    return (Template.instance() as AuthMethodsInstance).errorMessage.get();
   },
 });
 
 Template.editTeamPopup.helpers({
-  team() {
+  team(this: any) {
     // #6411: same fix as editOrgPopup — resolve the clicked team's id from the
     // `{ team }` data context instead of `getTeam(undefined)` (the first team).
     const teamId = (this.team && this.team._id) || this.teamId;
     return ReactiveCache.getTeam(teamId);
   },
   errorMessage() {
-    return Template.instance().errorMessage.get();
+    return (Template.instance() as AuthMethodsInstance).errorMessage.get();
   },
 });
 
 Template.editUserPopup.helpers({
-  user() {
+  user(this: any) {
     return ReactiveCache.getUser(this.userId);
   },
   authentications() {
-    return Template.instance().authenticationMethods.get();
+    return (Template.instance() as AuthMethodsInstance).authenticationMethods.get();
   },
   orgsDatas() {
     const ret = ReactiveCache.getOrgs({}, {sort: { orgDisplayName: 1 }});
@@ -925,7 +943,7 @@ Template.editUserPopup.helpers({
     const ret = ReactiveCache.getTeams({}, {sort: { teamDisplayName: 1 }});
     return ret;
   },
-  isSelected(match) {
+  isSelected(match: any) {
     const userId = Template.instance().data.userId;
     const selected = ReactiveCache.getUser(userId).authenticationMethod;
     return selected === match;
@@ -936,23 +954,24 @@ Template.editUserPopup.helpers({
     return selected === 'ldap';
   },
   errorMessage() {
-    return Template.instance().errorMessage.get();
+    return (Template.instance() as AuthMethodsInstance).errorMessage.get();
   },
 });
 
-Template.newOrgPopup.onCreated(function () {
+Template.newOrgPopup.onCreated(function (this: ErrorMessageInstance) {
   this.errorMessage = new ReactiveVar('');
 });
 
-Template.newTeamPopup.onCreated(function () {
+Template.newTeamPopup.onCreated(function (this: ErrorMessageInstance) {
   this.errorMessage = new ReactiveVar('');
 });
 
-Template.newUserPopup.onCreated(function () {
+Template.newUserPopup.onCreated(function (this: AuthMethodsInstance) {
   this.authenticationMethods = new ReactiveVar([]);
   this.errorMessage = new ReactiveVar('');
 
-  Meteor.call('getAuthenticationsEnabled', (_, result) => {
+  // _/result: any — untyped Meteor method callback.
+  Meteor.call('getAuthenticationsEnabled', (_: any, result: any) => {
     if (result) {
       // TODO : add a management of different languages
       // (ex {value: ldap, text: TAPi18n.__('ldap', {}, T9n.getLanguage() || 'en')})
@@ -960,37 +979,37 @@ Template.newUserPopup.onCreated(function () {
         { value: 'password' },
         // Gets only the authentication methods availables
         ...Object.entries(result)
-          .filter((e) => e[1])
-          .map((e) => ({ value: e[0] })),
+          .filter((e: any) => e[1])
+          .map((e: any) => ({ value: e[0] })),
       ]);
     }
   });
 });
 
 Template.newOrgPopup.helpers({
-  org() {
+  org(this: any) {
     return ReactiveCache.getOrg(this.orgId);
   },
   errorMessage() {
-    return Template.instance().errorMessage.get();
+    return (Template.instance() as AuthMethodsInstance).errorMessage.get();
   },
 });
 
 Template.newTeamPopup.helpers({
-  team() {
+  team(this: any) {
     return ReactiveCache.getTeam(this.teamId);
   },
   errorMessage() {
-    return Template.instance().errorMessage.get();
+    return (Template.instance() as AuthMethodsInstance).errorMessage.get();
   },
 });
 
 Template.newUserPopup.helpers({
-  user() {
+  user(this: any) {
     return ReactiveCache.getUser(this.userId);
   },
   authentications() {
-    return Template.instance().authenticationMethods.get();
+    return (Template.instance() as AuthMethodsInstance).authenticationMethods.get();
   },
   orgsDatas() {
     const ret = ReactiveCache.getOrgs({}, {sort: { orgDisplayName: 1 }});
@@ -1000,7 +1019,7 @@ Template.newUserPopup.helpers({
     const ret = ReactiveCache.getTeams({}, {sort: { teamDisplayName: 1 }});
     return ret;
   },
-  isSelected(match) {
+  isSelected(match: any) {
     const userId = Template.instance().data.userId;
     if(userId){
       const selected = ReactiveCache.getUser(userId).authenticationMethod;
@@ -1016,17 +1035,17 @@ Template.newUserPopup.helpers({
     return selected === 'ldap';
   },
   errorMessage() {
-    return Template.instance().errorMessage.get();
+    return (Template.instance() as AuthMethodsInstance).errorMessage.get();
   },
 });
 
-const ORG_FEATURE_METHODS = {
+const ORG_FEATURE_METHODS: Record<string, string> = {
   orgSharedTemplates: 'setOrgSharedTemplates',
   orgPropagateMembersToBoards: 'setOrgPropagateMembersToBoards',
   orgSyncMembersFromAuth: 'setOrgSyncMembersFromAuth',
 };
 
-const TEAM_FEATURE_METHODS = {
+const TEAM_FEATURE_METHODS: Record<string, string> = {
   teamSharedTemplates: 'setTeamSharedTemplates',
   teamPropagateMembersToBoards: 'setTeamPropagateMembersToBoards',
   teamSyncMembersFromAuth: 'setTeamSyncMembersFromAuth',
@@ -1036,12 +1055,13 @@ Template.orgRow.events({
   'click a.edit-org': Popup.open('editOrg'),
   'click a.more-settings-org': Popup.open('settingsOrg'),
   // #4737/#5850: per-org feature checkbox columns.
-  'change .js-toggle-org-feature'(event) {
+  'change .js-toggle-org-feature'(this: any, event: JQuery.TriggeredEvent) {
     const org = this.org || ReactiveCache.getOrg(this.orgId);
-    const field = event.currentTarget.getAttribute('data-feature');
-    const method = ORG_FEATURE_METHODS[field];
+    const currentTarget = event.currentTarget as HTMLInputElement;
+    const field = currentTarget.getAttribute('data-feature');
+    const method = ORG_FEATURE_METHODS[field as string];
     if (org && method) {
-      Meteor.call(method, { _id: org._id }, event.currentTarget.checked);
+      Meteor.call(method, { _id: org._id }, currentTarget.checked);
     }
   },
 });
@@ -1050,52 +1070,54 @@ Template.teamRow.events({
   'click a.edit-team': Popup.open('editTeam'),
   'click a.more-settings-team': Popup.open('settingsTeam'),
   // #4737/#5850: per-team feature checkbox columns.
-  'change .js-toggle-team-feature'(event) {
+  'change .js-toggle-team-feature'(this: any, event: JQuery.TriggeredEvent) {
     const team = this.team || ReactiveCache.getTeam(this.teamId);
-    const field = event.currentTarget.getAttribute('data-feature');
-    const method = TEAM_FEATURE_METHODS[field];
+    const currentTarget = event.currentTarget as HTMLInputElement;
+    const field = currentTarget.getAttribute('data-feature');
+    const method = TEAM_FEATURE_METHODS[field as string];
     if (team && method) {
-      Meteor.call(method, { _id: team._id }, event.currentTarget.checked);
+      Meteor.call(method, { _id: team._id }, currentTarget.checked);
     }
   },
 });
 
 Template.peopleRow.events({
-  'click a.edit-user'(event) {
+  'click a.edit-user'(event: JQuery.TriggeredEvent) {
     // Get the user ID from the data attribute
-    const userId = event.currentTarget.getAttribute('data-user-id');
+    const userId = (event.currentTarget as HTMLElement).getAttribute('data-user-id');
     if (userId) {
       Popup.open('editUser').call({ userId: userId }, event);
     }
   },
-  'click a.more-settings-user'(event) {
+  'click a.more-settings-user'(event: JQuery.TriggeredEvent) {
     // Get the user ID from the data attribute
-    const userId = event.currentTarget.getAttribute('data-user-id');
+    const userId = (event.currentTarget as HTMLElement).getAttribute('data-user-id');
     if (userId) {
       Popup.open('settingsUser').call({ userId: userId }, event);
     }
   },
-  'click .selectUserChkBox': function(ev){
-      if(ev.currentTarget){
-        if(ev.currentTarget.checked){
-          if(!selectedUserChkBoxUserIds.includes(ev.currentTarget.id)){
-            selectedUserChkBoxUserIds.push(ev.currentTarget.id);
+  'click .selectUserChkBox': function(ev: JQuery.TriggeredEvent){
+      const currentTarget = ev.currentTarget as HTMLInputElement;
+      if(currentTarget){
+        if(currentTarget.checked){
+          if(!selectedUserChkBoxUserIds.includes(currentTarget.id)){
+            selectedUserChkBoxUserIds.push(currentTarget.id);
           }
         }
         else{
-          if(selectedUserChkBoxUserIds.includes(ev.currentTarget.id)){
-            let index = selectedUserChkBoxUserIds.indexOf(ev.currentTarget.id);
+          if(selectedUserChkBoxUserIds.includes(currentTarget.id)){
+            let index = selectedUserChkBoxUserIds.indexOf(currentTarget.id);
             if(index > -1)
               selectedUserChkBoxUserIds.splice(index, 1);
           }
         }
       }
       if(selectedUserChkBoxUserIds.length > 0)
-        document.getElementById("divAddOrRemoveTeam").style.display = 'block';
+        document.getElementById("divAddOrRemoveTeam")!.style.display = 'block';
       else
-        document.getElementById("divAddOrRemoveTeam").style.display = 'none';
+        document.getElementById("divAddOrRemoveTeam")!.style.display = 'none';
   },
-  'click .js-toggle-active-status': function(ev) {
+  'click .js-toggle-active-status': function(this: any, ev: JQuery.TriggeredEvent) {
       ev.preventDefault();
       const userId = this.userId || this.user?._id;
       const user = ReactiveCache.getUser(userId);
@@ -1112,7 +1134,7 @@ Template.peopleRow.events({
         }
       });
   },
-  'click .js-toggle-lock-status': function(ev){
+  'click .js-toggle-lock-status': function(this: any, ev: JQuery.TriggeredEvent){
       ev.preventDefault();
       const userId = this.userId || this.user?._id;
       const user = ReactiveCache.getUser(userId);
@@ -1127,7 +1149,8 @@ Template.peopleRow.events({
 
       if (isLocked) {
         // Unlock the user
-        Meteor.call('unlockUser', userId, (error) => {
+        // error: any — untyped Meteor method callback.
+        Meteor.call('unlockUser', userId, (error: any) => {
           if (error) {
             console.error('Error unlocking user:', error);
           }
@@ -1138,9 +1161,9 @@ Template.peopleRow.events({
         // For now, we'll leave this as a no-op
       }
   },
-  'click a.js-edit-people-avatar'(event) {
+  'click a.js-edit-people-avatar'(event: JQuery.TriggeredEvent) {
     // Extract the user ID from the data attribute
-    const userId = event.currentTarget.getAttribute('data-user-id');
+    const userId = (event.currentTarget as HTMLElement).getAttribute('data-user-id');
     if (userId) {
       // Get the user from cache to pass correct context
       const user = ReactiveCache.getUser(userId);
@@ -1162,21 +1185,23 @@ Template.modifyTeamsUsers.helpers({
 Template.modifyTeamsUsers.events({
   'click #cancelBtn': function(){
     let selectedElt = document.getElementById("jsteamsUser");
-    document.getElementById("divAddOrRemoveTeamContainer").style.display = 'none';
+    document.getElementById("divAddOrRemoveTeamContainer")!.style.display = 'none';
   },
   'click #addTeamBtn': function(){
-    let selectedElt;
+    let selectedElt: HTMLSelectElement;
     let selectedEltValue;
     let selectedEltValueId;
-    let userTms = [];
-    let currentUser;
+    // userTms: any — user teams array; may be undefined on the doc, so `any`.
+    let userTms: any = [];
+    // currentUser: any — minimongo user doc with dynamic legacy fields.
+    let currentUser: any;
     let currUserTeamIndex;
 
-    selectedElt = document.getElementById("jsteamsUser");
+    selectedElt = document.getElementById("jsteamsUser") as HTMLSelectElement;
     selectedEltValue = selectedElt.options[selectedElt.selectedIndex].text;
     selectedEltValueId = selectedElt.options[selectedElt.selectedIndex].value;
 
-    if(document.getElementById('addAction').checked){
+    if((document.getElementById('addAction') as HTMLInputElement).checked){
       for(let i = 0; i < selectedUserChkBoxUserIds.length; i++){
         currentUser = ReactiveCache.getUser(selectedUserChkBoxUserIds[i]);
         userTms = currentUser.teams;
@@ -1189,7 +1214,7 @@ Template.modifyTeamsUsers.events({
         }
         else if(userTms.length > 0)
         {
-          currUserTeamIndex = userTms.findIndex(function(t){ return t.teamId == selectedEltValueId});
+          currUserTeamIndex = userTms.findIndex(function(t: any){ return t.teamId == selectedEltValueId});
           if(currUserTeamIndex == -1){
             userTms.push({
               "teamId": selectedEltValueId,
@@ -1211,7 +1236,7 @@ Template.modifyTeamsUsers.events({
         userTms = currentUser.teams;
         if(userTms !== undefined || userTms.length > 0)
         {
-          currUserTeamIndex = userTms.findIndex(function(t){ return t.teamId == selectedEltValueId});
+          currUserTeamIndex = userTms.findIndex(function(t: any){ return t.teamId == selectedEltValueId});
           if(currUserTeamIndex != -1){
             userTms.splice(currUserTeamIndex, 1);
           }
@@ -1225,7 +1250,7 @@ Template.modifyTeamsUsers.events({
       }
     }
 
-    document.getElementById("divAddOrRemoveTeamContainer").style.display = 'none';
+    document.getElementById("divAddOrRemoveTeamContainer")!.style.display = 'none';
   },
 });
 
@@ -1242,36 +1267,39 @@ Template.newUserRow.events({
 });
 
 Template.selectAllUser.events({
-  'click .allUserChkBox': function(ev){
+  'click .allUserChkBox': function(ev: JQuery.TriggeredEvent){
     selectedUserChkBoxUserIds = [];
     const checkboxes = document.getElementsByClassName("selectUserChkBox");
-    if(ev.currentTarget){
-      if(ev.currentTarget.checked){
+    const currentTarget = ev.currentTarget as HTMLInputElement;
+    if(currentTarget){
+      if(currentTarget.checked){
         for (let i=0; i<checkboxes.length; i++) {
-          if (!checkboxes[i].disabled) {
-           selectedUserChkBoxUserIds.push(checkboxes[i].id);
-           checkboxes[i].checked = true;
+          const checkbox = checkboxes[i] as HTMLInputElement;
+          if (!checkbox.disabled) {
+           selectedUserChkBoxUserIds.push(checkbox.id);
+           checkbox.checked = true;
           }
        }
       }
       else{
         for (let i=0; i<checkboxes.length; i++) {
-          if (!checkboxes[i].disabled) {
-           checkboxes[i].checked = false;
+          const checkbox = checkboxes[i] as HTMLInputElement;
+          if (!checkbox.disabled) {
+           checkbox.checked = false;
           }
        }
       }
     }
 
     if(selectedUserChkBoxUserIds.length > 0)
-      document.getElementById("divAddOrRemoveTeam").style.display = 'block';
+      document.getElementById("divAddOrRemoveTeam")!.style.display = 'block';
     else
-      document.getElementById("divAddOrRemoveTeam").style.display = 'none';
+      document.getElementById("divAddOrRemoveTeam")!.style.display = 'none';
   },
 });
 
 Template.editOrgPopup.events({
-  submit(event, templateInstance) {
+  submit(this: any, event: JQuery.TriggeredEvent, templateInstance: PopupFormInstance) {
     event.preventDefault();
     // #6411: prefer the `{ org }` data context (the row that was clicked);
     // `this.orgId` is undefined here, so the old getOrg(this.orgId) saved the
@@ -1319,7 +1347,7 @@ Template.editOrgPopup.events({
 });
 
 Template.editTeamPopup.events({
-  submit(event, templateInstance) {
+  submit(this: any, event: JQuery.TriggeredEvent, templateInstance: PopupFormInstance) {
     event.preventDefault();
     // #6411: prefer the `{ team }` data context (the row that was clicked).
     const team = this.team || ReactiveCache.getTeam(this.teamId);
@@ -1364,7 +1392,7 @@ Template.editTeamPopup.events({
 });
 
 Template.editUserPopup.events({
-  submit(event, templateInstance) {
+  submit(this: any, event: JQuery.TriggeredEvent, templateInstance: PopupFormInstance) {
     event.preventDefault();
     const user = ReactiveCache.getUser(this.userId);
     const username = templateInstance.find('.js-profile-username').value.trim();
@@ -1427,12 +1455,15 @@ Template.editUserPopup.events({
       isAdmin: isAdmin === 'true',
       loginDisabled: isActive === 'true',
       authenticationMethod: authentication,
-      importUsernames: Users.parseImportUsernames(importUsernames),
+      // parseImportUsernames is a runtime static on the Users model, not typed
+      // on the Mongo.Collection surface.
+      importUsernames: (Users as any).parseImportUsernames(importUsernames),
       teams: userTms,
       orgs: userOrganizations,
     };
 
-    Meteor.call('editUser', this.userId, updateData, (error) => {
+    // error: any — untyped Meteor method callback.
+    Meteor.call('editUser', this.userId, updateData, (error: any) => {
       if (error) {
         console.error('Error updating user:', error);
       }
@@ -1456,7 +1487,8 @@ Template.editUserPopup.events({
         username,
         email.toLowerCase(),
         this.userId,
-        function (error) {
+        // error: any — untyped Meteor method callback.
+        function (error: any) {
           const usernameMessageElement = templateInstance.$('.username-taken');
           const emailMessageElement = templateInstance.$('.email-taken');
           if (error) {
@@ -1476,7 +1508,8 @@ Template.editUserPopup.events({
         },
       );
     } else if (isChangeUserName) {
-      Meteor.call('setUsername', username, this.userId, function (error) {
+      // error: any — untyped Meteor method callback.
+      Meteor.call('setUsername', username, this.userId, function (error: any) {
         const usernameMessageElement = templateInstance.$('.username-taken');
         if (error) {
           const errorElement = error.error;
@@ -1493,7 +1526,8 @@ Template.editUserPopup.events({
         'setEmail',
         email.toLowerCase(),
         this.userId,
-        function (error) {
+        // error: any — untyped Meteor method callback.
+        function (error: any) {
           const emailMessageElement = templateInstance.$('.email-taken');
           if (error) {
             const errorElement = error.error;
@@ -1508,67 +1542,67 @@ Template.editUserPopup.events({
       );
     } else Popup.back();
   },
-  'click #addUserOrg'(event) {
+  'click #addUserOrg'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
 
     userOrgsTeamsAction = "addOrg";
-    document.getElementById("jsOrgs").style.display = 'block';
-    document.getElementById("jsTeams").style.display = 'none';
+    document.getElementById("jsOrgs")!.style.display = 'block';
+    document.getElementById("jsTeams")!.style.display = 'none';
   },
-  'click #removeUserOrg'(event) {
+  'click #removeUserOrg'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
 
     userOrgsTeamsAction = "removeOrg";
-    document.getElementById("jsOrgs").style.display = 'block';
-    document.getElementById("jsTeams").style.display = 'none';
+    document.getElementById("jsOrgs")!.style.display = 'block';
+    document.getElementById("jsTeams")!.style.display = 'none';
   },
-  'click #addUserTeam'(event) {
+  'click #addUserTeam'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
 
     userOrgsTeamsAction = "addTeam";
-    document.getElementById("jsTeams").style.display = 'block';
-    document.getElementById("jsOrgs").style.display = 'none';
+    document.getElementById("jsTeams")!.style.display = 'block';
+    document.getElementById("jsOrgs")!.style.display = 'none';
   },
-  'click #removeUserTeam'(event) {
+  'click #removeUserTeam'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
 
     userOrgsTeamsAction = "removeTeam";
-    document.getElementById("jsTeams").style.display = 'block';
-    document.getElementById("jsOrgs").style.display = 'none';
+    document.getElementById("jsTeams")!.style.display = 'block';
+    document.getElementById("jsOrgs")!.style.display = 'none';
   },
-  'change #jsOrgs'(event) {
+  'change #jsOrgs'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     UpdateUserOrgsOrTeamsElement();
   },
-  'change #jsTeams'(event) {
+  'change #jsTeams'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     UpdateUserOrgsOrTeamsElement();
   },
 });
 
 const UpdateUserOrgsOrTeamsElement = function(isNewUser = false){
-  let selectedElt;
+  let selectedElt!: HTMLSelectElement;
   let selectedEltValue;
   let selectedEltValueId;
-  let inputElt;
-  let inputEltId;
-  let lstInputValues = [];
-  let lstInputValuesIds = [];
+  let inputElt!: HTMLInputElement;
+  let inputEltId!: HTMLInputElement;
+  let lstInputValues: string[] = [];
+  let lstInputValuesIds: string[] = [];
   let index;
   let indexId;
   switch(userOrgsTeamsAction)
   {
     case "addOrg":
     case "removeOrg":
-      inputElt = !isNewUser ? document.getElementById("jsUserOrgsInPut") : document.getElementById("jsUserOrgsInPutNewUser");
-      inputEltId = !isNewUser ? document.getElementById("jsUserOrgIdsInPut") : document.getElementById("jsUserOrgIdsInPutNewUser");
-      selectedElt = !isNewUser ? document.getElementById("jsOrgs") : document.getElementById("jsOrgsNewUser");
+      inputElt = (!isNewUser ? document.getElementById("jsUserOrgsInPut") : document.getElementById("jsUserOrgsInPutNewUser")) as HTMLInputElement;
+      inputEltId = (!isNewUser ? document.getElementById("jsUserOrgIdsInPut") : document.getElementById("jsUserOrgIdsInPutNewUser")) as HTMLInputElement;
+      selectedElt = (!isNewUser ? document.getElementById("jsOrgs") : document.getElementById("jsOrgsNewUser")) as HTMLSelectElement;
       break;
     case "addTeam":
     case "removeTeam":
-      inputElt = !isNewUser ? document.getElementById("jsUserTeamsInPut") : document.getElementById("jsUserTeamsInPutNewUser");
-      inputEltId = !isNewUser ? document.getElementById("jsUserTeamIdsInPut") : document.getElementById("jsUserTeamIdsInPutNewUser");
-      selectedElt = !isNewUser ? document.getElementById("jsTeams") : document.getElementById("jsTeamsNewUser");
+      inputElt = (!isNewUser ? document.getElementById("jsUserTeamsInPut") : document.getElementById("jsUserTeamsInPutNewUser")) as HTMLInputElement;
+      inputEltId = (!isNewUser ? document.getElementById("jsUserTeamIdsInPut") : document.getElementById("jsUserTeamIdsInPutNewUser")) as HTMLInputElement;
+      selectedElt = (!isNewUser ? document.getElementById("jsTeams") : document.getElementById("jsTeamsNewUser")) as HTMLSelectElement;
       break;
     default:
       break;
@@ -1622,7 +1656,7 @@ const UpdateUserOrgsOrTeamsElement = function(isNewUser = false){
 }
 
 Template.newOrgPopup.events({
-  submit(event, templateInstance) {
+  submit(this: any, event: JQuery.TriggeredEvent, templateInstance: PopupFormInstance) {
     event.preventDefault();
     const orgDisplayName = templateInstance
       .find('.js-orgDisplayName')
@@ -1648,7 +1682,7 @@ Template.newOrgPopup.events({
 });
 
 Template.newTeamPopup.events({
-  submit(event, templateInstance) {
+  submit(this: any, event: JQuery.TriggeredEvent, templateInstance: PopupFormInstance) {
     event.preventDefault();
     const teamDisplayName = templateInstance
       .find('.js-teamDisplayName')
@@ -1674,7 +1708,7 @@ Template.newTeamPopup.events({
 });
 
 Template.newUserPopup.events({
-  submit(event, templateInstance) {
+  submit(this: any, event: JQuery.TriggeredEvent, templateInstance: PopupFormInstance) {
     event.preventDefault();
     const fullname = templateInstance.find('.js-profile-fullname').value.trim();
     const username = templateInstance.find('.js-profile-username').value.trim();
@@ -1683,7 +1717,9 @@ Template.newUserPopup.events({
     const isAdmin = templateInstance.find('.js-profile-isadmin').value.trim();
     const isActive = templateInstance.find('.js-profile-isactive').value.trim();
     const email = templateInstance.find('.js-profile-email').value.trim();
-    const importUsernames = Users.parseImportUsernames(
+    // parseImportUsernames is a runtime static on the Users model, not typed
+    // on the Mongo.Collection surface.
+    const importUsernames = (Users as any).parseImportUsernames(
       templateInstance.find('.js-import-usernames').value,
     );
     const userOrgs = templateInstance.find('.js-userOrgsNewUser').value.trim();
@@ -1727,7 +1763,8 @@ Template.newUserPopup.events({
       importUsernames,
       userOrganizations,
       userTms,
-      function(error) {
+      // error: any — untyped Meteor method callback.
+      function(error: any) {
         const usernameMessageElement = templateInstance.$('.username-taken');
         const emailMessageElement = templateInstance.$('.email-taken');
         if (error) {
@@ -1748,57 +1785,57 @@ Template.newUserPopup.events({
     );
     Popup.back();
   },
-  'click #addUserOrgNewUser'(event) {
+  'click #addUserOrgNewUser'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
 
     userOrgsTeamsAction = "addOrg";
-    document.getElementById("jsOrgsNewUser").style.display = 'block';
-    document.getElementById("jsTeamsNewUser").style.display = 'none';
+    document.getElementById("jsOrgsNewUser")!.style.display = 'block';
+    document.getElementById("jsTeamsNewUser")!.style.display = 'none';
   },
-  'click #removeUserOrgNewUser'(event) {
+  'click #removeUserOrgNewUser'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
 
     userOrgsTeamsAction = "removeOrg";
-    document.getElementById("jsOrgsNewUser").style.display = 'block';
-    document.getElementById("jsTeamsNewUser").style.display = 'none';
+    document.getElementById("jsOrgsNewUser")!.style.display = 'block';
+    document.getElementById("jsTeamsNewUser")!.style.display = 'none';
   },
-  'click #addUserTeamNewUser'(event) {
+  'click #addUserTeamNewUser'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
 
     userOrgsTeamsAction = "addTeam";
-    document.getElementById("jsTeamsNewUser").style.display = 'block';
-    document.getElementById("jsOrgsNewUser").style.display = 'none';
+    document.getElementById("jsTeamsNewUser")!.style.display = 'block';
+    document.getElementById("jsOrgsNewUser")!.style.display = 'none';
   },
-  'click #removeUserTeamNewUser'(event) {
+  'click #removeUserTeamNewUser'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
 
     userOrgsTeamsAction = "removeTeam";
-    document.getElementById("jsTeamsNewUser").style.display = 'block';
-    document.getElementById("jsOrgsNewUser").style.display = 'none';
+    document.getElementById("jsTeamsNewUser")!.style.display = 'block';
+    document.getElementById("jsOrgsNewUser")!.style.display = 'none';
   },
-  'change #jsOrgsNewUser'(event) {
+  'change #jsOrgsNewUser'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     UpdateUserOrgsOrTeamsElement(true);
   },
-  'change #jsTeamsNewUser'(event) {
+  'change #jsTeamsNewUser'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     UpdateUserOrgsOrTeamsElement(true);
   },
 });
 
 Template.settingsOrgPopup.events({
-  'click #deleteButton'(event) {
+  'click #deleteButton'(this: any, event: JQuery.TriggeredEvent) {
     event.preventDefault();
     // #6411: the popup carries `{ org }`; `this.orgId` is undefined, so the old
     // code checked users for an undefined org and called Org.remove(undefined).
     const orgId = (this.org && this.org._id) || this.orgId;
     if (ReactiveCache.getUsers({"orgs.orgId": orgId}).length > 0)
     {
-      let orgClassList = document.getElementById("deleteOrgWarningMessage").classList;
+      let orgClassList = document.getElementById("deleteOrgWarningMessage")!.classList;
       if(orgClassList.contains('hide'))
       {
         orgClassList.remove('hide');
-        document.getElementById("deleteOrgWarningMessage").style.color = "red";
+        document.getElementById("deleteOrgWarningMessage")!.style.color = "red";
       }
       return;
     }
@@ -1808,17 +1845,17 @@ Template.settingsOrgPopup.events({
 });
 
 Template.settingsTeamPopup.events({
-  'click #deleteButton'(event) {
+  'click #deleteButton'(this: any, event: JQuery.TriggeredEvent) {
     event.preventDefault();
     // #6411: same as settingsOrgPopup — derive the id from the `{ team }` context.
     const teamId = (this.team && this.team._id) || this.teamId;
     if (ReactiveCache.getUsers({"teams.teamId": teamId}).length > 0)
     {
-      let teamClassList = document.getElementById("deleteTeamWarningMessage").classList;
+      let teamClassList = document.getElementById("deleteTeamWarningMessage")!.classList;
       if(teamClassList.contains('hide'))
       {
         teamClassList.remove('hide');
-        document.getElementById("deleteTeamWarningMessage").style.color = "red";
+        document.getElementById("deleteTeamWarningMessage")!.style.color = "red";
       }
       return;
     }
@@ -1828,25 +1865,28 @@ Template.settingsTeamPopup.events({
 });
 
 Template.settingsUserPopup.events({
-  'click .impersonate-user'(event) {
+  'click .impersonate-user'(this: any, event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const userId = this.userId || this.user?._id;
 
-    Meteor.call('impersonate', userId, (err) => {
+    // err: any — untyped Meteor method callback.
+    Meteor.call('impersonate', userId, (err: any) => {
       if (!err) {
         // Meteor.connection.setUserId() triggers automatic cache invalidation
         // No need to manually invalidate - let Meteor handle the user data refresh
-        Meteor.connection.setUserId(userId);
+        // connection/setUserId are client internals not on the typed surface.
+        (Meteor as any).connection.setUserId(userId);
         FlowRouter.go('/');
       }
     });
   },
-  'click #deleteButton'(event) {
+  'click #deleteButton'(this: any, event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const userId = this.userId || this.user?._id;
 
     // Use secure server method instead of direct client-side removal
-    Meteor.call('removeUser', userId, (error, result) => {
+    // error/result: any — untyped Meteor method callback.
+    Meteor.call('removeUser', userId, (error: any, result: any) => {
       if (error) {
         if (process.env.DEBUG === 'true') {
           console.error('Error removing user:', error);
@@ -1872,14 +1912,14 @@ Template.settingsUserPopup.events({
 });
 
 Template.settingsUserPopup.helpers({
-  user() {
+  user(this: any) {
     const userId = this.userId || this.user?._id;
     return ReactiveCache.getUser(userId);
   },
   authentications() {
-    return Template.instance().authenticationMethods.get();
+    return (Template.instance() as AuthMethodsInstance).authenticationMethods.get();
   },
-  isSelected(match) {
+  isSelected(match: any) {
     const userId = Template.instance().data.userId || Template.instance().data.user?._id;
     const user = ReactiveCache.getUser(userId);
     if (!user) return false;
@@ -1894,6 +1934,75 @@ Template.settingsUserPopup.helpers({
     return selected === 'ldap';
   },
   errorMessage() {
-    return Template.instance().errorMessage.get();
+    return (Template.instance() as AuthMethodsInstance).errorMessage.get();
   },
 });
+
+// Template instance for the top-level `people` admin panel: the many reactive
+// vars back the Org/Team/People/Locked/Roles/Templates/Domains tabs and their
+// paging, plus imperative helpers set up in onCreated. Reactive payloads are
+// dynamic minimongo docs/selectors, hence ReactiveVar<any>.
+interface PeopleInstance extends Blaze.TemplateInstance {
+  infiniteScrolling: InfiniteScrolling;
+  error: ReactiveVar<any>;
+  loading: ReactiveVar<any>;
+  orgSetting: ReactiveVar<any>;
+  teamSetting: ReactiveVar<any>;
+  peopleSetting: ReactiveVar<any>;
+  lockedUsersSetting: ReactiveVar<any>;
+  rolesSetting: ReactiveVar<any>;
+  templatesSetting: ReactiveVar<any>;
+  domainSetting: ReactiveVar<any>;
+  domains: ReactiveVar<any>;
+  findOrgsOptions: ReactiveVar<any>;
+  findTeamsOptions: ReactiveVar<any>;
+  findUsersOptions: ReactiveVar<any>;
+  numberOrgs: ReactiveVar<any>;
+  numberTeams: ReactiveVar<any>;
+  numberPeople: ReactiveVar<any>;
+  userFilterType: ReactiveVar<any>;
+  peoplePage: ReactiveVar<any>;
+  orgPage: ReactiveVar<any>;
+  teamPage: ReactiveVar<any>;
+  page: ReactiveVar<any>;
+  loadNextPageLocked: boolean;
+  refreshUsersCount: () => void;
+  refreshOrgsCount: () => void;
+  refreshTeamsCount: () => void;
+  calculateNextPeak: () => void;
+  loadNextPage: () => void;
+  filterOrg: () => void;
+  filterTeam: () => void;
+  filterPeople: () => void;
+  switchMenu: (event: any) => void; // event: any — Blaze/jQuery menu event.
+}
+
+// rolesGeneral tab: working copy of the allowed board-invite roles.
+interface RolesGeneralInstance extends Blaze.TemplateInstance {
+  workingRoles: ReactiveVar<any>;
+}
+
+// templatesGeneral tab: shared-templates admin view state.
+interface TemplatesGeneralInstance extends Blaze.TemplateInstance {
+  selectedScopes: ReactiveVar<any>;
+  sharedTemplates: ReactiveVar<any>;
+  loading: ReactiveVar<any>;
+  loadSharedTemplates: () => void;
+}
+
+// Popups that expose the enabled authentication methods plus an error message.
+interface AuthMethodsInstance extends Blaze.TemplateInstance {
+  authenticationMethods: ReactiveVar<any>;
+  errorMessage: ReactiveVar<any>;
+}
+
+// Popups that only track a validation error message.
+interface ErrorMessageInstance extends Blaze.TemplateInstance {
+  errorMessage: ReactiveVar<any>;
+}
+
+// The edit/new Org/Team/User popups read form values through `find(...).value`;
+// every selector targets a form control, so narrow `find` to HTMLInputElement.
+interface PopupFormInstance extends Blaze.TemplateInstance {
+  find(selector: string): HTMLInputElement;
+}
