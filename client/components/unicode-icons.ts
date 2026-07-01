@@ -10,17 +10,20 @@ Meteor.startup(() => {
   ];
 
   const EXCLUDE_SELECTOR = '.header-user-bar-avatar, .avatar-initials, script, style';
-  let observer = null;
+  let observer: MutationObserver | null = null;
   let enabled = false;
 
-  function isExcluded(el) {
+  // The DOM tree-walking helpers below receive nodes of mixed kinds (Element,
+  // Text, generic Node); parameters are `any` because they are accessed through
+  // Element-only APIs (matches/closest/replaceChild) guarded by nodeType checks.
+  function isExcluded(el: any) {
     if (!el) return true;
     if (el.nodeType === Node.ELEMENT_NODE && (el.matches('script') || el.matches('style'))) return true;
     if (el.closest && el.closest(EXCLUDE_SELECTOR)) return true;
     return false;
   }
 
-  function wrapTextNodeOnce(parent, textNode) {
+  function wrapTextNodeOnce(parent: any, textNode: any) {
     if (!parent || !textNode) return;
     if (isExcluded(parent)) return;
     if (parent.closest && parent.closest('.unicode-icon')) return;
@@ -36,17 +39,19 @@ Meteor.startup(() => {
     parent.replaceChild(span, textNode);
   }
 
-  function wrapSubtree(root) {
+  function wrapSubtree(root: any) {
     try {
       if (!root) return;
       // Walk only within this subtree for text nodes
-      const walker = document.createTreeWalker(
+      // createTreeWalker's 4th (entityReferenceExpansion) argument is deprecated
+      // and absent from lib.dom's type; cast to any to retain the original call.
+      const walker = (document.createTreeWalker as any)(
         root.nodeType === Node.ELEMENT_NODE ? root : root.parentNode || document.body,
         NodeFilter.SHOW_TEXT,
         {
-          acceptNode: (node) => {
+          acceptNode: (node: Node) => {
             if (!node || !node.nodeValue) return NodeFilter.FILTER_REJECT;
-            const parent = node.parentNode;
+            const parent = node.parentNode as Element | null;
             if (!parent || isExcluded(parent)) return NodeFilter.FILTER_REJECT;
             if (parent.closest && parent.closest('.unicode-icon')) return NodeFilter.FILTER_REJECT;
             const txt = node.nodeValue.trim();
@@ -56,7 +61,7 @@ Meteor.startup(() => {
         },
         false,
       );
-      const toWrap = [];
+      const toWrap: Node[] = [];
       while (walker.nextNode()) {
         toWrap.push(walker.currentNode);
       }
@@ -74,11 +79,11 @@ Meteor.startup(() => {
 
   function startObserver() {
     if (observer) return;
-    observer = new MutationObserver((mutations) => {
+    observer = new MutationObserver((mutations: MutationRecord[]) => {
       // Batch process only added nodes, ignore attribute/character changes
       for (const m of mutations) {
         if (m.type !== 'childList') continue;
-        m.addedNodes && m.addedNodes.forEach((n) => {
+        m.addedNodes && m.addedNodes.forEach((n: Node) => {
           // Process only within the newly added subtree
           wrapSubtree(n);
         });
@@ -108,7 +113,7 @@ Meteor.startup(() => {
     stopObserver();
     try { document.body.classList.remove('grey-icons-enabled'); } catch (_) {}
     // unwrap existing
-    document.querySelectorAll('span.unicode-icon').forEach((span) => {
+    document.querySelectorAll('span.unicode-icon').forEach((span: Element) => {
       const txt = document.createTextNode(span.textContent || '');
       if (span.parentNode) span.parentNode.replaceChild(txt, span);
     });

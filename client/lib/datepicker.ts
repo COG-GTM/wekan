@@ -193,7 +193,7 @@ interface DatePickerState {
   date: ReactiveVar<Date>;
   defaultTime: string;
 }
-interface DatePickerInstance extends Blaze.TemplateInstance {
+export interface DatePickerInstance extends Blaze.TemplateInstance {
   datePicker: DatePickerState;
 }
 interface SetupDatePickerOptions {

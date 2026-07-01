@@ -1,4 +1,5 @@
 import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 import { ReactiveVar } from 'meteor/reactive-var';
 import {
   boardConverter,
@@ -26,7 +27,7 @@ Template.boardConversionProgress.helpers({
   }
 });
 
-Template.boardConversionProgress.onCreated(function() {
+Template.boardConversionProgress.onCreated(function(this: Blaze.TemplateInstance) {
   // Subscribe to conversion state changes
   this.autorun(() => {
     isConverting.get();

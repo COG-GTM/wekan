@@ -1,3 +1,5 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 import { ReactiveVar } from 'meteor/reactive-var';
 
 // Creation-time stack tracking which basicTabs is currently being rendered.
@@ -6,15 +8,15 @@ import { ReactiveVar } from 'meteor/reactive-var';
 // This is necessary because Blaze content blocks render with parentView pointing
 // back to the calling context (e.g. membersWidget), not the basicTabs template —
 // so walking the view tree cannot find the basicTabs instance.
-const _creatingStack = [];
+const _creatingStack: BasicTabsInstance[] = [];
 
-Template.basicTabs.onCreated(function () {
+Template.basicTabs.onCreated(function (this: BasicTabsInstance) {
   const activeTab = this.data.activeTab
     ? { slug: this.data.activeTab }
     : this.data.tabs[0];
   this._activeTab = new ReactiveVar(activeTab);
 
-  this.isActiveSlug = (slug) => {
+  this.isActiveSlug = (slug: string) => {
     const current = this._activeTab.get();
     return current && current.slug === slug;
   };
@@ -22,26 +24,27 @@ Template.basicTabs.onCreated(function () {
   _creatingStack.push(this);
 });
 
-Template.basicTabs.onRendered(function () {
+Template.basicTabs.onRendered(function (this: BasicTabsInstance) {
   const idx = _creatingStack.lastIndexOf(this);
   if (idx !== -1) _creatingStack.splice(idx, 1);
 });
 
 Template.basicTabs.helpers({
-  isActiveTab(slug) {
-    if (Template.instance().isActiveSlug(slug)) {
+  isActiveTab(slug: string) {
+    if ((Template.instance() as BasicTabsInstance).isActiveSlug(slug)) {
       return 'active';
     }
   },
 });
 
 Template.basicTabs.events({
-  'click .tab-item'(e, t) {
+  // this: any — the click handler's data context is the tab object.
+  'click .tab-item'(this: any, e: JQuery.TriggeredEvent, t: BasicTabsInstance) {
     t._activeTab.set(this);
   },
 });
 
-Template.tabContent.onCreated(function () {
+Template.tabContent.onCreated(function (this: TabContentInstance) {
   // Capture the parent basicTabs instance at creation time via the stack.
   // isActiveSlug reads a ReactiveVar on the basicTabs instance, so the
   // isActiveTab helper below will re-run reactively when the tab changes.
@@ -49,8 +52,17 @@ Template.tabContent.onCreated(function () {
 });
 
 Template.tabContent.helpers({
-  isActiveTab(slug) {
-    const inst = Template.instance()._basicTabsInst;
+  isActiveTab(slug: string) {
+    const inst = (Template.instance() as TabContentInstance)._basicTabsInst;
     if (inst && inst.isActiveSlug(slug)) return 'active';
   },
 });
+
+interface BasicTabsInstance extends Blaze.TemplateInstance {
+  _activeTab: ReactiveVar<any>;
+  isActiveSlug: (slug: string) => boolean;
+}
+
+interface TabContentInstance extends Blaze.TemplateInstance {
+  _basicTabsInst: BasicTabsInstance | null;
+}

@@ -1,23 +1,25 @@
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 
 /**
  * Component to display original position information for swimlanes, lists, and cards
  */
 
-Template.originalPosition.onCreated(function () {
+Template.originalPosition.onCreated(function (this: OriginalPositionInstance) {
   this.originalPosition = new ReactiveVar(null);
   this.isLoading = new ReactiveVar(false);
   this.hasMoved = new ReactiveVar(false);
 
   const tpl = this;
 
-  function loadOriginalPosition(entityId, entityType) {
+  function loadOriginalPosition(entityId: string, entityType: string) {
     tpl.isLoading.set(true);
 
     const methodName = `positionHistory.get${entityType.charAt(0).toUpperCase() + entityType.slice(1)}OriginalPosition`;
 
-    Meteor.call(methodName, entityId, (error, result) => {
+    Meteor.call(methodName, entityId, (error: any, result: any) => {
       tpl.isLoading.set(false);
       if (error) {
         console.error('Error loading original position:', error);
@@ -27,7 +29,7 @@ Template.originalPosition.onCreated(function () {
 
         // Check if the entity has moved
         const movedMethodName = `positionHistory.has${entityType.charAt(0).toUpperCase() + entityType.slice(1)}Moved`;
-        Meteor.call(movedMethodName, entityId, (movedError, movedResult) => {
+        Meteor.call(movedMethodName, entityId, (movedError: any, movedResult: any) => {
           if (!movedError) {
             tpl.hasMoved.set(movedResult);
           }
@@ -46,19 +48,19 @@ Template.originalPosition.onCreated(function () {
 
 Template.originalPosition.helpers({
   getOriginalPosition() {
-    return Template.instance().originalPosition.get();
+    return (Template.instance() as OriginalPositionInstance).originalPosition.get();
   },
 
   isLoading() {
-    return Template.instance().isLoading.get();
+    return (Template.instance() as OriginalPositionInstance).isLoading.get();
   },
 
   hasMovedFromOriginal() {
-    return Template.instance().hasMoved.get();
+    return (Template.instance() as OriginalPositionInstance).hasMoved.get();
   },
 
   getOriginalPositionDescription() {
-    const position = Template.instance().originalPosition.get();
+    const position = (Template.instance() as OriginalPositionInstance).originalPosition.get();
     if (!position) return 'No original position data';
 
     if (position.originalPosition) {
@@ -84,11 +86,17 @@ Template.originalPosition.helpers({
   },
 
   getOriginalTitle() {
-    const position = Template.instance().originalPosition.get();
+    const position = (Template.instance() as OriginalPositionInstance).originalPosition.get();
     return position ? position.originalTitle : '';
   },
 
   showOriginalPosition() {
-    return Template.instance().originalPosition.get() !== null;
+    return (Template.instance() as OriginalPositionInstance).originalPosition.get() !== null;
   },
 });
+
+interface OriginalPositionInstance extends Blaze.TemplateInstance {
+  originalPosition: ReactiveVar<any>;
+  isLoading: ReactiveVar<boolean>;
+  hasMoved: ReactiveVar<boolean>;
+}
