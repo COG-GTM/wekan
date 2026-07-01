@@ -11,8 +11,8 @@ export const ADD_LIST_VIEW_MODES = ['board-view-swimlanes', 'board-view-lists'];
 
 // Returns true when the given board-view mode should show the add-list
 // composer. Used so Lists mode gets the same affordance as Swimlanes mode.
-export function canAddListInView(viewMode) {
-  return ADD_LIST_VIEW_MODES.indexOf(viewMode) !== -1;
+export function canAddListInView(viewMode?: string) {
+  return ADD_LIST_VIEW_MODES.indexOf(viewMode as string) !== -1;
 }
 
 // Decide which swimlane a newly created list should belong to when the user
@@ -22,7 +22,8 @@ export function canAddListInView(viewMode) {
 //
 // `board` only needs to expose a `getDefaultSwimline()` method (the WeKan
 // Board model does); it may also be a plain object for testing.
-export function defaultSwimlaneIdForBoard(board, explicitSwimlaneId) {
+// board: any — only needs a getDefaultSwimline() method (Board model or a test stub).
+export function defaultSwimlaneIdForBoard(board: any, explicitSwimlaneId?: string) {
   if (explicitSwimlaneId) {
     return explicitSwimlaneId;
   }

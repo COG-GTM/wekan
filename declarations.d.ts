@@ -794,7 +794,11 @@ declare let __webpack_public_path__: string;
 // `Random` / `ReactiveCache` declarations above).
 // ---------------------------------------------------------------------------
 declare const Meteor: typeof import('meteor/meteor').Meteor;
-declare const Session: typeof import('meteor/session').Session;
+// Session is a ReactiveDict at runtime and exposes delete(), which the
+// @types/meteor `Session` namespace omits.
+declare const Session: typeof import('meteor/session').Session & {
+  delete(key: string): void;
+};
 declare const Tracker: typeof import('meteor/tracker').Tracker;
 declare const ReactiveVar: typeof import('meteor/reactive-var').ReactiveVar;
 declare const Blaze: typeof import('meteor/blaze').Blaze;

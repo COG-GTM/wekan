@@ -3,7 +3,11 @@ import { TAPi18n } from '/imports/i18n';
 import { EscapeActions } from '/client/lib/escapeActions';
 import { MultiSelection } from '/client/lib/multiSelection';
 import { Utils } from '/client/lib/utils';
-require('/client/lib/jquery-ui.js')
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
+import { Tracker } from 'meteor/tracker';
+import '/client/lib/jquery-ui.js';
 
 const { calculateIndex } = Utils;
 
@@ -23,7 +27,7 @@ const { calculateIndex } = Utils;
 const DEFAULT_LIST_WIDTH = 272;
 const MIN_LIST_WIDTH = 270;
 
-function isPersonalListWidth(boardId) {
+function isPersonalListWidth(boardId: string) {
   const board = ReactiveCache.getBoard(boardId);
   return !!(board && board.allowsPersonalListWidth);
 }
@@ -31,7 +35,7 @@ function isPersonalListWidth(boardId) {
 // #6409 Auto-width follows the same scope as fixed widths:
 //   * personal mode -> the user's own profile.autoWidthBoards
 //   * shared mode   -> the board's `autoWidth` (same for everyone)
-function effectiveAutoWidth(boardId) {
+function effectiveAutoWidth(boardId: string) {
   if (isPersonalListWidth(boardId)) {
     const user = ReactiveCache.getCurrentUser();
     return !!(user && user.isAutoWidth(boardId));
@@ -40,7 +44,7 @@ function effectiveAutoWidth(boardId) {
   return !!(board && board.autoWidth);
 }
 
-function readAnonListWidth(boardId, listId) {
+function readAnonListWidth(boardId: string, listId: string) {
   try {
     const stored = localStorage.getItem('wekan-list-widths');
     if (stored) {
@@ -63,7 +67,7 @@ function readAnonListWidth(boardId, listId) {
 //   * logged-in -> profile.fixedListWidthBoards / profile.fixedListWidths
 //   * anonymous  -> localStorage (mirrors readAnonListWidth)
 // ---------------------------------------------------------------------------
-function readAnonFixedListWidthEnabled(boardId) {
+function readAnonFixedListWidthEnabled(boardId: string) {
   try {
     const stored = localStorage.getItem('wekan-fixed-list-width-enabled');
     if (stored) {
@@ -76,7 +80,7 @@ function readAnonFixedListWidthEnabled(boardId) {
   return false;
 }
 
-function readAnonFixedListWidth(boardId) {
+function readAnonFixedListWidth(boardId: string) {
   try {
     const stored = localStorage.getItem('wekan-fixed-list-width');
     if (stored) {
@@ -91,7 +95,7 @@ function readAnonFixedListWidth(boardId) {
 }
 
 // Whether the current viewer has fixed width mode enabled for this board.
-function isFixedListWidth(boardId) {
+function isFixedListWidth(boardId: string) {
   const user = ReactiveCache.getCurrentUser();
   if (user) {
     return !!user.isFixedListWidth(boardId);
@@ -100,7 +104,7 @@ function isFixedListWidth(boardId) {
 }
 
 // The single width every list should use when fixed width mode is enabled.
-function fixedListWidthValue(boardId) {
+function fixedListWidthValue(boardId: string) {
   const user = ReactiveCache.getCurrentUser();
   if (user) {
     return user.getFixedListWidth(boardId);
@@ -109,7 +113,7 @@ function fixedListWidthValue(boardId) {
 }
 
 // Persist the single fixed width for the whole board (anon localStorage).
-function saveAnonFixedListWidth(boardId, width) {
+function saveAnonFixedListWidth(boardId: string, width: number) {
   try {
     const stored = localStorage.getItem('wekan-fixed-list-width');
     const widths = stored ? JSON.parse(stored) : {};
@@ -120,7 +124,8 @@ function saveAnonFixedListWidth(boardId, width) {
   }
 }
 
-function effectiveListWidth(list) {
+// list: any — the dynamic List model doc (or Blaze data context).
+function effectiveListWidth(list: any) {
   if (!list) return DEFAULT_LIST_WIDTH;
   // #5729 In fixed width mode every list renders at the single shared value.
   if (isFixedListWidth(list.boardId)) {
@@ -147,7 +152,8 @@ function effectiveListWidth(list) {
 //  - never while the board/list is in auto-width mode (the width is computed)
 //  - personal mode: always (it only affects their own view)
 //  - shared mode: only with board write access
-function canResizeList(list) {
+// list: any — the dynamic List model doc (or Blaze data context).
+function canResizeList(list: any) {
   if (!list) return false;
   if (effectiveAutoWidth(list.boardId)) return false;
   // #5729 Fixed width is the viewer's own per-board setting, so any viewer
@@ -158,7 +164,8 @@ function canResizeList(list) {
 }
 
 // Persist a new width to the place that matches the current board mode.
-function saveListWidth(list, width) {
+// list: any — the dynamic List model doc (or Blaze data context).
+function saveListWidth(list: any, width: number) {
   if (!list) return;
   const boardId = list.boardId;
   const listId = list._id;
@@ -167,7 +174,8 @@ function saveListWidth(list, width) {
   // the per-list width, so EVERY list re-renders at the new width.
   if (isFixedListWidth(boardId)) {
     if (user) {
-      Meteor.call('setFixedListWidth', boardId, width, error => {
+      // error: any — untyped Meteor.call rejection (Meteor.Error).
+      Meteor.call('setFixedListWidth', boardId, width, (error: any) => {
         if (error) console.error('Error saving fixed list width:', error);
       });
     } else {
@@ -191,20 +199,22 @@ function saveListWidth(list, width) {
     }
   } else if (user) {
     // Shared width: server also enforces board membership.
-    Meteor.call('applyListWidth', boardId, listId, width, width, error => {
+    // error: any — untyped Meteor.call rejection (Meteor.Error).
+    Meteor.call('applyListWidth', boardId, listId, width, width, (error: any) => {
       if (error) console.error('Error saving shared list width:', error);
     });
   }
 }
 
-Template.list.onCreated(function () {
+Template.list.onCreated(function (this: ListInstance) {
   this.newCardFormIsVisible = new ReactiveVar(true);
 
   // Proxy - find the listBody child template instance via the DOM
-  this.openForm = (options) => {
+  this.openForm = (options?: any) => {
     const listBodyEl = this.find('.list-body');
     const view = listBodyEl && Blaze.getView(listBodyEl, 'Template.listBody');
-    const listBodyInstance = view?.templateInstance?.();
+    // listBodyInstance: any — the listBody component exposes a custom openForm().
+    const listBodyInstance: any = view?.templateInstance?.();
     if (listBodyInstance) listBodyInstance.openForm(options);
   };
 });
@@ -216,11 +226,12 @@ Template.list.onCreated(function () {
 // By calling asking the sortable library to cancel its move on the `stop`
 // callback, we basically solve all issues related to reactive updates. A
 // comment below provides further details.
-Template.list.onRendered(function () {
-  const boardBodyEl = this.firstNode?.parentElement?.closest?.('.board-body') ||
+Template.list.onRendered(function (this: ListInstance) {
+  const boardBodyEl = (this.firstNode as HTMLElement | null)?.parentElement?.closest?.('.board-body') ||
     document.querySelector('.board-body');
-  const boardView = boardBodyEl && Blaze.getView(boardBodyEl, 'Template.boardBody');
-  const boardComponent = boardView?.templateInstance?.();
+  const boardView = boardBodyEl && Blaze.getView(boardBodyEl as HTMLElement, 'Template.boardBody');
+  // boardComponent: any — boardBody Blaze instance with custom imperative methods.
+  const boardComponent: any = boardView?.templateInstance?.();
 
   // Initialize list resize functionality immediately
   this.initializeListResize();
@@ -266,7 +277,7 @@ Template.list.onRendered(function () {
     scrollSpeed: 10,
     start(evt, ui) {
       ui.helper.css('z-index', 1000);
-      ui.placeholder.height(ui.helper.height());
+      ui.placeholder.height(ui.helper.height()!);
       EscapeActions.executeUpTo('popup-close');
       if (boardComponent) boardComponent.setIsDragging(true);
     },
@@ -277,7 +288,8 @@ Template.list.onRendered(function () {
       const nextCardDom = ui.item.next('.js-minicard').get(0);
       const nCards = MultiSelection.isActive() ? MultiSelection.count() : 1;
       const sortIndex = calculateIndex(prevCardDom, nextCardDom, nCards);
-      const listData = Blaze.getData(ui.item.parents('.list').get(0));
+      // listData: any — Blaze.getData returns the dynamic List model doc.
+      const listData: any = Blaze.getData(ui.item.parents('.list').get(0));
       const listId = listData._id;
       const currentBoard = Utils.getCurrentBoard();
       const defaultSwimlaneId = currentBoard.getDefaultSwimline()._id;
@@ -288,7 +300,8 @@ Template.list.onRendered(function () {
         Utils.boardView() === 'board-view-swimlanes' ||
         currentBoard.isTemplatesBoard()
       ) {
-        targetSwimlaneId = Blaze.getData(ui.item.parents('.swimlane').get(0))
+        // Blaze.getData returns the dynamic Swimlane model doc.
+        targetSwimlaneId = (Blaze.getData(ui.item.parents('.swimlane').get(0)) as any)
           ._id;
       } else if (listData.swimlaneId) {
         targetSwimlaneId = listData.swimlaneId;
@@ -304,7 +317,7 @@ Template.list.onRendered(function () {
       $cards.sortable('cancel');
 
       if (MultiSelection.isActive()) {
-        ReactiveCache.getCards(MultiSelection.getMongoSelector(), { sort: ['sort'] }).forEach((card, i) => {
+        ReactiveCache.getCards(MultiSelection.getMongoSelector(), { sort: ['sort'] }).forEach((card: any, i: number) => {
           const newSwimlaneId = targetSwimlaneId
             ? targetSwimlaneId
             : card.swimlaneId || defaultSwimlaneId;
@@ -317,7 +330,8 @@ Template.list.onRendered(function () {
         });
       } else {
         const cardDomElement = ui.item.get(0);
-        const card = Blaze.getData(cardDomElement);
+        // card: any — Blaze.getData returns the dynamic Card model doc.
+        const card: any = Blaze.getData(cardDomElement);
         const newSwimlaneId = targetSwimlaneId
           ? targetSwimlaneId
           : card.swimlaneId || defaultSwimlaneId;
@@ -325,13 +339,15 @@ Template.list.onRendered(function () {
       }
       if (boardComponent) boardComponent.setIsDragging(false);
     },
-    sort(event, ui) {
+    sort(event: any, ui: JQueryUiSortableUi) {
       const $boardCanvas = $('.board-canvas');
       const boardCanvas = $boardCanvas[0];
 
       if (event.pageX < 10) { // scroll to the left
         boardCanvas.scrollLeft -= 15;
-        ui.helper[0].offsetLeft -= 15;
+        // offsetLeft is read-only; this pre-existing assignment is a no-op, so
+        // cast to any to preserve the original runtime behaviour.
+        (ui.helper[0] as any).offsetLeft -= 15;
       }
       if (
         event.pageX > boardCanvas.offsetWidth - 10 &&
@@ -349,7 +365,7 @@ Template.list.onRendered(function () {
         boardCanvas.scrollTop -= 15;
       }
     },
-    activate(event, ui) {
+    activate(event: any, ui: JQueryUiSortableUi) {
       const $boardCanvas = $('.board-canvas');
       const boardCanvas = $boardCanvas[0];
       // scrollTopMax and scrollLeftMax only available at Firefox (https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollTopMax)
@@ -388,15 +404,16 @@ Template.list.onRendered(function () {
       $cards.find(itemsSelector).droppable({
         hoverClass: 'draggable-hover-card',
         accept: '.js-member,.js-label',
-        drop(event, ui) {
-          const cardId = Blaze.getData(this)._id;
+        // drop payloads read dynamic Blaze data contexts (card / member / label docs).
+        drop(this: any, event: any, ui: any) {
+          const cardId = (Blaze.getData(this) as any)._id;
           const card = ReactiveCache.getCard(cardId);
 
           if (ui.draggable.hasClass('js-member')) {
-            const memberId = Blaze.getData(ui.draggable.get(0)).userId;
+            const memberId = (Blaze.getData(ui.draggable.get(0)) as any).userId;
             card.assignMember(memberId);
           } else {
-            const labelId = Blaze.getData(ui.draggable.get(0))._id;
+            const labelId = (Blaze.getData(ui.draggable.get(0)) as any)._id;
             card.addLabel(labelId);
           }
         },
@@ -420,19 +437,19 @@ Template.list.helpers({
     return !!list && effectiveAutoWidth(list.boardId);
   },
 
-  collapsed() {
+  collapsed(this: any) {
     return Utils.getListCollapseState(this);
   },
 });
 
 // initializeListResize as a method on the template instance
-Template.list.onCreated(function () {
+Template.list.onCreated(function (this: ListInstance) {
   const tpl = this;
 
   tpl.initializeListResize = function () {
     // Resolve list data from the template instance to avoid relying on
     // Template.currentData() from async callbacks where no current view exists.
-    const list = tpl.data || Blaze.getData(tpl.firstNode);
+    const list = tpl.data || Blaze.getData(tpl.firstNode as HTMLElement);
     if (!list) {
       console.warn('No list data available for list resize initialization');
       return;
@@ -450,7 +467,7 @@ Template.list.onCreated(function () {
     if (!$list.length || !$resizeHandle.length) {
       console.warn('List or resize handle not found, retrying in 100ms');
       Meteor.setTimeout(() => {
-        if (!tpl.view.isDestroyed) {
+        if (!(tpl.view as any).isDestroyed) {
           tpl.initializeListResize();
         }
       }, 100);
@@ -477,17 +494,20 @@ Template.list.onCreated(function () {
     // Read the horizontal page coordinate from either a jQuery mouse event
     // or a native touch event (touchstart/move expose `touches`, touchend
     // exposes `changedTouches`).
-    const getEventPageX = (e) => {
+    // e: any — handler is bound to both jQuery mouse and native touch events,
+    // whose overlapping fields (originalEvent/touches/pageX) differ.
+    const getEventPageX = (e: any) => {
       const oe = e.originalEvent || e;
       if (oe.touches && oe.touches.length) return oe.touches[0].pageX;
       if (oe.changedTouches && oe.changedTouches.length) return oe.changedTouches[0].pageX;
       return e.pageX;
     };
 
-    const startResize = (e) => {
+    // e: any — bound to both jQuery mouse and native touch events (see getEventPageX).
+    const startResize = (e: any) => {
       isResizing = true;
       startX = getEventPageX(e);
-      startWidth = $list.outerWidth();
+      startWidth = $list.outerWidth()!;
 
       // Add visual feedback
       $list.addClass('list-resizing');
@@ -500,7 +520,8 @@ Template.list.onCreated(function () {
       e.stopPropagation();
     };
 
-    const doResize = (e) => {
+    // e: any — bound to both jQuery mouse and native touch events (see getEventPageX).
+    const doResize = (e: any) => {
       if (!isResizing) {
         return;
       }
@@ -523,7 +544,8 @@ Template.list.onCreated(function () {
       e.stopPropagation();
     };
 
-    const stopResize = (e) => {
+    // e: any — bound to both jQuery mouse and native touch events (see getEventPageX).
+    const stopResize = (e: any) => {
       if (!isResizing) return;
 
       isResizing = false;
@@ -576,7 +598,7 @@ Template.list.onCreated(function () {
     });
 
     // Clean up on component destruction
-    tpl.view.onViewDestroyed(() => {
+    (tpl.view as any).onViewDestroyed(() => {
       $(document).off('mousemove', doResize);
       $(document).off('mouseup', stopResize);
       document.removeEventListener('touchmove', doResize);
@@ -586,7 +608,7 @@ Template.list.onCreated(function () {
 });
 
 Template.miniList.events({
-  'click .js-select-list'() {
+  'click .js-select-list'(this: any) {
     const listId = this._id;
     Session.set('currentList', listId);
   },
@@ -595,3 +617,11 @@ Template.miniList.events({
 // NOTE: Collapsed list drag-reorder was previously here but referenced
 // boardComponent from an outer scope. If needed, this should be moved
 // into Template.list.onRendered where boardComponent is available.
+
+// openForm forwards an untyped options bag to the listBody child component;
+// initializeListResize wires up the drag-resize handlers imperatively.
+interface ListInstance extends Blaze.TemplateInstance {
+  newCardFormIsVisible: ReactiveVar<boolean>;
+  openForm: (options?: any) => void;
+  initializeListResize: () => void;
+}

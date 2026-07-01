@@ -10,22 +10,26 @@ import { Filter } from '/client/lib/filter';
 import { MultiSelection } from '/client/lib/multiSelection';
 import { Utils } from '/client/lib/utils';
 import autosize from 'autosize';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 
 // SubsManager removed for Meteor 3 migration
 const InfiniteScrollIter = 10;
 
-Template.listBody.onCreated(function () {
+Template.listBody.onCreated(function (this: ListBodyInstance) {
   // for infinite scrolling
   this.cardlimit = new ReactiveVar(InfiniteScrollIter);
 
-  this.openForm = (options) => {
+  this.openForm = (options?: any) => {
     options = options || {};
     options.position = options.position || 'top';
 
     const formEls = this.findAll('.js-inlined-form-wrapper');
-    let formInstance = null;
-    let firstInstance = null;
-    let lastInstance = null;
+    // inlinedForm instances expose a custom isOpen ReactiveVar.
+    let formInstance: any = null;
+    let firstInstance: any = null;
+    let lastInstance: any = null;
     for (const el of formEls) {
       const view = Blaze.getView(el, 'Template.inlinedForm');
       const inst = view?.templateInstance?.();
@@ -59,13 +63,13 @@ Template.listBody.onCreated(function () {
   };
 
   this.scrollToBottom = () => {
-    const container = this.firstNode;
+    const container = this.firstNode as HTMLElement;
     $(container).animate({
       scrollTop: container.scrollHeight,
     });
   };
 
-  this.idOrNull = (swimlaneId) => {
+  this.idOrNull = (swimlaneId?: any) => {
     const data = this.data;
     if (!data) {
       return undefined;
@@ -78,15 +82,15 @@ Template.listBody.onCreated(function () {
     return undefined;
   };
 
-  this.addCard = async (evt) => {
+  this.addCard = async (evt: any) => {
     evt.preventDefault();
     const firstCardDom = this.find('.js-minicard:first');
     const lastCardDom = this.find('.js-minicard:last');
     const textarea = $(evt.currentTarget).find('textarea');
-    const position = Blaze.getData(evt.currentTarget)?.position;
-    const title = textarea.val().trim();
+    const position = (Blaze.getData(evt.currentTarget) as any)?.position;
+    const title = (textarea.val() as string).trim();
 
-    let sortIndex;
+    let sortIndex: number | undefined;
     if (position === 'top') {
       sortIndex = Utils.calculateIndex(null, firstCardDom).base;
     } else if (position === 'bottom') {
@@ -114,7 +118,7 @@ Template.listBody.onCreated(function () {
 
       if (board.isTemplatesBoard()) {
         const swimlaneEl = this.$('.js-minicards').closest('.swimlane').get(0);
-        swimlaneId = swimlaneEl && Blaze.getData(swimlaneEl)?._id; // Always swimlanes view
+        swimlaneId = swimlaneEl && (Blaze.getData(swimlaneEl) as any)?._id; // Always swimlanes view
         const swimlane = ReactiveCache.getSwimlane(swimlaneId);
         // If this is the card templates swimlane, insert a card template
         if (swimlane.isCardTemplatesSwimlane()) cardType = 'template-card';
@@ -135,7 +139,7 @@ Template.listBody.onCreated(function () {
         }
       } else if (Utils.boardView() === 'board-view-swimlanes') {
         const swimlaneEl2 = this.$('.js-minicards').closest('.swimlane').get(0);
-        swimlaneId = swimlaneEl2 && Blaze.getData(swimlaneEl2)?._id;
+        swimlaneId = swimlaneEl2 && (Blaze.getData(swimlaneEl2) as any)?._id;
       }
       else if (
         Utils.boardView() === 'board-view-lists' ||
@@ -184,9 +188,10 @@ Template.listBody.onCreated(function () {
     }
   };
 
-  this.clickOnMiniCard = (evt) => {
+  this.clickOnMiniCard = (evt: any) => {
     const $target = $(evt.target);
-    const card = Blaze.getData(evt.currentTarget) || Template.currentData();
+    // card: any — the dynamic Card model doc from Blaze data.
+    const card: any = Blaze.getData(evt.currentTarget) || Template.currentData();
     if (!card || !card._id) {
       return;
     }
@@ -203,7 +208,8 @@ Template.listBody.onCreated(function () {
       evt.stopImmediatePropagation();
       evt.preventDefault();
       const methodName = evt.shiftKey ? 'toggleRange' : 'toggle';
-      MultiSelection[methodName](card._id);
+      // MultiSelection indexed by a dynamic method name (toggle/toggleRange).
+      (MultiSelection as any)[methodName](card._id);
       return;
     }
 
@@ -247,7 +253,7 @@ Template.listBody.onCreated(function () {
     }
   };
 
-  this.toggleMultiSelection = (evt) => {
+  this.toggleMultiSelection = (evt: any) => {
     evt.stopImmediatePropagation();
     evt.preventDefault();
     // Resolve the card from the clicked checkbox element. Using
@@ -255,14 +261,15 @@ Template.listBody.onCreated(function () {
     // context, whereas Template.currentData() can resolve to the enclosing
     // list context and toggle the wrong id (so the checkbox appears to do
     // nothing). Falls back to Template.currentData() just in case.
-    const card =
+    // card: any — the dynamic Card model doc from Blaze data.
+    const card: any =
       Blaze.getData(evt.currentTarget) || Template.currentData();
     if (card && card._id) {
       MultiSelection.toggle(card._id);
     }
   };
 
-  this.cardDetailsPopup = (event) => {
+  this.cardDetailsPopup = (event: any) => {
     if (!Popup.isOpen()) {
       Popup.open("cardDetails")(event);
     }
@@ -270,8 +277,8 @@ Template.listBody.onCreated(function () {
 });
 
 Template.listBody.helpers({
-  idOrNull(swimlaneId) {
-    return Template.instance().idOrNull(swimlaneId);
+  idOrNull(swimlaneId?: any) {
+    return (Template.instance() as ListBodyInstance).idOrNull(swimlaneId);
   },
   customFieldsSum() {
     const list = Template.currentData();
@@ -289,12 +296,12 @@ Template.listBody.helpers({
       archived: false,
     });
 
-    const result = fields.map(field => {
+    const result = fields.map((field: any) => {
       let sum = 0;
       if (cards && cards.length) {
-        cards.forEach(card => {
+        cards.forEach((card: any) => {
           const cfs = (card.customFields || []);
-          const cf = cfs.find(f => f && f._id === field._id);
+          const cf = cfs.find((f: any) => f && f._id === field._id);
           if (!cf || cf.value === null || cf.value === undefined) return;
           let v = cf.value;
           if (typeof v === 'string') {
@@ -320,8 +327,8 @@ Template.listBody.helpers({
     return result;
   },
 
-  cardsWithLimit(swimlaneId) {
-    const tpl = Template.instance();
+  cardsWithLimit(swimlaneId?: any) {
+    const tpl = Template.instance() as ListBodyInstance;
     const limit = tpl.cardlimit.get();
     const defaultSort = { sort: 1 };
     // Session is reset on page reload; fall back to the persisted card sort so a
@@ -338,7 +345,8 @@ Template.listBody.helpers({
     if (!sortBy) {
       sortBy = defaultSort;
     }
-    const selector = {
+    // selector: any — optional $or clause is added conditionally below.
+    const selector: any = {
       listId: Template.currentData()._id,
       archived: false,
     };
@@ -359,8 +367,8 @@ Template.listBody.helpers({
     return ret;
   },
 
-  showSpinner(swimlaneId) {
-    const tpl = Template.instance();
+  showSpinner(swimlaneId?: any) {
+    const tpl = Template.instance() as ListBodyInstance;
     const list = Template.currentData();
     return list.cards(swimlaneId).length > tpl.cardlimit.get();
   },
@@ -397,7 +405,7 @@ Template.listBody.helpers({
     return Session.equals('currentCard', Template.currentData()._id);
   },
 
-  formattedCurrencyCustomFieldValue(val) {
+  formattedCurrencyCustomFieldValue(this: any, val: any) {
     // `this` is the custom field sum object from customFieldsSum each-iteration
     const field = this || {};
     const code = (field.settings && field.settings.currencyCode) || 'USD';
@@ -412,21 +420,21 @@ Template.listBody.helpers({
 });
 
 Template.listBody.events({
-  'click .js-minicard'(evt, tpl) {
+  'click .js-minicard'(evt: JQuery.TriggeredEvent, tpl: ListBodyInstance) {
     tpl.clickOnMiniCard(evt);
   },
-  'click .js-toggle-multi-selection'(evt, tpl) {
+  'click .js-toggle-multi-selection'(evt: JQuery.TriggeredEvent, tpl: ListBodyInstance) {
     tpl.toggleMultiSelection(evt);
   },
-  'click .open-minicard-composer'(evt, tpl) {
+  'click .open-minicard-composer'(evt: JQuery.TriggeredEvent, tpl: ListBodyInstance) {
     tpl.scrollToBottom();
   },
-  submit(evt, tpl) {
+  submit(evt: JQuery.TriggeredEvent, tpl: ListBodyInstance) {
     tpl.addCard(evt);
   },
 });
 
-function toggleValueInReactiveArray(reactiveValue, value) {
+function toggleValueInReactiveArray(reactiveValue: ReactiveVar<any[]>, value: any) {
   const array = reactiveValue.get();
   const valueIndex = array.indexOf(value);
   if (valueIndex === -1) {
@@ -437,16 +445,16 @@ function toggleValueInReactiveArray(reactiveValue, value) {
   reactiveValue.set(array);
 }
 
-Template.addCardForm.onCreated(function () {
+Template.addCardForm.onCreated(function (this: AddCardFormInstance) {
   this.labels = new ReactiveVar([]);
   this.members = new ReactiveVar([]);
   this.customFields = new ReactiveVar([]);
 
   const currentBoardId = Session.get('currentBoard');
-  const arr = [];
+  const arr: Array<{ _id: string; value: null }> = [];
   ReactiveCache.getBoard(currentBoardId)
     .customFields()
-    .forEach(function (field) {
+    .forEach(function (field: any) {
       if (field.automaticallyOnCard || field.alwaysOnCard)
         arr.push({ _id: field._id, value: null });
     });
@@ -458,7 +466,7 @@ Template.addCardForm.onCreated(function () {
     this.customFields.set([]);
   };
 
-  this.pressKey = (evt) => {
+  this.pressKey = (evt: any) => {
     // Pressing Enter should submit the card
     if (evt.keyCode === 13 && !evt.shiftKey) {
       evt.preventDefault();
@@ -483,8 +491,9 @@ Template.addCardForm.onCreated(function () {
         nextList = $(listSelector + (isReverse ? ':last' : ':first')).get(0);
       }
 
-      const nextListView = Blaze.getView(nextList, 'Template.list');
-      const nextListInstance = nextListView?.templateInstance?.();
+      const nextListView = Blaze.getView(nextList as HTMLElement, 'Template.list');
+      // list instances expose a custom openForm().
+      const nextListInstance: any = nextListView?.templateInstance?.();
       if (nextListInstance) {
         nextListInstance.openForm({
           position: Template.currentData().position,
@@ -496,13 +505,13 @@ Template.addCardForm.onCreated(function () {
 
 Template.addCardForm.helpers({
   members() {
-    return Template.instance().members;
+    return (Template.instance() as AddCardFormInstance).members;
   },
   getLabels() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as AddCardFormInstance;
     const currentBoardId = Session.get('currentBoard');
     if (ReactiveCache.getBoard(currentBoardId).labels) {
-      return ReactiveCache.getBoard(currentBoardId).labels.filter(label => {
+      return ReactiveCache.getBoard(currentBoardId).labels.filter((label: any) => {
         return tpl.labels.get().indexOf(label._id) > -1;
       });
     }
@@ -511,7 +520,7 @@ Template.addCardForm.helpers({
 });
 
 Template.addCardForm.events({
-  keydown(evt, tpl) {
+  keydown(evt: JQuery.TriggeredEvent, tpl: AddCardFormInstance) {
     tpl.pressKey(evt);
   },
   'click .js-link': Popup.open('linkCard'),
@@ -519,7 +528,7 @@ Template.addCardForm.events({
   'click .js-card-template': Popup.open('searchElement'),
 });
 
-Template.addCardForm.onRendered(function () {
+Template.addCardForm.onRendered(function (this: AddCardFormInstance) {
   const tpl = this;
   const $textarea = this.$('textarea');
 
@@ -605,7 +614,7 @@ Template.addCardForm.onRendered(function () {
   );
 });
 
-Template.linkCardPopup.onCreated(function () {
+Template.linkCardPopup.onCreated(function (this: LinkCardPopupInstance) {
   this.selectedBoardId = new ReactiveVar('');
   this.selectedSwimlaneId = new ReactiveVar('');
   this.selectedListId = new ReactiveVar('');
@@ -615,22 +624,23 @@ Template.linkCardPopup.onCreated(function () {
   Meteor.subscribe('board', this.boardId, false);
   this.board = ReactiveCache.getBoard(this.boardId);
   // List where to insert card
-  this.list = $(Popup._getTopStack().openerElement).closest('.js-list');
-  const listData = Blaze.getData(this.list[0]);
+  this.list = $(Popup._getTopStack()!.openerElement).closest('.js-list');
+  // listData: any — Blaze.getData returns the dynamic List model doc.
+  const listData: any = Blaze.getData(this.list[0]);
   this.listId = listData._id;
   // Swimlane where to insert card
-  const swimlane = $(Popup._getTopStack().openerElement).closest(
+  const swimlane = $(Popup._getTopStack()!.openerElement).closest(
     '.js-swimlane',
   );
   this.swimlaneId = '';
   if (Utils.boardView() === 'board-view-swimlanes')
-    this.swimlaneId = Blaze.getData(swimlane[0])._id;
+    this.swimlaneId = (Blaze.getData(swimlane[0]) as any)._id;
   else if (Utils.boardView() === 'board-view-lists' || !Utils.boardView)
     this.swimlaneId = listData.swimlaneId || ReactiveCache.getSwimlane({ boardId: this.boardId })._id;
 
   this.getSortIndex = () => {
     const position = Template.currentData().position;
-    let ret;
+    let ret: number | undefined;
     if (position === 'top') {
       const firstCardDom = this.list.find('.js-minicard:first')[0];
       ret = Utils.calculateIndex(null, firstCardDom).base;
@@ -659,7 +669,7 @@ Template.linkCardPopup.helpers({
   },
 
   swimlanes() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as LinkCardPopupInstance;
     if (!tpl.selectedBoardId.get()) {
       return [];
     }
@@ -682,7 +692,7 @@ Template.linkCardPopup.helpers({
   },
 
   lists() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as LinkCardPopupInstance;
     if (!tpl.selectedBoardId.get()) {
       return [];
     }
@@ -697,12 +707,13 @@ Template.linkCardPopup.helpers({
   },
 
   cards() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as LinkCardPopupInstance;
     if (!tpl.board) {
       return [];
     }
-    const ownCardsIds = tpl.board.cards().map(card => card.getRealId());
-    const selector = {
+    const ownCardsIds = tpl.board.cards().map((card: any) => card.getRealId());
+    // selector: any — board/swimlane/list clauses are added conditionally below.
+    const selector: any = {
       archived: false,
       linkedId: { $nin: ownCardsIds },
       _id: { $nin: ownCardsIds },
@@ -716,7 +727,7 @@ Template.linkCardPopup.helpers({
     return ret;
   },
 
-  isTitleDefault(title) {
+  isTitleDefault(title: string) {
     // https://github.com/wekan/wekan/issues/4763
     // https://github.com/wekan/wekan/issues/4742
     // Translation text for "default" does not work, it returns an object.
@@ -741,29 +752,29 @@ Template.linkCardPopup.helpers({
 });
 
 Template.linkCardPopup.events({
-  'change .js-select-boards'(evt, tpl) {
-    const val = $(evt.currentTarget).val();
+  'change .js-select-boards'(evt: JQuery.TriggeredEvent, tpl: LinkCardPopupInstance) {
+    const val = $(evt.currentTarget).val() as string;
     Meteor.subscribe('board', val, false);
     // Clear selections to allow linking only board or re-choose swimlane/list
     tpl.selectedSwimlaneId.set('');
     tpl.selectedListId.set('');
     tpl.selectedBoardId.set(val);
   },
-  'change .js-select-swimlanes'(evt, tpl) {
-    tpl.selectedSwimlaneId.set($(evt.currentTarget).val());
+  'change .js-select-swimlanes'(evt: JQuery.TriggeredEvent, tpl: LinkCardPopupInstance) {
+    tpl.selectedSwimlaneId.set($(evt.currentTarget).val() as string);
   },
-  'change .js-select-lists'(evt, tpl) {
-    tpl.selectedListId.set($(evt.currentTarget).val());
+  'change .js-select-lists'(evt: JQuery.TriggeredEvent, tpl: LinkCardPopupInstance) {
+    tpl.selectedListId.set($(evt.currentTarget).val() as string);
   },
-  async 'click .js-done'(evt, tpl) {
+  async 'click .js-done'(evt: JQuery.TriggeredEvent, tpl: LinkCardPopupInstance) {
     // LINK CARD (or, when no card is chosen, fall back to a board-level link
     // so a whole board can be linked even when that board already has cards).
     // https://github.com/wekan/wekan/issues/5715
     evt.stopPropagation();
     evt.preventDefault();
-    const linkedId = $('.js-select-cards option:selected').val();
+    const linkedId = $('.js-select-cards option:selected').val() as string;
     if (!linkedId) {
-      const boardId = $('.js-select-boards option:selected').val();
+      const boardId = $('.js-select-boards option:selected').val() as string;
       // No board and no card selected: nothing to link.
       if (!boardId) {
         Popup.back();
@@ -805,11 +816,11 @@ Template.linkCardPopup.events({
     Filter.addException(_id);
     Popup.back();
   },
-  async 'click .js-link-board'(evt, tpl) {
+  async 'click .js-link-board'(evt: JQuery.TriggeredEvent, tpl: LinkCardPopupInstance) {
     //LINK BOARD
     evt.stopPropagation();
     evt.preventDefault();
-    const impBoardId = $('.js-select-boards option:selected').val();
+    const impBoardId = $('.js-select-boards option:selected').val() as string;
     if (
       !impBoardId ||
       ReactiveCache.getCard({ linkedId: impBoardId, archived: false })
@@ -834,17 +845,17 @@ Template.linkCardPopup.events({
   },
 });
 
-Template.searchElementPopup.onCreated(function () {
-  this.isCardTemplateSearch = $(Popup._getTopStack().openerElement).hasClass(
+Template.searchElementPopup.onCreated(function (this: SearchElementPopupInstance) {
+  this.isCardTemplateSearch = $(Popup._getTopStack()!.openerElement).hasClass(
     'js-card-template',
   );
-  this.isListTemplateSearch = $(Popup._getTopStack().openerElement).hasClass(
+  this.isListTemplateSearch = $(Popup._getTopStack()!.openerElement).hasClass(
     'js-list-template',
   );
   this.isSwimlaneTemplateSearch = $(
-    Popup._getTopStack().openerElement,
+    Popup._getTopStack()!.openerElement,
   ).hasClass('js-open-add-swimlane-menu');
-  this.isBoardTemplateSearch = $(Popup._getTopStack().openerElement).hasClass(
+  this.isBoardTemplateSearch = $(Popup._getTopStack()!.openerElement).hasClass(
     'js-add-board',
   );
   this.isTemplateSearch =
@@ -871,17 +882,18 @@ Template.searchElementPopup.onCreated(function () {
   // Subscribe to this board
   Meteor.subscribe('board', this.boardId, false);
   this.selectedBoardId = new ReactiveVar(this.boardId);
-  this.list = $(Popup._getTopStack().openerElement).closest('.js-list');
+  this.list = $(Popup._getTopStack()!.openerElement).closest('.js-list');
 
     if (!this.isBoardTemplateSearch) {
       this.swimlaneId = '';
       // Swimlane where to insert card
-      const swimlane = $(Popup._getTopStack().openerElement).parents(
+      const swimlane = $(Popup._getTopStack()!.openerElement).parents(
         '.js-swimlane',
       );
-      const listData = Blaze.getData(this.list[0]);
+      // listData: any — Blaze.getData returns the dynamic List model doc.
+      const listData: any = Blaze.getData(this.list[0]);
       if (Utils.boardView() === 'board-view-swimlanes')
-        this.swimlaneId = Blaze.getData(swimlane[0])._id;
+        this.swimlaneId = (Blaze.getData(swimlane[0]) as any)._id;
       else this.swimlaneId = listData.swimlaneId || ReactiveCache.getSwimlane({ boardId: this.boardId })._id;
       // List where to insert card
       this.listId = listData._id;
@@ -890,7 +902,7 @@ Template.searchElementPopup.onCreated(function () {
 
   this.getSortIndex = () => {
     const position = Template.currentData().position;
-    let ret;
+    let ret: number | undefined;
     if (position === 'top') {
       const firstCardDom = this.list.find('.js-minicard:first')[0];
       ret = Utils.calculateIndex(null, firstCardDom).base;
@@ -919,7 +931,7 @@ Template.searchElementPopup.helpers({
   },
 
   results() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as SearchElementPopupInstance;
     if (!tpl.selectedBoardId) {
       return [];
     }
@@ -932,7 +944,7 @@ Template.searchElementPopup.helpers({
       return board.searchSwimlanes(tpl.term.get());
     } else if (tpl.isBoardTemplateSearch) {
       const boards = board.searchBoards(tpl.term.get());
-      boards.forEach(board => {
+      boards.forEach((board: any) => {
         Meteor.subscribe('board', board.linkedId, false);
       });
       return boards;
@@ -943,21 +955,23 @@ Template.searchElementPopup.helpers({
 });
 
 Template.searchElementPopup.events({
-  'change .js-select-boards'(evt, tpl) {
+  'change .js-select-boards'(evt: JQuery.TriggeredEvent, tpl: SearchElementPopupInstance) {
     Meteor.subscribe('board', $(evt.currentTarget).val(), false);
-    tpl.selectedBoardId.set($(evt.currentTarget).val());
+    tpl.selectedBoardId.set($(evt.currentTarget).val() as string);
   },
-  'submit .js-search-term-form'(evt, tpl) {
+  'submit .js-search-term-form'(evt: JQuery.TriggeredEvent, tpl: SearchElementPopupInstance) {
     evt.preventDefault();
-    tpl.term.set(evt.target.searchTerm.value);
+    // evt.target is the form element; searchTerm is its named input control.
+    tpl.term.set((evt.target as any).searchTerm.value);
   },
-  async 'click .js-minicard'(evt, tpl) {
+  async 'click .js-minicard'(evt: JQuery.TriggeredEvent, tpl: SearchElementPopupInstance) {
     // 0. Common
-    const title = $('.js-element-title')
-      .val()
+    const title = ($('.js-element-title')
+      .val() as string)
       .trim();
     if (!title) return;
-    const element = Blaze.getData(evt.currentTarget);
+    // element: any — dynamic Card/List/Swimlane/Board model doc from Blaze data.
+    const element: any = Blaze.getData(evt.currentTarget);
     element.title = title;
     let _id = '';
     if (!tpl.isTemplateSearch || tpl.isCardTemplateSearch) {
@@ -990,8 +1004,8 @@ Template.searchElementPopup.events({
         // wrongly created the card on the templates board.
         const targetList = ReactiveCache.getList(tpl.listId);
         const targetBoardId =
-          (targetList || {}).boardId ||
-          (Utils.getCurrentBoard() || {})._id ||
+          ((targetList || {}) as any).boardId ||
+          ((Utils.getCurrentBoard() || {}) as any)._id ||
           tpl.boardId;
         _id = await element.copy(targetBoardId, tpl.swimlaneId, tpl.listId);
         // 1.B Linked card
@@ -1021,7 +1035,8 @@ Template.searchElementPopup.events({
           type: 'board',
           title: element.title,
         },
-        (err, data) => {
+        // err/data: any — untyped Meteor method callback (Meteor.Error / return).
+        (err: any, data: any) => {
           _id = data;
           Meteor.subscribe('board', _id, false);
           FlowRouter.go('board', {
@@ -1044,20 +1059,21 @@ Template.spinnerList.helpers({
   },
 });
 
-Template.spinnerList.onCreated(function () {
+Template.spinnerList.onCreated(function (this: SpinnerListInstance) {
   this.swimlaneId = '';
 });
 
-Template.spinnerList.onRendered(function () {
+Template.spinnerList.onRendered(function (this: SpinnerListInstance) {
   const instance = this;
 
   // Find the parent listBody template instance via the DOM
   const listBodyEl = this.$('.sk-spinner-list').closest('.list-body')[0];
   const listBodyView = listBodyEl && Blaze.getView(listBodyEl, 'Template.listBody');
-  const listBodyInstance = listBodyView?.templateInstance?.();
+  // listBodyInstance: any — the listBody component exposes a custom cardlimit.
+  const listBodyInstance: any = listBodyView?.templateInstance?.();
 
   instance.cardlimit = listBodyInstance && listBodyInstance.cardlimit;
-  instance.listId = listBodyInstance && Blaze.getData(listBodyEl)?._id;
+  instance.listId = listBodyInstance && (Blaze.getData(listBodyEl) as any)?._id;
 
   const isSandstorm =
     Meteor.settings &&
@@ -1067,7 +1083,7 @@ Template.spinnerList.onRendered(function () {
   // Get swimlane ID from the DOM hierarchy (listBody is inside list inside swimlane)
   const getSwimlaneId = () => {
     const swimlaneEl = listBodyEl && $(listBodyEl).closest('.swimlane').get(0);
-    return swimlaneEl && Blaze.getData(swimlaneEl)?._id;
+    return swimlaneEl && (Blaze.getData(swimlaneEl) as any)?._id;
   };
 
   if (isSandstorm) {
@@ -1095,14 +1111,15 @@ Template.spinnerList.onRendered(function () {
   instance._updateList();
 });
 
-Template.spinnerList.onDestroyed(function () {
+Template.spinnerList.onDestroyed(function (this: SpinnerListInstance) {
   $(this.container).off(`scroll.spinner_${this.swimlaneId}_${this.listId}`);
   $(window).off(`resize.spinner_${this.swimlaneId}_${this.listId}`);
 });
 
 function checkIdleTime() {
   return window.requestIdleCallback ||
-    function (handler) {
+    // handler: any — requestIdleCallback polyfill callback (IdleDeadline-like).
+    function (handler: any) {
       const startTime = Date.now();
       return setTimeout(function () {
         handler({
@@ -1115,7 +1132,7 @@ function checkIdleTime() {
     };
 }
 
-Template.spinnerList.onCreated(function () {
+Template.spinnerList.onCreated(function (this: SpinnerListInstance) {
   const instance = this;
 
   instance._updateList = function () {
@@ -1141,3 +1158,67 @@ Template.spinnerList.onCreated(function () {
     return bottomViewPosition > spinnerViewPosition;
   };
 });
+
+// The listBody component exposes several imperative helpers on its instance;
+// the *Component / form lookups return other Blaze instances typed as `any`.
+interface ListBodyInstance extends Blaze.TemplateInstance {
+  cardlimit: ReactiveVar<number>;
+  openForm: (options?: any) => void;
+  cardFormComponent: () => any;
+  scrollToBottom: () => void;
+  idOrNull: (swimlaneId?: any) => any;
+  addCard: (evt: any) => Promise<void>;
+  clickOnMiniCard: (evt: any) => void;
+  toggleMultiSelection: (evt: any) => void;
+  cardDetailsPopup: (event: any) => void;
+}
+
+interface AddCardFormInstance extends Blaze.TemplateInstance {
+  labels: ReactiveVar<any[]>;
+  members: ReactiveVar<any[]>;
+  customFields: ReactiveVar<any[]>;
+  reset: () => void;
+  pressKey: (evt: any) => void;
+}
+
+interface LinkCardPopupInstance extends Blaze.TemplateInstance {
+  selectedBoardId: ReactiveVar<string>;
+  selectedSwimlaneId: ReactiveVar<string>;
+  selectedListId: ReactiveVar<string>;
+  boardId: string;
+  // board: any — the dynamic Board model doc.
+  board: any;
+  list: JQuery;
+  listId: any;
+  swimlaneId: string;
+  getSortIndex: () => number | undefined;
+}
+
+interface SearchElementPopupInstance extends Blaze.TemplateInstance {
+  isCardTemplateSearch: boolean;
+  isListTemplateSearch: boolean;
+  isSwimlaneTemplateSearch: boolean;
+  isBoardTemplateSearch: boolean;
+  isTemplateSearch: boolean;
+  // board: any — the dynamic Board model doc.
+  board: any;
+  boardId: any;
+  selectedBoardId: ReactiveVar<any>;
+  list: JQuery;
+  swimlaneId: string;
+  listId: any;
+  term: ReactiveVar<string>;
+  getSortIndex: () => number | undefined;
+}
+
+// spinnerList grabs DOM nodes and the parent listBody's cardlimit imperatively;
+// the DOM/instance fields are stored untyped.
+interface SpinnerListInstance extends Blaze.TemplateInstance {
+  swimlaneId: any;
+  cardlimit: any;
+  listId: any;
+  spinner: any;
+  container: any;
+  _updateList: () => void;
+  _spinnerInView: () => boolean;
+}

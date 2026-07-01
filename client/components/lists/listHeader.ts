@@ -7,8 +7,11 @@ import Cards from '/models/cards';
 import { LIST_COLORS } from '/models/metadata/colors';
 import { MultiSelection } from '/client/lib/multiSelection';
 import { Utils } from '/client/lib/utils';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 
-let listsColors;
+let listsColors: typeof LIST_COLORS;
 Meteor.startup(() => {
   listsColors = LIST_COLORS;
 });
@@ -19,7 +22,7 @@ Template.listHeader.helpers({
     return (
       (!list.getWipLimit('enabled') ||
         list.getWipLimit('soft') ||
-        !Template.instance().reachedWipLimit()) &&
+        !(Template.instance() as ListHeaderInstance).reachedWipLimit()) &&
       !ReactiveCache.getCurrentUser()?.isWorker()
     );
   },
@@ -79,13 +82,15 @@ Template.listHeader.helpers({
     );
   },
 
-  showCardsCountForList(count) {
+  showCardsCountForList(count: number) {
     const currentUser = ReactiveCache.getCurrentUser();
-    const limit = currentUser ? currentUser.getLimitToShowCardsCount() : false;
+    // limit: any — getLimitToShowCardsCount() returns a number, but falls back
+    // to `false` when signed out; the comparisons rely on JS coercion.
+    const limit: any = currentUser ? currentUser.getLimitToShowCardsCount() : false;
     return limit >= 0 && count >= limit;
   },
 
-  cardsCountForListIsOne(count) {
+  cardsCountForListIsOne(count: number) {
     if (count === 1) {
       return TAPi18n.__('cards-count-one');
     } else {
@@ -106,10 +111,10 @@ Template.listHeader.helpers({
     const cards = ReactiveCache.getCards({ listId: list._id, archived: false });
     let total = 0;
     if (cards && cards.length) {
-      cards.forEach(card => {
+      cards.forEach((card: any) => {
         const cfs = (card.customFields || []);
-        fields.forEach(field => {
-          const cf = cfs.find(f => f && f._id === field._id);
+        fields.forEach((field: any) => {
+          const cf = cfs.find((f: any) => f && f._id === field._id);
           if (!cf || cf.value === null || cf.value === undefined) return;
           let v = cf.value;
           if (typeof v === 'string') {
@@ -138,7 +143,7 @@ Template.listHeader.helpers({
 });
 
 // Helper function on template instance for reachedWipLimit check
-Template.listHeader.onCreated(function () {
+Template.listHeader.onCreated(function (this: ListHeaderInstance) {
   this.reachedWipLimit = function () {
     const list = Template.currentData();
     return (
@@ -150,12 +155,13 @@ Template.listHeader.onCreated(function () {
 
 // #459: accessible reordering — move a list left/right via sr-only buttons by
 // swapping its sort value with the adjacent list (no drag-and-drop required).
-function moveListBy(list, delta) {
+// list: any — the dynamic List model doc (Blaze data context).
+function moveListBy(list: any, delta: number) {
   const siblings = ReactiveCache.getLists(
     { boardId: list.boardId, archived: false },
     { sort: { sort: 1 } },
   );
-  const idx = siblings.findIndex(l => l._id === list._id);
+  const idx = siblings.findIndex((l: any) => l._id === list._id);
   const target = siblings[idx + delta];
   if (idx < 0 || !target) return;
   // Capture both sort values before either update; the docs are reactive and
@@ -170,33 +176,34 @@ function moveListBy(list, delta) {
 }
 
 Template.listHeader.events({
-  'click .js-list-move-left'(event) {
+  'click .js-list-move-left'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     moveListBy(Template.currentData(), -1);
   },
-  'click .js-list-move-right'(event) {
+  'click .js-list-move-right'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     moveListBy(Template.currentData(), 1);
   },
-  async 'click .js-list-star'(event) {
+  async 'click .js-list-star'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const list = Template.currentData();
     const status = list.isStarred();
     await list.star(!status);
   },
-  'click .js-collapse'(event) {
+  'click .js-collapse'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const list = Template.currentData();
     const status = Utils.getListCollapseState(list);
     Utils.setListCollapseState(list, !status);
   },
   'click .js-open-list-menu': Popup.open('listAction'),
-  'click .js-add-card.list-header-plus-top'(event) {
+  'click .js-add-card.list-header-plus-top'(event: JQuery.TriggeredEvent) {
     const listDom = $(event.target).parents(
       `#js-list-${Template.currentData()._id}`,
     )[0];
-    const view = Blaze.getView(listDom, 'Template.list');
-    const listComponent = view?.templateInstance?.();
+    const view = Blaze.getView(listDom as HTMLElement, 'Template.list');
+    // list instances expose a custom openForm().
+    const listComponent: any = view?.templateInstance?.();
     if (listComponent) {
       listComponent.openForm({
         position: 'top',
@@ -206,9 +213,9 @@ Template.listHeader.events({
   'click .js-unselect-list'() {
     Session.set('currentList', null);
   },
-  async 'submit'(event, tpl) {
+  async 'submit'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     event.preventDefault();
-    const newTitle = tpl.$('textarea,input[type=text]').val()?.trim();
+    const newTitle = (tpl.$('textarea,input[type=text]').val() as string)?.trim();
     const list = Template.currentData();
     if (newTitle) {
       await list.rename(newTitle.trim());
@@ -225,17 +232,18 @@ Template.listActionPopup.helpers({
     return Template.currentData().getWipLimit('enabled');
   },
 
-  isWatching() {
+  isWatching(this: any) {
     return this.findWatcher(Meteor.userId());
   }
 });
 
 Template.listActionPopup.events({
   'click .js-list-subscribe'() {},
-  'click .js-add-card.list-header-plus-top'(event) {
+  'click .js-add-card.list-header-plus-top'(this: any, event: JQuery.TriggeredEvent) {
     const listDom = $(`#js-list-${this._id}`)[0];
-    const view = Blaze.getView(listDom, 'Template.list');
-    const listComponent = view?.templateInstance?.();
+    const view = Blaze.getView(listDom as HTMLElement, 'Template.list');
+    // list instances expose a custom openForm().
+    const listComponent: any = view?.templateInstance?.();
     if (listComponent) {
       listComponent.openForm({
         position: 'top',
@@ -243,10 +251,11 @@ Template.listActionPopup.events({
     }
     Popup.back();
   },
-  'click .js-add-card.list-header-plus-bottom'(event) {
+  'click .js-add-card.list-header-plus-bottom'(this: any, event: JQuery.TriggeredEvent) {
     const listDom = $(`#js-list-${this._id}`)[0];
-    const view = Blaze.getView(listDom, 'Template.list');
-    const listComponent = view?.templateInstance?.();
+    const view = Blaze.getView(listDom as HTMLElement, 'Template.list');
+    // list instances expose a custom openForm().
+    const listComponent: any = view?.templateInstance?.();
     if (listComponent) {
       listComponent.openForm({
         position: 'bottom',
@@ -257,27 +266,28 @@ Template.listActionPopup.events({
   'click .js-add-list': Popup.open('addList'),
   'click .js-set-list-width': Popup.open('setListWidth'),
   'click .js-set-color-list': Popup.open('setListColor'),
-  'click .js-select-cards'() {
+  'click .js-select-cards'(this: any) {
     // Scope "select all cards" to the current swimlane when invoked from a
     // swimlane context (#5623). In swimlanes board view the list carries its
     // swimlaneId; otherwise there is genuinely no swimlane context and we keep
     // the historical list-wide selection (swimlaneId stays undefined).
-    let swimlaneId;
+    let swimlaneId: any;
     if (Utils.boardView() === 'board-view-swimlanes' && this.swimlaneId) {
       swimlaneId = this.swimlaneId;
     }
-    const cardIds = this.allCards(swimlaneId).map(card => card._id);
+    const cardIds = this.allCards(swimlaneId).map((card: any) => card._id);
     MultiSelection.add(cardIds);
     Popup.back();
   },
-  'click .js-toggle-watch-list'() {
+  'click .js-toggle-watch-list'(this: any) {
     const currentList = this;
     const level = currentList.findWatcher(Meteor.userId()) ? null : 'watching';
-    Meteor.call('watch', 'list', currentList._id, level, (err, ret) => {
+    // err/ret: any — untyped Meteor method callback (Meteor.Error / return).
+    Meteor.call('watch', 'list', currentList._id, level, (err: any, ret: any) => {
       if (!err && ret) Popup.back();
     });
   },
-  'click .js-close-list': Popup.afterConfirm('listArchive', async function() {
+  'click .js-close-list': Popup.afterConfirm('listArchive', async function(this: any) {
     await this.archive();
     Popup.close();
   }),
@@ -313,10 +323,10 @@ Template.setWipLimitPopup.events({
     }
     Meteor.call('enableWipLimit', list._id);
   },
-  'click .wip-limit-apply'(event, tpl) {
+  'click .wip-limit-apply'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const list = Template.currentData();
     const limit = parseInt(
-      tpl.$('.wip-limit-value').val(),
+      tpl.$('.wip-limit-value').val() as string,
       10,
     );
 
@@ -342,12 +352,12 @@ Template.setWipLimitPopup.events({
 });
 
 Template.listMorePopup.events({
-  'click .js-delete': Popup.afterConfirm('listDelete', function() {
+  'click .js-delete': Popup.afterConfirm('listDelete', function(this: any) {
     Popup.back();
     const list = Lists.findOne(this._id);
     if (!list) return;
     const allCards = list.allCards();
-    const allCardIds = allCards.map(c => c._id);
+    const allCardIds = allCards.map((c: any) => c._id);
     // it's okay if the linked cards are on the same list
     if (
       ReactiveCache.getCards({
@@ -357,7 +367,7 @@ Template.listMorePopup.events({
         ],
       }).length === 0
     ) {
-      allCardIds.map(_id => Cards.remove(_id));
+      allCardIds.map((_id: any) => Cards.remove(_id));
       Lists.remove(list._id);
     } else {
       const message = `${TAPi18n.__(
@@ -371,39 +381,40 @@ Template.listMorePopup.events({
   }),
 });
 
-function registerListDialogTemplate(templateName) {
-  Template[templateName].helpers({
+function registerListDialogTemplate(templateName: string) {
+  // Template indexed by a dynamic template name registered at call time.
+  (Template as any)[templateName].helpers({
     boards() {
-      return Template.instance().dialog.boards();
+      return (Template.instance() as DialogInstance).dialog.boards();
     },
     swimlanes() {
-      return Template.instance().dialog.swimlanes();
+      return (Template.instance() as DialogInstance).dialog.swimlanes();
     },
     lists() {
-      return Template.instance().dialog.lists();
+      return (Template.instance() as DialogInstance).dialog.lists();
     },
-    isDialogOptionBoardId(boardId) {
-      return Template.instance().dialog.isDialogOptionBoardId(boardId);
+    isDialogOptionBoardId(boardId: any) {
+      return (Template.instance() as DialogInstance).dialog.isDialogOptionBoardId(boardId);
     },
-    isDialogOptionSwimlaneId(swimlaneId) {
-      return Template.instance().dialog.isDialogOptionSwimlaneId(swimlaneId);
+    isDialogOptionSwimlaneId(swimlaneId: any) {
+      return (Template.instance() as DialogInstance).dialog.isDialogOptionSwimlaneId(swimlaneId);
     },
-    isDialogOptionListId(listId) {
-      return Template.instance().dialog.isDialogOptionListId(listId);
+    isDialogOptionListId(listId: any) {
+      return (Template.instance() as DialogInstance).dialog.isDialogOptionListId(listId);
     },
-    isTitleDefault(title) {
-      return Template.instance().dialog.isTitleDefault(title);
+    isTitleDefault(title: any) {
+      return (Template.instance() as DialogInstance).dialog.isTitleDefault(title);
     },
   });
 
-  Template[templateName].events({
-    async 'click .js-done'(event, tpl) {
+  (Template as any)[templateName].events({
+    async 'click .js-done'(event: JQuery.TriggeredEvent, tpl: DialogInstance) {
       const dialog = tpl.dialog;
-      const boardSelect = tpl.$('.js-select-boards')[0];
+      const boardSelect = tpl.$('.js-select-boards')[0] as HTMLSelectElement | undefined;
       const boardId = boardSelect?.options[boardSelect?.selectedIndex]?.value;
-      const swimlaneSelect = tpl.$('.js-select-swimlanes')[0];
+      const swimlaneSelect = tpl.$('.js-select-swimlanes')[0] as HTMLSelectElement | undefined;
       const swimlaneId = swimlaneSelect?.options[swimlaneSelect?.selectedIndex]?.value;
-      const listSelect = tpl.$('.js-select-lists')[0];
+      const listSelect = tpl.$('.js-select-lists')[0] as HTMLSelectElement | undefined;
       const listId = listSelect?.options[listSelect?.selectedIndex]?.value || null;
       const position = tpl.$('input[name="list-position"]:checked').val() || 'right';
       try {
@@ -413,27 +424,28 @@ function registerListDialogTemplate(templateName) {
       }
       Popup.back(2);
     },
-    'change .js-select-boards'(event, tpl) {
+    'change .js-select-boards'(event: JQuery.TriggeredEvent, tpl: DialogInstance) {
       tpl.dialog.getBoardData($(event.currentTarget).val());
     },
-    'change .js-select-swimlanes'(event, tpl) {
+    'change .js-select-swimlanes'(event: JQuery.TriggeredEvent, tpl: DialogInstance) {
       tpl.dialog.selectedSwimlaneId.set($(event.currentTarget).val());
       tpl.dialog.setFirstListId();
     },
-    'change .js-select-lists'(event, tpl) {
+    'change .js-select-lists'(event: JQuery.TriggeredEvent, tpl: DialogInstance) {
       tpl.dialog.selectedListId.set($(event.currentTarget).val());
     },
   });
 }
 
-Template.copyListPopup.onCreated(function () {
+Template.copyListPopup.onCreated(function (this: DialogInstance) {
   this.dialog = new BoardSwimlaneListDialog(this, {
-    getDialogOptions() {
+    // returns any — this dialog has no preset options (null == none).
+    getDialogOptions(): any {
       return null;
     },
-    async setDone(options) {
+    async setDone(options: any) {
       const tpl = Template.instance();
-      const title = tpl.$('#copy-list-title').val().trim();
+      const title = (tpl.$('#copy-list-title').val() as string).trim();
       if (!title) return;
       const list = Template.currentData();
       await Meteor.callAsync('copyList', list._id, options.boardId, options.swimlaneId, title, options.listId, options.position);
@@ -442,14 +454,15 @@ Template.copyListPopup.onCreated(function () {
 });
 registerListDialogTemplate('copyListPopup');
 
-Template.moveListPopup.onCreated(function () {
+Template.moveListPopup.onCreated(function (this: DialogInstance) {
   this.dialog = new BoardSwimlaneListDialog(this, {
-    getDialogOptions() {
+    // returns any — this dialog has no preset options (null == none).
+    getDialogOptions(): any {
       return null;
     },
-    async setDone(options) {
+    async setDone(options: any) {
       const tpl = Template.instance();
-      const title = tpl.$('#move-list-title').val().trim();
+      const title = (tpl.$('#move-list-title').val() as string).trim();
       const list = Template.currentData();
       await Meteor.callAsync('moveList', list._id, options.boardId, options.swimlaneId, options.listId, options.position, title);
     },
@@ -457,7 +470,7 @@ Template.moveListPopup.onCreated(function () {
 });
 registerListDialogTemplate('moveListPopup');
 
-Template.setListColorPopup.onCreated(function () {
+Template.setListColorPopup.onCreated(function (this: SetListColorInstance) {
   const data = Template.currentData();
   this.currentList = Lists.findOne(data._id) || data;
   this.currentColor = new ReactiveVar(this.currentList.color);
@@ -468,8 +481,8 @@ Template.setListColorPopup.helpers({
     return listsColors.map(color => ({ color, name: '' }));
   },
 
-  isSelected(color) {
-    const tpl = Template.instance();
+  isSelected(color: any) {
+    const tpl = Template.instance() as SetListColorInstance;
     if (tpl.currentColor.get() === null) {
       return color === 'white';
     } else {
@@ -479,11 +492,11 @@ Template.setListColorPopup.helpers({
 });
 
 Template.setListColorPopup.events({
-  'click .js-palette-color'(event, tpl) {
-    const paletteData = Blaze.getData(event.currentTarget);
-    tpl.currentColor.set(paletteData?.color);
+  'click .js-palette-color'(event: JQuery.TriggeredEvent, tpl: SetListColorInstance) {
+    const paletteData = Blaze.getData(event.currentTarget as HTMLElement);
+    tpl.currentColor.set((paletteData as any)?.color);
   },
-  async 'submit form'(event, tpl) {
+  async 'submit form'(event: JQuery.TriggeredEvent, tpl: SetListColorInstance) {
     event.preventDefault();
     try {
       await tpl.currentList.setColor(tpl.currentColor.get());
@@ -492,7 +505,7 @@ Template.setListColorPopup.events({
     }
     Popup.close();
   },
-  async 'click .js-submit'(event, tpl) {
+  async 'click .js-submit'(event: JQuery.TriggeredEvent, tpl: SetListColorInstance) {
     event.preventDefault();
     try {
       await tpl.currentList.setColor(tpl.currentColor.get());
@@ -501,7 +514,7 @@ Template.setListColorPopup.events({
     }
     Popup.close();
   },
-  async 'click .js-remove-color'(event, tpl) {
+  async 'click .js-remove-color'(event: JQuery.TriggeredEvent, tpl: SetListColorInstance) {
     event.preventDefault();
     try {
       await tpl.currentList.setColor(null);
@@ -515,7 +528,7 @@ Template.setListColorPopup.events({
 // #6409: the per-list width popup is now a single fixed-width value. Whether it
 // affects everyone (shared) or just the current user (personal) follows the
 // board setting `allowsPersonalListWidth`.
-function isPersonalListWidth(boardId) {
+function isPersonalListWidth(boardId: string) {
   const board = ReactiveCache.getBoard(boardId);
   return !!(board && board.allowsPersonalListWidth);
 }
@@ -523,7 +536,7 @@ function isPersonalListWidth(boardId) {
 // #5729 Fixed (same) width for all lists is a per-viewer/per-board setting.
 // Logged-in users store it in their profile; anonymous (public board) users in
 // localStorage (mirrors the per-list anon storage in list.js).
-function readAnonFixedListWidthEnabled(boardId) {
+function readAnonFixedListWidthEnabled(boardId: string) {
   try {
     const stored = localStorage.getItem('wekan-fixed-list-width-enabled');
     if (stored) {
@@ -536,7 +549,7 @@ function readAnonFixedListWidthEnabled(boardId) {
   return false;
 }
 
-function readAnonFixedListWidth(boardId) {
+function readAnonFixedListWidth(boardId: string) {
   try {
     const stored = localStorage.getItem('wekan-fixed-list-width');
     if (stored) {
@@ -550,19 +563,19 @@ function readAnonFixedListWidth(boardId) {
   return 272;
 }
 
-function isFixedListWidth(boardId) {
+function isFixedListWidth(boardId: string) {
   const user = ReactiveCache.getCurrentUser();
   if (user) return !!user.isFixedListWidth(boardId);
   return readAnonFixedListWidthEnabled(boardId);
 }
 
-function fixedListWidthValue(boardId) {
+function fixedListWidthValue(boardId: string) {
   const user = ReactiveCache.getCurrentUser();
   if (user) return user.getFixedListWidth(boardId);
   return readAnonFixedListWidth(boardId);
 }
 
-function setAnonFixedListWidthEnabled(boardId, enabled) {
+function setAnonFixedListWidthEnabled(boardId: string, enabled: boolean) {
   try {
     const stored = localStorage.getItem('wekan-fixed-list-width-enabled');
     const flags = stored ? JSON.parse(stored) : {};
@@ -573,7 +586,7 @@ function setAnonFixedListWidthEnabled(boardId, enabled) {
   }
 }
 
-function setAnonFixedListWidth(boardId, width) {
+function setAnonFixedListWidth(boardId: string, width: number) {
   try {
     const stored = localStorage.getItem('wekan-fixed-list-width');
     const widths = stored ? JSON.parse(stored) : {};
@@ -645,7 +658,7 @@ Template.setListWidthPopup.helpers({
 });
 
 Template.setListWidthPopup.events({
-  'click .js-toggle-auto-width'(event) {
+  'click .js-toggle-auto-width'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const list = Template.currentData();
     const boardId = list.boardId;
@@ -661,7 +674,7 @@ Template.setListWidthPopup.events({
   },
   // #5729 Toggle "same width for all lists" (fixed width) for the current
   // viewer. Enabling it turns off auto-width (the two modes are exclusive).
-  'click .js-toggle-fixed-list-width'(event) {
+  'click .js-toggle-fixed-list-width'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const list = Template.currentData();
     const boardId = list.boardId;
@@ -677,10 +690,10 @@ Template.setListWidthPopup.events({
     }
     Popup.back();
   },
-  'click .list-width-apply'(event, tpl) {
+  'click .list-width-apply'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const list = Template.currentData();
     const boardId = list.boardId;
-    const width = parseInt(tpl.$('.list-width-value').val(), 10);
+    const width = parseInt(tpl.$('.list-width-value').val() as string, 10);
 
     if (!width || width < 270) {
       tpl.$('.list-width-error').click();
@@ -709,7 +722,7 @@ Template.setListWidthPopup.events({
   'click .list-width-error': Popup.open('listWidthError'),
 });
 
-Template.addListPopup.onCreated(function () {
+Template.addListPopup.onCreated(function (this: AddListPopupInstance) {
   this.currentBoard = Utils.getCurrentBoard();
   this.currentSwimlaneId = new ReactiveVar(null);
   this.currentListId = new ReactiveVar(null);
@@ -745,35 +758,35 @@ Template.addListPopup.onCreated(function () {
 
 Template.addListPopup.helpers({
   currentSwimlaneData() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as AddListPopupInstance;
     const swimlaneId = tpl.currentSwimlaneId.get();
     return swimlaneId ? ReactiveCache.getSwimlane({ _id: swimlaneId }) : null;
   },
 
   currentListIdValue() {
-    return Template.instance().currentListId.get();
+    return (Template.instance() as AddListPopupInstance).currentListId.get();
   },
 
   swimlaneLists() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as AddListPopupInstance;
     const swimlaneId = tpl.currentSwimlaneId.get();
     if (swimlaneId) {
-      return ReactiveCache.getLists({ swimlaneId, archived: false }).sort((a, b) => a.sort - b.sort);
+      return ReactiveCache.getLists({ swimlaneId, archived: false }).sort((a: any, b: any) => a.sort - b.sort);
     }
     return tpl.currentBoard.lists;
   },
 });
 
 Template.addListPopup.events({
-  async 'submit .js-add-list-form'(evt, tpl) {
+  async 'submit .js-add-list-form'(evt: JQuery.TriggeredEvent, tpl: AddListPopupInstance) {
     evt.preventDefault();
 
-    const titleInput = tpl.find('.list-name-input');
+    const titleInput = tpl.find('.list-name-input') as HTMLInputElement | null;
     const title = titleInput?.value.trim();
 
     if (!title) return;
 
-    const positionInput = tpl.find('.list-position-input');
+    const positionInput = tpl.find('.list-position-input') as HTMLSelectElement | null;
     const afterListId =
       positionInput && positionInput.value ? positionInput.value.trim() : null;
     const nextListId =
@@ -803,3 +816,26 @@ Template.addListPopup.events({
   },
   'click .js-list-template': Popup.open('searchElement'),
 });
+
+interface ListHeaderInstance extends Blaze.TemplateInstance {
+  reachedWipLimit: () => any;
+}
+
+// Dialog popups store a BoardSwimlaneListDialog helper on their instance.
+interface DialogInstance extends Blaze.TemplateInstance {
+  dialog: any;
+}
+
+interface SetListColorInstance extends Blaze.TemplateInstance {
+  // currentList: any — the dynamic List model doc.
+  currentList: any;
+  currentColor: ReactiveVar<any>;
+}
+
+interface AddListPopupInstance extends Blaze.TemplateInstance {
+  // currentBoard/currentSwimlane: any — dynamic Board/Swimlane model docs.
+  currentBoard: any;
+  currentSwimlane?: any;
+  currentSwimlaneId: ReactiveVar<any>;
+  currentListId: ReactiveVar<any>;
+}
