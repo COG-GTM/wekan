@@ -298,3 +298,23 @@ interface WekanUsersCollection {
   [key: string]: any;
 }
 declare const Users: WekanUsersCollection;
+
+// localStorage validation helpers (client/lib/localStorageValidator.js) that
+// models/users.js references as globals (guarded by `typeof … === 'function'`).
+// Their validator callbacks receive/return dynamic persisted JSON, hence `any`.
+declare function getValidatedLocalStorageData(
+  key: string,
+  validator: (data: any) => any,
+): any;
+declare function setValidatedLocalStorageData(
+  key: string,
+  data: any,
+  validator: (data: any) => any,
+): boolean;
+declare const validators: {
+  swimlaneHeights: (data: any) => any;
+  listWidths: (data: any) => any;
+  collapsedStates: (data: any) => any;
+  isValidNumber: (value: any, min?: number, max?: number) => boolean;
+  isValidBoolean: (value: any) => boolean;
+};

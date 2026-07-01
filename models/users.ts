@@ -6,16 +6,16 @@ import InviteToBoardRolesSettings, {
   INVITE_TO_BOARD_ROLES_DEFAULT,
 } from '/models/inviteToBoardRolesSettings';
 // import { Index, MongoDBEngine } from 'meteor/easy:search'; // Temporarily disabled due to compatibility issues
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 const Users = Meteor.users;
 const getUtils = () => require('/client/lib/utils').Utils;
 
 // Public-board collapse persistence helpers (cookie-based for non-logged-in users)
 if (Meteor.isClient) {
-  const readCookieMap = name => {
+  const readCookieMap = (name: string) => {
     try {
       const stored = typeof document !== 'undefined' ? document.cookie : '';
-      const cookies = stored.split(';').map(c => c.trim());
+      const cookies = stored.split(';').map((c: string) => c.trim());
       let json = '{}';
       for (const c of cookies) {
         if (c.startsWith(name + '=')) {
@@ -30,7 +30,7 @@ if (Meteor.isClient) {
     }
   };
 
-  const writeCookieMap = (name, data) => {
+  const writeCookieMap = (name: string, data: any) => {
     try {
       const serialized = encodeURIComponent(JSON.stringify(data || {}));
       const maxAge = 60 * 60 * 24 * 365; // 1 year
@@ -40,7 +40,7 @@ if (Meteor.isClient) {
     }
   };
 
-  Users.getPublicCollapsedList = (boardId, listId) => {
+  (Users as any).getPublicCollapsedList = (boardId: string, listId: string) => {
     if (!boardId || !listId) return null;
     const data = readCookieMap('wekan-collapsed-lists');
     if (data[boardId] && typeof data[boardId][listId] === 'boolean') {
@@ -49,7 +49,7 @@ if (Meteor.isClient) {
     return null;
   };
 
-  Users.setPublicCollapsedList = (boardId, listId, collapsed) => {
+  (Users as any).setPublicCollapsedList = (boardId: string, listId: string, collapsed: boolean) => {
     if (!boardId || !listId) return false;
     const data = readCookieMap('wekan-collapsed-lists');
     if (!data[boardId]) data[boardId] = {};
@@ -58,7 +58,7 @@ if (Meteor.isClient) {
     return true;
   };
 
-  Users.getPublicCollapsedSwimlane = (boardId, swimlaneId) => {
+  (Users as any).getPublicCollapsedSwimlane = (boardId: string, swimlaneId: string) => {
     if (!boardId || !swimlaneId) return null;
     const data = readCookieMap('wekan-collapsed-swimlanes');
     if (data[boardId] && typeof data[boardId][swimlaneId] === 'boolean') {
@@ -67,7 +67,7 @@ if (Meteor.isClient) {
     return null;
   };
 
-  Users.setPublicCollapsedSwimlane = (boardId, swimlaneId, collapsed) => {
+  (Users as any).setPublicCollapsedSwimlane = (boardId: string, swimlaneId: string, collapsed: boolean) => {
     if (!boardId || !swimlaneId) return false;
     const data = readCookieMap('wekan-collapsed-swimlanes');
     if (!data[boardId]) data[boardId] = {};
@@ -76,12 +76,12 @@ if (Meteor.isClient) {
     return true;
   };
 
-  Users.getPublicCardCollapsed = () => {
+  (Users as any).getPublicCardCollapsed = () => {
     const data = readCookieMap('wekan-card-collapsed');
     return typeof data.state === 'boolean' ? data.state : null;
   };
 
-  Users.setPublicCardCollapsed = collapsed => {
+  (Users as any).setPublicCardCollapsed = (collapsed: boolean) => {
     writeCookieMap('wekan-card-collapsed', { state: !!collapsed });
     return true;
   };
@@ -770,15 +770,15 @@ export const USER_UPDATE_FORBIDDEN_PREFIXES = [
   'sessionData',
 ];
 
-export function isUserUpdateAllowed(fields) {
-  const result = fields.every((f) =>
-    USER_UPDATE_ALLOWED_EXACT.includes(f) || USER_UPDATE_ALLOWED_PREFIXES.some((p) => f.startsWith(p))
+export function isUserUpdateAllowed(fields: string[]) {
+  const result = fields.every((f: string) =>
+    USER_UPDATE_ALLOWED_EXACT.includes(f) || USER_UPDATE_ALLOWED_PREFIXES.some((p: string) => f.startsWith(p))
   );
   return result;
 }
 
-export function hasForbiddenUserUpdateField(fields) {
-  const result = fields.some((f) => USER_UPDATE_FORBIDDEN_PREFIXES.some((p) => f === p || f.startsWith(p + '.')));
+export function hasForbiddenUserUpdateField(fields: string[]) {
+  const result = fields.some((f: string) => USER_UPDATE_FORBIDDEN_PREFIXES.some((p: string) => f === p || f.startsWith(p + '.')));
   return result;
 }
 
@@ -815,7 +815,7 @@ export function hasForbiddenUserUpdateField(fields) {
 
 // Temporary fallback - create a simple search index object
 export const UserSearchIndex = {
-  search: function(query, options) {
+  search: function(query: string, options?: any) {
     // Simple fallback search using MongoDB find
     const searchRegex = new RegExp(query, 'i');
     return Users.find({
@@ -835,7 +835,7 @@ export const UserSearchIndex = {
   }
 };
 
-Users.safeFields = {
+(Users as any).safeFields = {
   _id: 1,
   username: 1,
   'profile.fullname': 1,
@@ -910,7 +910,7 @@ if (Meteor.isClient) {
       return board && board.hasWorker(this._id);
     },
 
-    isBoardAdmin(boardId) {
+    isBoardAdmin(boardId?: string) {
       let board;
       if (boardId) {
         board = ReactiveCache.getBoard(boardId);
@@ -925,7 +925,7 @@ if (Meteor.isClient) {
     // server-side check in the inviteUserToBoard method: global site admins and
     // board admins always may; other board roles only if allowed by the
     // Admin Panel / People / Roles policy. Used to gate the UI add-member button.
-    canInviteToBoard(boardId) {
+    canInviteToBoard(boardId?: string) {
       if (this.isAdmin) return true;
       let board;
       if (boardId) {
@@ -945,7 +945,7 @@ if (Meteor.isClient) {
   });
 }
 
-Users.parseImportUsernames = (usernamesString) => {
+(Users as any).parseImportUsernames = (usernamesString: string) => {
   return usernamesString.trim().split(new RegExp('\\s*[,;]\\s*'));
 };
 
@@ -959,7 +959,7 @@ Users.helpers({
   teamIds() {
     if (this.teams) {
       // TODO: Should the Team collection be queried to determine if the team isActive?
-      return this.teams.map((team) => {
+      return this.teams.map((team: any) => {
         return team.teamId;
       });
     }
@@ -968,7 +968,7 @@ Users.helpers({
   orgIds() {
     if (this.orgs) {
       // TODO: Should the Org collection be queried to determine if the organization isActive?
-      return this.orgs.map((org) => {
+      return this.orgs.map((org: any) => {
         return org.orgId;
       });
     }
@@ -977,7 +977,7 @@ Users.helpers({
   // #6116: true when this user shares at least one Organization OR one Team with
   // `otherUser`. Used to restrict who can be added to a board when the global
   // admin setting `boardMembersFromSameOrgOrTeamOnly` is enabled.
-  sharesOrgOrTeamWith(otherUser) {
+  sharesOrgOrTeamWith(otherUser: any) {
     if (!otherUser) {
       return false;
     }
@@ -986,21 +986,21 @@ Users.helpers({
     const otherOrgs =
       typeof otherUser.orgIds === 'function'
         ? otherUser.orgIds()
-        : (otherUser.orgs || []).map(org => org.orgId);
+        : (otherUser.orgs || []).map((org: any) => org.orgId);
     const otherTeams =
       typeof otherUser.teamIds === 'function'
         ? otherUser.teamIds()
-        : (otherUser.teams || []).map(team => team.teamId);
+        : (otherUser.teams || []).map((team: any) => team.teamId);
     return (
-      otherOrgs.some(orgId => myOrgs.has(orgId)) ||
-      otherTeams.some(teamId => myTeams.has(teamId))
+      otherOrgs.some((orgId: any) => myOrgs.has(orgId)) ||
+      otherTeams.some((teamId: any) => myTeams.has(teamId))
     );
   },
   // #5850: the email-address domain(s) of this user, used for domain-based board
   // sharing (board.domains). Lower-cased; primary email's domain.
   emailDomains() {
-    const domains = [];
-    (this.emails || []).forEach((email) => {
+    const domains: string[] = [];
+    (this.emails || []).forEach((email: any) => {
       const addr = (email && email.address) || '';
       const at = addr.lastIndexOf('@');
       if (at !== -1) {
@@ -1015,7 +1015,7 @@ Users.helpers({
   orgsUserBelongs() {
     if (this.orgs) {
       return this.orgs
-        .map(function (org) {
+        .map(function (org: any) {
           return org.orgDisplayName;
         })
         .sort()
@@ -1026,14 +1026,14 @@ Users.helpers({
   orgIdsUserBelongs() {
     let ret = '';
     if (this.orgs) {
-      ret = this.orgs.map(org => org.orgId).join(',');
+      ret = this.orgs.map((org: any) => org.orgId).join(',');
     }
     return ret;
   },
   teamsUserBelongs() {
     if (this.teams) {
       return this.teams
-        .map(function (team) {
+        .map(function (team: any) {
           return team.teamDisplayName;
         })
         .sort()
@@ -1044,38 +1044,40 @@ Users.helpers({
   teamIdsUserBelongs() {
     let ret = '';
     if (this.teams) {
-      ret = this.teams.map(team => team.teamId).join(',');
+      ret = this.teams.map((team: any) => team.teamId).join(',');
     }
     return ret;
   },
   boards() {
     // Fetch unsorted; sorting is per-user via profile.boardSortIndex
-    return Boards.userBoards(this._id, null, {}, {});
+    // `userBoards` is a custom Boards static not on Mongo.Collection.
+    return (Boards as any).userBoards(this._id, null, {}, {});
   },
 
   starredBoards() {
     const { starredBoards = [] } = this.profile || {};
-    return Boards.userBoards(this._id, false, { _id: { $in: starredBoards } }, {});
+    // `userBoards` is a custom Boards static not on Mongo.Collection.
+    return (Boards as any).userBoards(this._id, false, { _id: { $in: starredBoards } }, {});
   },
 
-  hasStarred(boardId) {
+  hasStarred(boardId: string) {
     const { starredBoards = [] } = this.profile || {};
     return starredBoards.includes(boardId);
   },
 
-  isAutoWidth(boardId) {
+  isAutoWidth(boardId: string) {
     const { autoWidthBoards = {} } = this.profile || {};
     return autoWidthBoards[boardId] === true;
   },
 
   // #5729 "Same width for all lists" (fixed width) mode is per-user/per-board.
-  isFixedListWidth(boardId) {
+  isFixedListWidth(boardId: string) {
     const { fixedListWidthBoards = {} } = this.profile || {};
     return fixedListWidthBoards[boardId] === true;
   },
 
   // #5729 The single width applied to every list when fixed width mode is on.
-  getFixedListWidth(boardId) {
+  getFixedListWidth(boardId: string) {
     const { fixedListWidths = {} } = this.profile || {};
     const w = fixedListWidths[boardId];
     return typeof w === 'number' && w >= 270 ? w : 272;
@@ -1083,10 +1085,11 @@ Users.helpers({
 
   invitedBoards() {
     const { invitedBoards = [] } = this.profile || {};
-    return Boards.userBoards(this._id, false, { _id: { $in: invitedBoards } }, {});
+    // `userBoards` is a custom Boards static not on Mongo.Collection.
+    return (Boards as any).userBoards(this._id, false, { _id: { $in: invitedBoards } }, {});
   },
 
-  isInvitedTo(boardId) {
+  isInvitedTo(boardId: string) {
     const { invitedBoards = [] } = this.profile || {};
     return invitedBoards.includes(boardId);
   },
@@ -1105,7 +1108,7 @@ Users.helpers({
   /**
    * Get per-user board sort index for a board, or null when not set
    */
-  getBoardSortIndex(boardId) {
+  getBoardSortIndex(boardId: string) {
     const mapping = (this.profile && this.profile.boardSortIndex) || {};
     const v = mapping[boardId];
     return typeof v === 'number' ? v : null;
@@ -1123,10 +1126,10 @@ Users.helpers({
    * (#5799) boards are ordered alphabetically by title; otherwise the per-user
    * manual drag order (profile.boardSortIndex) is used, falling back to title.
    */
-  sortBoardsForUser(boardsArr) {
+  sortBoardsForUser(boardsArr: any[]) {
     const arr = (boardsArr || []).slice();
     const mode = this.getAllBoardsSortBy();
-    const byTitle = (a, b) =>
+    const byTitle = (a: any, b: any) =>
       (a.title || '').localeCompare(b.title || '', undefined, {
         sensitivity: 'base',
       });
@@ -1135,11 +1138,11 @@ Users.helpers({
       return arr;
     }
     if (mode === 'title-desc') {
-      arr.sort((a, b) => byTitle(b, a));
+      arr.sort((a: any, b: any) => byTitle(b, a));
       return arr;
     }
     const mapping = (this.profile && this.profile.boardSortIndex) || {};
-    arr.sort((a, b) => {
+    arr.sort((a: any, b: any) => {
       const ia = typeof mapping[a._id] === 'number' ? mapping[a._id] : Number.POSITIVE_INFINITY;
       const ib = typeof mapping[b._id] === 'number' ? mapping[b._id] : Number.POSITIVE_INFINITY;
       if (ia !== ib) return ia - ib;
@@ -1165,7 +1168,7 @@ Users.helpers({
     const { listWidths = {}, } = this.profile || {};
     return listWidths;
   },
-  getListWidth(boardId, listId) {
+  getListWidth(boardId: string, listId: string) {
     const listWidths = this.getListWidths();
     if (listWidths[boardId] && listWidths[boardId][listId]) {
       return listWidths[boardId][listId];
@@ -1177,7 +1180,7 @@ Users.helpers({
     const { listConstraints = {} } = this.profile || {};
     return listConstraints;
   },
-  getListConstraint(boardId, listId) {
+  getListConstraint(boardId: string, listId: string) {
     const listConstraints = this.getListConstraints();
     if (listConstraints[boardId] && listConstraints[boardId][listId]) {
       return listConstraints[boardId][listId];
@@ -1190,7 +1193,7 @@ Users.helpers({
     const { swimlaneHeights = {} } = this.profile || {};
     return swimlaneHeights;
   },
-  getSwimlaneHeight(boardId, listId) {
+  getSwimlaneHeight(boardId: string, listId: string) {
     const swimlaneHeights = this.getSwimlaneHeights();
     if (swimlaneHeights[boardId] && swimlaneHeights[boardId][listId]) {
       return swimlaneHeights[boardId][listId];
@@ -1199,51 +1202,10 @@ Users.helpers({
     }
   },
 
-  getSwimlaneHeightFromStorage(boardId, swimlaneId) {
-    // For logged-in users, get from profile
-    if (this._id) {
-      return this.getSwimlaneHeight(boardId, swimlaneId);
-    }
-
-    // For non-logged-in users, get from localStorage
-    try {
-      const stored = localStorage.getItem('wekan-swimlane-heights');
-      if (stored) {
-        const heights = JSON.parse(stored);
-        if (heights[boardId] && heights[boardId][swimlaneId]) {
-          return heights[boardId][swimlaneId];
-        }
-      }
-    } catch (e) {
-      console.warn('Error reading swimlane heights from localStorage:', e);
-    }
-
-    return -1;
-  },
-
-  setSwimlaneHeightToStorage(boardId, swimlaneId, height) {
-    // For logged-in users, save to profile
-    if (this._id) {
-      return this.setSwimlaneHeight(boardId, swimlaneId, height);
-    }
-
-    // For non-logged-in users, save to localStorage
-    try {
-      const stored = localStorage.getItem('wekan-swimlane-heights');
-      let heights = stored ? JSON.parse(stored) : {};
-
-      if (!heights[boardId]) {
-        heights[boardId] = {};
-      }
-      heights[boardId][swimlaneId] = height;
-
-      localStorage.setItem('wekan-swimlane-heights', JSON.stringify(heights));
-      return true;
-    } catch (e) {
-      console.warn('Error saving swimlane height to localStorage:', e);
-      return false;
-    }
-  },
+  // NOTE: getSwimlaneHeightFromStorage/setSwimlaneHeightToStorage were defined
+  // twice in the original file (identical duplicates); the later definitions
+  // (below) are the ones that took effect at runtime, so the earlier duplicates
+  // are dropped here to satisfy TypeScript without changing behavior.
 
   /** returns all confirmed move and copy dialog field values
    * <li> the board, swimlane and list id is stored for each board
@@ -1278,12 +1240,12 @@ Users.helpers({
     return _ret;
   },
 
-  hasTag(tag) {
+  hasTag(tag: string) {
     const { tags = [] } = this.profile || {};
     return tags.includes(tag);
   },
 
-  hasNotification(activityId) {
+  hasNotification(activityId: string) {
     const { notifications = [] } = this.profile || {};
     return notifications.includes(activityId);
   },
@@ -1304,7 +1266,7 @@ Users.helpers({
     // activityObj (activity.user, activity._id, …), so a single orphaned entry
     // threw and broke the whole notifications popup.
     // newest first. don't use reverse() because it changes the array inplace, so sometimes the array is reversed twice and oldest items at top again
-    const ret = notifications.filter(notification => notification.activityObj).toReversed();
+    const ret = notifications.filter((notification: any) => notification.activityObj).toReversed();
     return ret;
   },
 
@@ -1323,7 +1285,7 @@ Users.helpers({
     return profile.dismissedAnnouncementVersion || null;
   },
 
-  hasDismissedAnnouncement(announcement) {
+  hasDismissedAnnouncement(announcement: any) {
     const { announcementVersion } = require('/models/announcements');
     const version = announcementVersion(announcement);
     return !!version && this.getDismissedAnnouncementVersion() === version;
@@ -1365,7 +1327,7 @@ Users.helpers({
     else if (profile.fullname) {
       return profile.fullname
         .split(/\s+/)
-        .reduce((memo, word) => {
+        .reduce((memo: string, word: string) => {
           return memo + word[0];
         }, '')
         .toUpperCase();
@@ -1433,12 +1395,14 @@ Users.helpers({
   },
 
   remove() {
+    // @ts-expect-error `User` is an undefined global here (pre-existing bug,
+    // likely a typo for `Users`); preserved as-is during the TS migration.
     return User.removeAsync({
       _id: this._id,
     });
   },
 
-  getListWidthFromStorage(boardId, listId) {
+  getListWidthFromStorage(boardId: string, listId: string) {
     // For logged-in users, get from profile
     if (this._id) {
       return this.getListWidth(boardId, listId);
@@ -1463,7 +1427,7 @@ Users.helpers({
     return 270; // Return default width
   },
 
-  setListWidthToStorage(boardId, listId, width) {
+  setListWidthToStorage(boardId: string, listId: string, width: number) {
     // For logged-in users, save to profile
     if (this._id) {
       return this.setListWidth(boardId, listId, width);
@@ -1494,7 +1458,7 @@ Users.helpers({
     return false;
   },
 
-  getListConstraintFromStorage(boardId, listId) {
+  getListConstraintFromStorage(boardId: string, listId: string) {
     // For logged-in users, get from profile
     if (this._id) {
       return this.getListConstraint(boardId, listId);
@@ -1516,7 +1480,7 @@ Users.helpers({
     return 550; // Return default constraint instead of -1
   },
 
-  setListConstraintToStorage(boardId, listId, constraint) {
+  setListConstraintToStorage(boardId: string, listId: string, constraint: number) {
     // For logged-in users, save to profile
     if (this._id) {
       return this.setListConstraint(boardId, listId, constraint);
@@ -1540,7 +1504,7 @@ Users.helpers({
     }
   },
 
-  getSwimlaneHeightFromStorage(boardId, swimlaneId) {
+  getSwimlaneHeightFromStorage(boardId: string, swimlaneId: string) {
     // For logged-in users, get from profile
     if (this._id) {
       return this.getSwimlaneHeight(boardId, swimlaneId);
@@ -1562,7 +1526,7 @@ Users.helpers({
     return -1; // Return -1 if not found
   },
 
-  setSwimlaneHeightToStorage(boardId, swimlaneId, height) {
+  setSwimlaneHeightToStorage(boardId: string, swimlaneId: string, height: number) {
     // For logged-in users, save to profile
     if (this._id) {
       return this.setSwimlaneHeight(boardId, swimlaneId, height);
@@ -1586,21 +1550,21 @@ Users.helpers({
     }
   },
   // Per-user collapsed state helpers for lists/swimlanes
-  getCollapsedList(boardId, listId) {
+  getCollapsedList(boardId: string, listId: string) {
     const { collapsedLists = {} } = this.profile || {};
     if (collapsedLists[boardId] && typeof collapsedLists[boardId][listId] === 'boolean') {
       return collapsedLists[boardId][listId];
     }
     return null;
   },
-  getCollapsedSwimlane(boardId, swimlaneId) {
+  getCollapsedSwimlane(boardId: string, swimlaneId: string) {
     const { collapsedSwimlanes = {} } = this.profile || {};
     if (collapsedSwimlanes[boardId] && typeof collapsedSwimlanes[boardId][swimlaneId] === 'boolean') {
       return collapsedSwimlanes[boardId][swimlaneId];
     }
     return null;
   },
-  setCollapsedListToStorage(boardId, listId, collapsed) {
+  setCollapsedListToStorage(boardId: string, listId: string, collapsed: boolean) {
     // Logged-in users: save to profile
     if (this._id) {
       return this.setCollapsedList(boardId, listId, collapsed);
@@ -1609,7 +1573,7 @@ Users.helpers({
     try {
       const name = 'wekan-collapsed-lists';
       const stored = (typeof document !== 'undefined') ? document.cookie : '';
-      const cookies = stored.split(';').map(c => c.trim());
+      const cookies = stored.split(';').map((c: string) => c.trim());
       let json = '{}';
       for (const c of cookies) {
         if (c.startsWith(name + '=')) {
@@ -1617,7 +1581,8 @@ Users.helpers({
           break;
         }
       }
-      let data = {};
+      // Parsed cookie JSON is a dynamic boardId -> listId/swimlaneId map.
+      let data: any = {};
       try { data = JSON.parse(json || '{}'); } catch (e) { data = {}; }
       if (!data[boardId]) data[boardId] = {};
       data[boardId][listId] = !!collapsed;
@@ -1630,7 +1595,7 @@ Users.helpers({
       return false;
     }
   },
-  getCollapsedListFromStorage(boardId, listId) {
+  getCollapsedListFromStorage(boardId: string, listId: string) {
     // Logged-in users: read from profile
     if (this._id) {
       const v = this.getCollapsedList(boardId, listId);
@@ -1640,7 +1605,7 @@ Users.helpers({
     try {
       const name = 'wekan-collapsed-lists';
       const stored = (typeof document !== 'undefined') ? document.cookie : '';
-      const cookies = stored.split(';').map(c => c.trim());
+      const cookies = stored.split(';').map((c: string) => c.trim());
       let json = '{}';
       for (const c of cookies) {
         if (c.startsWith(name + '=')) {
@@ -1657,7 +1622,7 @@ Users.helpers({
     }
     return null;
   },
-  setCollapsedSwimlaneToStorage(boardId, swimlaneId, collapsed) {
+  setCollapsedSwimlaneToStorage(boardId: string, swimlaneId: string, collapsed: boolean) {
     // Logged-in users: save to profile
     if (this._id) {
       return this.setCollapsedSwimlane(boardId, swimlaneId, collapsed);
@@ -1666,7 +1631,7 @@ Users.helpers({
     try {
       const name = 'wekan-collapsed-swimlanes';
       const stored = (typeof document !== 'undefined') ? document.cookie : '';
-      const cookies = stored.split(';').map(c => c.trim());
+      const cookies = stored.split(';').map((c: string) => c.trim());
       let json = '{}';
       for (const c of cookies) {
         if (c.startsWith(name + '=')) {
@@ -1674,7 +1639,8 @@ Users.helpers({
           break;
         }
       }
-      let data = {};
+      // Parsed cookie JSON is a dynamic boardId -> listId/swimlaneId map.
+      let data: any = {};
       try { data = JSON.parse(json || '{}'); } catch (e) { data = {}; }
       if (!data[boardId]) data[boardId] = {};
       data[boardId][swimlaneId] = !!collapsed;
@@ -1687,7 +1653,7 @@ Users.helpers({
       return false;
     }
   },
-  getCollapsedSwimlaneFromStorage(boardId, swimlaneId) {
+  getCollapsedSwimlaneFromStorage(boardId: string, swimlaneId: string) {
     // Logged-in users: read from profile
     if (this._id) {
       const v = this.getCollapsedSwimlane(boardId, swimlaneId);
@@ -1697,7 +1663,7 @@ Users.helpers({
     try {
       const name = 'wekan-collapsed-swimlanes';
       const stored = (typeof document !== 'undefined') ? document.cookie : '';
-      const cookies = stored.split(';').map(c => c.trim());
+      const cookies = stored.split(';').map((c: string) => c.trim());
       let json = '{}';
       for (const c of cookies) {
         if (c.startsWith(name + '=')) {
@@ -1715,50 +1681,50 @@ Users.helpers({
     return null;
   },
 
-  async setMoveAndCopyDialogOption(boardId, options) {
+  async setMoveAndCopyDialogOption(boardId: string, options: any) {
     let currentOptions = this.getMoveAndCopyDialogOptions();
     currentOptions[boardId] = options;
     return await Users.updateAsync(this._id, { $set: { 'profile.moveAndCopyDialog': currentOptions } });
   },
 
-  async setMoveChecklistDialogOption(boardId, options) {
+  async setMoveChecklistDialogOption(boardId: string, options: any) {
     let currentOptions = this.getMoveChecklistDialogOptions();
     currentOptions[boardId] = options;
     return await Users.updateAsync(this._id, { $set: { 'profile.moveChecklistDialog': currentOptions } });
   },
 
-  async setCopyChecklistDialogOption(boardId, options) {
+  async setCopyChecklistDialogOption(boardId: string, options: any) {
     let currentOptions = this.getCopyChecklistDialogOptions();
     currentOptions[boardId] = options;
     return await Users.updateAsync(this._id, { $set: { 'profile.copyChecklistDialog': currentOptions } });
   },
 
-  async toggleBoardStar(boardId) {
+  async toggleBoardStar(boardId: string) {
     const queryKind = this.hasStarred(boardId) ? '$pull' : '$addToSet';
     return await Users.updateAsync(this._id, { [queryKind]: { 'profile.starredBoards': boardId } });
   },
 
-  async setBoardSortIndex(boardId, sortIndex) {
+  async setBoardSortIndex(boardId: string, sortIndex: number) {
     const mapping = (this.profile && this.profile.boardSortIndex) || {};
     mapping[boardId] = sortIndex;
     return await Users.updateAsync(this._id, { $set: { 'profile.boardSortIndex': mapping } });
   },
 
-  async toggleAutoWidth(boardId) {
+  async toggleAutoWidth(boardId: string) {
     const { autoWidthBoards = {} } = this.profile || {};
     autoWidthBoards[boardId] = !autoWidthBoards[boardId];
     return await Users.updateAsync(this._id, { $set: { 'profile.autoWidthBoards': autoWidthBoards } });
   },
 
   // #5729 Enable/disable "same width for all lists" mode for a board.
-  async setFixedListWidthEnabled(boardId, enabled) {
+  async setFixedListWidthEnabled(boardId: string, enabled: boolean) {
     const { fixedListWidthBoards = {} } = this.profile || {};
     fixedListWidthBoards[boardId] = !!enabled;
     return await Users.updateAsync(this._id, { $set: { 'profile.fixedListWidthBoards': fixedListWidthBoards } });
   },
 
   // #5729 Set the single width used by every list in fixed width mode.
-  async setFixedListWidth(boardId, width) {
+  async setFixedListWidth(boardId: string, width: number) {
     const { fixedListWidths = {} } = this.profile || {};
     fixedListWidths[boardId] = width;
     return await Users.updateAsync(this._id, { $set: { 'profile.fixedListWidths': fixedListWidths } });
@@ -1779,23 +1745,23 @@ Users.helpers({
     return await Users.updateAsync(this._id, { $set: { 'profile.showWeekOfYear': !showWeekOfYear } });
   },
 
-  async addInvite(boardId) {
+  async addInvite(boardId: string) {
     return await Users.updateAsync(this._id, { $addToSet: { 'profile.invitedBoards': boardId } });
   },
 
-  async removeInvite(boardId) {
+  async removeInvite(boardId: string) {
     return await Users.updateAsync(this._id, { $pull: { 'profile.invitedBoards': boardId } });
   },
 
-  async addTag(tag) {
+  async addTag(tag: string) {
     return await Users.updateAsync(this._id, { $addToSet: { 'profile.tags': tag } });
   },
 
-  async removeTag(tag) {
+  async removeTag(tag: string) {
     return await Users.updateAsync(this._id, { $pull: { 'profile.tags': tag } });
   },
 
-  async toggleTag(tag) {
+  async toggleTag(tag: string) {
     if (this.hasTag(tag)) {
       return await this.removeTag(tag);
     } else {
@@ -1803,69 +1769,69 @@ Users.helpers({
     }
   },
 
-  async setListSortBy(value) {
+  async setListSortBy(value: string) {
     return await Users.updateAsync(this._id, { $set: { 'profile.listSortBy': value } });
   },
 
-  async setAllBoardsSortBy(value) {
+  async setAllBoardsSortBy(value: string) {
     return await Users.updateAsync(this._id, { $set: { 'profile.allBoardsSortBy': value } });
   },
 
-  async setName(value) {
+  async setName(value: string) {
     return await Users.updateAsync(this._id, { $set: { 'profile.fullname': value } });
   },
 
-  async toggleDesktopHandles(value = false) {
+  async toggleDesktopHandles(value: boolean = false) {
     return await Users.updateAsync(this._id, { $set: { 'profile.showDesktopDragHandles': !value } });
   },
 
-  async toggleFieldsGrid(value = false) {
+  async toggleFieldsGrid(value: boolean = false) {
     return await Users.updateAsync(this._id, { $set: { 'profile.customFieldsGrid': !value } });
   },
 
-  async toggleCardMaximized(value = false) {
+  async toggleCardMaximized(value: boolean = false) {
     return await Users.updateAsync(this._id, { $set: { 'profile.cardMaximized': !value } });
   },
 
-  async toggleCardCollapsed(value = false) {
+  async toggleCardCollapsed(value: boolean = false) {
     return await Users.updateAsync(this._id, { $set: { 'profile.cardCollapsed': !value } });
   },
 
-  async toggleShowActivities(value = false) {
+  async toggleShowActivities(value: boolean = false) {
     return await Users.updateAsync(this._id, { $set: { 'profile.showActivities': !value } });
   },
 
-  async toggleLabelText(value = false) {
+  async toggleLabelText(value: boolean = false) {
     return await Users.updateAsync(this._id, { $set: { 'profile.hiddenMinicardLabelText': !value } });
   },
 
-  async toggleRescueCardDescription(value = false) {
+  async toggleRescueCardDescription(value: boolean = false) {
     return await Users.updateAsync(this._id, { $set: { 'profile.rescueCardDescription': !value } });
   },
 
-  async toggleGreyIcons(value = false) {
+  async toggleGreyIcons(value: boolean = false) {
     return await Users.updateAsync(this._id, { $set: { 'profile.GreyIcons': !value } });
   },
 
-  async setDismissedAnnouncementVersion(version) {
+  async setDismissedAnnouncementVersion(version: string) {
     return await Users.updateAsync(this._id, {
       $set: { 'profile.dismissedAnnouncementVersion': version },
     });
   },
 
-  async addNotification(activityId) {
+  async addNotification(activityId: string) {
     return await Users.updateAsync(this._id, {
       $addToSet: { 'profile.notifications': { activity: activityId, read: null } },
     });
   },
 
-  async removeNotification(activityId) {
+  async removeNotification(activityId: string) {
     return await Users.updateAsync(this._id, {
       $pull: { 'profile.notifications': { activity: activityId } },
     });
   },
 
-  async addEmailBuffer(text) {
+  async addEmailBuffer(text: string) {
     return await Users.updateAsync(this._id, { $addToSet: { 'profile.emailBuffer': text } });
   },
 
@@ -1873,70 +1839,70 @@ Users.helpers({
     return await Users.updateAsync(this._id, { $set: { 'profile.emailBuffer': [] } });
   },
 
-  async setAvatarUrl(avatarUrl) {
+  async setAvatarUrl(avatarUrl: string) {
     return await Users.updateAsync(this._id, { $set: { 'profile.avatarUrl': avatarUrl } });
   },
 
-  async setShowCardsCountAt(limit) {
+  async setShowCardsCountAt(limit: number) {
     return await Users.updateAsync(this._id, { $set: { 'profile.showCardsCountAt': limit } });
   },
 
-  async setStartDayOfWeek(startDay) {
+  async setStartDayOfWeek(startDay: number) {
     return await Users.updateAsync(this._id, { $set: { 'profile.startDayOfWeek': startDay } });
   },
 
-  async setDateFormat(dateFormat) {
+  async setDateFormat(dateFormat: string) {
     return await Users.updateAsync(this._id, { $set: { 'profile.dateFormat': dateFormat } });
   },
 
-  async setBoardView(view) {
+  async setBoardView(view: string) {
     return await Users.updateAsync(this._id, { $set: { 'profile.boardView': view } });
   },
 
-  async setListWidth(boardId, listId, width) {
+  async setListWidth(boardId: string, listId: string, width: number) {
     let currentWidths = this.getListWidths();
     if (!currentWidths[boardId]) currentWidths[boardId] = {};
     currentWidths[boardId][listId] = width;
     return await Users.updateAsync(this._id, { $set: { 'profile.listWidths': currentWidths } });
   },
 
-  async setListConstraint(boardId, listId, constraint) {
+  async setListConstraint(boardId: string, listId: string, constraint: number) {
     let currentConstraints = this.getListConstraints();
     if (!currentConstraints[boardId]) currentConstraints[boardId] = {};
     currentConstraints[boardId][listId] = constraint;
     return await Users.updateAsync(this._id, { $set: { 'profile.listConstraints': currentConstraints } });
   },
 
-  async setSwimlaneHeight(boardId, swimlaneId, height) {
+  async setSwimlaneHeight(boardId: string, swimlaneId: string, height: number) {
     let currentHeights = this.getSwimlaneHeights();
     if (!currentHeights[boardId]) currentHeights[boardId] = {};
     currentHeights[boardId][swimlaneId] = height;
     return await Users.updateAsync(this._id, { $set: { 'profile.swimlaneHeights': currentHeights } });
   },
 
-  async setCollapsedList(boardId, listId, collapsed) {
+  async setCollapsedList(boardId: string, listId: string, collapsed: boolean) {
     const current = (this.profile && this.profile.collapsedLists) || {};
     if (!current[boardId]) current[boardId] = {};
     current[boardId][listId] = !!collapsed;
     return await Users.updateAsync(this._id, { $set: { 'profile.collapsedLists': current } });
   },
 
-  async setCollapsedSwimlane(boardId, swimlaneId, collapsed) {
+  async setCollapsedSwimlane(boardId: string, swimlaneId: string, collapsed: boolean) {
     const current = (this.profile && this.profile.collapsedSwimlanes) || {};
     if (!current[boardId]) current[boardId] = {};
     current[boardId][swimlaneId] = !!collapsed;
     return await Users.updateAsync(this._id, { $set: { 'profile.collapsedSwimlanes': current } });
   },
 
-  async setZoomLevel(level) {
+  async setZoomLevel(level: number) {
     return await Users.updateAsync(this._id, { $set: { 'profile.zoomLevel': level } });
   },
 
-  async setMobileMode(enabled) {
+  async setMobileMode(enabled: boolean) {
     return await Users.updateAsync(this._id, { $set: { 'profile.mobileMode': enabled } });
   },
 
-  async setCardZoom(level) {
+  async setCardZoom(level: number) {
     return await Users.updateAsync(this._id, { $set: { 'profile.cardZoom': level } });
   },
 });
