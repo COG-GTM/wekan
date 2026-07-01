@@ -58,7 +58,7 @@ if (emojiPlugin) {
 // ourselves, instead of the `markdown-it-math/temml` entrypoint, to avoid a
 // top-level `await import("temml")` that the Meteor/rspack bundler dislikes.
 // Docs: https://github.com/wekan/wekan/blob/main/docs/Features/LaTeX.md
-const renderMath = (src, displayMode) => {
+const renderMath = (src: string, displayMode: boolean) => {
   try {
     return temml.renderToString(src, { throwOnError: false, errorColor: '#cc0000', displayMode });
   } catch (e) {
@@ -109,7 +109,7 @@ Markdown.use(function(md) {
             };
 
             // Insert warning token after the paragraph open
-            tokens.splice(i + 1, 0, warningToken);
+            tokens.splice(i + 1, 0, warningToken as (typeof tokens)[number]);
 
             // Add paragraph close token
             const closeToken = {
@@ -123,7 +123,7 @@ Markdown.use(function(md) {
               block: true,
               hidden: false
             };
-            tokens.splice(i + 2, 0, closeToken);
+            tokens.splice(i + 2, 0, closeToken as (typeof tokens)[number]);
 
             // Remove the original image token
             tokens.splice(i, 1);
@@ -193,7 +193,7 @@ Markdown.use(function(md) {
             };
 
             // Insert warning token after the paragraph open
-            tokens.splice(i + 1, 0, warningToken);
+            tokens.splice(i + 1, 0, warningToken as (typeof tokens)[number]);
 
             // Add paragraph close token
             const closeToken = {
@@ -207,7 +207,7 @@ Markdown.use(function(md) {
               block: true,
               hidden: false
             };
-            tokens.splice(i + 2, 0, closeToken);
+            tokens.splice(i + 2, 0, closeToken as (typeof tokens)[number]);
 
             // Remove the original HTML token
             tokens.splice(i, 1);
@@ -231,7 +231,7 @@ Markdown.use(function(md) {
 //  maxTextSize: 200000,
 //});
 
-Blaze.Template.registerHelper('markdown', new Template('markdown', function () {
+Blaze.Template.registerHelper('markdown', new Template('markdown', function (this: MarkdownTemplateContext) {
   const self = this;
   let text = '';
   if (self.templateContentBlock) {
@@ -251,3 +251,9 @@ Blaze.Template.registerHelper('markdown', new Template('markdown', function () {
     return HTML.Raw(sanitized);
   }
 }));
+
+// Render context for the `markdown` Blaze block helper. When invoked as
+// `{{#markdown}}...{{/markdown}}`, Blaze exposes the wrapped content block here.
+interface MarkdownTemplateContext {
+  templateContentBlock?: Blaze.Template;
+}
