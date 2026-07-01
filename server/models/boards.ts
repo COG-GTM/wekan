@@ -24,7 +24,7 @@ import { ensureIndex } from '/server/lib/mongoStartup';
 
 const getTAPi18n = () => require('/imports/i18n').TAPi18n;
 
-function getTranslatedString(key, fallback, options) {
+function getTranslatedString(key: string, fallback: WekanDocumentField, options?: WekanDocumentField) {
   const i18n = getTAPi18n && getTAPi18n();
   if (!i18n || !i18n.i18n) {
     return fallback;
@@ -33,7 +33,7 @@ function getTranslatedString(key, fallback, options) {
   return typeof translated === 'string' ? translated : fallback;
 }
 
-async function boardRemover(doc) {
+async function boardRemover(doc: WekanDocumentField) {
   for (const element of [
     Cards,
     Lists,
@@ -73,7 +73,7 @@ async function boardRemover(doc) {
   }
 }
 
-const foreachRemovedMember = (doc, modifier, callback) => {
+const foreachRemovedMember = (doc: WekanDocumentField, modifier: WekanDocumentField, callback: WekanDocumentField) => {
   Object.keys(modifier).forEach(set => {
     if (modifier[set] !== false) {
       return;
@@ -91,7 +91,7 @@ const foreachRemovedMember = (doc, modifier, callback) => {
 };
 
 Meteor.methods({
-  async createBoardWithInitialSwimlanes(payload) {
+  async createBoardWithInitialSwimlanes(payload: WekanDocumentField) {
     check(
       payload,
       Match.ObjectIncluding({
@@ -111,16 +111,17 @@ Meteor.methods({
       type = 'board',
       migrationVersion = 1,
       swimlanes = [],
-    } = payload;
+    } = payload as WekanDocumentField;
 
     for (const swimlane of swimlanes) {
       check(swimlane, Object);
-      check(swimlane.title, String);
-      check(swimlane.sort, Match.Maybe(Number));
-      check(swimlane.type, Match.Maybe(String));
+      const sw = swimlane as WekanDocumentField;
+      check(sw.title, String);
+      check(sw.sort, Match.Maybe(Number));
+      check(sw.type, Match.Maybe(String));
       // #2339/#5850: 'card' | 'list' | 'board' marks which template-container
       // swimlane this is, so the user's profile pointers can be wired below.
-      check(swimlane.role, Match.Maybe(String));
+      check(sw.role, Match.Maybe(String));
     }
 
     if (!this.userId) {
@@ -159,7 +160,7 @@ Meteor.methods({
       board: 'profile.boardTemplatesSwimlaneId',
     };
     const isTemplateContainer = type === 'template-container';
-    const profilePointerSet = {};
+    const profilePointerSet: Record<string, WekanDocumentField> = {};
     if (isTemplateContainer) {
       profilePointerSet['profile.templatesBoardId'] = boardId;
     }
@@ -171,8 +172,8 @@ Meteor.methods({
         sort: swimlane.sort,
         type: swimlane.type,
       });
-      if (isTemplateContainer && templateRolePointers[swimlane.role]) {
-        profilePointerSet[templateRolePointers[swimlane.role]] = swimlaneId;
+      if (isTemplateContainer && templateRolePointers[swimlane.role as keyof typeof templateRolePointers]) {
+        profilePointerSet[templateRolePointers[swimlane.role as keyof typeof templateRolePointers]] = swimlaneId;
       }
     }
 
@@ -183,9 +184,9 @@ Meteor.methods({
     return boardId;
   },
 
-  async getBackgroundImageURL(boardId) {
+  async getBackgroundImageURL(boardId: string) {
     check(boardId, String);
-    const board = await ReactiveCache.getBoard(boardId, {}, { backgroundImageUrl: 1 });
+    const board = await (ReactiveCache.getBoard as WekanDocumentField)(boardId, {}, { backgroundImageUrl: 1 });
     // Only return the background for boards the caller is allowed to see.
     if (!board || !board.isVisibleBy({ _id: this.userId })) {
       throw new Meteor.Error('error-notAuthorized');
@@ -193,7 +194,7 @@ Meteor.methods({
     return board;
   },
 
-  async quitBoard(boardId) {
+  async quitBoard(boardId: string) {
     check(boardId, String);
     const board = await ReactiveCache.getBoard(boardId);
     if (!board) {
@@ -210,18 +211,18 @@ Meteor.methods({
     return true;
   },
 
-  async acceptInvite(boardId) {
+  async acceptInvite(boardId: string) {
     check(boardId, String);
     const board = await ReactiveCache.getBoard(boardId);
     if (!board) {
       throw new Meteor.Error('error-board-doesNotExist');
     }
 
-    await Meteor.users.updateAsync(this.userId, {
+    await Meteor.users.updateAsync(this.userId!, {
       $pull: {
         'profile.invitedBoards': boardId,
       },
-    });
+    } as WekanDocumentField);
 
     await Boards.updateAsync(
       {
@@ -238,14 +239,14 @@ Meteor.methods({
   },
 
   async myLabelNames() {
-    let names = [];
+    let names: WekanDocumentField[] = [];
     const boards = await Boards.userBoards(this.userId);
     for (const board of boards) {
       if (board.labels !== undefined) {
         names = names.concat(
           board.labels
-            .filter(label => !!label.name)
-            .map(label => label.name),
+            .filter((label: WekanDocumentField) => !!label.name)
+            .map((label: WekanDocumentField) => label.name),
         );
       }
     }
@@ -254,7 +255,7 @@ Meteor.methods({
 
   async myBoardNames() {
     const boards = await Boards.userBoards(this.userId);
-    return [...new Set(boards.map(board => board.title))].sort();
+    return [...new Set(boards.map((board: WekanDocumentField) => board.title))].sort();
   },
 
   async setAllBoardsHideActivities() {
@@ -279,7 +280,7 @@ Meteor.methods({
     return true;
   },
 
-  async archiveBoard(boardId) {
+  async archiveBoard(boardId: string) {
     check(boardId, String);
     const board = await ReactiveCache.getBoard(boardId);
     if (!board) {
@@ -291,7 +292,7 @@ Meteor.methods({
     // matching the client gating (boardArchive.js `isBoardAdmin`) and the
     // Boards.allow update/remove rules. Previously any member (incl. read-only)
     // could archive a board over DDP. Global admins are also allowed.
-    const user = await ReactiveCache.getUser(userId);
+    const user = await ReactiveCache.getUser(userId!);
     if (!board.hasAdmin(userId) && !(user && user.isAdmin)) {
       throw new Meteor.Error('error-board-notAdmin');
     }
@@ -300,7 +301,7 @@ Meteor.methods({
     return true;
   },
 
-  async setBoardOrgs(boardOrgsArray, currBoardId) {
+  async setBoardOrgs(boardOrgsArray: WekanDocumentField[], currBoardId: string) {
     check(boardOrgsArray, Array);
     check(currBoardId, String);
 
@@ -317,7 +318,7 @@ Meteor.methods({
       throw new Meteor.Error('not-authorized', 'You must be a board admin to perform this action.');
     }
 
-    for (const org of boardOrgsArray) {
+    for (const org of boardOrgsArray as WekanDocumentField[]) {
       check(org.orgId, String);
       check(org.orgDisplayName, String);
       check(org.isActive, Boolean);
@@ -330,7 +331,7 @@ Meteor.methods({
     });
   },
 
-  async setBoardTeams(boardTeamsArray, membersArray, currBoardId) {
+  async setBoardTeams(boardTeamsArray: WekanDocumentField[], membersArray: WekanDocumentField[], currBoardId: string) {
     check(boardTeamsArray, Array);
     check(membersArray, Array);
     check(currBoardId, String);
@@ -348,13 +349,13 @@ Meteor.methods({
       throw new Meteor.Error('not-authorized', 'You must be a board admin to perform this action.');
     }
 
-    for (const team of boardTeamsArray) {
+    for (const team of boardTeamsArray as WekanDocumentField[]) {
       check(team.teamId, String);
       check(team.teamDisplayName, String);
       check(team.isActive, Boolean);
     }
 
-    for (const member of membersArray) {
+    for (const member of membersArray as WekanDocumentField[]) {
       check(member.userId, String);
       check(member.isAdmin, Boolean);
       check(member.isActive, Boolean);
@@ -375,7 +376,7 @@ Meteor.methods({
     });
   },
 
-  async setBoardDomains(boardDomainsArray, currBoardId) {
+  async setBoardDomains(boardDomainsArray: WekanDocumentField[], currBoardId: string) {
     check(boardDomainsArray, Array);
     check(currBoardId, String);
 
@@ -397,25 +398,26 @@ Meteor.methods({
     // looks like a domain (contains a '.' and no '@' or whitespace).
     const normalizedDomains = [];
     const seen = new Set();
-    for (const entry of boardDomainsArray) {
+    for (const entry of boardDomainsArray as WekanDocumentField[]) {
       check(entry, Object);
-      check(entry.domain, String);
-      check(entry.isActive, Boolean);
+      const e = entry as WekanDocumentField;
+      check(e.domain, String);
+      check(e.isActive, Boolean);
 
-      const domain = entry.domain.trim().toLowerCase();
+      const domain = e.domain.trim().toLowerCase();
       if (
         domain.length === 0 ||
         domain.indexOf('.') < 0 ||
         domain.indexOf('@') >= 0 ||
         /\s/.test(domain)
       ) {
-        throw new Meteor.Error('invalid-domain', `Invalid domain: ${entry.domain}`);
+        throw new Meteor.Error('invalid-domain', `Invalid domain: ${e.domain}`);
       }
       if (seen.has(domain)) {
         continue;
       }
       seen.add(domain);
-      normalizedDomains.push({ domain, isActive: entry.isActive });
+      normalizedDomains.push({ domain, isActive: e.isActive });
     }
 
     await Boards.updateAsync(currBoardId, {
@@ -428,28 +430,28 @@ Meteor.methods({
   // #5850: add a single email domain to a board, leaving any existing domains in
   // place. Mirrors the array-based setBoardDomains above and reuses it so the
   // same auth check and validation apply.
-  async addBoardDomain(domain, currBoardId) {
+  async addBoardDomain(domain: string, currBoardId: string) {
     check(domain, String);
     check(currBoardId, String);
 
     const board = await ReactiveCache.getBoard(currBoardId);
     const domains = (board && board.domains) ? board.domains.slice() : [];
     const normalized = domain.trim().toLowerCase();
-    if (!domains.some(d => d.domain === normalized)) {
+    if (!domains.some((d: WekanDocumentField) => d.domain === normalized)) {
       domains.push({ domain: normalized, isActive: true });
     }
     return Meteor.callAsync('setBoardDomains', domains, currBoardId);
   },
 
   // #5850: remove a single email domain from a board.
-  async removeBoardDomain(domain, currBoardId) {
+  async removeBoardDomain(domain: string, currBoardId: string) {
     check(domain, String);
     check(currBoardId, String);
 
     const board = await ReactiveCache.getBoard(currBoardId);
     const domains = (board && board.domains) ? board.domains : [];
     const normalized = domain.trim().toLowerCase();
-    const filtered = domains.filter(d => d.domain !== normalized);
+    const filtered = domains.filter((d: WekanDocumentField) => d.domain !== normalized);
     return Meteor.callAsync('setBoardDomains', filtered, currBoardId);
   },
 });
@@ -514,7 +516,7 @@ Boards.before.update((userId, doc, fieldNames, modifier) => {
   }
 
   const boardId = doc._id;
-  foreachRemovedMember(doc, modifier.$set, async memberId => {
+  foreachRemovedMember(doc, modifier.$set, async (memberId: WekanDocumentField) => {
     await Cards.updateAsync(
       { boardId },
       {
@@ -544,7 +546,7 @@ Boards.before.update((userId, doc, fieldNames, modifier) => {
         $pull: {
           'profile.starredBoards': boardId,
         },
-      });
+      } as WekanDocumentField);
     }
   });
 });
@@ -587,8 +589,8 @@ Boards.after.update(async (userId, doc, fieldNames, modifier) => {
   }
 
   if (modifier.$set) {
-    const removedMemberIds = [];
-    foreachRemovedMember(doc, modifier.$set, memberId => {
+    const removedMemberIds: WekanDocumentField[] = [];
+    foreachRemovedMember(doc, modifier.$set, (memberId: WekanDocumentField) => {
       removedMemberIds.push(memberId);
     });
 
@@ -622,7 +624,7 @@ WebApp.handlers.get('/api/users/:userId/boards', async function(req, res) {
     // #5582: hide internal helper boards (caret-wrapped titles like `^Subtasks^`
     // and non-`board` types such as `list`/`template`) from the REST API, the
     // same way the UI board list does.
-    const data = filterUserBoards(boards).map(board => ({
+    const data = filterUserBoards(boards).map((board: WekanDocumentField) => ({
       _id: board._id,
       title: board.title,
     }));
@@ -649,7 +651,7 @@ WebApp.handlers.get('/api/boards', async function(req, res) {
       code: 200,
       // #5582: exclude internal helper boards (caret-wrapped titles / non-board
       // types) from the public boards listing.
-      data: filterUserBoards(boards).map(doc => ({
+      data: filterUserBoards(boards).map((doc: WekanDocumentField) => ({
         _id: doc._id,
         title: doc.title,
       })),
@@ -774,16 +776,16 @@ WebApp.handlers.post('/api/boards/import', async function(req, res) {
       sendJsonResult(res, { code: 400, data: { error: 'Missing board export object' } });
       return;
     }
-    const additionalData = {};
+    const additionalData: Record<string, WekanDocumentField> = {};
     if (req.body.membersMapping && typeof req.body.membersMapping === 'object') {
       additionalData.membersMapping = req.body.membersMapping;
     }
     // Run the import as the authenticated user so the new board is owned by them.
-    const boardId = await DDP._CurrentMethodInvocation.withValue(
+    const boardId = await (DDP as WekanDocumentField)._CurrentMethodInvocation.withValue(
       { userId: req.userId },
       async () => {
         const creator = new WekanCreator(additionalData);
-        return await creator.create(board, null);
+        return await creator.create(board, null as WekanDocumentField);
       },
     );
     sendJsonResult(res, { code: 200, data: { _id: boardId } });
@@ -815,11 +817,11 @@ WebApp.handlers.post('/api/boards/import/:source', async function(req, res) {
     const source = req.params.source;
     const body = req.body || {};
     const board = body.board !== undefined ? body.board : body;
-    const additionalData = {};
+    const additionalData: Record<string, WekanDocumentField> = {};
     if (body.membersMapping && typeof body.membersMapping === 'object') {
       additionalData.membersMapping = body.membersMapping;
     }
-    const boardId = await DDP._CurrentMethodInvocation.withValue(
+    const boardId = await (DDP as WekanDocumentField)._CurrentMethodInvocation.withValue(
       { userId: req.userId },
       async () => Meteor.callAsync('importBoard', board, additionalData, source, null),
     );
@@ -984,7 +986,7 @@ WebApp.handlers.get('/api/boards/:boardId/cardSettings', async function(req, res
     sendJsonResult(res, { code: 404, data: { error: 'Board not found' } });
     return;
   }
-  const data = {};
+  const data: Record<string, WekanDocumentField> = {};
   BOARD_CARD_SETTING_KEYS.forEach(key => {
     data[key] = board[key];
   });
@@ -1002,8 +1004,8 @@ WebApp.handlers.put('/api/boards/:boardId/cardSettings', async function(req, res
     sendJsonResult(res, { code: 404, data: { error: 'Board not found' } });
     return;
   }
-  const $set = {};
-  const toBool = value => value === true || String(value).toLowerCase() === 'true';
+  const $set: Record<string, WekanDocumentField> = {};
+  const toBool = (value: WekanDocumentField) => value === true || String(value).toLowerCase() === 'true';
   BOARD_CARD_SETTING_KEYS.forEach(key => {
     if (Object.prototype.hasOwnProperty.call(req.body, key)) {
       $set[key] = toBool(req.body[key]);
@@ -1021,7 +1023,7 @@ WebApp.handlers.put('/api/boards/:boardId/cardSettings', async function(req, res
   }
   await Boards.direct.updateAsync({ _id: id }, { $set });
   const updated = await ReactiveCache.getBoard(id);
-  const data = {};
+  const data: Record<string, WekanDocumentField> = {};
   BOARD_CARD_SETTING_KEYS.forEach(key => {
     data[key] = updated[key];
   });
@@ -1035,7 +1037,7 @@ WebApp.handlers.post('/api/boards/:boardId/copy', async function(req, res) {
   try {
     const id = req.params.boardId;
     const board = await ReactiveCache.getBoard(id);
-    const adminAccess = board.members.some(e => e.userId === req.userId && e.isAdmin);
+    const adminAccess = board.members.some((e: WekanDocumentField) => e.userId === req.userId && e.isAdmin);
     await Authentication.checkAdminOrCondition(req.userId, adminAccess);
     board.title = req.body.title || await Boards.uniqueTitle(board.title);
     const ret = await board.copy();
@@ -1092,7 +1094,7 @@ WebApp.handlers.post('/api/boards/:boardId/members/:memberId', async function(re
     } = roleFlags === null ? req.body : roleFlags;
     const board = await ReactiveCache.getBoard(boardId);
 
-    function isTrue(data) {
+    function isTrue(data: WekanDocumentField) {
       // Tolerate both real booleans (from a named `role`) and 'true'/'false'
       // strings (from individual flag params).
       if (data === true || data === false) {
@@ -1213,7 +1215,7 @@ WebApp.handlers.post('/api/boards/:boardId/domains', async function(req, res) {
       return;
     }
     const domains = (authBoard.domains || []).slice();
-    if (!domains.some(d => d.domain === domain)) {
+    if (!domains.some((d: WekanDocumentField) => d.domain === domain)) {
       domains.push({ domain, isActive: true });
     }
     // Reuse the existing setBoardDomains method (same auth + validation).
@@ -1263,7 +1265,7 @@ WebApp.handlers.delete('/api/boards/:boardId/domains/:domain', async function(re
       return;
     }
     const normalized = String(req.params.domain || '').trim().toLowerCase();
-    const filtered = (authBoard.domains || []).filter(d => d.domain !== normalized);
+    const filtered = (authBoard.domains || []).filter((d: WekanDocumentField) => d.domain !== normalized);
     // Reuse the existing setBoardDomains method (same auth + validation).
     await Meteor.callAsync('setBoardDomains', filtered, boardId);
     const updated = await ReactiveCache.getBoard(boardId);
@@ -1284,7 +1286,7 @@ WebApp.handlers.get('/api/boards/:boardId/attachments', async function(req, res)
   );
   sendJsonResult(res, {
     code: 200,
-    data: attachments.map(attachment => ({
+    data: attachments.map((attachment: WekanDocumentField) => ({
       attachmentId: attachment._id,
       attachmentName: attachment.name,
       attachmentType: attachment.type,
