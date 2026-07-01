@@ -2,15 +2,22 @@
 // settings.js → ReactiveCache → i18n/tap → translation.js → ReactiveCache → settings.js
 // All dependencies use require() so Settings collection is defined first.
 
-const Meteor = Package.meteor.Meteor;
-const Mongo = Package.mongo.Mongo;
-const Settings = new Mongo.Collection('settings');
-const FlowRouter = Package['ostrio:flow-router-extra'].FlowRouter;
+// @types/meteor only types the build-time `Package` API; the runtime package
+// registry is reached through the documented WekanRuntimePackageRegistry cast.
+const runtimePackage = Package as WekanRuntimePackageRegistry;
+const Meteor = runtimePackage.meteor.Meteor;
+const Mongo = runtimePackage.mongo.Mongo;
+// The `new Mongo.Collection(...)` value comes from the runtime `Package.mongo`
+// accessor (`any`), so the collection is annotated with a type-only inline
+// import of the augmented `meteor/mongo` type (erased at runtime, so it does
+// NOT reintroduce the circular import warned about above).
+const Settings: import('meteor/mongo').Mongo.Collection<SettingDocument> = new Mongo.Collection('settings');
+const FlowRouter = runtimePackage['ostrio:flow-router-extra'].FlowRouter;
 // Lazy getter — avoids circular dependency (reactiveCache imports settings)
 const getReactiveCache = () => require('/imports/reactiveCache').ReactiveCache;
 // Lazy getter — avoids circular dependency (i18n/tap → reactiveCache → settings)
 const getTAPi18n = () => require('/imports/i18n').TAPi18n;
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 const InvitationCodes = require('/models/invitationCodes').default;
 //var nodemailer = require('nodemailer');
 
@@ -230,17 +237,70 @@ Settings.attachSchema(
 );
 Settings.helpers({
   mailUrl() {
-    if (!this.mailServer.host) {
+    if (!this.mailServer!.host) {
       return null;
     }
-    const protocol = this.mailServer.enableTLS ? 'smtps://' : 'smtp://';
-    if (!this.mailServer.username && !this.mailServer.password) {
-      return `${protocol}${this.mailServer.host}:${this.mailServer.port}/`;
+    const protocol = this.mailServer!.enableTLS ? 'smtps://' : 'smtp://';
+    if (!this.mailServer!.username && !this.mailServer!.password) {
+      return `${protocol}${this.mailServer!.host}:${this.mailServer!.port}/`;
     }
-    return `${protocol}${this.mailServer.username}:${encodeURIComponent(
-      this.mailServer.password,
-    )}@${this.mailServer.host}:${this.mailServer.port}/`;
+    return `${protocol}${this.mailServer!.username}:${encodeURIComponent(
+      this.mailServer!.password as string,
+    )}@${this.mailServer!.host}:${this.mailServer!.port}/`;
   },
 });
 
 export default Settings;
+
+interface SettingMailServer {
+  username?: string;
+  password?: string;
+  host?: string;
+  port?: string;
+  enableTLS?: boolean;
+  from?: string;
+}
+
+interface SettingDocument {
+  _id?: string;
+  disableRegistration?: boolean;
+  disableForgotPassword?: boolean;
+  mailServer?: SettingMailServer;
+  productName?: string;
+  displayAuthenticationMethod?: boolean;
+  defaultAuthenticationMethod: string;
+  spinnerName?: string;
+  hideLogo?: boolean;
+  hideCardCounterList?: boolean;
+  hideBoardMemberList?: boolean;
+  customLoginLogoImageUrl?: string;
+  customLoginLogoLinkUrl?: string;
+  customHelpLinkUrl?: string;
+  textBelowCustomLoginLogo?: string;
+  automaticLinkedUrlSchemes?: string;
+  customTopLeftCornerLogoImageUrl?: string;
+  customTopLeftCornerLogoLinkUrl?: string;
+  customTopLeftCornerLogoHeight?: string;
+  oidcBtnText?: string;
+  mailDomainName?: string;
+  legalNotice?: string;
+  customHeadEnabled?: boolean;
+  customHeadMetaTags?: string;
+  customHeadLinkTags?: string;
+  customManifestEnabled?: boolean;
+  customManifestContent?: string;
+  customAssetLinksEnabled?: boolean;
+  customAssetLinksContent?: string;
+  accessibilityPageEnabled?: boolean;
+  accessibilityTitle?: string;
+  accessibilityContent?: string;
+  supportPopupText?: string;
+  supportPageEnabled?: boolean;
+  supportPagePublic?: boolean;
+  boardMembersFromSameOrgOrTeamOnly?: boolean;
+  supportTitle?: string;
+  supportPageText?: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  [field: string]: WekanDocumentField;
+}

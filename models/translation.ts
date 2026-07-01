@@ -1,7 +1,7 @@
 import { Mongo } from 'meteor/mongo';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const Translation = new Mongo.Collection('translation');
+const Translation = new Mongo.Collection<TranslationDocument>('translation');
 
 /**
  * A Organization User in wekan
@@ -59,3 +59,13 @@ Translation.attachSchema(
 );
 
 export default Translation;
+
+interface TranslationDocument {
+  _id?: string;
+  language: string;
+  text: string;
+  translationText?: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  [field: string]: WekanDocumentField;
+}

@@ -1,9 +1,13 @@
+import { Mongo } from 'meteor/mongo';
 import Boards from '/models/boards';
 import Lists from '/models/lists';
 import Cards from '/models/cards';
 
+type WatchableCollection = Mongo.Collection<WekanDocumentField>;
+type WatchLevel = string | boolean | null | undefined;
+
 // simple version, only toggle watch / unwatch
-const simpleWatchable = collection => {
+const simpleWatchable = (collection: WatchableCollection) => {
   collection.attachSchema({
     watchers: {
       type: Array,
@@ -19,15 +23,15 @@ const simpleWatchable = collection => {
       return [true, false];
     },
 
-    watcherIndex(userId) {
+    watcherIndex(userId: string) {
       return this.watchers.indexOf(userId);
     },
 
-    findWatcher(userId) {
+    findWatcher(userId: string) {
       return (this.watchers || []).includes(userId);
     },
 
-    async setWatcher(userId, level) {
+    async setWatcher(userId: string, level: WatchLevel) {
       // if level undefined or null or false, then remove
       if (!level) {
         return await collection.updateAsync(this._id, { $pull: { watchers: userId } });
@@ -41,7 +45,7 @@ const simpleWatchable = collection => {
 const complexWatchOptions = ['watching', 'tracking', 'muted'];
 const complexWatchDefault = 'muted';
 
-const complexWatchable = collection => {
+const complexWatchable = (collection: WatchableCollection) => {
   collection.attachSchema({
     watchers: {
       type: Array,
@@ -68,20 +72,20 @@ const complexWatchable = collection => {
       return complexWatchDefault;
     },
 
-    watcherIndex(userId) {
-      return (this.watchers || []).map(x => x.userId).indexOf(userId);
+    watcherIndex(userId: string) {
+      return (this.watchers || []).map((x: WekanDocumentField) => x.userId).indexOf(userId);
     },
 
-    findWatcher(userId) {
-      return (this.watchers || []).find(w => w.userId === userId);
+    findWatcher(userId: string) {
+      return (this.watchers || []).find((w: WekanDocumentField) => w.userId === userId);
     },
 
-    getWatchLevel(userId) {
+    getWatchLevel(userId: string) {
       const watcher = this.findWatcher(userId);
       return watcher ? watcher.level : complexWatchDefault;
     },
 
-    async setWatcher(userId, level) {
+    async setWatcher(userId: string, level: WatchLevel) {
       // if level undefined or null or false, then remove
       if (level === complexWatchDefault) level = null;
       if (!level) {

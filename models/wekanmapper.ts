@@ -1,6 +1,6 @@
 import { ReactiveCache } from '/imports/reactiveCache';
 
-export async function getMembersToMap(data) {
+export async function getMembersToMap(data: WekanMapperData) {
   // we will work on the list itself (an ordered array of objects) when a
   // mapping is done, we add a 'wekan' field to the object representing the
   // imported member
@@ -31,4 +31,26 @@ export async function getMembersToMap(data) {
     mappable.push(importedMember);
   }
   return mappable;
+}
+
+interface WekanMapperImportedMember {
+  id?: string;
+  userId?: string;
+  fullName?: string;
+  username?: string;
+  wekanId?: string;
+  [field: string]: WekanDocumentField;
+}
+
+interface WekanMapperUser {
+  _id: string;
+  username?: string;
+  profile?: { fullname?: string; [field: string]: WekanDocumentField };
+  [field: string]: WekanDocumentField;
+}
+
+interface WekanMapperData {
+  members?: WekanMapperImportedMember[];
+  users?: WekanMapperUser[];
+  [field: string]: WekanDocumentField;
 }

@@ -1,8 +1,8 @@
 import { ReactiveCache } from '/imports/reactiveCache';
 import { Mongo } from 'meteor/mongo';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const Rules = new Mongo.Collection('rules');
+const Rules = new Mongo.Collection<RuleDocument>('rules');
 
 Rules.attachSchema(
   new SimpleSchema({
@@ -64,8 +64,8 @@ Rules.attachSchema(
 );
 
 Rules.helpers({
-  async rename(description) {
-    return await Rules.updateAsync(this._id, { $set: { description } });
+  async rename(description: string) {
+    return await Rules.updateAsync(this._id!, { $set: { description } });
   },
   getAction() {
     return ReactiveCache.getAction(this.actionId);
@@ -85,3 +85,16 @@ Rules.helpers({
 });
 
 export default Rules;
+
+interface RuleDocument {
+  _id?: string;
+  title: string;
+  triggerId: string;
+  actionId: string;
+  boardId: string;
+  buttonType?: string;
+  buttonLabel?: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  [field: string]: WekanDocumentField;
+}

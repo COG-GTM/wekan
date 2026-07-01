@@ -1,8 +1,8 @@
 import { Mongo } from 'meteor/mongo';
 import { incrementCounter } from './counters';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const OrgUser = new Mongo.Collection('orgUser');
+const OrgUser = new Mongo.Collection<OrgUserDocument>('orgUser');
 
 /**
  * A Organization User in wekan
@@ -75,3 +75,13 @@ OrgUser.attachSchema(
 );
 
 export default OrgUser;
+
+interface OrgUserDocument {
+  _id?: number;
+  orgId?: number;
+  userId?: number;
+  role?: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  [field: string]: WekanDocumentField;
+}

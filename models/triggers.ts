@@ -1,7 +1,7 @@
 import { ReactiveCache } from '/imports/reactiveCache';
 import { Mongo } from 'meteor/mongo';
 
-const Triggers = new Mongo.Collection('triggers');
+const Triggers = new Mongo.Collection<TriggerDocument>('triggers');
 
 Triggers.before.insert((userId, doc) => {
   doc.createdAt = new Date();
@@ -14,8 +14,8 @@ Triggers.before.update((userId, doc, fieldNames, modifier) => {
 });
 
 Triggers.helpers({
-  async rename(description) {
-    return await Triggers.updateAsync(this._id, {
+  async rename(description: string) {
+    return await Triggers.updateAsync(this._id!, {
       $set: { description },
     });
   },
@@ -36,7 +36,7 @@ Triggers.helpers({
     return ReactiveCache.getList(this.toId);
   },
 
-  findList(title) {
+  findList(title: string) {
     return ReactiveCache.getList({
       title,
     });
@@ -44,7 +44,7 @@ Triggers.helpers({
 
   labels() {
     const boardLabels = this.board().labels;
-    const cardLabels = boardLabels.filter(label => {
+    const cardLabels = boardLabels.filter((label: WekanDocumentField) => {
       return (this.labelIds || []).includes(label._id);
     });
     return cardLabels;
@@ -52,3 +52,14 @@ Triggers.helpers({
 });
 
 export default Triggers;
+
+interface TriggerDocument {
+  _id?: string;
+  desc?: string;
+  fromId?: string;
+  toId?: string;
+  labelIds?: string[];
+  createdAt?: Date;
+  updatedAt?: Date;
+  [field: string]: WekanDocumentField;
+}

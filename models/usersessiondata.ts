@@ -1,9 +1,9 @@
 import { Meteor } from 'meteor/meteor';
 import { Mongo } from 'meteor/mongo';
 import { incrementCounter } from './counters';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const SessionData = new Mongo.Collection('sessiondata');
+const SessionData = new Mongo.Collection<SessionDataDocument>('sessiondata');
 
 /**
  * A UserSessionData in Wekan. Organization in Trello.
@@ -155,13 +155,13 @@ SessionData.helpers({
   },
 });
 
-SessionData.unpickle = pickle => {
+SessionData.unpickle = (pickle: string) => {
   return JSON.parse(pickle, (key, value) => {
     return unpickleValue(value);
   });
 };
 
-function unpickleValue(value) {
+function unpickleValue(value: WekanDocumentField) {
   if (value === null) {
     return null;
   } else if (typeof value === 'object') {
@@ -180,21 +180,21 @@ function unpickleValue(value) {
   return value;
 }
 
-function unpickleObject(obj) {
-  const newObject = {};
+function unpickleObject(obj: WekanDocumentField) {
+  const newObject: Record<string, WekanDocumentField> = {};
   Object.entries(obj).forEach(([key, value]) => {
     newObject[key] = unpickleValue(value);
   });
   return newObject;
 }
 
-SessionData.pickle = value => {
+SessionData.pickle = (value: WekanDocumentField) => {
   return JSON.stringify(value, (key, value) => {
     return pickleValue(value);
   }, 2);
 };
 
-function pickleValue(value) {
+function pickleValue(value: WekanDocumentField) {
   if (value === null) {
     return null;
   } else if (typeof value === 'object') {
@@ -217,8 +217,8 @@ function pickleValue(value) {
   return value;
 }
 
-function pickleObject(obj) {
-  const newObject = {};
+function pickleObject(obj: WekanDocumentField) {
+  const newObject: Record<string, WekanDocumentField> = {};
   Object.entries(obj).forEach(([key, value]) => {
     newObject[key] = pickleValue(value);
   });
@@ -242,3 +242,27 @@ if (!Meteor.isServer) {
 }
 
 export default SessionData;
+
+interface SessionDataError {
+  tag: string;
+  value?: string | null;
+  color?: boolean;
+}
+
+interface SessionDataDocument {
+  _id?: number;
+  userId: string;
+  sessionId: string;
+  totalHits?: number;
+  resultsCount?: number;
+  lastHit?: number;
+  cards?: string[];
+  selector?: string;
+  projection?: string;
+  errorMessages?: string[];
+  errors?: SessionDataError[];
+  debug?: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  [field: string]: WekanDocumentField;
+}

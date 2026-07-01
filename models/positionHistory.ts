@@ -1,12 +1,12 @@
 import { Mongo } from 'meteor/mongo';
 import { ReactiveCache } from '/imports/reactiveCache';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
 /**
  * PositionHistory collection to track original positions of swimlanes, lists, and cards
  * before the list naming feature was added in commit 719ef87efceacfe91461a8eeca7cf74d11f4cc0a
  */
-const PositionHistory = new Mongo.Collection('positionHistory');
+const PositionHistory = new Mongo.Collection<PositionHistoryDocument>('positionHistory');
 
 PositionHistory.attachSchema(
   new SimpleSchema({
@@ -162,3 +162,17 @@ PositionHistory.helpers({
 });
 
 export default PositionHistory;
+
+interface PositionHistoryDocument {
+  _id?: string;
+  boardId: string;
+  entityType: string;
+  entityId: string;
+  originalPosition: { sort?: number; [field: string]: WekanDocumentField };
+  originalSwimlaneId?: string;
+  originalListId?: string;
+  originalTitle?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  [field: string]: WekanDocumentField;
+}

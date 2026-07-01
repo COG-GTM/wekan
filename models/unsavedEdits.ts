@@ -1,9 +1,9 @@
 // This collection shouldn't be manipulated directly by instead throw the
 // `UnsavedEdits` API on the client.
 import { Mongo } from 'meteor/mongo';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const UnsavedEditCollection = new Mongo.Collection('unsaved-edits');
+const UnsavedEditCollection = new Mongo.Collection<UnsavedEditDocument>('unsaved-edits');
 
 UnsavedEditCollection.attachSchema(
   new SimpleSchema({
@@ -54,3 +54,14 @@ UnsavedEditCollection.attachSchema(
 );
 
 export default UnsavedEditCollection;
+
+interface UnsavedEditDocument {
+  _id?: string;
+  fieldName: string;
+  docId: string;
+  value: string;
+  userId: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  [field: string]: WekanDocumentField;
+}

@@ -148,6 +148,13 @@ declare const Attachments: WekanFilesCollection;
 declare const ReactiveCache: WekanReactiveCache;
 declare const Random: { id(n?: number): string };
 
+// Meteor exposes every loaded package at runtime on the global `Package` object
+// (e.g. `Package.meteor.Meteor`, `Package.mongo.Mongo`). @types/meteor already
+// declares a global `namespace Package` for the build-time package API, so the
+// runtime registry shape (keyed by the dynamic package name) is exposed through
+// this documented interop alias, which call sites cast `Package` to.
+type WekanRuntimePackageRegistry = Record<string, WekanDocumentField>;
+
 // Activities are intentionally schema-less: different activity types carry
 // different fields, so the document is modelled as an open shape.
 interface WekanActivityDocument {

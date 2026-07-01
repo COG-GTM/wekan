@@ -15,6 +15,13 @@ import { Mongo } from 'meteor/mongo';
 //
 // No SimpleSchema is attached on purpose: the job is internal bookkeeping
 // updated with frequent $set/$push, and it is only ever published to its owner.
-const TrelloImportJobs = new Mongo.Collection('trello_import_jobs');
+const TrelloImportJobs = new Mongo.Collection<TrelloImportJobDocument>('trello_import_jobs');
 
 export default TrelloImportJobs;
+
+// Schema-less internal bookkeeping document (see comment above); fields are
+// updated with frequent $set/$push, so the shape is modelled as open.
+interface TrelloImportJobDocument {
+  _id?: string;
+  [field: string]: WekanDocumentField;
+}

@@ -7,4 +7,5 @@ import { Meteor } from 'meteor/meteor';
  * @param fct {function} the function to be executed on the server
  * @return {*} a return value from the function, if there is any
  */
-export const runOnServer = fct => Meteor.isServer && fct();
+export const runOnServer = (fct: () => WekanDocumentField) =>
+  Meteor.isServer && fct();

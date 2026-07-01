@@ -1,8 +1,8 @@
 import { Mongo } from 'meteor/mongo';
 import { ReactiveCache } from '/imports/reactiveCache';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const Org = new Mongo.Collection('org');
+const Org = new Mongo.Collection<OrgDocument>('org');
 
 /**
  * A Organization in Wekan. A Enterprise in Trello.
@@ -109,3 +109,19 @@ Org.attachSchema(
 );
 
 export default Org;
+
+interface OrgDocument {
+  _id?: string;
+  orgDisplayName?: string;
+  orgDesc?: string;
+  orgShortName?: string;
+  orgAutoAddUsersWithDomainName?: string;
+  orgWebsite?: string;
+  orgIsActive?: boolean;
+  orgSharedTemplates?: boolean;
+  orgPropagateMembersToBoards?: boolean;
+  orgSyncMembersFromAuth?: boolean;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  [field: string]: WekanDocumentField;
+}
