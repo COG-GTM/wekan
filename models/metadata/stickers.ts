@@ -48,7 +48,7 @@ const STICKER_ICONS = [
 
 // Trello built-in sticker name => Font Awesome (v4) icon name. Unknown Trello
 // stickers fall back to a generic note sticker.
-const TRELLO_STICKER_TO_FA: { [trelloName: string]: string } = {
+const TRELLO_STICKER_TO_FA = {
   thumbsup: 'thumbs-up',
   thumbsdown: 'thumbs-down',
   heart: 'heart',
@@ -135,7 +135,10 @@ const STICKER_KEYWORD_TO_FA = [
 function trelloStickerToFa(name?: string) {
   if (!name) return DEFAULT_STICKER_ICON;
   const n = String(name).toLowerCase();
-  if (TRELLO_STICKER_TO_FA[n]) return TRELLO_STICKER_TO_FA[n];
+  // Dynamic lookup by arbitrary Trello name: widen the literal-keyed map to a
+  // string index so an unknown key resolves to undefined instead of a type error.
+  const trelloMap: { [trelloName: string]: string } = TRELLO_STICKER_TO_FA;
+  if (trelloMap[n]) return trelloMap[n];
   for (const [kw, icon] of STICKER_KEYWORD_TO_FA) {
     if (n.includes(kw)) return icon;
   }

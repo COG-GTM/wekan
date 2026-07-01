@@ -33,7 +33,7 @@ const DANGEROUS_ELEMENTS = [
   'animateMotion',
 ];
 
-export function sanitizeSvgContent(svg) {
+export function sanitizeSvgContent(svg: string) {
   if (typeof svg !== 'string' || svg.length === 0) {
     return { content: svg, changed: false };
   }
@@ -70,7 +70,7 @@ export function sanitizeSvgContent(svg) {
 }
 
 // Returns true when a file looks like an SVG (by MIME type or .svg extension).
-export function isSvgFile(mimeType, fileName) {
+export function isSvgFile(mimeType?: string, fileName?: string) {
   const mime = (mimeType || '').toLowerCase();
   if (mime === 'image/svg+xml' || mime === 'image/svg') {
     return true;
@@ -80,7 +80,7 @@ export function isSvgFile(mimeType, fileName) {
 
 // Sanitize an SVG file in place. Returns the new byte size when the file was
 // rewritten, or null when nothing changed / the file could not be processed.
-export function sanitizeSvgFileSync(filePath) {
+export function sanitizeSvgFileSync(filePath?: string) {
   if (!Meteor.isServer || !filePath) {
     return null;
   }

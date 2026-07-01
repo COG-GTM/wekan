@@ -4,7 +4,7 @@
 // #6412: very long attachment filenames produced an on-disk
 // "<id>-<version>-<name>" component longer than the filesystem's 255-byte limit
 // and failed with ENAMETOOLONG (worse with multibyte UTF-8 like German umlauts).
-const path = require('path');
+import path from 'path';
 
 /**
  * Maximum number of bytes for the sanitized filename. Most filesystems limit a
@@ -21,7 +21,7 @@ const MAX_FILENAME_BYTES = 200;
  * @param {number} maxBytes
  * @return {string} the (possibly) shortened filename
  */
-function truncateFilenameToBytes(filename, maxBytes) {
+function truncateFilenameToBytes(filename: string, maxBytes: number) {
   if (Buffer.byteLength(filename, 'utf8') <= maxBytes) {
     return filename;
   }
@@ -53,7 +53,7 @@ function truncateFilenameToBytes(filename, maxBytes) {
  * @param {string} filename - User-provided filename
  * @return {string} Sanitized filename safe for filesystem operations
  */
-function sanitizeFilename(filename) {
+function sanitizeFilename(filename: string | null | undefined) {
   if (!filename || typeof filename !== 'string') {
     return 'unnamed';
   }
@@ -87,4 +87,4 @@ function sanitizeFilename(filename) {
   return safe;
 }
 
-module.exports = { MAX_FILENAME_BYTES, truncateFilenameToBytes, sanitizeFilename };
+export { MAX_FILENAME_BYTES, truncateFilenameToBytes, sanitizeFilename };
