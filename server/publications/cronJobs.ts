@@ -1,8 +1,9 @@
-import { CronJobStatus } from '../cronJobStorage';
+import { Meteor } from 'meteor/meteor';
+import { CronJobStatus } from '/server/cronJobStorage';
 import Users from '/models/users';
 
-// Publish migration status for admin users only
-Meteor.publish('cronMigrationStatus', async function() {
+// Publish cron jobs status for admin users only
+Meteor.publish('cronJobs', async function() {
   if (!this.userId) {
     return this.ready();
   }

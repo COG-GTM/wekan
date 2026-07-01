@@ -1,3 +1,4 @@
+import { Meteor } from 'meteor/meteor';
 import { ReactiveCache } from '/imports/reactiveCache';
 import Settings from '/models/settings';
 import Integrations from '/models/integrations';
@@ -12,7 +13,9 @@ Meteor.publish('globalwebhooks', async function() {
     return this.ready();
   }
 
-  const boardId = Integrations.Const.GLOBAL_WEBHOOK_ID;
+  // `Integrations.Const` is a runtime static attached to the collection (see
+  // models/integrations), not part of the typed Mongo.Collection, hence `any`.
+  const boardId = (Integrations as any).Const.GLOBAL_WEBHOOK_ID;
   const ret = await ReactiveCache.getIntegrations(
     {
       boardId,

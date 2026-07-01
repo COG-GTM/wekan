@@ -1,3 +1,4 @@
+import { Meteor } from 'meteor/meteor';
 import { ReactiveCache } from '/imports/reactiveCache';
 
 // We use these when displaying notifications in the notificationsDrawer
@@ -9,7 +10,7 @@ Meteor.publish('notificationActivities', async () => {
 
 // gets all attachments associated with activities associated with the current user
 Meteor.publish('notificationAttachments', async function() {
-  const activityEntries = await activityDocs();
+  const activityEntries: ActivityDoc[] = await activityDocs();
   const ret = await ReactiveCache.getAttachments(
     {
       _id: {
@@ -26,7 +27,7 @@ Meteor.publish('notificationAttachments', async function() {
 
 // gets all cards associated with activities associated with the current user
 Meteor.publish('notificationCards', async function() {
-  const activityEntries = await activityDocs();
+  const activityEntries: ActivityDoc[] = await activityDocs();
   const ret = await ReactiveCache.getCards(
     {
       _id: {
@@ -43,7 +44,7 @@ Meteor.publish('notificationCards', async function() {
 
 // gets all checklistItems associated with activities associated with the current user
 Meteor.publish('notificationChecklistItems', async function() {
-  const activityEntries = await activityDocs();
+  const activityEntries: ActivityDoc[] = await activityDocs();
   const ret = await ReactiveCache.getChecklistItems(
     {
       _id: {
@@ -60,7 +61,7 @@ Meteor.publish('notificationChecklistItems', async function() {
 
 // gets all checklists associated with activities associated with the current user
 Meteor.publish('notificationChecklists', async function() {
-  const activityEntries = await activityDocs();
+  const activityEntries: ActivityDoc[] = await activityDocs();
   const ret = await ReactiveCache.getChecklists(
     {
       _id: {
@@ -77,7 +78,7 @@ Meteor.publish('notificationChecklists', async function() {
 
 // gets all comments associated with activities associated with the current user
 Meteor.publish('notificationComments', async function() {
-  const activityEntries = await activityDocs();
+  const activityEntries: ActivityDoc[] = await activityDocs();
   const ret = await ReactiveCache.getCardComments(
     {
       _id: {
@@ -94,7 +95,7 @@ Meteor.publish('notificationComments', async function() {
 
 // gets all lists associated with activities associated with the current user
 Meteor.publish('notificationLists', async function() {
-  const activityEntries = await activityDocs();
+  const activityEntries: ActivityDoc[] = await activityDocs();
   const ret = await ReactiveCache.getLists(
     {
       _id: {
@@ -111,7 +112,7 @@ Meteor.publish('notificationLists', async function() {
 
 // gets all swimlanes associated with activities associated with the current user
 Meteor.publish('notificationSwimlanes', async function() {
-  const activityEntries = await activityDocs();
+  const activityEntries: ActivityDoc[] = await activityDocs();
   const ret = await ReactiveCache.getSwimlanes(
     {
       _id: {
@@ -128,7 +129,7 @@ Meteor.publish('notificationSwimlanes', async function() {
 
 // gets all users associated with activities associated with the current user
 Meteor.publish('notificationUsers', async function() {
-  const activityEntries = await activityDocs();
+  const activityEntries: ActivityDoc[] = await activityDocs();
   const ret = await ReactiveCache.getUsers(
     {
       _id: {
@@ -151,7 +152,7 @@ Meteor.publish('notificationUsers', async function() {
 });
 
 async function activityIds() {
-  const activityIds = (await ReactiveCache.getCurrentUser())?.profile?.notifications?.map(v => v.activity) || [];
+  const activityIds = (await ReactiveCache.getCurrentUser())?.profile?.notifications?.map((v: { activity: string }) => v.activity) || [];
   return activityIds;
 }
 
@@ -163,6 +164,19 @@ async function activityDocs() {
   return await ReactiveCache.getActivities({
     _id: { $in: ids },
   });
+}
+
+// An activity document, referenced by the notification publications only for the
+// ids of the related documents (card, comment, attachment, etc.) they carry.
+interface ActivityDoc {
+  attachmentId?: string;
+  cardId?: string;
+  checklistItemId?: string;
+  checklistId?: string;
+  commentId?: string;
+  listId?: string;
+  swimlaneId?: string;
+  userId?: string;
 }
 
 async function activityCursor() {

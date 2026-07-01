@@ -1,9 +1,11 @@
+import { Meteor } from 'meteor/meteor';
+import { check } from 'meteor/check';
 import AttachmentMigrationStatus from '/models/attachmentMigrationStatus';
 import Boards from '/models/boards';
 import Users from '/models/users';
 
 // Publish attachment migration status for boards user has access to
-Meteor.publish('attachmentMigrationStatus', async function(boardId) {
+Meteor.publish('attachmentMigrationStatus', async function(boardId: string) {
   if (!this.userId) {
     return this.ready();
   }

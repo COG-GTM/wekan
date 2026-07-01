@@ -1,3 +1,5 @@
+import { Meteor } from 'meteor/meteor';
+import { check, Match } from 'meteor/check';
 import { ReactiveCache } from '/imports/reactiveCache';
 
 // We use activities fields at two different places:
@@ -5,10 +7,10 @@ import { ReactiveCache } from '/imports/reactiveCache';
 // 2. The card activity tab
 // We use this publication to paginate for these two publications.
 
-Meteor.publish('activities', async function(kind, id, limit, showActivities) {
+Meteor.publish('activities', async function(kind: string, id: string | null | undefined, limit: number, showActivities: boolean) {
   check(
     kind,
-    Match.Where(x => {
+    Match.Where((x: string) => {
       return ['board', 'card'].indexOf(x) !== -1;
     }),
   );
@@ -59,7 +61,7 @@ Meteor.publish('activities', async function(kind, id, limit, showActivities) {
     }
   }
 
-  const selector = showActivities
+  const selector: MongoQuery = showActivities
     ? { [`${kind}Id`]: { $in: linkedElmtId } }
     : { $and: [{ activityType: 'addComment' }, { [`${kind}Id`]: { $in: linkedElmtId } }] };
 

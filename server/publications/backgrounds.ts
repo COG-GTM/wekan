@@ -1,10 +1,12 @@
+import { Meteor } from 'meteor/meteor';
+import { check } from 'meteor/check';
 import Attachments from '/models/attachments';
 import { ReactiveCache } from '/imports/reactiveCache';
 
 // Publish a board's background images so the board-settings backgrounds list
 // can show them. Board backgrounds are stored as board-level Attachments
 // (meta.boardId set, no meta.cardId, meta.source === 'board-background').
-Meteor.publish('boardBackgrounds', async function (boardId) {
+Meteor.publish('boardBackgrounds', async function (boardId: string) {
   check(boardId, String);
   if (!this.userId) {
     return this.ready();

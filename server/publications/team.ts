@@ -1,6 +1,8 @@
+import { Meteor } from 'meteor/meteor';
+import { check, Match } from 'meteor/check';
 import { ReactiveCache } from '/imports/reactiveCache';
 
-Meteor.publish('team', async function(query, limit, skip = 0) {
+Meteor.publish('team', async function(query: MongoQuery | null, limit: number, skip: number | null | undefined = 0) {
   check(query, Match.OneOf(Object, null));
   check(limit, Number);
   check(skip, Match.OneOf(Number, null, undefined));
@@ -9,7 +11,7 @@ Meteor.publish('team', async function(query, limit, skip = 0) {
 
   let ret = [];
   if (user && user.isAdmin) {
-    ret = await ReactiveCache.getTeams(query,
+    ret = await ReactiveCache.getTeams(query as MongoQuery,
       {
         limit,
         skip: skip || 0,

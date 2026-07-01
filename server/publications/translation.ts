@@ -1,6 +1,8 @@
+import { Meteor } from 'meteor/meteor';
+import { check, Match } from 'meteor/check';
 import { ReactiveCache } from '/imports/reactiveCache';
 
-Meteor.publish('translation', async function(query, limit) {
+Meteor.publish('translation', async function(query: MongoQuery | null, limit: number) {
   check(query, Match.OneOf(Object, null));
   check(limit, Number);
 
@@ -8,7 +10,7 @@ Meteor.publish('translation', async function(query, limit) {
   const user = await ReactiveCache.getCurrentUser();
 
   if (user && user.isAdmin) {
-    ret = await ReactiveCache.getTranslations(query,
+    ret = await ReactiveCache.getTranslations(query as MongoQuery,
       {
         limit,
         sort: { modifiedAt: -1 },

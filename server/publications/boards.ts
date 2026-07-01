@@ -2,6 +2,8 @@
 // non-archived boards:
 // 1. that the user is a member of
 // 2. the user has starred
+import { Meteor } from 'meteor/meteor';
+import { check, Match } from 'meteor/check';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { publishComposite } from 'meteor/reywood:publish-composite';
 import { findWhere } from '/imports/lib/collectionHelpers';
@@ -10,6 +12,7 @@ import Org from "../../models/org";
 import Team from "../../models/team";
 import Attachments from '../../models/attachments';
 import Boards from '/models/boards';
+import { BoardMemberFull } from './types';
 
 publishComposite('boards', function() {
   const userId = this.userId;
@@ -99,7 +102,7 @@ publishComposite('boards', function() {
   };
 });
 
-Meteor.publish('boardsReport', async function(searchTerm = '', limit, skip = 0) {
+Meteor.publish('boardsReport', async function(searchTerm: string | null | undefined = '', limit: number, skip: number | null | undefined = 0) {
   check(searchTerm, Match.OneOf(String, null, undefined));
   check(limit, Number);
   check(skip, Match.OneOf(Number, null, undefined));
@@ -108,7 +111,9 @@ Meteor.publish('boardsReport', async function(searchTerm = '', limit, skip = 0) 
   // array to tell the client to remove the previously published docs.
   if (!Match.test(userId, String) || !userId) return [];
 
-  const query = { _id: { $in: await Boards.userBoardIds(userId, null) } };
+  // `userBoardIds` is a runtime static on the Boards collection (models/boards),
+  // not part of the typed Mongo.Collection, hence `any`.
+  const query: MongoQuery = { _id: { $in: await (Boards as any).userBoardIds(userId, null) } };
   if (searchTerm) {
     query.title = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
   }
@@ -139,22 +144,22 @@ Meteor.publish('boardsReport', async function(searchTerm = '', limit, skip = 0) 
     true,
   );
 
-  const userIds = [];
-  const orgIds = [];
-  const teamIds = [];
-  boards.forEach(board => {
+  const userIds: string[] = [];
+  const orgIds: string[] = [];
+  const teamIds: string[] = [];
+  boards.forEach((board: BoardReportDoc) => {
     if (board.members) {
-      board.members.forEach(member => {
+      board.members.forEach((member: BoardMemberRef) => {
         userIds.push(member.userId);
       });
     }
     if (board.orgs) {
-      board.orgs.forEach(org => {
+      board.orgs.forEach((org: BoardOrgRef) => {
         orgIds.push(org.orgId);
       });
     }
     if (board.teams) {
-      board.teams.forEach(team => {
+      board.teams.forEach((team: BoardTeamRef) => {
         teamIds.push(team.teamId);
       });
     }
@@ -162,7 +167,9 @@ Meteor.publish('boardsReport', async function(searchTerm = '', limit, skip = 0) 
 
   const ret = [
     boards,
-    await ReactiveCache.getUsers({ _id: { $in: userIds } }, { fields: Users.safeFields }, true),
+    // `safeFields` is a runtime static on the Users collection (models/users),
+    // not part of the typed Mongo.Collection, hence `any`.
+    await ReactiveCache.getUsers({ _id: { $in: userIds } }, { fields: (Users as any).safeFields }, true),
     await ReactiveCache.getTeams({ _id: { $in: teamIds } }, {}, true),
     await ReactiveCache.getOrgs({ _id: { $in: orgIds } }, {}, true),
   ]
@@ -170,13 +177,14 @@ Meteor.publish('boardsReport', async function(searchTerm = '', limit, skip = 0) 
 });
 
 Meteor.methods({
-  async getBoardsReportCount(searchTerm = '') {
+  async getBoardsReportCount(searchTerm: string | null | undefined = '') {
     check(searchTerm, Match.OneOf(String, null, undefined));
     const user = await ReactiveCache.getCurrentUser();
     if (!user || !user.isAdmin) {
       throw new Meteor.Error('not-authorized');
     }
-    const query = { _id: { $in: await Boards.userBoardIds(this.userId, null) } };
+    // `userBoardIds` is a runtime static on the Boards collection (see above).
+    const query: MongoQuery = { _id: { $in: await (Boards as any).userBoardIds(this.userId, null) } };
     if (searchTerm) {
       query.title = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     }
@@ -191,7 +199,7 @@ Meteor.methods({
   // all resolved here against the *effective* current user — so it also works
   // when a GlobalAdmin impersonates a user (impersonate() calls this.setUserId(),
   // so this.userId / getCurrentUser() are the impersonated user).
-  async getAllBoardsPage(params) {
+  async getAllBoardsPage(params: AllBoardsPageParams) {
     check(params, {
       search: Match.Optional(String),
       sortBy: Match.Optional(String),
@@ -212,13 +220,13 @@ Meteor.methods({
     const perPage = Math.min(200, Math.max(1, params.perPage || 25));
     const page = Math.max(1, params.page || 1);
     const search = (params.search || '').trim();
-    const sortBy = ['title-asc', 'title-desc'].includes(params.sortBy)
+    const sortBy = params.sortBy && ['title-asc', 'title-desc'].includes(params.sortBy)
       ? params.sortBy
       : 'title-asc';
     const menu = params.menu || 'remaining';
 
     // Same visibility selector as the live `boards` publication.
-    const selector = {
+    const selector: MongoQuery = {
       archived: false,
       type: { $in: ['board', 'template-container'] },
       $or: [
@@ -255,20 +263,20 @@ Meteor.methods({
     const starred = profile.starredBoards || [];
     if (!search) {
       if (menu === 'starred') {
-        boards = boards.filter(b => starred.includes(b._id));
+        boards = boards.filter((b: BoardPageDoc) => starred.includes(b._id));
       } else if (menu === 'templates') {
-        boards = boards.filter(b => b.type === 'template-container');
+        boards = boards.filter((b: BoardPageDoc) => b.type === 'template-container');
       } else if (menu === 'remaining') {
         boards = boards.filter(
-          b => !assignments[b._id] && b.type !== 'template-container',
+          (b: BoardPageDoc) => !assignments[b._id] && b.type !== 'template-container',
         );
       } else {
         // menu is a workspace id
-        boards = boards.filter(b => assignments[b._id] === menu);
+        boards = boards.filter((b: BoardPageDoc) => assignments[b._id] === menu);
       }
     }
 
-    boards.sort((a, b) => {
+    boards.sort((a: BoardPageDoc, b: BoardPageDoc) => {
       const cmp = (a.title || '').localeCompare(b.title || '', undefined, {
         sensitivity: 'base',
       });
@@ -277,7 +285,7 @@ Meteor.methods({
 
     const total = boards.length;
     const start = (page - 1) * perPage;
-    const ids = boards.slice(start, start + perPage).map(b => b._id);
+    const ids = boards.slice(start, start + perPage).map((b: BoardPageDoc) => b._id);
     return { ids, total };
   },
 });
@@ -334,18 +342,18 @@ Meteor.publish('archivedBoards', async function() {
 //
 // If isArchived = false, this will only return board elements which are not archived.
 // If isArchived = true, this will only return board elements which are archived.
-publishComposite('board', async function(boardId, isArchived) {
+publishComposite('board', async function(boardId: string, isArchived: boolean) {
   check(boardId, String);
   check(isArchived, Boolean);
 
   const thisUserId = this.userId;
-  const $or = [{ permission: 'public' }];
+  const $or: MongoQuery[] = [{ permission: 'public' }];
 
   let currUser = (!Match.test(thisUserId, String) || !thisUserId) ? 'undefined' : await ReactiveCache.getUser(thisUserId);
   let orgIdsUserBelongs = currUser !== 'undefined' && currUser.teams !== 'undefined' ? currUser.orgIdsUserBelongs() : '';
   let teamIdsUserBelongs = currUser !== 'undefined' && currUser.teams !== 'undefined' ? currUser.teamIdsUserBelongs() : '';
-  let orgsIds = [];
-  let teamsIds = [];
+  let orgsIds: string[] = [];
+  let teamsIds: string[] = [];
   // #5850: the user's email domain(s) for domain-based board sharing.
   let emailDomains = currUser !== 'undefined' && typeof currUser.emailDomains === 'function'
     ? currUser.emailDomains()
@@ -422,14 +430,14 @@ publishComposite('board', async function(boardId, isArchived) {
       // Cards
       {
         async find(board) {
-          const cardSelector = {
+          const cardSelector: MongoQuery = {
             boardId: { $in: [board._id, board.subtasksDefaultBoardId] },
             archived: isArchived,
           };
 
           // Check if current user has assigned-only permissions
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<BoardMemberFull>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               // User with assigned-only permissions should only see cards assigned to them
               cardSelector.assignees = { $in: [thisUserId] };
@@ -474,14 +482,14 @@ publishComposite('board', async function(boardId, isArchived) {
           // not assigned to; boardId alone cannot express that, so fall back to
           // the assigned cards' ids for those members.
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<BoardMemberFull>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               const cards = await ReactiveCache.getCards(
                 { boardId: { $in: boardIds }, archived: isArchived, assignees: { $in: [thisUserId] } },
                 { fields: { _id: 1 } },
                 false,
               );
-              const cardIds = (cards || []).map(c => c._id);
+              const cardIds = (cards || []).map((c: CardLinkDoc) => c._id);
               return await ReactiveCache.getChecklists({ cardId: { $in: cardIds } }, {}, true);
             }
           }
@@ -494,14 +502,14 @@ publishComposite('board', async function(boardId, isArchived) {
           const boardIds = [board._id];
           if (board.subtasksDefaultBoardId) boardIds.push(board.subtasksDefaultBoardId);
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<BoardMemberFull>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               const cards = await ReactiveCache.getCards(
                 { boardId: { $in: boardIds }, archived: isArchived, assignees: { $in: [thisUserId] } },
                 { fields: { _id: 1 } },
                 false,
               );
-              const cardIds = (cards || []).map(c => c._id);
+              const cardIds = (cards || []).map((c: CardLinkDoc) => c._id);
               return await ReactiveCache.getChecklistItems({ cardId: { $in: cardIds } }, {}, true);
             }
           }
@@ -511,13 +519,13 @@ publishComposite('board', async function(boardId, isArchived) {
       // Parent cards (for subtasks)
       {
         async find(board) {
-          const cardSelector = {
+          const cardSelector: MongoQuery = {
             boardId: { $in: [board._id, board.subtasksDefaultBoardId] },
             archived: isArchived,
           };
 
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<BoardMemberFull>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               cardSelector.assignees = { $in: [thisUserId] };
             }
@@ -526,7 +534,7 @@ publishComposite('board', async function(boardId, isArchived) {
           const cards = await ReactiveCache.getCards(cardSelector, { fields: { _id: 1, parentId: 1 } }, false);
           if (!cards || cards.length === 0) return null;
 
-          const parentIds = cards.filter(c => c.parentId).map(c => c.parentId);
+          const parentIds = cards.filter((c: CardLinkDoc) => c.parentId).map((c: CardLinkDoc) => c.parentId);
           if (parentIds.length === 0) return null;
 
           return await ReactiveCache.getCards({ _id: { $in: parentIds } }, {}, true);
@@ -535,13 +543,13 @@ publishComposite('board', async function(boardId, isArchived) {
       // Linked cards (cardType-linkedCard)
       {
         async find(board) {
-          const cardSelector = {
+          const cardSelector: MongoQuery = {
             boardId: { $in: [board._id, board.subtasksDefaultBoardId] },
             archived: isArchived,
           };
 
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<BoardMemberFull>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               cardSelector.assignees = { $in: [thisUserId] };
             }
@@ -550,7 +558,7 @@ publishComposite('board', async function(boardId, isArchived) {
           const cards = await ReactiveCache.getCards(cardSelector, { fields: { _id: 1, type: 1, linkedId: 1 } }, false);
           if (!cards || cards.length === 0) return null;
 
-          const linkedCardIds = cards.filter(c => c.type === 'cardType-linkedCard' && c.linkedId).map(c => c.linkedId);
+          const linkedCardIds = cards.filter((c: CardLinkDoc) => c.type === 'cardType-linkedCard' && c.linkedId).map((c: CardLinkDoc) => c.linkedId);
           if (linkedCardIds.length === 0) return null;
 
           return await ReactiveCache.getCards({ _id: { $in: linkedCardIds }, archived: isArchived }, {}, true);
@@ -559,13 +567,13 @@ publishComposite('board', async function(boardId, isArchived) {
       // Comments for linked cards
       {
         async find(board) {
-          const cardSelector = {
+          const cardSelector: MongoQuery = {
             boardId: { $in: [board._id, board.subtasksDefaultBoardId] },
             archived: isArchived,
           };
 
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<BoardMemberFull>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               cardSelector.assignees = { $in: [thisUserId] };
             }
@@ -574,7 +582,7 @@ publishComposite('board', async function(boardId, isArchived) {
           const cards = await ReactiveCache.getCards(cardSelector, { fields: { _id: 1, type: 1, linkedId: 1 } }, false);
           if (!cards || cards.length === 0) return null;
 
-          const linkedCardIds = cards.filter(c => c.type === 'cardType-linkedCard' && c.linkedId).map(c => c.linkedId);
+          const linkedCardIds = cards.filter((c: CardLinkDoc) => c.type === 'cardType-linkedCard' && c.linkedId).map((c: CardLinkDoc) => c.linkedId);
           if (linkedCardIds.length === 0) return null;
 
           return await ReactiveCache.getCardComments({ cardId: { $in: linkedCardIds } }, {}, true);
@@ -583,13 +591,13 @@ publishComposite('board', async function(boardId, isArchived) {
       // Attachments for linked cards
       {
         async find(board) {
-          const cardSelector = {
+          const cardSelector: MongoQuery = {
             boardId: { $in: [board._id, board.subtasksDefaultBoardId] },
             archived: isArchived,
           };
 
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<BoardMemberFull>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               cardSelector.assignees = { $in: [thisUserId] };
             }
@@ -598,7 +606,7 @@ publishComposite('board', async function(boardId, isArchived) {
           const cards = await ReactiveCache.getCards(cardSelector, { fields: { _id: 1, type: 1, linkedId: 1 } }, false);
           if (!cards || cards.length === 0) return null;
 
-          const linkedCardIds = cards.filter(c => c.type === 'cardType-linkedCard' && c.linkedId).map(c => c.linkedId);
+          const linkedCardIds = cards.filter((c: CardLinkDoc) => c.type === 'cardType-linkedCard' && c.linkedId).map((c: CardLinkDoc) => c.linkedId);
           if (linkedCardIds.length === 0) return null;
 
           const result = await ReactiveCache.getAttachments({ 'meta.cardId': { $in: linkedCardIds } }, {}, true);
@@ -608,13 +616,13 @@ publishComposite('board', async function(boardId, isArchived) {
       // Checklists for linked cards
       {
         async find(board) {
-          const cardSelector = {
+          const cardSelector: MongoQuery = {
             boardId: { $in: [board._id, board.subtasksDefaultBoardId] },
             archived: isArchived,
           };
 
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<BoardMemberFull>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               cardSelector.assignees = { $in: [thisUserId] };
             }
@@ -623,7 +631,7 @@ publishComposite('board', async function(boardId, isArchived) {
           const cards = await ReactiveCache.getCards(cardSelector, { fields: { _id: 1, type: 1, linkedId: 1 } }, false);
           if (!cards || cards.length === 0) return null;
 
-          const linkedCardIds = cards.filter(c => c.type === 'cardType-linkedCard' && c.linkedId).map(c => c.linkedId);
+          const linkedCardIds = cards.filter((c: CardLinkDoc) => c.type === 'cardType-linkedCard' && c.linkedId).map((c: CardLinkDoc) => c.linkedId);
           if (linkedCardIds.length === 0) return null;
 
           return await ReactiveCache.getChecklists({ cardId: { $in: linkedCardIds } }, {}, true);
@@ -632,13 +640,13 @@ publishComposite('board', async function(boardId, isArchived) {
       // ChecklistItems for linked cards
       {
         async find(board) {
-          const cardSelector = {
+          const cardSelector: MongoQuery = {
             boardId: { $in: [board._id, board.subtasksDefaultBoardId] },
             archived: isArchived,
           };
 
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<BoardMemberFull>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               cardSelector.assignees = { $in: [thisUserId] };
             }
@@ -647,7 +655,7 @@ publishComposite('board', async function(boardId, isArchived) {
           const cards = await ReactiveCache.getCards(cardSelector, { fields: { _id: 1, type: 1, linkedId: 1 } }, false);
           if (!cards || cards.length === 0) return null;
 
-          const linkedCardIds = cards.filter(c => c.type === 'cardType-linkedCard' && c.linkedId).map(c => c.linkedId);
+          const linkedCardIds = cards.filter((c: CardLinkDoc) => c.type === 'cardType-linkedCard' && c.linkedId).map((c: CardLinkDoc) => c.linkedId);
           if (linkedCardIds.length === 0) return null;
 
           return await ReactiveCache.getChecklistItems({ cardId: { $in: linkedCardIds } }, {}, true);
@@ -660,14 +668,14 @@ publishComposite('board', async function(boardId, isArchived) {
             // Board members. This publication also includes former board members that
             // aren't members anymore but may have some activities attached to them in
             // the history.
-            const memberIds = board.members.map(x => x.userId);
+            const memberIds = board.members.map((x: BoardMemberRef) => x.userId);
 
             // We omit the current user because the client should already have that data,
             // and sending it triggers a subtle bug:
             // https://github.com/wefork/wekan/issues/15
             return await ReactiveCache.getUsers(
               {
-                _id: { $in: memberIds.filter(x => x !== thisUserId) },
+                _id: { $in: memberIds.filter((x: string) => x !== thisUserId) },
               },
               {
                 fields: {
@@ -688,7 +696,7 @@ publishComposite('board', async function(boardId, isArchived) {
 });
 
 Meteor.methods({
-  async copyBoard(boardId, properties) {
+  async copyBoard(boardId: string, properties: MongoQuery) {
     check(boardId, String);
     check(properties, Object);
 
@@ -708,3 +716,52 @@ Meteor.methods({
     return board.copy();
   },
 });
+
+// A board member reference stored on Boards.members (report/roster lookups).
+interface BoardMemberRef {
+  userId: string;
+}
+
+// A board org reference stored on Boards.orgs.
+interface BoardOrgRef {
+  orgId: string;
+}
+
+// A board team reference stored on Boards.teams.
+interface BoardTeamRef {
+  teamId: string;
+}
+
+// The subset of a board document read by the boardsReport publication when
+// collecting related member/org/team ids.
+interface BoardReportDoc {
+  members?: BoardMemberRef[];
+  orgs?: BoardOrgRef[];
+  teams?: BoardTeamRef[];
+}
+
+// Arguments accepted by the getAllBoardsPage method (all optional; validated
+// with Match.Optional).
+interface AllBoardsPageParams {
+  search?: string;
+  sortBy?: string;
+  menu?: string;
+  page?: number;
+  perPage?: number;
+}
+
+// The subset of a board document used to filter/sort/paginate in getAllBoardsPage.
+interface BoardPageDoc {
+  _id: string;
+  title?: string;
+  type?: string;
+}
+
+// The subset of a card document read while resolving subtask/linked-card ids in
+// the composite 'board' publication.
+interface CardLinkDoc {
+  _id: string;
+  parentId?: string;
+  type?: string;
+  linkedId?: string;
+}

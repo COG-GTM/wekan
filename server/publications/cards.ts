@@ -1,6 +1,9 @@
+import { Meteor } from 'meteor/meteor';
+import { check, Match } from 'meteor/check';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { publishComposite } from 'meteor/reywood:publish-composite';
 import { findWhere } from '/imports/lib/collectionHelpers';
+import { BoardMemberFull } from './types';
 import escapeForRegex from 'escape-string-regexp';
 import Users from '../../models/users';
 import {
@@ -79,7 +82,7 @@ import { CARD_TYPES } from '../../config/const';
 import Org from "../../models/org";
 import Team from "../../models/team";
 
-Meteor.publish('card', async function(cardId) {
+Meteor.publish('card', async function(cardId: string) {
   check(cardId, String);
 
   const userId = this.userId;
@@ -96,7 +99,7 @@ Meteor.publish('card', async function(cardId) {
 
   // If user has assigned-only permissions, check if they're assigned to this card
   if (userId && board.members) {
-    const member = findWhere(board.members, { userId: userId, isActive: true });
+    const member = findWhere<BoardMemberFull>(board.members, { userId: userId, isActive: true });
     if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
       // User with assigned-only permissions can only view cards assigned to them
       if (!card.assignees || !card.assignees.includes(userId)) {
@@ -116,7 +119,7 @@ Meteor.publish('card', async function(cardId) {
 /** publish all data which is necessary to display card details as popup
  * @returns array of cursors
  */
-publishComposite('popupCardData', async function(cardId) {
+publishComposite('popupCardData', async function(cardId: string) {
   check(cardId, String);
 
   const userId = this.userId;
@@ -133,7 +136,7 @@ publishComposite('popupCardData', async function(cardId) {
 
   // If user has assigned-only permissions, check if they're assigned to this card
   if (userId && board.members) {
-    const member = findWhere(board.members, { userId: userId, isActive: true });
+    const member = findWhere<BoardMemberFull>(board.members, { userId: userId, isActive: true });
     if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
       // User with assigned-only permissions can only view cards assigned to them
       if (!card.assignees || !card.assignees.includes(userId)) {
@@ -161,7 +164,7 @@ publishComposite('popupCardData', async function(cardId) {
   };
 });
 
-Meteor.publish('archiveSidebar', async function(boardId, activeTab = 'cards', cardsLimit = 30, listsLimit = 30, swimlanesLimit = 30) {
+Meteor.publish('archiveSidebar', async function(boardId: string, activeTab: string = 'cards', cardsLimit: number = 30, listsLimit: number = 30, swimlanesLimit: number = 30) {
   check(boardId, String);
   check(activeTab, String);
   check(cardsLimit, Match.Integer);
@@ -200,14 +203,14 @@ Meteor.publish('archiveSidebar', async function(boardId, activeTab = 'cards', ca
     return [];
   }
 
-  const cardSelector = {
+  const cardSelector: MongoQuery = {
     boardId: { $in: [board._id, board.subtasksDefaultBoardId] },
     archived: true,
   };
 
   // Respect assigned-only board permissions for archived cards as well.
   if (board.members) {
-    const member = findWhere(board.members, { userId, isActive: true });
+    const member = findWhere<BoardMemberFull>(board.members, { userId, isActive: true });
     if (
       member &&
       (member.isNormalAssignedOnly ||
@@ -243,7 +246,7 @@ Meteor.publish('archiveSidebar', async function(boardId, activeTab = 'cards', ca
   return [cardsCursor, listsCursor, swimlanesCursor];
 });
 
-Meteor.publish('myCards', async function(sessionId) {
+Meteor.publish('myCards', async function(sessionId: string) {
   check(sessionId, String);
 
   if (!this.userId) return this.ready();
@@ -268,7 +271,7 @@ Meteor.publish('myCards', async function(sessionId) {
 });
 
 // Optimized due cards publication for better performance
-Meteor.publish('dueCards', async function(allUsers = false) {
+Meteor.publish('dueCards', async function(allUsers: boolean = false) {
   check(allUsers, Boolean);
 
   const userId = this.userId;
@@ -282,14 +285,14 @@ Meteor.publish('dueCards', async function(allUsers = false) {
       { permission: 'public' },
       { members: { $elemMatch: { userId, isActive: true } } }
     ]
-  })).map(board => board._id);
+  })).map((board: { _id: string }) => board._id);
 
   if (userBoards.length === 0) {
     return this.ready();
   }
 
   // Build optimized selector
-  const selector = {
+  const selector: MongoQuery = {
     type: 'cardType-card',
     archived: false,
     dueAt: { $exists: true, $nin: [null, ''] },
@@ -329,7 +332,7 @@ Meteor.publish('dueCards', async function(allUsers = false) {
   return result;
 });
 
-Meteor.publish('globalSearch', async function(sessionId, params, text) {
+Meteor.publish('globalSearch', async function(sessionId: string, params: Record<string, any>, text: string) {
   check(sessionId, String);
   check(params, Object);
   check(text, String);
@@ -345,7 +348,7 @@ Meteor.publish('globalSearch', async function(sessionId, params, text) {
   return cursors;
 });
 
-Meteor.publish('sessionData', async function(sessionId) {
+Meteor.publish('sessionData', async function(sessionId: string) {
   check(sessionId, String);
   const userId = this.userId;
 
@@ -359,20 +362,22 @@ Meteor.publish('sessionData', async function(sessionId) {
   return cursor;
 });
 
-async function buildSelector(queryParams, userId) {
+async function buildSelector(queryParams: QueryParams, userId: string) {
   const errors = new QueryErrors();
 
-  let selector = {};
+  let selector: MongoQuery = {};
 
-  if (queryParams.selector) {
-    selector = queryParams.selector;
+  // `selector` is not a declared QueryParams field; this pre-existing read
+  // yields undefined unless a caller attached one, hence `any`.
+  if ((queryParams as any).selector) {
+    selector = (queryParams as any).selector;
   } else {
-    const boardsSelector = {};
+    const boardsSelector: MongoQuery = {};
 
-    let archived = false;
-    let endAt = null;
+    let archived: boolean | null = false;
+    let endAt: MongoQuery | null = null;
     if (queryParams.hasOperator(OPERATOR_STATUS)) {
-      queryParams.getPredicates(OPERATOR_STATUS).forEach(status => {
+      queryParams.getPredicates(OPERATOR_STATUS).forEach((status: string) => {
         if (status === PREDICATE_ARCHIVED) {
           archived = true;
         } else if (status === PREDICATE_ALL) {
@@ -386,7 +391,7 @@ async function buildSelector(queryParams, userId) {
     }
 
     if (queryParams.hasOperator(OPERATOR_ORG)) {
-      const orgs = [];
+      const orgs: string[] = [];
       for (const name of queryParams.getPredicates(OPERATOR_ORG)) {
         const org = await ReactiveCache.getOrg({
           $or: [
@@ -408,7 +413,7 @@ async function buildSelector(queryParams, userId) {
     }
 
     if (queryParams.hasOperator(OPERATOR_TEAM)) {
-      const teams = [];
+      const teams: string[] = [];
       for (const name of queryParams.getPredicates(OPERATOR_TEAM)) {
         const team = await ReactiveCache.getTeam({
           $or: [
@@ -438,30 +443,30 @@ async function buildSelector(queryParams, userId) {
     if (archived !== null) {
       if (archived) {
         selector.boardId = {
-          $in: await Boards.userBoardIds(userId, null, boardsSelector),
+          $in: await (Boards as any).userBoardIds(userId, null, boardsSelector),
         };
         selector.$and.push({
           $or: [
             {
               boardId: {
-                $in: await Boards.userBoardIds(userId, archived, boardsSelector),
+                $in: await (Boards as any).userBoardIds(userId, archived, boardsSelector),
               },
             },
-            { swimlaneId: { $in: Swimlanes.userArchivedSwimlaneIds(userId) } },
-            { listId: { $in: Lists.userArchivedListIds(userId) } },
+            { swimlaneId: { $in: (Swimlanes as any).userArchivedSwimlaneIds(userId) } },
+            { listId: { $in: (Lists as any).userArchivedListIds(userId) } },
             { archived: true },
           ],
         });
       } else {
         selector.boardId = {
-          $in: await Boards.userBoardIds(userId, false, boardsSelector),
+          $in: await (Boards as any).userBoardIds(userId, false, boardsSelector),
         };
-        selector.swimlaneId = { $nin: await Swimlanes.archivedSwimlaneIds() };
-        selector.listId = { $nin: await Lists.archivedListIds() };
+        selector.swimlaneId = { $nin: await (Swimlanes as any).archivedSwimlaneIds() };
+        selector.listId = { $nin: await (Lists as any).archivedListIds() };
         selector.archived = false;
       }
     } else {
-      const userBoardIds = await Boards.userBoardIds(userId, null, boardsSelector);
+      const userBoardIds = await (Boards as any).userBoardIds(userId, null, boardsSelector);
       selector.boardId = {
         $in: userBoardIds,
       };
@@ -471,13 +476,13 @@ async function buildSelector(queryParams, userId) {
     }
 
     if (queryParams.hasOperator(OPERATOR_BOARD)) {
-      const queryBoards = [];
+      const queryBoards: string[] = [];
       for (const query of queryParams.getPredicates(OPERATOR_BOARD)) {
-        const boards = await Boards.userSearch(userId, {
+        const boards = await (Boards as any).userSearch(userId, {
           title: new RegExp(escapeForRegex(query), 'i'),
         });
         if (boards.length) {
-          boards.forEach(board => {
+          boards.forEach((board: { _id: string }) => {
             queryBoards.push(board._id);
           });
         } else {
@@ -489,13 +494,13 @@ async function buildSelector(queryParams, userId) {
     }
 
     if (queryParams.hasOperator(OPERATOR_SWIMLANE)) {
-      const querySwimlanes = [];
+      const querySwimlanes: string[] = [];
       for (const query of queryParams.getPredicates(OPERATOR_SWIMLANE)) {
         const swimlanes = await ReactiveCache.getSwimlanes({
           title: new RegExp(escapeForRegex(query), 'i'),
         });
         if (swimlanes.length) {
-          swimlanes.forEach(swim => {
+          swimlanes.forEach((swim: { _id: string }) => {
             querySwimlanes.push(swim._id);
           });
         } else {
@@ -511,13 +516,13 @@ async function buildSelector(queryParams, userId) {
     }
 
     if (queryParams.hasOperator(OPERATOR_LIST)) {
-      const queryLists = [];
+      const queryLists: string[] = [];
       for (const query of queryParams.getPredicates(OPERATOR_LIST)) {
         const lists = await ReactiveCache.getLists({
           title: new RegExp(escapeForRegex(query), 'i'),
         });
         if (lists.length) {
-          lists.forEach(list => {
+          lists.forEach((list: { _id: string }) => {
             queryLists.push(list._id);
           });
         } else {
@@ -533,15 +538,15 @@ async function buildSelector(queryParams, userId) {
     }
 
     if (queryParams.hasOperator(OPERATOR_COMMENT)) {
-      const commentsFound = typeof CardComments.textSearch === 'function' ? await CardComments.textSearch(
+      const commentsFound = typeof (CardComments as any).textSearch === 'function' ? await (CardComments as any).textSearch(
         userId,
         queryParams.getPredicates(OPERATOR_COMMENT),
       ) : [];
-      const cardIds = commentsFound.map(com => com.cardId);
+      const cardIds = commentsFound.map((com: { cardId: string }) => com.cardId);
       if (cardIds.length) {
         selector._id = { $in: cardIds };
       } else {
-        queryParams.getPredicates(OPERATOR_COMMENT).forEach(comment => {
+        queryParams.getPredicates(OPERATOR_COMMENT).forEach((comment: string) => {
           errors.addNotFound(OPERATOR_COMMENT, comment);
         });
       }
@@ -555,13 +560,13 @@ async function buildSelector(queryParams, userId) {
       }
     });
 
-    const queryUsers = {};
+    const queryUsers: MongoQuery = {};
     queryUsers[OPERATOR_ASSIGNEE] = [];
     queryUsers[OPERATOR_MEMBER] = [];
     queryUsers[OPERATOR_CREATOR] = [];
 
     if (queryParams.hasOperator(OPERATOR_USER)) {
-      const users = [];
+      const users: string[] = [];
       for (const username of queryParams.getPredicates(OPERATOR_USER)) {
         const user = await ReactiveCache.getUser({ username });
         if (user) {
@@ -579,7 +584,7 @@ async function buildSelector(queryParams, userId) {
 
     for (const key of [OPERATOR_MEMBER, OPERATOR_ASSIGNEE, OPERATOR_CREATOR]) {
       if (queryParams.hasOperator(key)) {
-        const users = [];
+        const users: string[] = [];
         for (const username of queryParams.getPredicates(key)) {
           const user = await ReactiveCache.getUser({ username });
           if (user) {
@@ -595,14 +600,14 @@ async function buildSelector(queryParams, userId) {
     }
 
     if (queryParams.hasOperator(OPERATOR_LABEL)) {
-      const queryLabels = [];
+      const queryLabels: string[] = [];
       for (const label of queryParams.getPredicates(OPERATOR_LABEL)) {
-        let boards = await Boards.userBoards(userId, null, {
+        let boards = await (Boards as any).userBoards(userId, null, {
           labels: { $elemMatch: { color: label.toLowerCase() } },
         });
 
         if (boards.length) {
-          boards.forEach(board => {
+          boards.forEach((board: BoardLabelsDoc) => {
             board.labels
               .filter(boardLabel => {
                 return boardLabel.color === label.toLowerCase();
@@ -613,12 +618,12 @@ async function buildSelector(queryParams, userId) {
           });
         } else {
           const reLabel = new RegExp(escapeForRegex(label), 'i');
-          boards = await Boards.userBoards(userId, null, {
+          boards = await (Boards as any).userBoards(userId, null, {
             labels: { $elemMatch: { name: reLabel } },
           });
 
           if (boards.length) {
-            boards.forEach(board => {
+            boards.forEach((board: BoardLabelsDoc) => {
               board.labels
                 .filter(boardLabel => {
                   if (!boardLabel.name) {
@@ -647,7 +652,7 @@ async function buildSelector(queryParams, userId) {
             selector.$and.push({
               _id: {
                 $in: (await ReactiveCache.getAttachments({}, { fields: { cardId: 1 } })).map(
-                  a => a.cardId,
+                  (a: { cardId: string }) => a.cardId,
                 ),
               },
             });
@@ -656,7 +661,7 @@ async function buildSelector(queryParams, userId) {
             selector.$and.push({
               _id: {
                 $in: (await ReactiveCache.getChecklists({}, { fields: { cardId: 1 } })).map(
-                  a => a.cardId,
+                  (a: { cardId: string }) => a.cardId,
                 ),
               },
             });
@@ -694,7 +699,7 @@ async function buildSelector(queryParams, userId) {
         {
           $or: [
             { title: regex },
-            { _id: { $in: items.map(item => item.checklistId) } },
+            { _id: { $in: items.map((item: { checklistId: string }) => item.checklistId) } },
           ],
         },
         { fields: { cardId: 1 } },
@@ -714,14 +719,14 @@ async function buildSelector(queryParams, userId) {
         { fields: { cardId: 1 } },
       );
 
-      let cardsSelector = [
+      let cardsSelector: MongoQuery[] = [
           { title: regex },
           { description: regex },
           { customFields: { $elemMatch: { value: regex } } },
-          { _id: { $in: checklists.map(list => list.cardId) } },
-          { _id: { $in: attachments.map(attach => attach.cardId) } },
+          { _id: { $in: checklists.map((list: { cardId: string }) => list.cardId) } },
+          { _id: { $in: attachments.map((attach: { cardId: string }) => attach.cardId) } },
           // #5910: include cards whose comment text matches (board-scoped).
-          { _id: { $in: comments.map(com => com.cardId) } },
+          { _id: { $in: comments.map((com: { cardId: string }) => com.cardId) } },
         ];
       if (queryParams.text === "false" || queryParams.text === "true") {
         cardsSelector.push({ customFields: { $elemMatch: { value: queryParams.text === "true" } } } );
@@ -730,18 +735,18 @@ async function buildSelector(queryParams, userId) {
     }
 
     if (queryParams.hasOperator(OPERATOR_TITLE)) {
-      const regexes = queryParams.getPredicates(OPERATOR_TITLE).map(t => new RegExp(escapeForRegex(t), 'i'));
-      selector.$and.push({ $or: regexes.map(regex => ({ title: regex })) });
+      const regexes = queryParams.getPredicates(OPERATOR_TITLE).map((t: string) => new RegExp(escapeForRegex(t), 'i'));
+      selector.$and.push({ $or: regexes.map((regex: RegExp) => ({ title: regex })) });
     }
 
     if (queryParams.hasOperator(OPERATOR_DESCRIPTION)) {
-      const regexes = queryParams.getPredicates(OPERATOR_DESCRIPTION).map(t => new RegExp(escapeForRegex(t), 'i'));
-      selector.$and.push({ $or: regexes.map(regex => ({ description: regex })) });
+      const regexes = queryParams.getPredicates(OPERATOR_DESCRIPTION).map((t: string) => new RegExp(escapeForRegex(t), 'i'));
+      selector.$and.push({ $or: regexes.map((regex: RegExp) => ({ description: regex })) });
     }
 
     if (queryParams.hasOperator(OPERATOR_CUSTOMFIELD)) {
-      const regexes = queryParams.getPredicates(OPERATOR_CUSTOMFIELD).map(t => new RegExp(escapeForRegex(t), 'i'));
-      selector.$and.push({ $or: regexes.map(regex => ({ customFields: { $elemMatch: { value: regex } } })) });
+      const regexes = queryParams.getPredicates(OPERATOR_CUSTOMFIELD).map((t: string) => new RegExp(escapeForRegex(t), 'i'));
+      selector.$and.push({ $or: regexes.map((regex: RegExp) => ({ customFields: { $elemMatch: { value: regex } } })) });
     }
 
     if (queryParams.hasOperator(OPERATOR_ATTACHMENT_TEXT)) {
@@ -749,7 +754,7 @@ async function buildSelector(queryParams, userId) {
         const regex = new RegExp(escapeForRegex(t), 'i');
         const attachments = await ReactiveCache.getAttachments({ 'original.name': regex });
         if (attachments.length) {
-          selector.$and.push({ _id: { $in: attachments.map(attach => attach.cardId) } });
+          selector.$and.push({ _id: { $in: attachments.map((attach: { cardId: string }) => attach.cardId) } });
         } else {
           selector.$and.push({ _id: null });
         }
@@ -767,13 +772,13 @@ async function buildSelector(queryParams, userId) {
           {
             $or: [
               { title: regex },
-              { _id: { $in: items.map(item => item.checklistId) } },
+              { _id: { $in: items.map((item: { checklistId: string }) => item.checklistId) } },
             ],
           },
           { fields: { cardId: 1 } },
         );
         if (checklists.length) {
-          selector.$and.push({ _id: { $in: checklists.map(list => list.cardId) } });
+          selector.$and.push({ _id: { $in: checklists.map((list: { cardId: string }) => list.cardId) } });
         } else {
           selector.$and.push({ _id: null });
         }
@@ -793,14 +798,16 @@ async function buildSelector(queryParams, userId) {
   return query;
 }
 
-function buildProjection(query) {
+function buildProjection(query: Query) {
 
   let skip = 0;
-  if (query.getQueryParams().skip) {
-    skip = query.getQueryParams().skip;
+  // `skip` is not a declared QueryParams field; this pre-existing read yields
+  // undefined at runtime (skip is carried on the projection instead), hence `any`.
+  if ((query.getQueryParams() as any).skip) {
+    skip = (query.getQueryParams() as any).skip;
   }
   let limit = DEFAULT_LIMIT;
-  const configLimit = parseInt(process.env.RESULTS_PER_PAGE, 10);
+  const configLimit = parseInt(process.env.RESULTS_PER_PAGE || '', 10);
   if (!isNaN(configLimit) && configLimit > 0) {
     limit = configLimit;
   }
@@ -809,7 +816,7 @@ function buildProjection(query) {
     limit = query.getQueryParams().getPredicate(OPERATOR_LIMIT);
   }
 
-  const projection = {
+  const projection: MongoQuery = {
     fields: {
       _id: 1,
       archived: 1,
@@ -895,18 +902,20 @@ function buildProjection(query) {
   return query;
 }
 
-async function buildQuery(queryParams, userId) {
+async function buildQuery(queryParams: QueryParams, userId: string) {
   const query = await buildSelector(queryParams, userId);
 
   return buildProjection(query);
 }
 
-Meteor.publish('brokenCards', async function(sessionId) {
+Meteor.publish('brokenCards', async function(sessionId: string) {
   check(sessionId, String);
 
   const params = new QueryParams();
   params.addPredicate(OPERATOR_STATUS, PREDICATE_ALL);
-  const query = await buildQuery(params, this.userId);
+  // `this.userId` is `string | null`; the query helpers accept the null at
+  // runtime (an unauthenticated subscription simply matches no boards).
+  const query = await buildQuery(params, this.userId as string);
   query.selector.$or = [
     { boardId: { $in: [null, ''] } },
     { swimlaneId: { $in: [null, ''] } },
@@ -914,36 +923,36 @@ Meteor.publish('brokenCards', async function(sessionId) {
     { type: { $nin: CARD_TYPES } },
   ];
 
-  const { cursors: brokenCursors, sessionData: brokenSessionData } = await findCards(sessionId, query, this.userId);
+  const { cursors: brokenCursors, sessionData: brokenSessionData } = await findCards(sessionId, query, this.userId as string);
   if (brokenSessionData) this.added('sessiondata', brokenSessionData._id, brokenSessionData);
   return brokenCursors;
 });
 
-Meteor.publish('nextPage', async function(sessionId) {
+Meteor.publish('nextPage', async function(sessionId: string) {
   check(sessionId, String);
 
   const session = await ReactiveCache.getSessionData({ sessionId });
   const projection = session.getProjection();
   projection.skip = session.lastHit;
 
-  const { cursors: nextCursors, sessionData: nextSessionData } = await findCards(sessionId, new Query(session.getSelector(), projection), this.userId);
+  const { cursors: nextCursors, sessionData: nextSessionData } = await findCards(sessionId, new Query(session.getSelector(), projection), this.userId as string);
   if (nextSessionData) this.added('sessiondata', nextSessionData._id, nextSessionData);
   return nextCursors;
 });
 
-Meteor.publish('previousPage', async function(sessionId) {
+Meteor.publish('previousPage', async function(sessionId: string) {
   check(sessionId, String);
 
   const session = await ReactiveCache.getSessionData({ sessionId });
   const projection = session.getProjection();
   projection.skip = session.lastHit - session.resultsCount - projection.limit;
 
-  const { cursors: prevCursors, sessionData: prevSessionData } = await findCards(sessionId, new Query(session.getSelector(), projection), this.userId);
+  const { cursors: prevCursors, sessionData: prevSessionData } = await findCards(sessionId, new Query(session.getSelector(), projection), this.userId as string);
   if (prevSessionData) this.added('sessiondata', prevSessionData._id, prevSessionData);
   return prevCursors;
 });
 
-async function findCards(sessionId, query, userId) {
+async function findCards(sessionId: string, query: Query, userId: string) {
   let textMatches = query.getQueryParams().text;
   let isTextSearch = !!textMatches;
   let dbProjection = query.projection;
@@ -955,26 +964,26 @@ async function findCards(sessionId, query, userId) {
 
   let cards = await ReactiveCache.getCards(query.selector, dbProjection, true);
   let totalCardsCount = cards ? (typeof cards.countAsync === 'function' ? await cards.countAsync() : cards.count()) : 0;
-  let orderedIds = [];
+  let orderedIds: string[] = [];
 
   if (isTextSearch && totalCardsCount > 0) {
     let fetched = typeof cards.fetchAsync === 'function' ? await cards.fetchAsync() : cards.fetch();
     const regex = new RegExp(escapeForRegex(textMatches), 'i');
-    fetched.forEach(c => {
+    fetched.forEach((c: SearchCardDoc) => {
       c._score = 0;
       if (c.title && regex.test(c.title)) c._score += 10;
       else if (c.description && regex.test(c.description)) c._score += 5;
       else if (c.customFields && c.customFields.some(f => f.value && regex.test(String(f.value)))) c._score += 1;
     });
-    fetched.sort((a, b) => {
-      if (b._score !== a._score) return b._score - a._score;
+    fetched.sort((a: SearchCardDoc, b: SearchCardDoc) => {
+      if (b._score !== a._score) return (b._score ?? 0) - (a._score ?? 0);
       return (a.title || '').localeCompare(b.title || '');
     });
 
     const skip = query.projection.skip || 0;
     const limit = query.projection.limit || 25;
     const page = fetched.slice(skip, skip + limit);
-    orderedIds = page.map(c => c._id);
+    orderedIds = page.map((c: { _id: string }) => c._id);
 
     // override the cursor to only contain the paginated results for this page
     cards = await ReactiveCache.getCards({ _id: { $in: orderedIds } }, { fields: query.projection.fields }, true);
@@ -987,9 +996,9 @@ async function findCards(sessionId, query, userId) {
       totalHits: 0,
       lastHit: 0,
       resultsCount: 0,
-      cards: [],
-      selector: SessionData.pickle(query.selector),
-      projection: SessionData.pickle(query.projection),
+      cards: [] as string[],
+      selector: (SessionData as any).pickle(query.selector),
+      projection: (SessionData as any).pickle(query.projection),
       errors: query.errors(),
       modifiedAt: new Date()
     },
@@ -1007,7 +1016,7 @@ async function findCards(sessionId, query, userId) {
       update.$set.cards = orderedIds;
     } else {
       const cardArray = typeof cards.fetchAsync === 'function' ? await cards.fetchAsync() : cards.fetch();
-      update.$set.cards = cardArray.map(card => card._id);
+      update.$set.cards = cardArray.map((card: { _id: string }) => card._id);
     }
     update.$set.resultsCount = update.$set.cards.length;
   }
@@ -1034,16 +1043,16 @@ async function findCards(sessionId, query, userId) {
   }
 
   if (cards && totalCardsCount > 0) {
-    const boards = [];
-    const swimlanes = [];
-    const lists = [];
-    const customFieldIds = [];
+    const boards: string[] = [];
+    const swimlanes: string[] = [];
+    const lists: string[] = [];
+    const customFieldIds: string[] = [];
     const users = [userId];
 
     const cardArray = typeof cards.fetchAsync === 'function' ? await cards.fetchAsync() : cards.fetch();
-    const cardIds = cardArray.map(c => c._id);
+    const cardIds = cardArray.map((c: { _id: string }) => c._id);
 
-    cardArray.forEach(card => {
+    cardArray.forEach((card: SearchCardDoc) => {
       if (card.boardId) boards.push(card.boardId);
       if (card.swimlaneId) swimlanes.push(card.swimlaneId);
       if (card.listId) lists.push(card.listId);
@@ -1083,7 +1092,7 @@ async function findCards(sessionId, query, userId) {
         await ReactiveCache.getSwimlanes({ _id: { $in: swimlanes } }, { fields: { ...fields, color: 1 } }, true),
         await ReactiveCache.getLists({ _id: { $in: lists } }, { fields: { ...fields, color: 1 } }, true),
         await ReactiveCache.getCustomFields({ _id: { $in: customFieldIds } }, {}, true),
-        await ReactiveCache.getUsers({ _id: { $in: users } }, { fields: Users.safeFields }, true),
+        await ReactiveCache.getUsers({ _id: { $in: users } }, { fields: (Users as any).safeFields }, true),
         await ReactiveCache.getChecklists({ cardId: { $in: cardIds } }, {}, true),
         await ReactiveCache.getChecklistItems({ cardId: { $in: cardIds } }, {}, true),
         attachmentsResult.cursor || attachmentsResult,
@@ -1103,7 +1112,7 @@ async function findCards(sessionId, query, userId) {
 // board/swimlane/list/member context. Uses plain server-side limit/skip just
 // like the org/team/people admin lists, so only the current page is ever sent
 // to the browser instead of the whole Cards collection.
-Meteor.publish('cardsReport', async function(searchTerm = '', limit, skip = 0) {
+Meteor.publish('cardsReport', async function(searchTerm: string | null | undefined = '', limit: number, skip: number | null | undefined = 0) {
   check(searchTerm, Match.OneOf(String, null, undefined));
   check(limit, Number);
   check(skip, Match.OneOf(Number, null, undefined));
@@ -1111,7 +1120,7 @@ Meteor.publish('cardsReport', async function(searchTerm = '', limit, skip = 0) {
     return this.ready();
   }
 
-  const query = {};
+  const query: MongoQuery = {};
   if (searchTerm) {
     query.title = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
   }
@@ -1122,11 +1131,11 @@ Meteor.publish('cardsReport', async function(searchTerm = '', limit, skip = 0) {
     true,
   );
 
-  const boardIds = new Set();
-  const listIds = new Set();
-  const swimlaneIds = new Set();
-  const userIds = new Set();
-  cards.forEach(card => {
+  const boardIds = new Set<string>();
+  const listIds = new Set<string>();
+  const swimlaneIds = new Set<string>();
+  const userIds = new Set<string>();
+  cards.forEach((card: CardReportDoc) => {
     if (card.boardId) boardIds.add(card.boardId);
     if (card.listId) listIds.add(card.listId);
     if (card.swimlaneId) swimlaneIds.add(card.swimlaneId);
@@ -1139,17 +1148,17 @@ Meteor.publish('cardsReport', async function(searchTerm = '', limit, skip = 0) {
     await ReactiveCache.getBoards({ _id: { $in: [...boardIds] } }, { fields: { title: 1 } }, true),
     await ReactiveCache.getLists({ _id: { $in: [...listIds] } }, { fields: { title: 1 } }, true),
     await ReactiveCache.getSwimlanes({ _id: { $in: [...swimlaneIds] } }, { fields: { title: 1 } }, true),
-    await ReactiveCache.getUsers({ _id: { $in: [...userIds] } }, { fields: Users.safeFields }, true),
+    await ReactiveCache.getUsers({ _id: { $in: [...userIds] } }, { fields: (Users as any).safeFields }, true),
   ];
 });
 
 Meteor.methods({
-  async getCardsReportCount(searchTerm = '') {
+  async getCardsReportCount(searchTerm: string | null | undefined = '') {
     check(searchTerm, Match.OneOf(String, null, undefined));
     if (!this.userId || !(await ReactiveCache.getUser(this.userId))?.isAdmin) {
       throw new Meteor.Error('not-authorized');
     }
-    const query = {};
+    const query: MongoQuery = {};
     if (searchTerm) {
       query.title = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     }
@@ -1157,3 +1166,49 @@ Meteor.methods({
     return typeof cursor.countAsync === 'function' ? await cursor.countAsync() : cursor.count();
   },
 });
+
+// A custom-field entry on a card; `value` may hold any supported field value
+// type (text, number, date, boolean, dropdown id), hence `any`.
+interface CardCustomFieldRef {
+  _id: string;
+  value?: any;
+}
+
+// A card document read back from the Cards collection for search-result scoring
+// and cursor assembly; `_score` is a synthetic ranking field added at runtime
+// during text search.
+interface SearchCardDoc {
+  _id: string;
+  _score?: number;
+  title?: string;
+  description?: string;
+  boardId?: string;
+  swimlaneId?: string;
+  listId?: string;
+  userId?: string;
+  members?: string[];
+  assignees?: string[];
+  customFields?: CardCustomFieldRef[];
+}
+
+// A board label, matched by color or name when resolving label search operators.
+interface BoardLabelRef {
+  _id: string;
+  color?: string;
+  name?: string;
+}
+
+// A board document exposing just its labels, used when resolving label queries.
+interface BoardLabelsDoc {
+  labels: BoardLabelRef[];
+}
+
+// A card document for the admin cards report, referenced only for its board /
+// list / swimlane context and member/assignee ids.
+interface CardReportDoc {
+  boardId?: string;
+  listId?: string;
+  swimlaneId?: string;
+  members?: string[];
+  assignees?: string[];
+}

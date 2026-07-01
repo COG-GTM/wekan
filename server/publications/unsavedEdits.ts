@@ -1,3 +1,4 @@
+import { Meteor } from 'meteor/meteor';
 import UnsavedEditCollection from '/models/unsavedEdits';
 
 Meteor.publish('unsaved-edits', function() {

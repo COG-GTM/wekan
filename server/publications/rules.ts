@@ -1,10 +1,12 @@
+import { Meteor } from 'meteor/meteor';
+import { check, Match } from 'meteor/check';
 import Boards from '/models/boards';
 import Actions from '/models/actions';
 import Triggers from '/models/triggers';
 import Rules from '/models/rules';
 import { ReactiveCache } from '/imports/reactiveCache';
 
-Meteor.publish('rules', async function(ruleId) {
+Meteor.publish('rules', async function(ruleId: string) {
   check(ruleId, String);
 
   if (!this.userId) {
@@ -35,7 +37,7 @@ Meteor.publish('rules', async function(ruleId) {
 // actions, for anyone who can see the board (not just global admins). This backs
 // the fullscreen Rules page, the workflow view, the board/card buttons and the
 // rules-list editor.
-Meteor.publish('boardRules', async function(boardId) {
+Meteor.publish('boardRules', async function(boardId: string) {
   check(boardId, String);
   if (!this.userId) {
     return this.ready();
@@ -78,7 +80,7 @@ Meteor.publish('allActions', async function() {
   return ret;
 });
 
-Meteor.publish('rulesReport', async function(searchTerm = '', limit, skip = 0) {
+Meteor.publish('rulesReport', async function(searchTerm: string | null | undefined = '', limit: number, skip: number | null | undefined = 0) {
   check(searchTerm, Match.OneOf(String, null, undefined));
   check(limit, Number);
   check(skip, Match.OneOf(Number, null, undefined));
@@ -86,7 +88,7 @@ Meteor.publish('rulesReport', async function(searchTerm = '', limit, skip = 0) {
     return this.ready();
   }
 
-  const query = {};
+  const query: MongoQuery = {};
   if (searchTerm) {
     query.title = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
   }
@@ -96,11 +98,11 @@ Meteor.publish('rulesReport', async function(searchTerm = '', limit, skip = 0) {
     { sort: { boardId: 1 }, limit, skip: skip || 0 },
     true,
   );
-  const actionIds = [];
-  const triggerIds = [];
-  const boardIds = [];
+  const actionIds: string[] = [];
+  const triggerIds: string[] = [];
+  const boardIds: string[] = [];
 
-  rules.forEach(rule => {
+  rules.forEach((rule: RuleReportDoc) => {
     actionIds.push(rule.actionId);
     triggerIds.push(rule.triggerId);
     boardIds.push(rule.boardId);
@@ -116,12 +118,12 @@ Meteor.publish('rulesReport', async function(searchTerm = '', limit, skip = 0) {
 });
 
 Meteor.methods({
-  async getRulesReportCount(searchTerm = '') {
+  async getRulesReportCount(searchTerm: string | null | undefined = '') {
     check(searchTerm, Match.OneOf(String, null, undefined));
     if (!this.userId || !(await ReactiveCache.getUser(this.userId)).isAdmin) {
       throw new Meteor.Error('not-authorized');
     }
-    const query = {};
+    const query: MongoQuery = {};
     if (searchTerm) {
       query.title = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     }
@@ -129,3 +131,11 @@ Meteor.methods({
     return typeof cursor.countAsync === 'function' ? await cursor.countAsync() : cursor.count();
   },
 });
+
+// A rule document as consumed by the rulesReport publication: it links a board
+// to its trigger and action documents by id.
+interface RuleReportDoc {
+  actionId: string;
+  triggerId: string;
+  boardId: string;
+}

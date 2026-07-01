@@ -1,3 +1,4 @@
+import { Meteor } from 'meteor/meteor';
 import Announcements from '/models/announcements';
 
 Meteor.publish('announcements', function() {

@@ -1,3 +1,4 @@
+import { Meteor } from 'meteor/meteor';
 import Settings from '/models/settings';
 
 // Publish custom UI configuration

@@ -1,3 +1,4 @@
+import { Meteor } from 'meteor/meteor';
 import { CronJobStatus } from '/server/cronJobStorage';
 import Users from '/models/users';
 

@@ -1,3 +1,4 @@
+import { Meteor } from 'meteor/meteor';
 import TrelloImportJobs from '/models/trelloImportJobs';
 
 // Publish the current user's recent Trello import jobs so the import page can
