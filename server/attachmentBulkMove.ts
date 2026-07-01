@@ -60,7 +60,7 @@ const controller = {
   cancelled: false,
 };
 
-function sleep(ms) {
+function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
@@ -72,7 +72,7 @@ function getDb() {
   return db;
 }
 
-async function setStatus(fields) {
+async function setStatus(fields: StatusFields) {
   await AttachmentBulkMoveStatus.upsertAsync(
     { _id: STATUS_ID },
     { $set: { ...fields, updatedAt: new Date() } },
@@ -101,7 +101,7 @@ Meteor.startup(async () => {
   }
 });
 
-async function requireAdmin(userId) {
+async function requireAdmin(userId: string | null | undefined) {
   if (!userId) {
     throw new Meteor.Error('not-authorized', 'Must be logged in');
   }
@@ -112,7 +112,7 @@ async function requireAdmin(userId) {
   return user;
 }
 
-function collectionConfigs(scope) {
+function collectionConfigs(scope: string) {
   const attachments = { coll: 'attachments', Collection: Attachments, factory: attachmentsFactory };
   const avatars = { coll: 'avatars', Collection: Avatars, factory: avatarsFactory };
   if (scope === 'both') return [attachments, avatars];
@@ -122,7 +122,7 @@ function collectionConfigs(scope) {
 
 // Whether a backend is usable as a read source given admin settings. Filesystem,
 // GridFS and CollectionFS default to enabled; cloud must be configured/enabled.
-function storageReadable(settings, name) {
+function storageReadable(settings: StorageSettings | null | undefined, name: string) {
   if (settings && typeof settings.isStorageReadEnabled === 'function' && !settings.isStorageReadEnabled(name)) {
     return false;
   }
@@ -132,7 +132,7 @@ function storageReadable(settings, name) {
   return true;
 }
 
-function storageWritable(settings, name) {
+function storageWritable(settings: StorageSettings | null | undefined, name: string) {
   if (settings && typeof settings.isStorageWriteEnabled === 'function' && !settings.isStorageWriteEnabled(name)) {
     return false;
   }
@@ -143,7 +143,7 @@ function storageWritable(settings, name) {
 }
 
 // Resolve where a Meteor-Files document's original version currently lives.
-function resolveDocStorage(cfg, doc) {
+function resolveDocStorage(cfg: CollectionConfig, doc: any) {
   try {
     return cfg.factory.getFileStrategy(doc, 'original').getStorageName();
   } catch (error) {
@@ -151,14 +151,15 @@ function resolveDocStorage(cfg, doc) {
   }
 }
 
-async function readStrategyBuffer(strategy) {
+// `strategy` is an untyped fileStoreStrategy instance from the models layer.
+async function readStrategyBuffer(strategy: any) {
   const stream = strategy.getReadStream();
   if (!stream) {
     throw new Error('source file not found in storage');
   }
-  return await new Promise((resolve, reject) => {
-    const chunks = [];
-    stream.on('data', c => chunks.push(c));
+  return await new Promise<Buffer>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    stream.on('data', (c: Buffer) => chunks.push(c));
     stream.on('end', () => resolve(Buffer.concat(chunks)));
     stream.on('error', reject);
   });
@@ -166,8 +167,8 @@ async function readStrategyBuffer(strategy) {
 
 // Build the list of items to move for one collection, honoring the source
 // selection and (for 'all') the Read-enabled/working backends.
-async function buildItems(cfg, source, settings) {
-  const items = [];
+async function buildItems(cfg: CollectionConfig, source: string, settings: StorageSettings | null | undefined) {
+  const items: MoveItem[] = [];
 
   // CollectionFS records (separate metadata collection + bucket).
   if ((source === STORAGE_NAME_COLLECTIONFS || source === 'all') &&
@@ -204,7 +205,7 @@ async function buildItems(cfg, source, settings) {
 
 // Create a Meteor-Files document on the filesystem from a buffer, in the exact
 // shape the app produces on upload. Returns the new _id.
-async function createMeteorFilesDocFromBuffer(cfg, info) {
+async function createMeteorFilesDocFromBuffer(cfg: CollectionConfig, info: DocFromBufferInfo) {
   const { ObjectId } = MongoInternals.NpmModule;
   const newId = new ObjectId().toString();
   const name = info.name || newId;
@@ -262,7 +263,7 @@ async function createMeteorFilesDocFromBuffer(cfg, info) {
 }
 
 // Repoint references after a file's _id changes (cross-format move).
-async function remapReferences(cfg, oldId, newId) {
+async function remapReferences(cfg: CollectionConfig, oldId: string | undefined, newId: string | undefined) {
   if (!oldId || !newId || oldId === newId) {
     return;
   }
@@ -288,7 +289,7 @@ async function remapReferences(cfg, oldId, newId) {
 }
 
 // Move a single item to the destination backend.
-async function moveItem(item, dest) {
+async function moveItem(item: MoveItem, dest: string) {
   const cfg = item.cfg;
 
   // Source is legacy CollectionFS.
@@ -296,7 +297,9 @@ async function moveItem(item, dest) {
     if (dest === STORAGE_NAME_COLLECTIONFS) {
       return; // already there
     }
-    const buffer = await readCollectionFsBuffer(item);
+    // In this branch `item` is a normalized CollectionFS record (spread from
+    // listCollectionFsRecords); MoveItem widens those fields to optional.
+    const buffer = await readCollectionFsBuffer(item as object as Parameters<typeof readCollectionFsBuffer>[0]);
     const newId = await createMeteorFilesDocFromBuffer(cfg, {
       buffer,
       name: item.name,
@@ -314,7 +317,7 @@ async function moveItem(item, dest) {
       }
     }
     await remapReferences(cfg, item.sourceId, newId);
-    await deleteCollectionFsRecord(cfg.coll, item.sourceId, item.gridFsKey);
+    await deleteCollectionFsRecord(cfg.coll, item.sourceId as string, item.gridFsKey);
     return;
   }
 
@@ -351,7 +354,7 @@ async function moveItem(item, dest) {
   await moveToStorage(doc, dest, cfg.factory);
 }
 
-async function runMigration(items, dest, source, scope) {
+async function runMigration(items: MoveItem[], dest: string, source: string, scope: string) {
   const total = items.length;
   try {
     for (let i = 0; i < total; i++) {
@@ -384,7 +387,7 @@ async function runMigration(items, dest, source, scope) {
     controller.paused = false;
     controller.cancelled = false;
     const finishedAt = new Date();
-    const finalStatus = {
+    const finalStatus: { [key: string]: any } = {
       running: false,
       paused: false,
       cancelled,
@@ -416,7 +419,7 @@ async function runMigration(items, dest, source, scope) {
 
 // Look up a Meteor-Files GridFS file by the metadata stamped on upload
 // (metadata.fileId = document _id; the GridFS bucket name equals the collection).
-async function findGridFsFile(coll, fileId, versionName) {
+async function findGridFsFile(coll: string, fileId: string, versionName: string) {
   const db = getDb();
   const files = db.collection(`${coll}.files`);
   let f = await files.findOne({ 'metadata.fileId': fileId, 'metadata.versionName': versionName });
@@ -428,7 +431,7 @@ async function findGridFsFile(coll, fileId, versionName) {
 
 // Best-effort check whether a version's binary exists on the filesystem; returns
 // the resolved path, or null.
-function findFilesystemFile(factory, doc, versionName) {
+function findFilesystemFile(factory: any, doc: any, versionName: string) {
   const v = (doc.versions && doc.versions[versionName]) || {};
   const storagePath = factory.storagePath;
   const candidates = [];
@@ -456,7 +459,7 @@ function findFilesystemFile(factory, doc, versionName) {
 // Authoritative "is this version readable on the filesystem?" check — reuses the
 // strategy's own (thorough) path resolution so the repair agrees with what a real
 // move/download would find, even when versions.<v>.path is stale.
-function strategyCanReadFilesystem(factory, doc, versionName) {
+function strategyCanReadFilesystem(factory: any, doc: any, versionName: string) {
   try {
     const strategy = factory.getFileStrategy(doc, versionName, STORAGE_NAME_FILESYSTEM);
     const rs = strategy.getReadStream();
@@ -475,8 +478,8 @@ function strategyCanReadFilesystem(factory, doc, versionName) {
   return false;
 }
 
-async function repairCollectionStorage(cfg) {
-  const result = { scanned: 0, repaired: 0, broken: 0, brokenItems: [] };
+async function repairCollectionStorage(cfg: CollectionConfig) {
+  const result: RepairResult = { scanned: 0, repaired: 0, broken: 0, brokenItems: [] };
   // Index the GridFS files by metadata.fileId so the per-file lookup below is a
   // point query rather than a collection scan (idempotent).
   try {
@@ -485,14 +488,14 @@ async function repairCollectionStorage(cfg) {
     // index may already exist or the bucket may not exist yet
   }
   const cursor = cfg.Collection.collection.find({}, { fields: { versions: 1, name: 1 } });
-  await cursor.forEachAsync(async doc => {
+  await cursor.forEachAsync(async (doc: any) => {
     const versions = doc.versions || {};
     for (const versionName of Object.keys(versions)) {
       result.scanned += 1;
       const v = versions[versionName] || {};
       const recorded = v.storage;
-      const set = {};
-      const unset = {};
+      const set: { [key: string]: any } = {};
+      const unset: { [key: string]: any } = {};
 
       const gfs = await findGridFsFile(cfg.coll, doc._id, versionName);
       if (gfs) {
@@ -528,7 +531,7 @@ async function repairCollectionStorage(cfg) {
         }
       }
 
-      const modifier = {};
+      const modifier: { $set?: { [key: string]: any }; $unset?: { [key: string]: any } } = {};
       if (Object.keys(set).length) modifier.$set = set;
       if (Object.keys(unset).length) modifier.$unset = unset;
       if (Object.keys(modifier).length) {
@@ -551,7 +554,7 @@ Meteor.methods({
         'A bulk attachment move is running; try the repair again after it finishes',
       );
     }
-    const summary = {};
+    const summary: { [key: string]: any } = {};
     for (const cfg of collectionConfigs('both')) {
       summary[cfg.coll] = await repairCollectionStorage(cfg);
     }
@@ -593,7 +596,7 @@ Meteor.methods({
 
     // Build the work list up front so we can return an accurate total (and show
     // the "nothing to move" message) before deferring the background job.
-    let items = [];
+    let items: MoveItem[] = [];
     for (const cfg of collectionConfigs(scope)) {
       items = items.concat(await buildItems(cfg, source, settings));
     }
@@ -705,3 +708,74 @@ Meteor.startup(() => {
     { $set: { running: false, paused: false, interrupted: true, updatedAt: new Date() } },
   ).catch(() => {});
 });
+
+// The persisted progress document (`attachmentBulkMoveStatus`, _id 'bulk') is a
+// schemaless status bag `$set` into Mongo, hence the index signature.
+interface StatusFields {
+  [key: string]: any;
+}
+
+// One collection's move configuration. `Collection` is the untyped Wekan
+// FilesCollection model and `factory` the untyped fileStoreStrategyFactory, both
+// from the not-yet-migrated models layer.
+interface CollectionConfig {
+  coll: string;
+  Collection: any;
+  factory: any;
+}
+
+// The AttachmentStorageSettings document, exposing the per-backend enablement
+// predicates this module consults. Methods are optional because a settings
+// document may be absent.
+interface StorageSettings {
+  isStorageReadEnabled?: (name: string) => boolean;
+  isStorageWriteEnabled?: (name: string) => boolean;
+  isStorageEnabled?: (name: string) => boolean;
+}
+
+// A single file queued for moving: either a legacy CollectionFS record (spread
+// from listCollectionFsRecords) or a Meteor-Files document. `doc` is the untyped
+// Meteor-Files document; the index signature covers CollectionFS record fields.
+interface MoveItem {
+  cfg: CollectionConfig;
+  backend?: string;
+  currentStorage?: string;
+  doc?: any;
+  name?: string;
+  size?: number;
+  type?: string;
+  meta?: { [key: string]: any };
+  userId?: string;
+  uploadedAt?: Date;
+  sourceId?: string;
+  gridFsKey?: any;
+  [key: string]: any;
+}
+
+// Inputs for createMeteorFilesDocFromBuffer.
+interface DocFromBufferInfo {
+  buffer: Buffer;
+  name?: string;
+  type?: string;
+  size?: number;
+  meta?: { [key: string]: any };
+  userId?: string;
+  uploadedAt?: Date;
+  migratedFromId?: string;
+}
+
+// A version whose recorded storage location could not be reconciled.
+interface BrokenItem {
+  id: string;
+  version: string;
+  recorded: string;
+  name: string;
+}
+
+// The outcome of repairCollectionStorage for one collection.
+interface RepairResult {
+  scanned: number;
+  repaired: number;
+  broken: number;
+  brokenItems: BrokenItem[];
+}
