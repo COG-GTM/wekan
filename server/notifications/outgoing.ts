@@ -7,14 +7,16 @@ import CardComments from '/models/cardComments';
 import Integrations from '/models/integrations';
 
 const Lock = {
-    _lock: {},
-    _timer: {},
+    // Maps a comment id to its current lock value: either the comment text
+    // (string) being echoed or a numeric sentinel.
+    _lock: {} as { [id: string]: string | number },
+    _timer: {} as { [id: string]: number },
     echoDelay: 500, // echo should be happening much faster
     normalDelay: 1e3, // normally user typed comment will be much slower
     ECHO: 2,
     NORMAL: 1,
     NULL: 0,
-    has(id, value) {
+    has(id: string, value: string | number) {
       const existing = this._lock[id];
       let ret = this.NULL;
       if (existing) {
@@ -22,14 +24,14 @@ const Lock = {
       }
       return ret;
     },
-    clear(id, delay) {
+    clear(id: string, delay: number) {
       const previous = this._timer[id];
       if (previous) {
         Meteor.clearTimeout(previous);
       }
       this._timer[id] = Meteor.setTimeout(() => this.unset(id), delay);
     },
-    set(id, value) {
+    set(id: string, value: string | number) {
       const state = this.has(id, value);
       let delay = this.normalDelay;
       if (state === this.ECHO) {
@@ -42,7 +44,7 @@ const Lock = {
       this._lock[id] = value;
       this.clear(id, delay); // always auto reset the locker after delay
     },
-    unset(id) {
+    unset(id: string) {
       delete this._lock[id];
     },
   };
@@ -64,14 +66,19 @@ const Lock = {
     'label',
     'attachmentId',
   ];
-  const responseFunc = async (data, integration) => {
+  // `data` is the untrusted JSON body returned by a webhook and `integration`
+  // is the caller-supplied integration document; both are dynamic shapes, hence
+  // `any`.
+  const responseFunc = async (data: any, integration: any) => {
     const paramCommentId = data.commentId;
     const paramCardId = data.cardId;
     const paramBoardId = data.boardId;
     const newComment = data.comment;
 
-    // Authorization: Verify the request is from a bidirectional webhook
-    if (!integration || integration.type !== Integrations.Const.TWOWAY) {
+    // Authorization: Verify the request is from a bidirectional webhook.
+    // `Integrations.Const` is a runtime static attached to the collection (see
+    // models/integrations), not part of the typed Mongo.Collection, hence `any`.
+    if (!integration || integration.type !== (Integrations as any).Const.TWOWAY) {
       return; // Only bidirectional webhooks can update comments
     }
 
@@ -102,11 +109,16 @@ const Lock = {
     }
   };
 Meteor.methods({
-    async outgoingWebhooks(integration, description, params) {
+    // `integration` and `params` are caller-supplied dynamic shapes (validated
+    // at runtime via `check` below), hence `any`.
+    async outgoingWebhooks(integration: any, description: string, params: any) {
       if (this.userId) {
-        check(integration, Object);
+        // `check(x, Object)` asserts `x is object`, which would strip the
+        // dynamic `any` shape these payloads need; casting the checked value to
+        // `object` keeps the runtime validation while preventing that narrowing.
+        check(integration as object, Object);
         check(description, String);
-        check(params, Object);
+        check(params as object, Object);
         this.unblock();
 
         // label activity did not work yet, see wekan/models/activities.js
@@ -151,7 +163,8 @@ Meteor.methods({
 
         if (text.length === 0) return;
 
-        const value = {
+        // Webhook payload assembled from a dynamic set of activity attributes.
+        const value: { [key: string]: any } = {
           text: `${text}`,
         };
 
@@ -160,9 +173,9 @@ Meteor.methods({
         });
         value.description = description;
         //integrations.forEach(integration => {
-        const is2way = integration.type === Integrations.Const.TWOWAY;
+        const is2way = integration.type === (Integrations as any).Const.TWOWAY;
         const token = integration.token || '';
-        const fetchHeaders = {
+        const fetchHeaders: { [key: string]: string } = {
           'Content-Type': 'application/json',
         };
         if (token) fetchHeaders['X-Wekan-Token'] = token;
@@ -203,14 +216,18 @@ Meteor.methods({
             headers: fetchHeaders,
             body: JSON.stringify(is2way ? { description, ...clonedParams } : value),
           });
-        } catch (err) {
+        } catch (err: any) {
+          // `err` is a thrown fetch/network error of unknown concrete type; we
+          // only read its `.message`, so it is typed `any`.
           throw new Meteor.Error(
             'invalid-webhook-url',
             `Webhook request failed: ${err.message}`,
           );
         }
 
-        if (response && response.status >= 200 && response.status < 300) {
+        // `SafeResponse.status` is typed optional, but fetchSafe always sets it
+        // on a resolved response; assert non-null to keep the original check.
+        if (response && response.status! >= 200 && response.status! < 300) {
           if (is2way) {
             // Only act on a JSON-encoded response body
             let data = null;

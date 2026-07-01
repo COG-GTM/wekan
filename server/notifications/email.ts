@@ -1,3 +1,5 @@
+import { Meteor } from 'meteor/meteor';
+import { Accounts } from 'meteor/accounts-base';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
 //var nodemailer = require('nodemailer');
@@ -75,7 +77,10 @@ Meteor.startup(() => {
         } catch (e) {
           return;
         }
-      }, process.env.EMAIL_NOTIFICATION_TIMEOUT || 30000);
+        // The env override is a numeric string that setTimeout coerces at
+        // runtime; narrow the `string | number` union to `number` for the typed
+        // Meteor.setTimeout signature without changing the runtime value.
+      }, (process.env.EMAIL_NOTIFICATION_TIMEOUT || 30000) as number);
     } catch (error) {
       console.error('Error preparing email notification:', error);
     }

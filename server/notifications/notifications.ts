@@ -8,19 +8,19 @@ import { ReactiveCache } from '/imports/reactiveCache';
 // - description, String, TAPi18n key
 // - params: Object, values extracted from context, to used for above two TAPi18n keys
 //   see example call to Notifications.notify() in models/activities.js
-const notifyServices = {};
+const notifyServices: { [serviceName: string]: NotifyCallback } = {};
 
 export const Notifications = {
-  subscribe: (serviceName, callback) => {
+  subscribe: (serviceName: string, callback: NotifyCallback) => {
     notifyServices[serviceName] = callback;
   },
 
-  unsubscribe: serviceName => {
+  unsubscribe: (serviceName: string) => {
     if (typeof notifyServices[serviceName] === 'function')
       delete notifyServices[serviceName];
   },
 
-  getUsers: async watchers => {
+  getUsers: async (watchers: string[]) => {
     const users = [];
     for (const userId of watchers) {
       const user = await ReactiveCache.getUser(userId);
@@ -29,7 +29,8 @@ export const Notifications = {
     return users;
   },
 
-  notify: (user, title, description, params) => {
+  // `user` is a Wekan user model instance (dynamic helper surface), hence `any`.
+  notify: (user: any, title: string, description: string, params: NotifyParams) => {
     // Skip if user is invalid
     if (!user || !user._id) return;
 
@@ -49,3 +50,20 @@ export const Notifications = {
     }
   },
 };
+
+// A notification's template params: a dynamic bag of context values (card/list/
+// board titles, urls, ids, etc.) interpolated into TAPi18n message keys. The
+// keys and value types vary per activity, hence the `any` index signature.
+export interface NotifyParams {
+  [key: string]: any;
+}
+
+// A notification delivery callback (email/web/profile/...). `user` is a Wekan
+// user model instance whose helper method surface varies per service, hence
+// `any`.
+export type NotifyCallback = (
+  user: any,
+  title: string,
+  description: string,
+  params: NotifyParams,
+) => void | Promise<void>;

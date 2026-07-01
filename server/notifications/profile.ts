@@ -1,3 +1,4 @@
+import { Meteor } from 'meteor/meteor';
 import { Notifications } from '/server/notifications/notifications';
 import Users from '/models/users';
 
