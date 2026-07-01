@@ -28,6 +28,7 @@ Package.describe({
 
 Package.onUse(function(api) {
   api.versionsFrom(['2.16', '3.0']);
+  api.use('typescript', ['client', 'server']);
   api.use('random', ['client', 'server']);
   api.use('accounts-base', ['client', 'server'], {weak: true});
   api.use('webapp', 'server');
@@ -37,8 +38,8 @@ Package.onUse(function(api) {
   api.use('check', 'server');
   api.use('ddp-server', 'server');
 
-  api.addFiles("client.js", "client");
-  api.addFiles("server.js", "server");
+  api.addFiles("client.ts", "client");
+  api.addFiles("server.ts", "server");
 
   api.export("SandstormAccounts", "client");
 });

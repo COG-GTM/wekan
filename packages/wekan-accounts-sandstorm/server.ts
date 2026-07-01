@@ -24,9 +24,9 @@ if (process.env.SANDSTORM) {
 }
 
 if (__meteor_runtime_config__.SANDSTORM) {
-  if (Package["accounts-base"]) {
+  if ((Package as SandstormPackageRegistry)["accounts-base"]) {
     // Highlander Mode: Disable all non-Sandstorm login mechanisms.
-    Package["accounts-base"].Accounts.validateLoginAttempt(function (attempt) {
+    (Package as SandstormPackageRegistry)["accounts-base"]!.Accounts.validateLoginAttempt(function (attempt) {
       if (!attempt.allowed) {
         return false;
       }
@@ -35,7 +35,7 @@ if (__meteor_runtime_config__.SANDSTORM) {
       }
       return true;
     });
-    Package["accounts-base"].Accounts.validateNewUser(function (user) {
+    (Package as SandstormPackageRegistry)["accounts-base"]!.Accounts.validateNewUser(function (user) {
       if (!user.services.sandstorm) {
         throw new Meteor.Error(403, "Non-Sandstorm login mechanisms disabled on Sandstorm.");
       }
@@ -43,10 +43,10 @@ if (__meteor_runtime_config__.SANDSTORM) {
     });
   }
 
-  var logins = {};
+  var logins: Logins = {};
   // Maps tokens to currently-waiting login method calls.
 
-  if (Package["accounts-base"]) {
+  if ((Package as SandstormPackageRegistry)["accounts-base"]) {
     Meteor.startup(async () => {
       await Meteor.users.createIndexAsync("services.sandstorm.id", {unique: 1, sparse: 1});
     });
@@ -77,10 +77,10 @@ if (__meteor_runtime_config__.SANDSTORM) {
   });
 
   Meteor.methods({
-    async loginWithSandstorm(token) {
+    async loginWithSandstorm(token: string) {
       check(token, String);
 
-      const loginPromise = new Promise((resolve, reject) => {
+      const loginPromise = new Promise<SandstormUserInfo>((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Meteor.Error("timeout", "Gave up waiting for login rendezvous XHR."));
         }, 10000);
@@ -88,7 +88,7 @@ if (__meteor_runtime_config__.SANDSTORM) {
         logins[token] = { resolve, reject, timeout };
       });
 
-      var info;
+      var info: SandstormUserInfo;
       try {
         info = await loginPromise;
       } finally {
@@ -107,10 +107,10 @@ if (__meteor_runtime_config__.SANDSTORM) {
       // Note that calling setUserId() with the same ID a second time still goes through the motions
       // of restarting all subscriptions, which is important if the permissions changed. Hopefully
       // Meteor won't decide to "optimize" this by returning early if the user ID hasn't changed.
-      this.connection._sandstormUser = info.sandstorm;
-      this.connection._sandstormSessionId = info.sessionId;
-      this.connection._sandstormTabId = info.tabId;
-      this.setUserId(info.userId);
+      this.connection!._sandstormUser = info.sandstorm;
+      this.connection!._sandstormSessionId = info.sessionId;
+      this.connection!._sandstormTabId = info.tabId;
+      this.setUserId(info.userId!);
 
       return info;
     }
@@ -124,9 +124,9 @@ if (__meteor_runtime_config__.SANDSTORM) {
     return next();
   });
 
-  async function readAll(stream) {
-    return new Promise((resolve, reject) => {
-      const chunks = [];
+  async function readAll(stream: SandstormHttpRequest) {
+    return new Promise<string>((resolve, reject) => {
+      const chunks: string[] = [];
       stream.on("data", function (chunk) {
         chunks.push(chunk.toString());
       });
@@ -139,7 +139,7 @@ if (__meteor_runtime_config__.SANDSTORM) {
     });
   }
 
-  var handlePostToken = async function (req, res) {
+  var handlePostToken = async function (req: SandstormHttpRequest, res: SandstormHttpResponse) {
     try {
       // Note that cross-origin POSTs cannot set arbitrary Content-Types without explicit CORS
       // permission, so this effectively prevents XSRF.
@@ -154,9 +154,9 @@ if (__meteor_runtime_config__.SANDSTORM) {
         throw new Error("no current login request matching token");
       }
 
-      var permissions = req.headers["x-sandstorm-permissions"];
+      var permissions: string | string[] = req.headers["x-sandstorm-permissions"];
       if (permissions && permissions !== "") {
-        permissions = permissions.split(",");
+        permissions = (permissions as string).split(",");
       } else {
         permissions = [];
       }
@@ -170,12 +170,12 @@ if (__meteor_runtime_config__.SANDSTORM) {
         pronouns: req.headers["x-sandstorm-user-pronouns"] || null,
       };
 
-      var userInfo = {sandstorm: sandstormInfo};
-      if (Package["accounts-base"]) {
+      var userInfo: SandstormUserInfo = {sandstorm: sandstormInfo};
+      if ((Package as SandstormPackageRegistry)["accounts-base"]) {
         if (sandstormInfo.id) {
           // The user is logged into Sandstorm. Create a Meteor account for them, or find the
           // existing one, and record the user ID.
-          var login = await Package["accounts-base"].Accounts.updateOrCreateUserFromExternalService(
+          var login = await (Package as SandstormPackageRegistry)["accounts-base"]!.Accounts.updateOrCreateUserFromExternalService(
               "sandstorm", sandstormInfo, {profile: {name: sandstormInfo.name}});
           userInfo.userId = login.userId;
         } else {
@@ -199,4 +199,13 @@ if (__meteor_runtime_config__.SANDSTORM) {
       res.end(err.stack);
     }
   };
+}
+
+interface LoginEntry {
+  resolve: (info: SandstormUserInfo) => void;
+  reject: (reason?: Error | Meteor.Error) => void;
+  timeout: ReturnType<typeof setTimeout>;
+}
+interface Logins {
+  [token: string]: LoginEntry;
 }

@@ -19,7 +19,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-function loginWithSandstorm(connection, apiHost, apiToken) {
+function loginWithSandstorm(connection: SandstormClientConnection, apiHost: string | undefined, apiToken: string | undefined) {
   // Log in the connection using Sandstorm authentication.
   //
   // After calling this, connection.sandstormUser() will reactively return an object containing
@@ -42,7 +42,7 @@ function loginWithSandstorm(connection, apiHost, apiToken) {
 
   // If the connection doesn't already have a sandstormUser() method, add it now.
   if (!connection._sandstormUser) {
-    connection._sandstormUser = new ReactiveVar(null);
+    connection._sandstormUser = new ReactiveVar<SandstormUser | null>(null);
     connection.sandstormUser = connection._sandstormUser.get.bind(connection._sandstormUser);
   }
 
@@ -52,7 +52,7 @@ function loginWithSandstorm(connection, apiHost, apiToken) {
   var waiting = true;          // We'll keep retrying XHRs until the method returns.
   var reconnected = false;
 
-  var onResultReceived = function (error, result) {
+  var onResultReceived = function (error: Error | Meteor.Error | undefined, result?: SandstormUserInfo) {
     waiting = false;
 
     if (error) {
@@ -65,7 +65,7 @@ function loginWithSandstorm(connection, apiHost, apiToken) {
     }
   };
 
-  var loggedInAndDataReadyCallback = function (error, result) {
+  var loggedInAndDataReadyCallback = function (error: Error | Meteor.Error | undefined, result?: SandstormUserInfo) {
     if (reconnected) {
       // Oh, we're already on a future connection attempt. Don't mess with anything.
       return;
@@ -74,8 +74,8 @@ function loginWithSandstorm(connection, apiHost, apiToken) {
     if (error) {
       console.error("loginWithSandstorm failed:", error);
     } else {
-      connection._sandstormUser.set(result.sandstorm);
-      connection.setUserId(result.userId);
+      connection._sandstormUser.set(result!.sandstorm);
+      connection.setUserId(result!.userId);
     }
   };
 
@@ -86,7 +86,7 @@ function loginWithSandstorm(connection, apiHost, apiToken) {
   var sendXhr = function () {
     if (!waiting) return;  // Method call finished.
 
-    var headers = {"Content-Type": "application/x-sandstorm-login-token"};
+    var headers: Record<string, string> = {"Content-Type": "application/x-sandstorm-login-token"};
 
     var testInfo = localStorage.sandstormTestUserInfo;
     if (testInfo) {
@@ -168,11 +168,11 @@ if (__meteor_runtime_config__.SANDSTORM) {
   loginWithSandstorm(Meteor.connection, __meteor_runtime_config__.SANDSTORM_API_HOST,
     __meteor_runtime_config__.SANDSTORM_API_TOKEN);
 
-  if (Package["accounts-base"]) {
+  if ((Package as SandstormPackageRegistry)["accounts-base"]) {
     // Make Meteor.loggingIn() work by calling a private method of accounts-base. If this breaks then
     // maybe we should just overwrite Meteor.loggingIn() instead.
     Tracker.autorun(function () {
-      Package["accounts-base"].Accounts._setLoggingIn(!Meteor.connection.sandstormUser());
+      (Package as SandstormPackageRegistry)["accounts-base"]!.Accounts._setLoggingIn(!Meteor.connection.sandstormUser());
     });
   }
 
