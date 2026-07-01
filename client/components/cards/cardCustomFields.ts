@@ -1,3 +1,7 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
+import { Tracker } from 'meteor/tracker';
 import { TAPi18n } from '/imports/i18n';
 import {
   setupDatePicker,
@@ -34,7 +38,7 @@ import { EscapeActions } from '/client/lib/escapeActions';
 import { getSidebarInstance } from '/client/features/sidebar/service';
 
 Template.cardCustomFieldsPopup.helpers({
-  hasCustomField() {
+  hasCustomField(this: any) {
     const card = getCurrentCardFromContext();
     if (!card) return false;
     const customFieldId = this._id;
@@ -43,14 +47,14 @@ Template.cardCustomFieldsPopup.helpers({
 });
 
 Template.cardCustomFieldsPopup.events({
-  'click .js-select-field'(event) {
+  'click .js-select-field'(this: any, event: JQuery.TriggeredEvent) {
     const card = getCurrentCardFromContext();
     if (!card) return;
     const customFieldId = this._id;
     card.toggleCustomField(customFieldId);
     event.preventDefault();
   },
-  'click .js-settings'(event) {
+  'click .js-settings'(event: JQuery.TriggeredEvent) {
     EscapeActions.executeUpTo('detailsPane');
     const sidebar = getSidebarInstance();
     if (sidebar) {
@@ -62,24 +66,24 @@ Template.cardCustomFieldsPopup.events({
 
 // cardCustomField
 Template.cardCustomField.helpers({
-  getTemplate() {
+  getTemplate(this: any) {
     return `cardCustomField-${this.definition.type}`;
   },
 });
 
-Template.cardCustomField.onCreated(function () {
+Template.cardCustomField.onCreated(function (this: CardCustomFieldInstance) {
   this.card = getCurrentCardFromContext();
   this.customFieldId = Template.currentData()._id;
 });
 
 // cardCustomField-text
-Template['cardCustomField-text'].onCreated(function () {
+Template['cardCustomField-text'].onCreated(function (this: CardCustomFieldTextInstance) {
   this.card = getCurrentCardFromContext();
   this.customFieldId = Template.currentData()._id;
 });
 
 Template['cardCustomField-text'].events({
-  'submit .js-card-customfield-text'(event, tpl) {
+  'submit .js-card-customfield-text'(event: JQuery.TriggeredEvent, tpl: CardCustomFieldTextInstance) {
     event.preventDefault();
     const value = tpl.currentComponent ? tpl.currentComponent().getValue() : tpl.$('textarea').val();
     tpl.card.setCustomField(tpl.customFieldId, value);
@@ -87,22 +91,22 @@ Template['cardCustomField-text'].events({
 });
 
 // cardCustomField-number
-Template['cardCustomField-number'].onCreated(function () {
+Template['cardCustomField-number'].onCreated(function (this: CardCustomFieldInstance) {
   this.card = getCurrentCardFromContext();
   this.customFieldId = Template.currentData()._id;
 });
 
 Template['cardCustomField-number'].helpers({
   // Render blank / cleared / non-numeric values as empty instead of "NaN" (#2091).
-  formattedValue() {
+  formattedValue(this: any) {
     return formatNumberValue(this.value);
   },
 });
 
 Template['cardCustomField-number'].events({
-  'submit .js-card-customfield-number'(event, tpl) {
+  'submit .js-card-customfield-number'(event: JQuery.TriggeredEvent, tpl: CardCustomFieldInstance) {
     event.preventDefault();
-    const rawValue = tpl.find('input').value;
+    const rawValue = (tpl.find('input') as HTMLInputElement).value;
     // A cleared/blank input parses to NaN; store '' instead so it renders empty
     // rather than as "NaN" (#2091).
     const parsed = parseInt(rawValue, 10);
@@ -112,28 +116,28 @@ Template['cardCustomField-number'].events({
 });
 
 // cardCustomField-checkbox
-Template['cardCustomField-checkbox'].onCreated(function () {
+Template['cardCustomField-checkbox'].onCreated(function (this: CardCustomFieldInstance) {
   this.card = getCurrentCardFromContext();
   this.customFieldId = Template.currentData()._id;
 });
 
 Template['cardCustomField-checkbox'].events({
-  'click .js-checklist-item .check-box-container'(event, tpl) {
+  'click .js-checklist-item .check-box-container'(event: JQuery.TriggeredEvent, tpl: CardCustomFieldInstance) {
     tpl.card.setCustomField(tpl.customFieldId, !Template.currentData().value);
   },
 });
 
 // cardCustomField-currency
-Template['cardCustomField-currency'].onCreated(function () {
+Template['cardCustomField-currency'].onCreated(function (this: CardCustomFieldCurrencyInstance) {
   this.card = getCurrentCardFromContext();
   this.customFieldId = Template.currentData()._id;
   this.currencyCode = Template.currentData().definition.settings.currencyCode;
 });
 
 Template['cardCustomField-currency'].helpers({
-  formattedValue() {
+  formattedValue(this: any) {
     const locale = TAPi18n.getLanguage();
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardCustomFieldCurrencyInstance;
     return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: tpl.currencyCode,
@@ -142,21 +146,21 @@ Template['cardCustomField-currency'].helpers({
 });
 
 Template['cardCustomField-currency'].events({
-  'submit .js-card-customfield-currency'(event, tpl) {
+  'submit .js-card-customfield-currency'(event: JQuery.TriggeredEvent, tpl: CardCustomFieldCurrencyInstance) {
     event.preventDefault();
     // To allow input separated by comma, the comma is replaced by a period.
-    const value = Number(tpl.find('input').value.replace(/,/i, '.'), 10);
+    const value = Number((tpl.find('input') as HTMLInputElement).value.replace(/,/i, '.'));
     tpl.card.setCustomField(tpl.customFieldId, value);
   },
 });
 
 // cardCustomField-date
-Template['cardCustomField-date'].onCreated(function () {
+Template['cardCustomField-date'].onCreated(function (this: CardCustomFieldDateInstance) {
   this.card = getCurrentCardFromContext();
   this.customFieldId = Template.currentData()._id;
   const self = this;
-  self.date = ReactiveVar();
-  self.now = ReactiveVar(now());
+  self.date = new ReactiveVar<Date | undefined>(undefined);
+  self.now = new ReactiveVar(now());
   window.setInterval(() => {
     self.now.set(now());
   }, 60000);
@@ -168,7 +172,7 @@ Template['cardCustomField-date'].onCreated(function () {
 
 Template['cardCustomField-date'].helpers({
   showWeek() {
-    return getISOWeek(Template.instance().date.get()).toString();
+    return getISOWeek((Template.instance() as CardCustomFieldDateInstance).date.get()!).toString();
   },
   showWeekOfYear() {
     const user = ReactiveCache.getCurrentUser();
@@ -180,15 +184,15 @@ Template['cardCustomField-date'].helpers({
   showDate() {
     const currentUser = ReactiveCache.getCurrentUser();
     const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-    return formatDateByUserPreference(Template.instance().date.get(), dateFormat, true);
+    return formatDateByUserPreference((Template.instance() as CardCustomFieldDateInstance).date.get()!, dateFormat, true);
   },
   showISODate() {
-    return Template.instance().date.get().toISOString();
+    return (Template.instance() as CardCustomFieldDateInstance).date.get()!.toISOString();
   },
-  classes() {
-    const tpl = Template.instance();
+  classes(this: any) {
+    const tpl = Template.instance() as CardCustomFieldDateInstance;
     if (
-      isBefore(tpl.date.get(), tpl.now.get(), 'minute') &&
+      isBefore(tpl.date.get()!, tpl.now.get(), 'minute') &&
       isBefore(tpl.now.get(), this.value, 'minute')
     ) {
       return 'current';
@@ -196,7 +200,7 @@ Template['cardCustomField-date'].helpers({
     return '';
   },
   showTitle() {
-    return `${TAPi18n.__('card-start-on')} ${Template.instance().date.get().toLocaleString()}`;
+    return `${TAPi18n.__('card-start-on')} ${(Template.instance() as CardCustomFieldDateInstance).date.get()!.toLocaleString()}`;
   },
 });
 
@@ -205,7 +209,7 @@ Template['cardCustomField-date'].events({
 });
 
 // cardCustomField-datePopup
-Template['cardCustomField-datePopup'].onCreated(function () {
+Template['cardCustomField-datePopup'].onCreated(function (this: CardCustomFieldDatePopupInstance) {
   const data = Template.currentData();
   setupDatePicker(this, {
     initialDate: data.value ? data.value : undefined,
@@ -215,23 +219,23 @@ Template['cardCustomField-datePopup'].onCreated(function () {
   this.customFieldId = data._id;
 });
 
-Template['cardCustomField-datePopup'].onRendered(function () {
+Template['cardCustomField-datePopup'].onRendered(function (this: CardCustomFieldDatePopupInstance) {
   datePickerRendered(this);
 });
 
 Template['cardCustomField-datePopup'].helpers(datePickerHelpers());
 
 Template['cardCustomField-datePopup'].events(datePickerEvents({
-  storeDate(date) {
+  storeDate(this: CardCustomFieldDatePopupInstance, date: Date) {
     this.datePicker.card.setCustomField(this.customFieldId, date);
   },
-  deleteDate() {
+  deleteDate(this: CardCustomFieldDatePopupInstance) {
     this.datePicker.card.setCustomField(this.customFieldId, '');
   },
 }));
 
 // cardCustomField-dropdown
-Template['cardCustomField-dropdown'].onCreated(function () {
+Template['cardCustomField-dropdown'].onCreated(function (this: CardCustomFieldDropdownInstance) {
   this.card = getCurrentCardFromContext();
   this.customFieldId = Template.currentData()._id;
   this._items = Template.currentData().definition.settings.dropdownItems;
@@ -244,10 +248,10 @@ Template['cardCustomField-dropdown'].onCreated(function () {
 
 Template['cardCustomField-dropdown'].helpers({
   items() {
-    return Template.instance().items;
+    return (Template.instance() as CardCustomFieldDropdownInstance).items;
   },
-  selectedItem() {
-    const tpl = Template.instance();
+  selectedItem(this: any) {
+    const tpl = Template.instance() as CardCustomFieldDropdownInstance;
     const selected = tpl._items.find(item => {
       return item._id === this.value;
     });
@@ -258,64 +262,65 @@ Template['cardCustomField-dropdown'].helpers({
 });
 
 Template['cardCustomField-dropdown'].events({
-  'submit .js-card-customfield-dropdown'(event, tpl) {
+  'submit .js-card-customfield-dropdown'(event: JQuery.TriggeredEvent, tpl: CardCustomFieldDropdownInstance) {
     event.preventDefault();
-    const value = tpl.find('select').value;
+    const value = (tpl.find('select') as HTMLSelectElement).value;
     tpl.card.setCustomField(tpl.customFieldId, value);
   },
 });
 
 // cardCustomField-stringtemplate
-Template['cardCustomField-stringtemplate'].onCreated(function () {
+Template['cardCustomField-stringtemplate'].onCreated(function (this: CardCustomFieldStringtemplateInstance) {
   this.card = getCurrentCardFromContext();
   this.customFieldId = Template.currentData()._id;
   this.customField = new CustomFieldStringTemplate(Template.currentData().definition);
-  this.stringtemplateItems = new ReactiveVar(Template.currentData().value ?? []);
+  this.stringtemplateItems = new ReactiveVar<string[]>(Template.currentData().value ?? []);
 });
 
 Template['cardCustomField-stringtemplate'].helpers({
-  formattedValue() {
-    const tpl = Template.instance();
+  formattedValue(this: any) {
+    const tpl = Template.instance() as CardCustomFieldStringtemplateInstance;
     const ret = tpl.customField.getFormattedValue(this.value);
     return ret;
   },
   stringtemplateItems() {
-    return Template.instance().stringtemplateItems.get();
+    return (Template.instance() as CardCustomFieldStringtemplateInstance).stringtemplateItems.get();
   },
 });
 
 Template['cardCustomField-stringtemplate'].events({
-  'submit .js-card-customfield-stringtemplate'(event, tpl) {
+  'submit .js-card-customfield-stringtemplate'(event: JQuery.TriggeredEvent, tpl: CardCustomFieldStringtemplateInstance) {
     event.preventDefault();
     const items = tpl.stringtemplateItems.get();
     tpl.card.setCustomField(tpl.customFieldId, items);
   },
 
-  'keydown .js-card-customfield-stringtemplate-item'(event, tpl) {
+  'keydown .js-card-customfield-stringtemplate-item'(event: JQuery.TriggeredEvent, tpl: CardCustomFieldStringtemplateInstance) {
     if (event.keyCode === 13) {
       event.preventDefault();
 
-      if (event.target.value.trim() || event.metaKey || event.ctrlKey) {
-        const inputLast = tpl.find('input.last');
+      const target = event.target as HTMLInputElement;
+      if (target.value.trim() || event.metaKey || event.ctrlKey) {
+        const inputLast = tpl.find('input.last') as HTMLInputElement;
 
         let items = Array.from(tpl.findAll('input'))
-          .map(input => input.value)
+          .map(input => (input as HTMLInputElement).value)
           .filter(value => !!value.trim());
 
-        if (event.target === inputLast) {
+        if (target === inputLast) {
           inputLast.value = '';
-        } else if (event.target.nextSibling === inputLast) {
+        } else if (target.nextSibling === inputLast) {
           inputLast.focus();
         } else {
-          event.target.blur();
+          target.blur();
 
           const idx = Array.from(tpl.findAll('input')).indexOf(
-            event.target,
+            target,
           );
           items.splice(idx + 1, 0, '');
 
           Tracker.afterFlush(() => {
-            const element = tpl.findAll('input')[idx + 1];
+            const element = tpl.findAll('input')[idx + 1] as HTMLInputElement;
             element.focus();
             element.value = '';
           });
@@ -324,25 +329,72 @@ Template['cardCustomField-stringtemplate'].events({
         tpl.stringtemplateItems.set(items);
       }
       if (event.metaKey || event.ctrlKey) {
-        tpl.find('button[type=submit]').click();
+        (tpl.find('button[type=submit]') as HTMLElement).click();
       }
     }
   },
 
-  'blur .js-card-customfield-stringtemplate-item'(event, tpl) {
+  'blur .js-card-customfield-stringtemplate-item'(event: JQuery.TriggeredEvent, tpl: CardCustomFieldStringtemplateInstance) {
+    const target = event.target as HTMLInputElement;
     if (
-      !event.target.value.trim() ||
-      event.target === tpl.find('input.last')
+      !target.value.trim() ||
+      target === tpl.find('input.last')
     ) {
       const items = Array.from(tpl.findAll('input'))
-        .map(input => input.value)
+        .map(input => (input as HTMLInputElement).value)
         .filter(value => !!value.trim());
       tpl.stringtemplateItems.set(items);
-      tpl.find('input.last').value = '';
+      (tpl.find('input.last') as HTMLInputElement).value = '';
     }
   },
 
-  'click .js-close-inlined-form'(event, tpl) {
+  'click .js-close-inlined-form'(event: JQuery.TriggeredEvent, tpl: CardCustomFieldStringtemplateInstance) {
     tpl.stringtemplateItems.set(Template.currentData().value ?? []);
   },
 });
+
+// Shared state for the per-type cardCustomField templates: the card being
+// edited and the id of the custom field. `card` is the (possibly null) card
+// model instance; typed `any` because these handlers only run when a card is
+// present and call its dynamic setCustomField/toggleCustomField helpers.
+interface CardCustomFieldInstance extends Blaze.TemplateInstance {
+  card: any;
+  customFieldId: string;
+}
+
+// The text field instance may expose a rich-text editor component accessor.
+interface CardCustomFieldTextInstance extends CardCustomFieldInstance {
+  currentComponent?: () => { getValue(): string };
+}
+
+interface CardCustomFieldCurrencyInstance extends CardCustomFieldInstance {
+  currencyCode: string;
+}
+
+interface CardCustomFieldDateInstance extends CardCustomFieldInstance {
+  date: ReactiveVar<Date | undefined>;
+  now: ReactiveVar<Date>;
+}
+
+// The date popup builds on the shared datepicker instance state; `datePicker`
+// holds the picker's own reactive state plus the overridden card accessor.
+interface CardCustomFieldDatePopupInstance extends Blaze.TemplateInstance {
+  datePicker: any;
+  customFieldId: string;
+}
+
+interface CardCustomFieldDropdownInstance extends CardCustomFieldInstance {
+  _items: DropdownItem[];
+  items: DropdownItem[];
+}
+
+interface CardCustomFieldStringtemplateInstance extends CardCustomFieldInstance {
+  customField: CustomFieldStringTemplate;
+  stringtemplateItems: ReactiveVar<string[]>;
+}
+
+// An option of a dropdown custom field.
+interface DropdownItem {
+  _id: string;
+  name: string;
+}
