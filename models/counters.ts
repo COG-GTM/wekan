@@ -2,8 +2,10 @@ import { Mongo } from 'meteor/mongo';
 
 const Counters = new Mongo.Collection('counters');
 
-async function incrementCounterAsync(counterName, amount = 1) {
-  const result = await Counters.rawCollection().findOneAndUpdate(
+async function incrementCounterAsync(counterName: string, amount = 1) {
+  // The mongodb driver's findOneAndUpdate return shape varies across versions
+  // (ModifyResult vs. the document directly), so read it through `any`.
+  const result: any = await Counters.rawCollection().findOneAndUpdate(
     { _id: counterName },
     { $inc: { next_val: amount } },
     { upsert: true, returnDocument: 'after' },

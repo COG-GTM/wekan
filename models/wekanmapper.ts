@@ -1,17 +1,19 @@
 import { ReactiveCache } from '/imports/reactiveCache';
 
-export async function getMembersToMap(data) {
+// `data` is a raw imported board/export payload whose shape is dynamic, hence
+// `any`.
+export async function getMembersToMap(data: any) {
   // we will work on the list itself (an ordered array of objects) when a
   // mapping is done, we add a 'wekan' field to the object representing the
   // imported member
   const membersToMap = data.members || [];
   const users = data.users || [];
   // auto-map based on username
-  const mappable = [];
+  const mappable: any[] = [];
   for (const importedMember of membersToMap) {
     importedMember.id = importedMember.userId;
     delete importedMember.userId;
-    const user = users.filter(user => {
+    const user = users.filter((user: any) => {
       return user._id === importedMember.id;
     })[0];
     // Skip dangling user references (e.g. a board member whose account was

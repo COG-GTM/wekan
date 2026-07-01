@@ -85,11 +85,22 @@ declare module 'meteor/mongo' {
       attachSchema(schema: any, options?: any): void;
       simpleSchema(): any;
       helpers(helpers: { [name: string]: (this: any, ...args: any[]) => any }): void;
-      before: any;
-      after: any;
+      before: CollectionHooks;
+      after: CollectionHooks;
       hookOptions: any;
     }
   }
+}
+
+// matb33:collection-hooks: registers callbacks around collection mutations. The
+// document, selector, options and modifier passed to these callbacks are
+// dynamic Mongo shapes (defined per-collection), hence `any`.
+interface CollectionHooks {
+  insert(cb: (userId: string, doc: any) => void): void;
+  update(cb: (userId: string, doc: any, fieldNames: string[], modifier: any) => void): void;
+  remove(cb: (userId: string, doc: any) => void): void;
+  find(cb: (userId: string, selector: any, options: any) => void): void;
+  findOne(cb: (userId: string, selector: any, options: any) => void): void;
 }
 
 // i18next-sprintf-postprocessor — sprintf() post-processor plugin for i18next.
