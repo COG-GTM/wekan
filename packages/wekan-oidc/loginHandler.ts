@@ -1,7 +1,7 @@
 // creates Object if not present in collection
 // initArr = [displayName, shortName, website, isActive]
 // objString = ["Org","Team"] for method mapping
-async function createObject(initArr, objString)
+async function createObject(initArr: InitAttributes, objString: string)
 {
   functionName = objString === "Org" ? 'setCreateOrgFromOidc' : 'setCreateTeamFromOidc';
   creationString = 'setCreate'+ objString + 'FromOidc';
@@ -13,7 +13,7 @@ async function createObject(initArr, objString)
     initArr[4]//xxxisActive
     );
 }
-async function updateObject(initArr, objString)
+async function updateObject(initArr: InitAttributes, objString: string)
 {
   functionName = objString === "Org" ? 'setOrgAllFieldsFromOidc' : 'setTeamAllFieldsFromOidc';
   return await Meteor.callAsync(functionName,
@@ -30,7 +30,7 @@ async function updateObject(initArr, objString)
 //e.g. userObjs = user.teams
 //e.g. obj = Team.findOne...
 //e.g. collection = "team"
-function contains(userObjs, obj, collection)
+function contains(userObjs: Array<{ [key: string]: string | undefined }> | undefined, obj: { _id: string }, collection: string)
 {
   id = collection+'Id';
 
@@ -62,22 +62,20 @@ function getOauth2AdminGroups()
 // Extract a group name from a single OIDC group entry. The OIDC `groups` claim
 // may arrive as an array of plain strings OR an array of objects carrying a
 // displayName (see oidc_server.js), so handle both forms.
-function oauth2GroupName(group)
+function oauth2GroupName(group: string | OidcGroup)
 {
   if (typeof group === 'string') return group;
   if (group && typeof group === 'object') return group.displayName || group.name || '';
   return '';
 }
 
-module.exports = {
-
-getOauth2AdminGroups: getOauth2AdminGroups,
+export { getOauth2AdminGroups };
 
 // #5876: returns { manage, isAdmin }. When OAUTH2_ADMIN_GROUPS is empty/unset,
 // manage is false and the caller MUST NOT change the user's isAdmin (default
 // off, behavior unchanged). When it is set, manage is true and isAdmin reflects
 // whether the user's OIDC group names intersect the configured admin groups.
-oauth2AdminStatusFromGroups: function (groups)
+export const oauth2AdminStatusFromGroups = function (groups: Array<string | OidcGroup> | undefined)
 {
   const adminGroups = getOauth2AdminGroups();
   if (!adminGroups.length) {
@@ -88,7 +86,7 @@ oauth2AdminStatusFromGroups: function (groups)
     .filter(name => name.length > 0);
   const isAdmin = userGroupNames.some(name => adminGroups.includes(name));
   return { manage: true, isAdmin: isAdmin };
-},
+};
 
 // This function adds groups as organizations or teams to users and
 // creates them if not already existing
@@ -98,7 +96,7 @@ oauth2AdminStatusFromGroups: function (groups)
 //  isAdmin: [true, false] -> admin group becomes admin in wekan
 //  isOrganization: [true, false] -> creates org and adds to user
 //  displayName: "string"
-addGroupsWithAttributes: async function (user, groups){
+export const addGroupsWithAttributes = async function (user: Meteor.User, groups: OidcGroup[]){
   teamArray=[];
   orgArray=[];
   isAdmin = [];
@@ -136,7 +134,8 @@ addGroupsWithAttributes: async function (user, groups){
       {
         continue;
       }
-      orgHash = {'orgId': org._id, 'orgDisplayName': group.displayName};
+      // org was just fetched/created above; non-null within this branch
+      orgHash = {'orgId': org!._id, 'orgDisplayName': group.displayName};
       orgArray.push(orgHash);
     }
 
@@ -162,7 +161,8 @@ addGroupsWithAttributes: async function (user, groups){
       {
         continue;
       }
-      teamHash = {'teamId': team._id, 'teamDisplayName': group.displayName};
+      // team was just fetched/created above; non-null within this branch
+      teamHash = {'teamId': team!._id, 'teamDisplayName': group.displayName};
       teamArray.push(teamHash);
     }
   }
@@ -179,24 +179,25 @@ addGroupsWithAttributes: async function (user, groups){
   await users.updateAsync({ _id: user._id }, { $unset:  {"services.oidc.groups": []}});
 
   return;
-},
+};
 
-changeUsername: async function(user, name)
+export const changeUsername = async function(user: Meteor.User, name: string)
 {
   username = {'username': name};
   if (user.username != username) await users.updateAsync({ _id: user._id }, { $set:  username});
-},
-changeFullname: async function(user, name)
+};
+export const changeFullname = async function(user: Meteor.User, name: string)
 {
   username = {'profile.fullname': name};
   if (user.username != username) await users.updateAsync({ _id: user._id }, { $set:  username});
-},
-addEmail: async function(user, email)
+};
+export const addEmail = async function(user: Meteor.User, email: string)
 {
   user_email = user.emails || [];
   var contained = false;
   position = 0;
-  for (const [count, mail_hash] of Object.entries(user_email))
+  // user_email is dynamically typed (emails array here); iterate its entries as any
+  for (const [count, mail_hash] of Object.entries<any>(user_email))
   {
     if (mail_hash['address'] === email)
     {
@@ -216,5 +217,4 @@ addEmail: async function(user, email)
     user_email = {'emails': user_email};
     await users.updateAsync({ _id: user._id }, { $set:  user_email});
   }
-}
-}
+};

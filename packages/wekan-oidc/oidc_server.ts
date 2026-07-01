@@ -18,11 +18,12 @@ if (process.env.OAUTH2_CA_CERT !== undefined) {
 	console.log(e);
     }
 }
-var profile = {};
-var serviceData = {};
-var userinfo = {};
+var profile: OidcProfile = {};
+var serviceData: ServiceData = {};
+// OIDC userinfo claims are addressed by admin-configured env-var names (OAUTH2_*_MAP), so the key set is dynamic
+var userinfo: any = {};
 
-OAuth.registerService('oidc', 2, null, async function (query) {
+OAuth.registerService('oidc', 2, null, async function (query: OidcQuery) {
   var debug = process.env.DEBUG === 'true';
 
   var token = await getToken(query);
@@ -32,9 +33,9 @@ OAuth.registerService('oidc', 2, null, async function (query) {
   var expiresAt = (+new Date) + (1000 * parseInt(token.expires_in, 10));
 
   var claimsInAccessToken = (process.env.OAUTH2_ADFS_ENABLED === 'true'  ||
-                             process.env.OAUTH2_ADFS_ENABLED === true    ||
+                             (process.env.OAUTH2_ADFS_ENABLED as string | boolean) === true    ||
                              process.env.OAUTH2_B2C_ENABLED  === 'true'  ||
-                             process.env.OAUTH2_B2C_ENABLED  === true)   || false;
+                             (process.env.OAUTH2_B2C_ENABLED as string | boolean)  === true)   || false;
 
   if(claimsInAccessToken)
   {
@@ -59,7 +60,7 @@ OAuth.registerService('oidc', 2, null, async function (query) {
 
 
   // If on Oracle OIM email is empty or null, get info from username
-  if (process.env.ORACLE_OIM_ENABLED === 'true' || process.env.ORACLE_OIM_ENABLED === true) {
+  if (process.env.ORACLE_OIM_ENABLED === 'true' || (process.env.ORACLE_OIM_ENABLED as string | boolean) === true) {
     if (userinfo[process.env.OAUTH2_EMAIL_MAP]) {
       serviceData.email = userinfo[process.env.OAUTH2_EMAIL_MAP];
     } else {
@@ -67,11 +68,11 @@ OAuth.registerService('oidc', 2, null, async function (query) {
     }
   }
 
-  if (process.env.ORACLE_OIM_ENABLED !== 'true' && process.env.ORACLE_OIM_ENABLED !== true) {
+  if (process.env.ORACLE_OIM_ENABLED !== 'true' && (process.env.ORACLE_OIM_ENABLED as string | boolean) !== true) {
     serviceData.email = userinfo[process.env.OAUTH2_EMAIL_MAP]; // || userinfo["email"];
   }
 
-  if (process.env.OAUTH2_B2C_ENABLED  === 'true'  || process.env.OAUTH2_B2C_ENABLED  === true) {
+  if (process.env.OAUTH2_B2C_ENABLED  === 'true'  || (process.env.OAUTH2_B2C_ENABLED as string | boolean)  === true) {
     serviceData.email = userinfo["emails"][0];
   }
 
@@ -100,7 +101,7 @@ OAuth.registerService('oidc', 2, null, async function (query) {
   profile.name = userinfo[process.env.OAUTH2_FULLNAME_MAP]; // || userinfo["displayName"];
   profile.email = userinfo[process.env.OAUTH2_EMAIL_MAP]; // || userinfo["email"];
 
-  if (process.env.OAUTH2_B2C_ENABLED  === 'true'  || process.env.OAUTH2_B2C_ENABLED  === true) {
+  if (process.env.OAUTH2_B2C_ENABLED  === 'true'  || (process.env.OAUTH2_B2C_ENABLED as string | boolean)  === true) {
     profile.email = userinfo["emails"][0];
   }
 
@@ -118,17 +119,19 @@ OAuth.registerService('oidc', 2, null, async function (query) {
   {
     user = await Meteor.users.findOneAsync({'_id':  serviceData.id});
 
-    serviceData.groups.forEach(function(groupName, i)
+    // serviceData.groups is narrowed to an array by the Array.isArray guard
+    // above, but the narrowing does not carry into this callback closure.
+    serviceData.groups.forEach(function(groupName: string, i: number)
     {
       if(user?.isAdmin && i == 0)
       {
         // keep information of user.isAdmin since in loginHandler the user will // be updated regarding group admin privileges provided via oidc
-        serviceData.groups[i] = {"isAdmin": true};
-        serviceData.groups[i]["displayName"]= groupName;
+        serviceData.groups![i] = {"isAdmin": true};
+        serviceData.groups![i]["displayName"]= groupName;
       }
       else
       {
-        serviceData.groups[i] = {"displayName": groupName};
+        serviceData.groups![i] = {"displayName": groupName};
       }
     });
   }
@@ -149,8 +152,8 @@ if (Meteor.release) {
   userAgent += "/" + Meteor.release;
 }
 
-if (process.env.ORACLE_OIM_ENABLED !== 'true' && process.env.ORACLE_OIM_ENABLED !== true) {
-  var getToken = async function (query) {
+if (process.env.ORACLE_OIM_ENABLED !== 'true' && (process.env.ORACLE_OIM_ENABLED as string | boolean) !== true) {
+  var getToken = async function (query: OidcQuery): Promise<Record<string, any>> {
     var debug = process.env.DEBUG === 'true';
     var config = await getConfiguration();
     var serverTokenEndpoint;
@@ -170,7 +173,7 @@ if (process.env.ORACLE_OIM_ENABLED !== 'true' && process.env.ORACLE_OIM_ENABLED 
         state: query.state
       });
 
-      var fetchOptions = {
+      var fetchOptions: FetchOptions = {
         method: 'POST',
         headers: new Headers({
           'Accept': 'application/json',
@@ -203,9 +206,9 @@ if (process.env.ORACLE_OIM_ENABLED !== 'true' && process.env.ORACLE_OIM_ENABLED 
   };
 }
 
-if (process.env.ORACLE_OIM_ENABLED === 'true' || process.env.ORACLE_OIM_ENABLED === true) {
+if (process.env.ORACLE_OIM_ENABLED === 'true' || (process.env.ORACLE_OIM_ENABLED as string | boolean) === true) {
 
-  var getToken = async function (query) {
+  var getToken = async function (query: OidcQuery): Promise<Record<string, any>> {
     var debug = process.env.DEBUG === 'true';
     var config = await getConfiguration();
     var serverTokenEndpoint;
@@ -232,7 +235,7 @@ if (process.env.ORACLE_OIM_ENABLED === 'true' || process.env.ORACLE_OIM_ENABLED 
         state: query.state
       });
 
-      var fetchOptions = {
+      var fetchOptions: FetchOptions = {
         method: 'POST',
         headers: new Headers({
           'Accept': 'application/json',
@@ -268,7 +271,7 @@ if (process.env.ORACLE_OIM_ENABLED === 'true' || process.env.ORACLE_OIM_ENABLED 
 }
 
 
-var getUserInfo = async function (accessToken) {
+var getUserInfo = async function (accessToken: string | undefined): Promise<Record<string, any>> {
   var debug = process.env.DEBUG === 'true';
   var config = await getConfiguration();
   // Some userinfo endpoints use a different base URL than the authorization or token endpoints.
@@ -281,7 +284,7 @@ var getUserInfo = async function (accessToken) {
   }
 
   try {
-    var fetchOptions = {
+    var fetchOptions: FetchOptions = {
       method: 'GET',
       headers: new Headers({
         'User-Agent': userAgent,
@@ -308,7 +311,7 @@ var getUserInfo = async function (accessToken) {
   }
 };
 
-var getConfiguration = async function () {
+var getConfiguration = async function (): Promise<Configuration> {
   var config = await ServiceConfiguration.configurations.findOneAsync({ service: 'oidc' });
   if (!config) {
     throw new ServiceConfiguration.ConfigError('Service oidc not configured.');
@@ -316,7 +319,7 @@ var getConfiguration = async function () {
   return config;
 };
 
-var getTokenContent = function (token) {
+var getTokenContent = function (token: string | undefined): Record<string, any> {
   var content = null;
   if (token) {
     try {
@@ -334,7 +337,7 @@ var getTokenContent = function (token) {
   return content;
 }
 Meteor.methods({
-  'groupRoutineOnLogin': async function(info, userId)
+  'groupRoutineOnLogin': async function(info: ServiceData, userId: string)
   {
     // SECURITY (GHSA-cv95-8h7c-2ffq): This method is invoked only server-side
     // during the OIDC login flow (via Meteor.callAsync from the
@@ -386,7 +389,7 @@ Meteor.methods({
 });
 
 Meteor.methods({
-  'boardRoutineOnLogin': async function(info, oidcUserId)
+  'boardRoutineOnLogin': async function(info: ServiceData, oidcUserId: string)
   {
     // SECURITY (GHSA-cv95-8h7c-2ffq): Invoked only server-side during the OIDC
     // login flow (via Meteor.callAsync from the OAuth.registerService('oidc')
@@ -423,3 +426,10 @@ Meteor.methods({
 Oidc.retrieveCredential = function (credentialToken, credentialSecret) {
   return OAuth.retrieveCredential(credentialToken, credentialSecret);
 };
+
+interface FetchOptions {
+  method: string;
+  headers: Headers;
+  body?: string;
+  agent?: import('https').Agent;
+}
