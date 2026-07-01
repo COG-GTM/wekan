@@ -38,6 +38,23 @@ declare module 'meteor/meteor' {
     interface UserServices {
       oidc?: any;
     }
+    // Login methods contributed by wekan's accounts packages (accounts-ldap,
+    // accounts-saml, accounts-cas, accounts-oidc); not part of @types/meteor.
+    function loginWithLDAP(
+      username: string,
+      password: string,
+      callback?: (error?: Error) => void,
+    ): void;
+    function loginWithCas(
+      username: string,
+      password: string,
+      callback?: (error?: Error) => void,
+    ): void;
+    function loginWithSaml(
+      options: { provider: string },
+      callback?: (error?: Error) => void,
+    ): void;
+    function loginWithOidc(options: { loginStyle?: string }): void;
   }
 }
 
@@ -176,6 +193,8 @@ declare module 'meteor/ostrio:flow-router-extra' {
     reload(): void;
     getRouteName(): string;
     getQueryParam(key: string): string | undefined;
+    // Reactively depends on the current path so autoruns re-run on navigation.
+    watchPathChange(): void;
     // Current matched route: path plus resolved path/query params.
     current(): {
       path: string;
@@ -488,6 +507,11 @@ interface AccountsTemplatesStatic {
   configure(options: MongoQuery): void;
   configureRoute(routeName: string, options?: MongoQuery): void;
   ensureSignedIn: (context: object, redirect: (path: string) => void) => void;
+  // useraccounts runtime config bag (social login style, texts, ...); dynamic.
+  options: { socialLoginStyle?: string; [key: string]: any };
+  // Reactive form/login state; `form.keys` holds the current field values and is
+  // wrapped in a Proxy by layouts to react to state changes.
+  state: { form: { keys: { [key: string]: any } }; [key: string]: any };
 }
 
 // Modal manager (client), implemented in client/lib/modal.ts and used by

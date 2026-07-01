@@ -1,3 +1,7 @@
+import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
 import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
@@ -5,11 +9,18 @@ import Users from '/models/users';
 import { EscapeActions } from '/client/lib/escapeActions';
 import { enablePageDragscroll, disablePageDragscroll } from '/client/lib/pageDragscroll';
 
+// Pre-existing references to undefined globals in this file: `options` is
+// assigned inside the OIDC redirect callback, and `currentSetting` is read by
+// the afterBodyStart/beforeBodyEnd helpers. These are declared ambiently so the
+// (unchanged) runtime behaviour is preserved without introducing new names.
+declare let options: { loginStyle?: string };
+declare const currentSetting: any;
+
 let alreadyCheck = 1;
 let isCheckDone = false;
 let counter = 0;
-const validator = {
-  set(obj, prop, value) {
+const validator: ProxyHandler<any> = {
+  set(obj: any, prop: string, value: any) {
     if (prop === 'state' && value !== 'signIn') {
       $('.at-form-authentication').hide();
     } else if (prop === 'state' && value === 'signIn') {
@@ -22,13 +33,13 @@ const validator = {
   },
 };
 
-Template.userFormsLayout.onCreated(function () {
+Template.userFormsLayout.onCreated(function (this: UserFormsLayoutInstance) {
   const templateInstance = this;
-  templateInstance.currentSetting = new ReactiveVar();
+  templateInstance.currentSetting = new ReactiveVar(undefined);
   templateInstance.isLoading = new ReactiveVar(false);
 
   if (!ReactiveCache.getCurrentUser()?.profile) {
-    Meteor.call('isOidcRedirectionEnabled', (_, result) => {
+    Meteor.call('isOidcRedirectionEnabled', (_: any, result: any) => {
       if (result) {
         AccountsTemplates.options.socialLoginStyle = 'redirect';
         options = {
@@ -39,7 +50,8 @@ Template.userFormsLayout.onCreated(function () {
     });
 
     Meteor.subscribe('setting', {
-      onReady() {
+      // this: any — inside the subscription's onReady, `this` is the handle.
+      onReady(this: any) {
         templateInstance.currentSetting.set(ReactiveCache.getCurrentSetting());
         return this.stop();
       },
@@ -59,7 +71,7 @@ Template.userFormsLayout.onRendered(() => {
   // form (and they sit behind the on-screen keyboard). See userForm.css.
   document.body.classList.add('userform-layout');
 
-  Meteor.call('getAuthenticationsEnabled', (_, result) => {
+  Meteor.call('getAuthenticationsEnabled', (_: any, result: any) => {
     let enabledAuthenticationMethods = ['password']; // we show/hide this based on isPasswordLoginEnabled
 
     if (result) {
@@ -68,7 +80,7 @@ Template.userFormsLayout.onRendered(() => {
       });
     }
 
-    Meteor.call('isPasswordLoginEnabled', (_, result) => {
+    Meteor.call('isPasswordLoginEnabled', (_: any, result: any) => {
       // Issue #6380: the password form (.at-pwd-form) is hidden by default in CSS
       // and only revealed here. If this method call errors / returns late, or the
       // accounts-templates form has not rendered its fields yet when this runs,
@@ -83,13 +95,13 @@ Template.userFormsLayout.onRendered(() => {
       })();
     });
 
-    Meteor.call('isDisableRegistration', (_, result) => {
+    Meteor.call('isDisableRegistration', (_: any, result: any) => {
       if (result) {
         $('.at-signup-link').hide();
       }
     });
 
-    Meteor.call('isDisableForgotPassword', (_, result) => {
+    Meteor.call('isDisableForgotPassword', (_: any, result: any) => {
       if (result) {
         $('.at-pwd-link').hide();
       }
@@ -112,7 +124,7 @@ Template.userFormsLayout.onRendered(() => {
     // Set up MutationObserver for OIDC button instead of deprecated DOMSubtreeModified
     const oidcButton = document.getElementById('at-oidc');
     if (oidcButton) {
-      const observer = new MutationObserver((mutations) => {
+      const observer = new MutationObserver((mutations: MutationRecord[]) => {
         if (alreadyCheck <= 2) {
           let currSetting = ReactiveCache.getCurrentSetting();
           let oidcBtnElt = $('#at-oidc');
@@ -142,7 +154,7 @@ Template.userFormsLayout.onRendered(() => {
     // Set up MutationObserver for .at-form instead of deprecated DOMSubtreeModified
     const atForm = document.querySelector('.at-form');
     if (atForm) {
-      const formObserver = new MutationObserver((mutations) => {
+      const formObserver = new MutationObserver((mutations: MutationRecord[]) => {
         if (alreadyCheck <= 2 && !isCheckDone) {
           if (document.getElementById('at-oidc') != null) {
             let currSetting = ReactiveCache.getCurrentSetting();
@@ -174,7 +186,7 @@ Template.userFormsLayout.onRendered(() => {
     }
 
     // Add autocomplete attribute to login input for WCAG compliance
-    const loginInput = document.querySelector(
+    const loginInput = document.querySelector<HTMLInputElement>(
       'input[type="text"], input[type="email"]',
     );
     if (
@@ -187,7 +199,7 @@ Template.userFormsLayout.onRendered(() => {
     }
 
     // Add autocomplete attributes to password fields for WCAG compliance
-    const passwordInputs = document.querySelectorAll('input[type="password"]');
+    const passwordInputs = document.querySelectorAll<HTMLInputElement>('input[type="password"]');
     passwordInputs.forEach((input) => {
       if (input.name && input.name.includes('password')) {
         if (
@@ -212,7 +224,7 @@ Template.userFormsLayout.onDestroyed(() => {
 
 Template.userFormsLayout.helpers({
   isLegalNoticeLinkExist() {
-    const currSet = Template.instance().currentSetting.get();
+    const currSet = (Template.instance() as UserFormsLayoutInstance).currentSetting.get();
     if (currSet && currSet !== undefined && currSet != null) {
       return (
         currSet.legalNotice !== undefined && currSet.legalNotice.trim() != ''
@@ -233,7 +245,7 @@ Template.userFormsLayout.helpers({
   },
 
   isLoading() {
-    return Template.instance().isLoading.get();
+    return (Template.instance() as UserFormsLayoutInstance).isLoading.get();
   },
 
   afterBodyStart() {
@@ -256,7 +268,7 @@ Template.userFormsLayout.helpers({
       });
   },
 
-  isCurrentLanguage() {
+  isCurrentLanguage(this: { tag: string }) {
     const curLang = TAPi18n.getLanguage();
     return this.tag === curLang;
   },
@@ -273,8 +285,8 @@ Template.main.helpers({
 });
 
 Template.userFormsLayout.events({
-  'change .js-userform-set-language'(event) {
-    const tag = $(event.currentTarget).val();
+  'change .js-userform-set-language'(event: JQuery.TriggeredEvent) {
+    const tag = $(event.currentTarget).val() as string;
     // setLanguage is async; surface a failed load instead of silently leaving
     // the UI in English (#5756).
     Promise.resolve(TAPi18n.setLanguage(tag)).catch(error => {
@@ -283,7 +295,7 @@ Template.userFormsLayout.events({
     });
     event.preventDefault();
   },
-  'click #at-btn'(event, templateInstance) {
+  'click #at-btn'(event: JQuery.TriggeredEvent, templateInstance: UserFormsLayoutInstance) {
     if (FlowRouter.getRouteName() === 'atSignIn') {
       templateInstance.isLoading.set(true);
       authentication(event, templateInstance).then(() => {
@@ -304,16 +316,16 @@ Template.defaultLayout.events({
 // keyboard focus into it so screen-reader and keyboard users land inside the
 // dialog instead of being left behind in the page. When it closes, restore
 // focus to whatever element was focused before it opened.
-Template.defaultLayout.onRendered(function () {
-  let lastFocused = null;
+Template.defaultLayout.onRendered(function (this: Blaze.TemplateInstance) {
+  let lastFocused: HTMLElement | null = null;
   this.autorun(() => {
     const isOpen = Modal.isOpen();
     Tracker.afterFlush(() => {
       if (isOpen) {
-        lastFocused = document.activeElement;
+        lastFocused = document.activeElement as HTMLElement | null;
         const modal = document.getElementById('modal');
         if (modal) {
-          const focusTarget = modal.querySelector('.modal-close-btn') || modal;
+          const focusTarget = (modal.querySelector('.modal-close-btn') || modal) as HTMLElement;
           focusTarget.focus();
         }
       } else if (lastFocused && typeof lastFocused.focus === 'function') {
@@ -349,9 +361,9 @@ Template.defaultLayout.onRendered(function () {
   });
 });
 
-async function authentication(event, templateInstance) {
-  const match = $('#at-field-username_and_email').val();
-  const password = $('#at-field-password').val();
+async function authentication(event: JQuery.TriggeredEvent, templateInstance: UserFormsLayoutInstance) {
+  const match = $('#at-field-username_and_email').val() as string;
+  const password = $('#at-field-password').val() as string;
 
   if (!match || !password) return undefined;
 
@@ -400,8 +412,8 @@ async function authentication(event, templateInstance) {
 }
 
 function getAuthenticationMethod(
-  settings,
-  match,
+  settings: any,
+  match: any,
 ) {
   if (!settings) {
     return getUserAuthenticationMethod(undefined, match);
@@ -415,7 +427,7 @@ function getAuthenticationMethod(
   return getUserAuthenticationMethod(defaultAuthenticationMethod, match);
 }
 
-function getUserAuthenticationMethod(defaultAuthenticationMethod, match) {
+function getUserAuthenticationMethod(defaultAuthenticationMethod: any, match: any) {
   return new Promise((resolve) => {
     try {
       Meteor.subscribe('user-authenticationMethod', match, {
@@ -432,4 +444,9 @@ function getUserAuthenticationMethod(defaultAuthenticationMethod, match) {
       resolve(defaultAuthenticationMethod);
     }
   });
+}
+
+interface UserFormsLayoutInstance extends Blaze.TemplateInstance {
+  currentSetting: ReactiveVar<any>;
+  isLoading: ReactiveVar<boolean>;
 }
