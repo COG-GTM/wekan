@@ -1,9 +1,11 @@
 
-Meteor.loginWithCas = function(callback) {
+Meteor.loginWithCas = function(callback?: (err?: Error) => void) {
 
   var credentialToken = Random.id();
 
-  if (!Meteor.settings.public &&
+  // `Meteor.settings.public` is a dynamic settings dictionary; the cast keeps
+  // the chained `.cas` accesses typed instead of narrowing to `never`.
+  if (!(Meteor.settings.public as { [key: string]: any }) &&
       !Meteor.settings.public.cas &&
       !Meteor.settings.public.cas.loginUrl) {
     return;
@@ -17,7 +19,7 @@ Meteor.loginWithCas = function(callback) {
       credentialToken;
 
 
-  var fail = function (err) {
+  var fail = function (err: InAppBrowserEvent) {
     Meteor._debug("Error from OAuth popup: " + JSON.stringify(err));
   };
 
@@ -28,7 +30,7 @@ Meteor.loginWithCas = function(callback) {
   // works that we don't understand and isn't well-documented.
   var oauthFinished = false;
 
-  var pageLoaded = function (event) {
+  var pageLoaded = function (event: InAppBrowserEvent) {
     if (oauthFinished) {
       return;
     }
@@ -62,10 +64,20 @@ Meteor.loginWithCas = function(callback) {
     popup.removeEventListener('exit', onExit);
   };
 
-  var popup = window.open(loginUrl, '_blank', 'location=no,hidden=no');
+  // any: Cordova's InAppBrowser plugin replaces `window.open` at runtime,
+  // returning an InAppBrowser instance (not a DOM Window) whose type is not
+  // available here; only the members used below (see InAppBrowserEvent) matter.
+  var popup: any = window.open(loginUrl, '_blank', 'location=no,hidden=no');
   popup.addEventListener('loadstop', pageLoaded);
   popup.addEventListener('loaderror', fail);
   popup.addEventListener('exit', onExit);
   popup.show();
 
 };
+
+interface InAppBrowserEvent {
+  type: string;
+  url: string;
+  code?: number;
+  message?: string;
+}

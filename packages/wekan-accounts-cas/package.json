@@ -1,0 +1,10 @@
+{
+  "name": "wekan-accounts-cas",
+  "private": true,
+  "devDependencies": {
+    "@types/meteor": "^2.9.8",
+    "@types/node": "^20.14.0",
+    "@types/xml2js": "^0.4.14",
+    "typescript": "^5.6.3"
+  }
+}
