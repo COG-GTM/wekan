@@ -2,6 +2,7 @@ import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
 import { toggleNotificationsDrawer } from './notifications.js';
 import Users from '/models/users';
+import { Template } from 'meteor/templating';
 
 Template.notificationsDrawer.onCreated(function() {
   Meteor.subscribe('notificationActivities');
@@ -26,26 +27,27 @@ Template.notificationsDrawer.helpers({
   readNotifications() {
     const user = ReactiveCache.getCurrentUser();
     const list = user ? user.notifications() : [];
-    const readNotifications = list.filter(v => !!v.read);
+    const readNotifications = list.filter((v: any) => !!v.read);
     return readNotifications.length;
   },
 });
 
 Template.notificationsDrawer.events({
-  'click .notification-menu-toggle'(event) {
+  'click .notification-menu-toggle'(event: JQuery.TriggeredEvent) {
     event.stopPropagation();
     Session.set('showNotificationMenu', !Session.get('showNotificationMenu'));
   },
-  async 'click .notification-menu .menu-item'(event) {
+  async 'click .notification-menu .menu-item'(event: JQuery.TriggeredEvent) {
     const target = event.currentTarget;
 
     if (target.classList.contains('mark-all-read')) {
       const notifications = ReactiveCache.getCurrentUser().profile.notifications;
       for (const index in notifications) {
         if (notifications.hasOwnProperty(index) && !notifications[index].read) {
-          const update = {};
+          const update: { [key: string]: Date | null } = {};
           update[`profile.notifications.${index}.read`] = new Date();
-          await Users.updateAsync(Meteor.userId(), { $set: update }).catch((error) => {
+          // error: any — Meteor updateAsync rejection is an untyped Meteor.Error.
+          await Users.updateAsync(Meteor.userId()!, { $set: update }).catch((error: any) => {
             console.error('Error marking notification as read:', error);
           });
         }
@@ -55,9 +57,10 @@ Template.notificationsDrawer.events({
       const notifications = ReactiveCache.getCurrentUser().profile.notifications;
       for (const index in notifications) {
         if (notifications.hasOwnProperty(index) && notifications[index].read) {
-          const update = {};
+          const update: { [key: string]: Date | null } = {};
           update[`profile.notifications.${index}.read`] = null;
-          await Users.updateAsync(Meteor.userId(), { $set: update }).catch((error) => {
+          // error: any — Meteor updateAsync rejection is an untyped Meteor.Error.
+          await Users.updateAsync(Meteor.userId()!, { $set: update }).catch((error: any) => {
             console.error('Error marking notification as unread:', error);
           });
         }
@@ -93,9 +96,10 @@ Template.notificationsDrawer.events({
     Session.set('showNotificationMenu', false);
     toggleNotificationsDrawer();
   },
-  'click'(event) {
+  'click'(event: JQuery.TriggeredEvent) {
     // Close menu when clicking outside
-    if (!event.target.closest('.notification-menu') && !event.target.closest('.notification-menu-toggle')) {
+    const target = event.target as HTMLElement;
+    if (!target.closest('.notification-menu') && !target.closest('.notification-menu-toggle')) {
       Session.set('showNotificationMenu', false);
     }
   },

@@ -1,9 +1,11 @@
 import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
 import Cards from '/models/cards';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 
 // Add click handler to ganttView for card titles
 Template.ganttView.events({
-  'click .js-gantt-card-title'(event, template) {
+  'click .js-gantt-card-title'(event: JQuery.TriggeredEvent, template: GanttViewInstance) {
     event.preventDefault();
     // Get card ID from the closest row's data attribute
     const $row = template.$(event.currentTarget).closest('tr');
@@ -18,15 +20,15 @@ import { Template } from 'meteor/templating';
 import { Utils } from '/client/lib/utils';
 
 // Blaze template helpers for ganttView
-function getISOWeekInfo(d) {
+function getISOWeekInfo(d: Date) {
 	const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
 	const dayNum = date.getUTCDay() || 7;
 	date.setUTCDate(date.getUTCDate() + 4 - dayNum);
 	const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-	const week = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+	const week = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 	return { year: date.getUTCFullYear(), week };
 }
-function startOfISOWeek(d) {
+function startOfISOWeek(d: Date) {
 	const date = new Date(d);
 	const day = date.getDay() || 7;
 	if (day !== 1) date.setDate(date.getDate() - (day - 1));
@@ -40,9 +42,9 @@ Template.ganttView.helpers({
 		if (!board) return [];
 		const cards = Cards.find({ boardId: board._id }, { sort: { startAt: 1, dueAt: 1 } }).fetch();
 		const weeksMap = new Map();
-		const relevantCards = cards.filter(c => c.receivedAt || c.startAt || c.dueAt || c.endAt);
-		relevantCards.forEach(card => {
-			['receivedAt','startAt','dueAt','endAt'].forEach(field => {
+		const relevantCards = cards.filter((c: any) => c.receivedAt || c.startAt || c.dueAt || c.endAt);
+		relevantCards.forEach((card: any) => {
+			['receivedAt','startAt','dueAt','endAt'].forEach((field: string) => {
 				if (card[field]) {
 					const dt = new Date(card[field]);
 					const info = getISOWeekInfo(dt);
@@ -53,9 +55,9 @@ Template.ganttView.helpers({
 				}
 			});
 		});
-		return Array.from(weeksMap.values()).sort((a,b) => a.start - b.start);
+		return Array.from(weeksMap.values()).sort((a: any, b: any) => a.start - b.start);
 	},
-	weekDays(week) {
+	weekDays(week: any) {
 		const weekStart = new Date(week.start);
 		return Array.from({length:7}, (_,i) => {
 			const d = new Date(weekStart);
@@ -64,21 +66,21 @@ Template.ganttView.helpers({
 			return d;
 		});
 	},
-	weekdayLabel(day) {
+	weekdayLabel(day: Date) {
 		const weekdayKeys = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
 		return TAPi18n.__(weekdayKeys[day.getDay() === 0 ? 6 : day.getDay() - 1]);
 	},
-	formattedDate(day) {
+	formattedDate(day: Date) {
 		const currentUser = ReactiveCache.getCurrentUser && ReactiveCache.getCurrentUser();
 		const dateFormat = currentUser ? currentUser.getDateFormat() : 'YYYY-MM-DD';
 		return formatDateByUserPreference(day, dateFormat, false);
 	},
-	cardsInWeek(week) {
+	cardsInWeek(week: any) {
 		const board = Utils.getCurrentBoard();
 		if (!board) return [];
 		const cards = Cards.find({ boardId: board._id }).fetch();
-		return cards.filter(card => {
-			return ['receivedAt','startAt','dueAt','endAt'].some(field => {
+		return cards.filter((card: any) => {
+			return ['receivedAt','startAt','dueAt','endAt'].some((field: string) => {
 				if (card[field]) {
 					const dt = new Date(card[field]);
 					const info = getISOWeekInfo(dt);
@@ -88,13 +90,13 @@ Template.ganttView.helpers({
 			});
 		});
 	},
-	cardTitle(card) {
+	cardTitle(card: any) {
 		return card.title;
 	},
-	cardId(card) {
+	cardId(card: any) {
 		return card._id;
 	},
-	cardUrl(card) {
+	cardUrl(card: any) {
 		if (!card) return '#';
 		const board = ReactiveCache.getBoard(card.boardId);
 		if (!board) return '#';
@@ -104,7 +106,7 @@ Template.ganttView.helpers({
 			cardId: card._id,
 		});
 	},
-	 cellContentClass(card, day) {
+	 cellContentClass(card: any, day: Date) {
 		 const cardDates = {
 			 receivedAt: card.receivedAt ? new Date(card.receivedAt) : null,
 			 startAt: card.startAt ? new Date(card.startAt) : null,
@@ -117,7 +119,7 @@ Template.ganttView.helpers({
 		 if (cardDates.endAt && cardDates.endAt.toDateString() === day.toDateString()) return 'ganttview-end';
 		 return '';
 	 },
-	 cellContent(card, day) {
+	 cellContent(card: any, day: Date) {
 		 const cardDates = {
 			 receivedAt: card.receivedAt ? new Date(card.receivedAt) : null,
 			 startAt: card.startAt ? new Date(card.startAt) : null,
@@ -130,22 +132,22 @@ Template.ganttView.helpers({
 		 if (cardDates.endAt && cardDates.endAt.toDateString() === day.toDateString()) return '🏁';
 		 return '';
 	 },
-	isToday(day) {
+	isToday(day: Date) {
 		const today = new Date();
 		return day.toDateString() === today.toDateString();
 	},
-	isWeekend(day) {
+	isWeekend(day: Date) {
 		const idx = day.getDay();
 		return idx === 0 || idx === 6;
 	},
 	hasSelectedCard() {
-		return Template.instance().selectedCardId.get() !== null;
+		return (Template.instance() as GanttViewInstance).selectedCardId.get() !== null;
 	},
 	selectedCard() {
-		const cardId = Template.instance().selectedCardId.get();
+		const cardId = (Template.instance() as GanttViewInstance).selectedCardId.get();
 		return cardId ? ReactiveCache.getCard(cardId) : null;
 	},
-	cellClasses(card, day) {
+	cellClasses(card: any, day: Date) {
 		// Get the base class from cellContentClass logic
 		const cardDates = {
 			receivedAt: card.receivedAt ? new Date(card.receivedAt) : null,
@@ -170,15 +172,15 @@ Template.ganttView.helpers({
 	}
 });
 
-Template.ganttView.onCreated(function() {
-	this.selectedCardId = new ReactiveVar(null);
+Template.ganttView.onCreated(function(this: GanttViewInstance) {
+	this.selectedCardId = new ReactiveVar<string | null>(null);
 	// Provide properties expected by cardDetails component
 	this.showOverlay = new ReactiveVar(false);
 	this.mouseHasEnterCardDetails = false;
 });
 
 // Blaze onRendered logic for ganttView
-Template.ganttView.onRendered(function() {
+Template.ganttView.onRendered(function(this: GanttViewInstance) {
 	const self = this;
 	this.autorun(() => {
 		// If you have legacy imperative rendering, keep it here
@@ -187,7 +189,7 @@ Template.ganttView.onRendered(function() {
 		}
 	});
 	// Add click handler for date cells (Received, Start, Due, End)
-	this.$('.gantt-table').on('click', '.js-gantt-date-icon', function(e) {
+	this.$('.gantt-table').on('click', '.js-gantt-date-icon', function(this: HTMLElement, e: JQuery.TriggeredEvent) {
 		e.preventDefault();
 		e.stopPropagation();
 		const $cell = self.$(this);
@@ -203,7 +205,7 @@ Template.ganttView.onRendered(function() {
 			due: 'editCardDueDate',
 			end: 'editCardEndDate',
 		};
-		const popupName = popupMap[dateType];
+		const popupName = (popupMap as { [key: string]: string })[dateType];
 		if (!popupName || typeof Popup === 'undefined' || typeof Popup.open !== 'function') return;
 		const card = ReactiveCache.getCard(cardId);
 		if (!card) return;
@@ -219,3 +221,9 @@ import { formatDateByUserPreference } from '/imports/lib/dateUtils';
 import { ReactiveCache } from '/imports/reactiveCache';
 
 const md = markdownit({ breaks: true, linkify: true });
+
+interface GanttViewInstance extends Blaze.TemplateInstance {
+	selectedCardId: ReactiveVar<string | null>;
+	showOverlay: ReactiveVar<boolean>;
+	mouseHasEnterCardDetails: boolean;
+}

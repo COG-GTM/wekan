@@ -95,6 +95,12 @@ declare module '*.css';
 // the type-checker they carry no exported bindings.
 declare module '*.jade';
 
+// Legacy optional gantt renderer hook. client/components/gantt/gantt.ts guards
+// on `typeof renderGanttChart === 'function'` before calling it; the function is
+// never actually defined in the app, so it is declared here (as possibly
+// undefined) solely so that dead-code presence check type-checks.
+declare const renderGanttChart: undefined | (() => void);
+
 // @wekanteam/dragscroll — mouse drag-to-scroll library (no bundled types).
 // client/lib/pageDragscroll.ts only calls `reset()` to re-scan/re-bind after
 // toggling the `dragscroll` class on the page scroll containers.
@@ -447,6 +453,26 @@ declare module 'papaparse' {
   const Papa: { parse: typeof parse; unparse: typeof unparse };
   export default Papa;
   export { parse, unparse };
+}
+
+// markdown-it ships no bundled types and @types/markdown-it is not installed.
+// The renderer is constructed with an options bag and exposes render/renderInline
+// plus a chainable use() for plugins; option and plugin shapes are library-defined.
+declare module 'markdown-it' {
+  interface MarkdownIt {
+    render(src: string, env?: any): string;
+    renderInline(src: string, env?: any): string;
+    use(plugin: any, ...params: any[]): MarkdownIt;
+    utils: any;
+  }
+  interface MarkdownItConstructor {
+    (options?: any): MarkdownIt;
+    (presetName: string, options?: any): MarkdownIt;
+    new (options?: any): MarkdownIt;
+    new (presetName: string, options?: any): MarkdownIt;
+  }
+  const markdownit: MarkdownItConstructor;
+  export default markdownit;
 }
 
 // meteor/reywood:publish-composite — declarative publication of related cursors

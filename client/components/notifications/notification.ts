@@ -1,39 +1,41 @@
 import { ReactiveCache } from '/imports/reactiveCache';
 import { formatDateByUserPreference } from '/imports/lib/dateUtils';
 import Users from '/models/users';
+import { Template } from 'meteor/templating';
 
 Template.notification.events({
-  async 'click .read-status .materialCheckBox'() {
-    const update = {};
+  async 'click .read-status .materialCheckBox'(this: any) {
+    const update: { [key: string]: Date | null } = {};
     const newReadValue = this.read ? null : new Date();
     update[`profile.notifications.${this.index}.read`] = newReadValue;
 
-    await Users.updateAsync(Meteor.userId(), { $set: update }).catch((error) => {
+    // error: any — Meteor updateAsync rejection is an untyped Meteor.Error.
+    await Users.updateAsync(Meteor.userId()!, { $set: update }).catch((error: any) => {
       if (error) {
         console.error('Error updating notification:', error);
       }
     });
   },
-  'click .remove a'() {
+  'click .remove a'(this: any) {
     ReactiveCache.getCurrentUser().removeNotification(this.activityData._id);
   },
 });
 
 Template.notification.helpers({
   mode: 'board',
-  isOfActivityType(activityId, type) {
+  isOfActivityType(activityId: string, type: string) {
     const activity = ReactiveCache.getActivity(activityId);
     return activity && activity.activityType === type;
   },
-  activityType(activityId) {
+  activityType(activityId: string) {
     const activity = ReactiveCache.getActivity(activityId);
     return activity ? activity.activityType : '';
   },
-  activityUser(activityId) {
+  activityUser(activityId: string) {
     const activity = ReactiveCache.getActivity(activityId);
     return activity && activity.userId;
   },
-  activityDate() {
+  activityDate(this: any) {
     const activity = this.activityData;
     if (!activity || !activity.createdAt) return '';
 
