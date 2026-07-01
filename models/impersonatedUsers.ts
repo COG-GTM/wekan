@@ -1,5 +1,5 @@
 import { Mongo } from 'meteor/mongo';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
 const ImpersonatedUsers = new Mongo.Collection('impersonatedUsers');
 

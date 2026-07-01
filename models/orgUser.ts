@@ -1,6 +1,6 @@
 import { Mongo } from 'meteor/mongo';
 import { incrementCounter } from './counters';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
 const OrgUser = new Mongo.Collection('orgUser');
 

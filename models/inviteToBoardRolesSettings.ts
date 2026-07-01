@@ -1,5 +1,5 @@
 import { Mongo } from 'meteor/mongo';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
 // All board-member role keys that a global admin may grant the "invite to
 // board" capability to. Order is the display order in the Admin Panel / People
@@ -72,14 +72,16 @@ InviteToBoardRolesSettings.attachSchema(
 );
 
 InviteToBoardRolesSettings.helpers({
-  isRoleAllowed(role) {
+  isRoleAllowed(role: string) {
     return (this.allowedRoles || []).includes(role);
   },
 });
 
 // Returns the configured set of allowed roles, falling back to the secure
 // default if the settings document does not exist yet.
-InviteToBoardRolesSettings.allowedRoles = async function() {
+// A custom static method attached to the collection instance; it is not part of
+// the Mongo.Collection type, so the assignment goes through `any`.
+(InviteToBoardRolesSettings as any).allowedRoles = async function() {
   const doc = await InviteToBoardRolesSettings.findOneAsync(INVITE_TO_BOARD_ROLES_ID);
   return (doc && doc.allowedRoles) || INVITE_TO_BOARD_ROLES_DEFAULT;
 };

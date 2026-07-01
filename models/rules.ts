@@ -1,6 +1,6 @@
 import { ReactiveCache } from '/imports/reactiveCache';
 import { Mongo } from 'meteor/mongo';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
 const Rules = new Mongo.Collection('rules');
 
@@ -64,7 +64,7 @@ Rules.attachSchema(
 );
 
 Rules.helpers({
-  async rename(description) {
+  async rename(description: string) {
     return await Rules.updateAsync(this._id, { $set: { description } });
   },
   getAction() {
