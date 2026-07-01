@@ -1,9 +1,13 @@
+import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { findWhere } from '/imports/lib/collectionHelpers';
 import { TAPi18n } from '/imports/i18n';
 import Attachments from '/models/attachments';
 import { Utils } from '/client/lib/utils';
 import autosize from 'autosize';
+// converter is the untyped @wekanteam/html-to-markdown module (require -> any).
 var converter = require('@wekanteam/html-to-markdown');
 
 const specialHandles = [
@@ -23,12 +27,12 @@ const boardSpecialHandles = [
 const specialHandleNames = specialHandles.map(m => m.username);
 
 
-Template.editor.onRendered(function () {
+Template.editor.onRendered(function (this: Blaze.TemplateInstance) {
     const tpl = this;
     // Start: Copy <pre> code https://github.com/wekan/wekan/issues/5149
     // TODO: Try to make copyPre visible at Card Details after editing or closing editor or Card Details.
     //       - Also this same TODO below at event, if someone gets it working.
-    var copy = function(target) {
+    var copy = function(target: HTMLElement) {
       var textArea = document.createElement('textarea');
       textArea.setAttribute('style','width:1px;border:0;opacity:0;');
       document.body.appendChild(textArea);
@@ -38,31 +42,31 @@ Template.editor.onRendered(function () {
       document.body.removeChild(textArea);
     }
     var pres = document.querySelectorAll(".viewer > pre");
-    pres.forEach(function(pre){
+    pres.forEach(function(pre: Element){
       var button = document.createElement("a");
       button.className = "fa fa-copy btn btn-sm right";
       // TODO: Translate text 'Copy text to clipboard'
       button.setAttribute('title','Copy text to clipboard');
       button.innerHTML = '';
-      pre.parentNode.insertBefore(button, pre);
-      button.addEventListener('click', function(e){
+      pre.parentNode!.insertBefore(button, pre);
+      button.addEventListener('click', function(e: Event){
         e.preventDefault();
-        copy(pre.childNodes[0]);
+        copy(pre.childNodes[0] as HTMLElement);
       })
     })
     // End: Copy <pre> code
 
     const textareaSelector = 'textarea';
-    const mentions = [
+    const mentions: import('@textcomplete/core').StrategyProps[] = [
       // User mentions
       {
         match: /\B@([\w.-]*)$/,
-        search(term, callback) {
+        search(term: string, callback: (results: any[]) => void) {
           const currentBoard = Utils.getCurrentBoard();
           const searchTerm = term.toLowerCase();
           const users = currentBoard
             .activeMembers()
-            .map(member => {
+            .map((member: any) => {
               const user = ReactiveCache.getUser(member.userId);
               const username = user.username.toLowerCase();
               const fullName = user.profile && user.profile !== undefined && user.profile.fullname ? user.profile.fullname.toLowerCase() : "";
@@ -72,7 +76,7 @@ Template.editor.onRendered(function () {
           // Order: 1. Users, 2. Card-specific options, 3. Board-wide options
           callback([...new Set([...users, ...cardSpecialHandles, ...boardSpecialHandles])]);
         },
-        template(user) {
+        template(user: any) {
           if (user.profile && user.profile.fullname) {
             return (user.profile.fullname + " (" + user.username + ")");
           }
@@ -82,7 +86,7 @@ Template.editor.onRendered(function () {
           }
           return user.username;
         },
-        replace(user) {
+        replace(user: any) {
           if (user.profile && user.profile.fullname) {
             return `@${user.username} (${user.profile.fullname}) `;
           }
@@ -119,7 +123,7 @@ Template.editor.onRendered(function () {
             ['insert', ['link']], //, 'picture']], // modal popup has issue somehow :(
             ['view', ['fullscreen', 'codeview', 'help']],
           ];
-      const cleanPastedHTML = function(input) {
+      const cleanPastedHTML = function(input: string) {
         const badTags = [
           'style',
           'script',
@@ -168,21 +172,22 @@ Template.editor.onRendered(function () {
         enableTextarea();
       } else {
         const placeholder = inputs.attr('placeholder') || '';
-        const mSummernotes = [];
-        const getSummernote = function(input) {
+        const mSummernotes: any[] = [];
+        const getSummernote = function(input: any) {
           const idx = inputs.index(input);
           if (idx > -1) {
             return mSummernotes[idx];
           }
           return undefined;
         };
-        inputs.each(function(idx, input) {
+        inputs.each(function(idx: number, input: HTMLElement) {
           mSummernotes[idx] = $(input).summernote({
             placeholder,
             callbacks: {
-              onInit(object) {
+              // Summernote callback context is dynamic (jQuery plugin, untyped).
+              onInit(this: any, object: any) {
                 const originalInput = this;
-                $(originalInput).on('submitted', function() {
+                $(originalInput).on('submitted', function(this: any) {
                   // when comment is submitted, the original textarea will be set to '', so shall we
                   if (!this.value) {
                     const sn = getSummernote(this);
@@ -196,21 +201,23 @@ Template.editor.onRendered(function () {
                 }
                 if (toolbar !== undefined) {
                   const fBtn = toolbar.find('.btn-fullscreen');
-                  fBtn.on('click', function() {
+                  fBtn.on('click', function(this: any) {
                     const $this = $(this),
                       isActive = $this.hasClass('active');
                     $('.minicards,#header-quick-access').toggle(!isActive); // mini card is still showing when editor is in fullscreen mode, we hide here manually
                   });
                 }
               },
-              onImageUpload(files) {
+              onImageUpload(this: any, files: any) {
                 const $summernote = getSummernote(this);
                 if (files && files.length > 0) {
                   const image = files[0];
                   const currentCard = Utils.getCurrentCard();
                   const MAX_IMAGE_PIXEL = Utils.MAX_IMAGE_PIXEL;
-                  const COMPRESS_RATIO = Utils.IMAGE_COMPRESS_RATIO;
-                  const processUpload = async function(file) {
+                  // IMAGE_COMPRESS_RATIO is not exposed on Utils (only COMPRESS_RATIO);
+                  // preserving the original (undefined) lookup via a cast.
+                  const COMPRESS_RATIO = (Utils as any).IMAGE_COMPRESS_RATIO;
+                  const processUpload = async function(file: any) {
                     const uploader = await Attachments.insertAsync(
                       {
                         file,
@@ -219,7 +226,7 @@ Template.editor.onRendered(function () {
                       },
                       false,
                     );
-                    uploader.on('uploaded', (error, fileRef) => {
+                    uploader.on('uploaded', (error: any, fileRef: any) => {
                       if (!error) {
                         if (fileRef.isImage) {
                           const img = document.createElement('img');
@@ -233,16 +240,17 @@ Template.editor.onRendered(function () {
                   };
                   if (MAX_IMAGE_PIXEL) {
                     const reader = new FileReader();
-                    reader.onload = function(e) {
+                    reader.onload = function(e: ProgressEvent<FileReader>) {
                       const dataurl = e && e.target && e.target.result;
                       if (dataurl !== undefined) {
                         // need to shrink image
                         Utils.shrinkImage({
-                          dataurl,
+                          dataurl: dataurl as string,
                           maxSize: MAX_IMAGE_PIXEL,
                           ratio: COMPRESS_RATIO,
                           toBlob: true,
-                          callback(blob) {
+                          // blob is the shrunk File/Blob (or false); dynamic plugin result.
+                          callback(blob: any) {
                             if (blob !== false) {
                               blob.name = image.name;
                               processUpload(blob);
@@ -257,7 +265,8 @@ Template.editor.onRendered(function () {
                   }
                 }
               },
-              onPaste(e) {
+              // e is the summernote paste event carrying clipboardData (untyped).
+              onPaste(this: any, e: any) {
                 var clipboardData = e.clipboardData;
                 var pastedData = clipboardData.getData('Text');
 
@@ -269,7 +278,7 @@ Template.editor.onRendered(function () {
 
                 // clear up unwanted tag info when user pasted in text
                 const thisNote = this;
-                const updatePastedText = function(object) {
+                const updatePastedText = function(object: any) {
                   const someNote = getSummernote(object);
                   // Fix Pasting text into a card is adding a line before and after
                   // (and multiplies by pasting more) by changing paste "p" to "br".
@@ -321,16 +330,16 @@ Template.editor.onRendered(function () {
 });
 
 Template.editor.events({
-    'click a.fa.fa-copy'(event, tpl) {
+    'click a.fa.fa-copy'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
       const $editor = tpl.$('textarea.editor');
-      const promise = Utils.copyTextToClipboard($editor[0].value);
+      const promise = Utils.copyTextToClipboard(($editor[0] as HTMLTextAreaElement).value);
 
       const $tooltip = tpl.$('.copied-tooltip');
       Utils.showCopied(promise, $tooltip);
     },
-    'click a.fa.fa-brands.fa-markdown'(event, tpl) {
+    'click a.fa.fa-brands.fa-markdown'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
       const $editor = tpl.$('textarea.editor');
-      $editor[0].value = converter.convert($editor[0].value);
+      ($editor[0] as HTMLTextAreaElement).value = converter.convert(($editor[0] as HTMLTextAreaElement).value);
     },
     // TODO: Try to make copyPre visible at Card Details after editing or closing editor or Card Details.
     //'click .js-close-inlined-form'(event) {
@@ -381,15 +390,18 @@ function mySafeAttrValue(tag, name, value, cssFilter) {
 const at = HTML.CharRef({ html: '&commat;', str: '@' });
 Blaze.Template.registerHelper(
   'mentions',
-  new Template('mentions', function() {
+  // Registering a Template instance as a Blaze block helper is valid Blaze usage
+  // but @types/meteor types registerHelper's second arg as a plain Function.
+  new Template('mentions', function(this: any) {
     const view = this;
     let content = Blaze.toHTML(view.templateContentBlock);
     const currentBoard = Utils.getCurrentBoard();
     if (!currentBoard)
-      return HTML.Raw(sanitizeHTML(content));
+      // HTML.Raw takes a raw HTML string, not the tag-factory attributes shape.
+      return (HTML.Raw as any)(sanitizeHTML(content));
     const knowedUsers = [...new Set([...currentBoard.members
-      .filter(member => member.isActive)
-      .map(member => {
+      .filter((member: any) => member.isActive)
+      .map((member: any) => {
         const u = ReactiveCache.getUser(member.userId);
         if (u) {
           member.username = u.username;
@@ -440,21 +452,22 @@ Blaze.Template.registerHelper(
       content = content.replace(fullMention, Blaze.toHTML(link));
     }
 
-    return HTML.Raw(sanitizeHTML(content));
-  }),
+    // HTML.Raw takes a raw HTML string, not the tag-factory attributes shape.
+    return (HTML.Raw as any)(sanitizeHTML(content));
+  }) as any,
 );
 
 Template.viewer.events({
   // Viewer sometimes have click-able wrapper around them (for instance to edit
   // the corresponding text). Clicking a link shouldn't fire these actions, stop
   // we stop these event at the viewer component level.
-  'click a'(event, templateInstance) {
+  'click a'(event: JQuery.TriggeredEvent, templateInstance: Blaze.TemplateInstance) {
     const prevent = true;
-    const userId = event.currentTarget.dataset.userid;
+    const userId = (event.currentTarget as HTMLElement).dataset.userid;
     if (userId) {
-      Popup.open('member').call({ userId }, event, templateInstance);
+      (Popup.open('member') as any).call({ userId }, event, templateInstance);
     } else {
-      const href = event.currentTarget.href;
+      const href = (event.currentTarget as HTMLAnchorElement).href;
       if (href) {
         // Open links in current browser tab, changed from _blank to _self, and back to _blank:
         // https://github.com/wekan/wekan/discussions/3534

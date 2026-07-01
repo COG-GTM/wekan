@@ -117,6 +117,10 @@ interface JQuery {
   // carrying the pasted/dropped image (dataURL + file).
   pasteImageReader(handler: (results: any) => void): JQuery;
   dropImageReader(handler: (results: any) => void): JQuery;
+  // Summernote rich-text editor plugin (loaded for RICHER_CARD_COMMENT_EDITOR).
+  // Its API is dynamic (init with an options bag, or invoke string commands),
+  // and it ships no usable types, so args/return are `any`.
+  summernote(...args: any[]): any;
 }
 
 // The `ui` object passed to jQuery UI sortable start/stop callbacks.
