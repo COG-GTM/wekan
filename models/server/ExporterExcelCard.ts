@@ -52,20 +52,20 @@ const LABEL_COLOR_ARGB = {
 };
 
 /** Convert a WeKan color name to ARGB, falling back to silver. */
-function labelColorToArgb(colorName) {
-  return LABEL_COLOR_ARGB[colorName] || 'FFC0C0C0';
+function labelColorToArgb(colorName: WekanDocumentField) {
+  return (LABEL_COLOR_ARGB as Record<string, string>)[colorName] || 'FFC0C0C0';
 }
 
 /**
  * Return FFFFFFFF (white) or FF000000 (black) text colour based on the
  * relative luminance of the background ARGB string.
  */
-function labelTextArgb(bgArgb) {
+function labelTextArgb(bgArgb: string) {
   const hex = bgArgb.slice(2); // strip leading AA byte
   const r = parseInt(hex.slice(0, 2), 16);
   const g = parseInt(hex.slice(2, 4), 16);
   const b = parseInt(hex.slice(4, 6), 16);
-  const toLinear = c => {
+  const toLinear = (c: number) => {
     const s = c / 255;
     return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
   };
@@ -109,8 +109,8 @@ const THEME_PROGRESS_COLOR = {
 };
 
 /** Return the progress-bar ARGB colour for a given board colour/theme name. */
-function progressColorArgb(boardColor) {
-  return THEME_PROGRESS_COLOR[boardColor] || 'FF2980B9'; // default: belize blue
+function progressColorArgb(boardColor: WekanDocumentField) {
+  return (THEME_PROGRESS_COLOR as Record<string, string>)[boardColor] || 'FF2980B9'; // default: belize blue
 }
 
 const IMG_WIDTH_PX       = 150;   // embedded image width in pixels
@@ -121,11 +121,11 @@ const IMG_COLS_PER_IMAGE = 1.5;   // fractional column units each image occupies
 
 // ── Pure helper functions ────────────────────────────────────────────────────
 
-function sanitizeSheetName(value) {
+function sanitizeSheetName(value: WekanDocumentField) {
   return String(value || 'Card').replace(/[\\/*?:[\]]/g, '-').slice(0, 31);
 }
 
-function sanitizeFilename(value) {
+function sanitizeFilename(value: WekanDocumentField) {
   return (
     String(value || 'export-card')
       .replace(/[^a-z0-9._-]+/gi, '-')
@@ -135,14 +135,14 @@ function sanitizeFilename(value) {
   );
 }
 
-function normalizeText(value) {
+function normalizeText(value: WekanDocumentField) {
   return String(value ?? '')
     .replace(/<[^>]*>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-function formatFileSize(bytes) {
+function formatFileSize(bytes: WekanDocumentField) {
   if (!bytes || bytes < 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.min(Math.floor(Math.log2(bytes) / 10), units.length - 1);
@@ -151,10 +151,10 @@ function formatFileSize(bytes) {
 }
 
 /** Read an entire readable stream into a Buffer. */
-function streamToBuffer(stream) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    stream.on('data', chunk => chunks.push(Buffer.from(chunk)));
+function streamToBuffer(stream: WekanDocumentField) {
+  return new Promise<Buffer>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    stream.on('data', (chunk: WekanDocumentField) => chunks.push(Buffer.from(chunk)));
     stream.on('error', reject);
     stream.on('end', () => resolve(Buffer.concat(chunks)));
   });
@@ -163,6 +163,13 @@ function streamToBuffer(stream) {
 // ── ExporterExcelCard ────────────────────────────────────────────────────────
 
 class ExporterExcelCard {
+  _boardId: string;
+  _listId: string;
+  _cardId: string;
+  userLanguage: string;
+  _fields: Set<string>;
+  dateFormat: string;
+
   /**
    * @param {string}        boardId
    * @param {string}        listId
@@ -171,7 +178,7 @@ class ExporterExcelCard {
    * @param {string[]|null} fields        Sections to include; null = all
    * @param {string}        dateFormat    User date format: 'YYYY-MM-DD' | 'DD-MM-YYYY' | 'MM-DD-YYYY'
    */
-  constructor(boardId, listId, cardId, userLanguage, fields, dateFormat) {
+  constructor(boardId: string, listId: string, cardId: string, userLanguage: string, fields: string[] | null, dateFormat: string) {
     this._boardId     = boardId;
     this._listId      = listId;
     this._cardId      = cardId;
@@ -180,21 +187,21 @@ class ExporterExcelCard {
     this.dateFormat   = dateFormat || 'YYYY-MM-DD';
   }
 
-  __(key) { return TAPi18n.__(key, '', this.userLanguage); }
+  __(key: string) { return TAPi18n.__(key, '', this.userLanguage); }
 
   /** Format a date value using the user's preferred format, always including time. */
-  fmtDate(d) { return d ? formatDateByUserPreference(d, this.dateFormat, true) : ''; }
+  fmtDate(d: WekanDocumentField) { return d ? formatDateByUserPreference(d, this.dateFormat, true) : ''; }
 
-  hasField(key) { return this._fields.has(key); }
+  hasField(key: string) { return this._fields.has(key); }
 
-  async canExport(user) {
+  async canExport(user: WekanDocumentField) {
     const board = await ReactiveCache.getBoard(this._boardId);
     return board && board.isVisibleBy(user);
   }
 
   // ── Build ────────────────────────────────────────────────────────────────
 
-  async build(res) {
+  async build(res: WekanWebAppResponse) {
     try {
       await this._buildAndWrite(res);
     } catch (err) {
@@ -208,7 +215,7 @@ class ExporterExcelCard {
 
   // ── Internal build ───────────────────────────────────────────────────────
 
-  async _buildAndWrite(res) {
+  async _buildAndWrite(res: WekanWebAppResponse) {
     const card = await ReactiveCache.getCard(this._cardId);
     if (!card) {
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -231,27 +238,27 @@ class ExporterExcelCard {
     const list     = needsBoardInfo ? await ReactiveCache.getList(card.listId)               : null;
     const swimlane = needsBoardInfo ? await ReactiveCache.getSwimlane(card.swimlaneId)        : null;
 
-    const userMap = {};
+    const userMap: Record<string, WekanDocumentField> = {};
     if (needsPeople || needsDates || needsComments || needsAttachments) {
       const userIds = new Set();
       if (card.userId) userIds.add(card.userId);
       if (needsPeople) {
-        if (card.members)   card.members.forEach(id => userIds.add(id));
-        if (card.assignees) card.assignees.forEach(id => userIds.add(id));
+        if (card.members)   card.members.forEach((id: WekanDocumentField) => userIds.add(id));
+        if (card.assignees) card.assignees.forEach((id: WekanDocumentField) => userIds.add(id));
       }
       const uDocs = await ReactiveCache.getUsers(
         { _id: { $in: Array.from(userIds) } },
         { fields: { _id: 1, username: 1 } },
       );
-      uDocs.forEach(u => { userMap[u._id] = u.username; });
+      uDocs.forEach((u: WekanDocumentField) => { userMap[u._id] = u.username; });
     }
 
     const creatorName   = userMap[card.userId] || '';
     const ownerName     = (card.members && card.members.length > 0)
       ? (userMap[card.members[0]] || creatorName)
       : creatorName;
-    const memberNames   = (card.members   || []).map(id => userMap[id] || id).join(', ');
-    const assigneeNames = (card.assignees || []).map(id => userMap[id] || id).join(', ');
+    const memberNames   = (card.members   || []).map((id: WekanDocumentField) => userMap[id] || id).join(', ');
+    const assigneeNames = (card.assignees || []).map((id: WekanDocumentField) => userMap[id] || id).join(', ');
 
     const checklists    = needsChecklists  ? await ReactiveCache.getChecklists({ cardId: this._cardId })                                 : [];
     const checklistItems= needsChecklists  ? await ReactiveCache.getChecklistItems({ cardId: this._cardId })                             : [];
@@ -262,8 +269,8 @@ class ExporterExcelCard {
     // Batch-load any missing user IDs (comments + attachments uploaders)
     if (needsComments || needsAttachments) {
       const extraIds = new Set();
-      if (needsComments)    comments.forEach(c => c.userId && extraIds.add(c.userId));
-      if (needsAttachments) attachments.forEach(a => (a.userId || (a.meta && a.meta.userId)) && extraIds.add(a.userId || a.meta.userId));
+      if (needsComments)    comments.forEach((c: WekanDocumentField) => c.userId && extraIds.add(c.userId));
+      if (needsAttachments) attachments.forEach((a: WekanDocumentField) => (a.userId || (a.meta && a.meta.userId)) && extraIds.add(a.userId || a.meta.userId));
       // Remove already-fetched
       Object.keys(userMap).forEach(id => extraIds.delete(id));
       if (extraIds.size > 0) {
@@ -271,12 +278,15 @@ class ExporterExcelCard {
           { _id: { $in: Array.from(extraIds) } },
           { fields: { _id: 1, username: 1 } },
         );
-        extra.forEach(u => { userMap[u._id] = u.username; });
+        extra.forEach((u: WekanDocumentField) => { userMap[u._id] = u.username; });
       }
     }
 
     // ── Workbook & worksheet setup ───────────────────────────────────────
-    const workbook = createWorkbook();
+    // ExcelJS's Workbook/Worksheet types are deeply nested; this exporter builds
+    // cells dynamically (styles, fills, borders, images), so the workbook is used
+    // through this documented interop handle rather than the strict library types.
+    const workbook: WekanDocumentField = createWorkbook();
     workbook.creator  = this.__('export-board');
     workbook.created  = new Date();
     workbook.modified = new Date();
@@ -313,14 +323,14 @@ class ExporterExcelCard {
     const thinBdr    = { top: { style: 'thin'   }, left: { style: 'thin'   }, bottom: { style: 'thin'   }, right: { style: 'thin'   } };
 
     let row = 1;
-    const pageBreakRows = []; // collect rows where we want explicit page breaks
+    const pageBreakRows: number[] = []; // collect rows where we want explicit page breaks
 
     // ── Style helpers (closures capturing ws / fontName / row) ───────────
 
     /**
      * Merge A–F on current row, set cell properties, advance row counter.
      */
-    const mergeRow = (value, opts = {}) => {
+    const mergeRow = (value: WekanDocumentField, opts: WekanDocumentField = {}) => {
       ws.mergeCells(`A${row}:F${row}`);
       const cell = ws.getCell(`A${row}`);
       cell.value     = value;
@@ -336,7 +346,7 @@ class ExporterExcelCard {
     };
 
     /** Full-width section header with gray background and thick border. */
-    const sectionHeader = (text, withPageBreak = false) => {
+    const sectionHeader = (text: WekanDocumentField, withPageBreak = false) => {
       if (withPageBreak && row > 15) pageBreakRows.push(row - 1);
       return mergeRow(text, {
         font:      { name: fontName, size: 11, bold: true },
@@ -347,7 +357,7 @@ class ExporterExcelCard {
       });
     };
 
-    const setLabel = (cellRef, text) => {
+    const setLabel = (cellRef: string, text: WekanDocumentField) => {
       const c = ws.getCell(cellRef);
       c.value     = text;
       c.font      = { name: fontName, size: 10, bold: true };
@@ -355,7 +365,7 @@ class ExporterExcelCard {
       c.border    = thinBdr;
     };
 
-    const setValue = (cellRef, text) => {
+    const setValue = (cellRef: string, text: WekanDocumentField) => {
       const c = ws.getCell(cellRef);
       c.value     = text;
       c.font      = { name: fontName, size: 10 };
@@ -364,9 +374,9 @@ class ExporterExcelCard {
     };
 
     /** Three label–value pairs across A–F on one row. */
-    const metaRow = (pairs) => {
+    const metaRow = (pairs: WekanDocumentField[]) => {
       const cols = [['A','B'], ['C','D'], ['E','F']];
-      pairs.forEach(([labelKey, value], i) => {
+      pairs.forEach(([labelKey, value]: WekanDocumentField, i: number) => {
         if (!cols[i]) return;
         setLabel(`${cols[i][0]}${row}`, `${this.__(labelKey)}:`);
         setValue(`${cols[i][1]}${row}`, value || '');
@@ -381,7 +391,7 @@ class ExporterExcelCard {
      * Single data row: value is placed in A:B (merged), rest in C:F (merged).
      * Used for comments.
      */
-    const splitRow = (leftText, rightText, leftFont = {}, rightFont = {}) => {
+    const splitRow = (leftText: WekanDocumentField, rightText: WekanDocumentField, leftFont: WekanDocumentField = {}, rightFont: WekanDocumentField = {}) => {
       ws.mergeCells(`A${row}:B${row}`);
       ws.mergeCells(`C${row}:F${row}`);
       const lc = ws.getCell(`A${row}`);
@@ -406,7 +416,7 @@ class ExporterExcelCard {
      * Estimate a good row height for word-wrapped text in a merged A:F cell
      * (6 columns ≈ 114 characters at default column widths / typical font).
      */
-    const estimateHeight = (text, minH = 20, maxH = 300) =>
+    const estimateHeight = (text: WekanDocumentField, minH = 20, maxH = 300) =>
       Math.min(Math.max(minH, Math.ceil((text || '').length / 114) * 14), maxH);
 
     // ════════════════════════════════════════════════════════════════════
@@ -423,7 +433,7 @@ class ExporterExcelCard {
     // ════════════════════════════════════════════════════════════════════
     if (needsLabels) {
       const cardLabels = board
-        ? (board.labels || []).filter(l => (card.labelIds || []).includes(l._id))
+        ? (board.labels || []).filter((l: WekanDocumentField) => (card.labelIds || []).includes(l._id))
         : [];
 
       // Up to 5 label cells per row (columns B–F); column A holds the key.
@@ -563,15 +573,15 @@ class ExporterExcelCard {
         const fillProgressDone  = { type: 'pattern', pattern: 'solid', fgColor: { argb: progressColorArgb(board && board.color) } };
         const fillProgressEmpty = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } }; // gray
 
-        const sorted = [...checklists].sort((a, b) => (a.sort || 0) - (b.sort || 0));
+        const sorted = [...checklists].sort((a: WekanDocumentField, b: WekanDocumentField) => (a.sort || 0) - (b.sort || 0));
         for (const cl of sorted) {
           // Items (needed for progress calculation before rendering title)
           const items = (checklistItems || [])
-            .filter(i => i.checklistId === cl._id)
-            .sort((a, b) => (a.sort || 0) - (b.sort || 0));
+            .filter((i: WekanDocumentField) => i.checklistId === cl._id)
+            .sort((a: WekanDocumentField, b: WekanDocumentField) => (a.sort || 0) - (b.sort || 0));
 
           const total    = items.length;
-          const finished = items.filter(i => i.isFinished).length;
+          const finished = items.filter((i: WekanDocumentField) => i.isFinished).length;
           const percent  = total > 0 ? Math.round(finished / total * 100) : 0;
 
           // Checklist name
@@ -700,8 +710,8 @@ class ExporterExcelCard {
         row++;
 
         // ── One metadata row per attachment ────────────────────────────
-        const imageAttachments = [];
-        const usedFilenames    = new Set();
+        const imageAttachments: WekanDocumentField[] = [];
+        const usedFilenames    = new Set<string>();
 
         for (let ai = 0; ai < attachments.length; ai++) {
           const att     = attachments[ai];

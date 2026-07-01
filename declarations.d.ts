@@ -50,6 +50,10 @@ declare module 'meteor/meteor' {
     interface UserProfile {
       [field: string]: WekanDocumentField;
     }
+    // The running DDP server instance (stream_server, method tables, …). Not
+    // modelled by @types/meteor; the /metrics route reads open socket sessions
+    // through this documented interop handle.
+    const server: WekanDocumentField;
     // Wekan flags site administrators directly on the user document. The user
     // document also carries many wekan-specific fields (profile settings, org
     // and team memberships, per-board preferences, import bookkeeping, …) that
@@ -154,6 +158,10 @@ interface WekanCardDoc {
 
 interface WekanReactiveCache {
   getCard(id: string): WekanCardDoc;
+  // The runtime ReactiveCache exposes a getX/getXs accessor per collection; the
+  // metrics route reaches them through the global handle, so the remaining
+  // accessors come in through this documented interop signature.
+  [accessor: string]: (...args: WekanDocumentField[]) => WekanDocumentField;
 }
 
 declare const Attachments: WekanFilesCollection;
@@ -180,6 +188,15 @@ declare const validators: Record<string, WekanDocumentField>;
 declare const User: import('meteor/mongo').Mongo.Collection<
   import('meteor/meteor').Meteor.User
 >;
+
+// Meteor exposes Node's require through the server-only `Npm.require` global for
+// packages that ship without ES module wrappers.
+declare const Npm: { require(id: string): WekanDocumentField };
+
+// Meteor's webapp package. Wekan reaches it via `require('meteor/webapp')` in
+// most routes, but the /metrics route uses it as a bare global; expose the
+// small `handlers` surface it touches.
+declare const WebApp: { handlers: WekanDocumentField };
 
 // Meteor's `check` package registers `check` and `Match` as globals when loaded.
 // @types/meteor only models them as exports of the 'meteor/check' module, so
@@ -593,7 +610,7 @@ interface WekanWebAppRequest {
 }
 
 interface WekanWebAppResponse {
-  writeHead(statusCode: number, headers?: Record<string, string>): WekanWebAppResponse;
+  writeHead(statusCode: number, headers?: Record<string, string | number>): WekanWebAppResponse;
   write(chunk: string | Uint8Array): boolean;
   end(chunk?: string | Uint8Array): void;
   // The node ServerResponse surface is large; the export routes only touch the

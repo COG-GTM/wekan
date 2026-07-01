@@ -26,12 +26,15 @@ import {
 // exporter maybe is broken since Gridfs introduced, add fs and path
 
 class ExporterExcel {
-  constructor(boardId, userLanguage) {
+  _boardId: string;
+  userLanguage: string;
+
+  constructor(boardId: string, userLanguage: string) {
     this._boardId = boardId;
     this.userLanguage = userLanguage;
   }
 
-  async build(res) {
+  async build(res: WekanWebAppResponse) {
     const fs = Npm.require('fs');
     const os = Npm.require('os');
     const path = Npm.require('path');
@@ -51,7 +54,7 @@ class ExporterExcel {
         boardId: 0,
       },
     };
-    const result = {
+    const result: Record<string, WekanDocumentField> = {
       _format: 'wekan-board-1.0.0',
     };
     Object.assign(
@@ -77,7 +80,7 @@ class ExporterExcel {
         },
       },
     );
-    const cardIds = result.cards.map(card => card._id);
+    const cardIds = result.cards.map((card: WekanDocumentField) => card._id);
     result.comments = await ReactiveCache.getCardComments(
       { cardId: { $in: cardIds } },
       noBoardId,
@@ -134,33 +137,33 @@ class ExporterExcel {
     // include id but we have to be careful:
     // 1- only exports users that are linked somehow to that board
     // 2- do not export any sensitive information
-    const users = {};
-    result.members.forEach((member) => {
+    const users: Record<string, boolean> = {};
+    result.members.forEach((member: WekanDocumentField) => {
       users[member.userId] = true;
     });
-    result.lists.forEach((list) => {
+    result.lists.forEach((list: WekanDocumentField) => {
       users[list.userId] = true;
     });
-    result.cards.forEach((card) => {
+    result.cards.forEach((card: WekanDocumentField) => {
       users[card.userId] = true;
       if (card.members) {
-        card.members.forEach((memberId) => {
+        card.members.forEach((memberId: WekanDocumentField) => {
           users[memberId] = true;
         });
       }
       if (card.assignees) {
-        card.assignees.forEach((memberId) => {
+        card.assignees.forEach((memberId: WekanDocumentField) => {
           users[memberId] = true;
         });
       }
     });
-    result.comments.forEach((comment) => {
+    result.comments.forEach((comment: WekanDocumentField) => {
       users[comment.userId] = true;
     });
-    result.activities.forEach((activity) => {
+    result.activities.forEach((activity: WekanDocumentField) => {
       users[activity.userId] = true;
     });
-    result.checklists.forEach((checklist) => {
+    result.checklists.forEach((checklist: WekanDocumentField) => {
       users[checklist.userId] = true;
     });
     const byUserIds = {
@@ -179,7 +182,7 @@ class ExporterExcel {
       },
     };
     result.users = (await ReactiveCache.getUsers(byUserIds, userFields))
-      .map((user) => {
+      .map((user: WekanDocumentField) => {
         // user avatar is stored as a relative url, we export absolute
         if ((user.profile || {}).avatarUrl) {
           user.profile.avatarUrl = FlowRouter.url(user.profile.avatarUrl);
@@ -190,7 +193,10 @@ class ExporterExcel {
 
 
     //init exceljs workbook
-    const workbook = createWorkbook();
+    // ExcelJS's Workbook/Worksheet types are deeply nested; this exporter builds
+    // sheets and cells dynamically, so the workbook is used through this
+    // documented interop handle rather than the strict library types.
+    const workbook: WekanDocumentField = createWorkbook();
     workbook.creator = TAPi18n.__('export-board','',this.userLanguage);
     workbook.lastModifiedBy = TAPi18n.__('export-board','',this.userLanguage);
     workbook.created = new Date();
@@ -369,8 +375,8 @@ class ExporterExcel {
     //get member and assignee info
     let jmem = '';
     let jassig = '';
-    const jmeml = {};
-    const jassigl = {};
+    const jmeml: Record<string, WekanDocumentField> = {};
+    const jassigl: Record<string, WekanDocumentField> = {};
     for (const i in result.users) {
       jmem = `${jmem + result.users[i].username},`;
       jmeml[result.users[i]._id] = result.users[i].username;
@@ -382,18 +388,18 @@ class ExporterExcel {
     }
     jassig = jassig.substr(0, jassig.length - 1);
     //get kanban list info
-    const jlist = {};
+    const jlist: Record<string, WekanDocumentField> = {};
     for (const klist in result.lists) {
       jlist[result.lists[klist]._id] = result.lists[klist].title;
     }
     //get kanban swimlanes info
-    const jswimlane = {};
+    const jswimlane: Record<string, WekanDocumentField> = {};
     for (const kswimlane in result.swimlanes) {
       jswimlane[result.swimlanes[kswimlane]._id] =
         result.swimlanes[kswimlane].title;
     }
     //get kanban label info
-    const jlabel = {};
+    const jlabel: Record<string, WekanDocumentField> = {};
     var isFirst = 1;
     for (const klabel in result.labels) {
       // console.log(klabel);
@@ -405,7 +411,7 @@ class ExporterExcel {
       }
     }
     //add data +8 hours
-    function addTZhours(jdate) {
+    function addTZhours(jdate: WekanDocumentField) {
       if (!jdate) { return ' '; }
       const curdate = new Date(jdate);
       const checkCorrectDate = new Date(curdate);
@@ -421,14 +427,14 @@ class ExporterExcel {
     }
 
     //cell center
-    function cellCenter(cellno) {
+    function cellCenter(cellno: string) {
       ws.getCell(cellno).alignment = {
         vertical: 'middle',
         horizontal: 'center',
         wrapText: true,
       };
     }
-    function cellLeft(cellno) {
+    function cellLeft(cellno: string) {
       ws.getCell(cellno).alignment = {
         vertical: 'middle',
         horizontal: 'left',
@@ -436,7 +442,7 @@ class ExporterExcel {
       };
     }
     // cell Card alignment
-    function cellCardAlignment(cellno) {
+    function cellCardAlignment(cellno: string) {
       ws.getCell(cellno).alignment = {
         vertical: 'top',
         horizontal: 'left',
@@ -444,7 +450,7 @@ class ExporterExcel {
       };
     }
     //all border
-    function allBorder(cellno) {
+    function allBorder(cellno: string) {
       ws.getCell(cellno).border = {
         top: {
           style: 'thin',
@@ -648,7 +654,7 @@ class ExporterExcel {
       //get parent name
       if (jcard.parentId) {
         const parentCard = result.cards.find(
-          (card) => card._id === jcard.parentId,
+          (card: WekanDocumentField) => card._id === jcard.parentId,
         );
         jcard.parentCardTitle = parentCard ? parentCard.title : '';
       }
@@ -793,7 +799,7 @@ class ExporterExcel {
       },
     ];
     // cell Card alignment
-    function cellCardAlignmentWs2(cellno) {
+    function cellCardAlignmentWs2(cellno: string) {
       ws2.getCell(cellno).alignment = {
         vertical: 'top',
         horizontal: 'left',
@@ -801,7 +807,7 @@ class ExporterExcel {
       };
     }
     //all border
-    function allBorderWs2(cellno) {
+    function allBorderWs2(cellno: string) {
       ws2.getCell(cellno).border = {
         top: {
           style: 'thin',
@@ -870,7 +876,7 @@ class ExporterExcel {
       const jcomment = result.comments[i];
       //card title
       const parentCard = result.cards.find(
-        (card) => card._id === jcomment.cardId,
+        (card: WekanDocumentField) => card._id === jcomment.cardId,
       );
       jcomment.cardTitle = parentCard ? parentCard.title : '';
       if (jcomment.cardTitle == '') {
@@ -914,7 +920,7 @@ class ExporterExcel {
     workbook.xlsx.write(res).then(function () {});
   }
 
-  async canExport(user) {
+  async canExport(user: WekanDocumentField) {
     const board = await ReactiveCache.getBoard(this._boardId);
     return board && board.isVisibleBy(user);
   }

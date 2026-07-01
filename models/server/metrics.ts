@@ -1,7 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import Users from '../users';
 
-function acceptedIpAddress(ipAddress) {
+function acceptedIpAddress(ipAddress: WekanDocumentField) {
   const trustedIpAddress = process.env.METRICS_ACCEPTED_IP_ADDRESS;
   return (
     trustedIpAddress !== undefined &&
@@ -9,7 +9,7 @@ function acceptedIpAddress(ipAddress) {
   );
 }
 
-function accessToken(req) {
+function accessToken(req: WekanWebAppRequest) {
   const valid_token = process.env.METRICS_ACCESS_TOKEN;
   let token;
   if (req.headers && req.headers.authorization) {
@@ -34,7 +34,7 @@ function accessToken(req) {
   );
 }
 
-const getBoardTitleWithMostActivities = async (dateWithXdaysAgo, nbLimit) => {
+const getBoardTitleWithMostActivities = async (dateWithXdaysAgo: Date, nbLimit: number) => {
   return await Activities.rawCollection()
     .aggregate([
       {
@@ -57,12 +57,12 @@ const getBoardTitleWithMostActivities = async (dateWithXdaysAgo, nbLimit) => {
     .toArray();
 };
 
-const getBoards = async (boardIds) => {
+const getBoards = async (boardIds: string[]) => {
   const ret = await ReactiveCache.getBoards({ _id: { $in: boardIds } });
   return ret;
 };
 Meteor.startup(() => {
-  WebApp.handlers.use('/metrics', async (req, res, next) => {
+  WebApp.handlers.use('/metrics', async (req: WekanWebAppRequest, res: WekanWebAppResponse, next: WekanDocumentField) => {
     try {
       const ipAddress =
         req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -82,9 +82,9 @@ Meteor.startup(() => {
 
         // Get number of connected user by using meteor socketJs
         const allOpenedSockets = Meteor.server.stream_server.open_sockets;
-        let connectedUserIds = [];
+        let connectedUserIds: string[] = [];
         allOpenedSockets.forEach(
-          (socket) =>
+          (socket: WekanDocumentField) =>
             socket._meteorSession.userId !== null &&
             connectedUserIds.push(socket._meteorSession.userId),
         );
@@ -142,7 +142,7 @@ Meteor.startup(() => {
         // Get number of users with last connection dated 5 days ago
         let xdays = 5;
         let dateWithXdaysAgo = new Date(
-          new Date() - xdays * 24 * 60 * 60 * 1000,
+          (new Date() as unknown as number) - xdays * 24 * 60 * 60 * 1000,
         );
         resCount = (await ReactiveCache.getUsers({
           lastConnectionDate: { $gte: dateWithXdaysAgo },
@@ -156,7 +156,7 @@ Meteor.startup(() => {
 
         // Get number of users with last connection dated 10 days ago
         xdays = 10;
-        dateWithXdaysAgo = new Date(new Date() - xdays * 24 * 60 * 60 * 1000);
+        dateWithXdaysAgo = new Date((new Date() as unknown as number) - xdays * 24 * 60 * 60 * 1000);
         resCount = (await ReactiveCache.getUsers({
           lastConnectionDate: { $gte: dateWithXdaysAgo },
         })).length; // KPI 5
@@ -169,7 +169,7 @@ Meteor.startup(() => {
 
         // Get number of users with last connection dated 20 days ago
         xdays = 20;
-        dateWithXdaysAgo = new Date(new Date() - xdays * 24 * 60 * 60 * 1000);
+        dateWithXdaysAgo = new Date((new Date() as unknown as number) - xdays * 24 * 60 * 60 * 1000);
         resCount = (await ReactiveCache.getUsers({
           lastConnectionDate: { $gte: dateWithXdaysAgo },
         })).length; // KPI 5
@@ -182,7 +182,7 @@ Meteor.startup(() => {
 
         // Get number of users with last connection dated 20 days ago
         xdays = 30;
-        dateWithXdaysAgo = new Date(new Date() - xdays * 24 * 60 * 60 * 1000);
+        dateWithXdaysAgo = new Date((new Date() as unknown as number) - xdays * 24 * 60 * 60 * 1000);
         resCount = (await ReactiveCache.getUsers({
           lastConnectionDate: { $gte: dateWithXdaysAgo },
         })).length; // KPI 5
@@ -202,10 +202,10 @@ Meteor.startup(() => {
         );
 
         const boardWithMostActivities = boardTitleWithMostActivities.map(
-          (board) => board.lookup[0].title,
+          (board: WekanDocumentField) => board.lookup[0].title,
         );
 
-        boardWithMostActivities.forEach((title, index) => {
+        boardWithMostActivities.forEach((title: WekanDocumentField, index: number) => {
           metricsRes +=
             `wekan_top10BoardsWithMostActivities{n="${title}"} ${
               index + 1

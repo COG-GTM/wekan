@@ -7,7 +7,7 @@ const LINE_HEIGHT = 14;
 const FONT_SIZE = 10;
 const TEXT_WIDTH = 90;
 
-function sanitizeFilename(value) {
+function sanitizeFilename(value: WekanDocumentField) {
   return String(value || 'export-card')
     .replace(/[^a-z0-9._-]+/gi, '-')
     .replace(/-+/g, '-')
@@ -15,7 +15,7 @@ function sanitizeFilename(value) {
     .slice(0, 80) || 'export-card';
 }
 
-function normalizePdfText(value) {
+function normalizePdfText(value: WekanDocumentField) {
   return String(value ?? '')
     .replace(/<[^>]*>/g, ' ')
     .replace(/\r/g, '')
@@ -23,14 +23,14 @@ function normalizePdfText(value) {
     .replace(/[^\x20-\x7E\n]/g, '?');
 }
 
-function escapePdfText(value) {
+function escapePdfText(value: WekanDocumentField) {
   return normalizePdfText(value)
     .replace(/\\/g, '\\\\')
     .replace(/\(/g, '\\(')
     .replace(/\)/g, '\\)');
 }
 
-function wrapLine(line, width = TEXT_WIDTH) {
+function wrapLine(line: string, width = TEXT_WIDTH) {
   if (!line) {
     return [''];
   }
@@ -40,7 +40,7 @@ function wrapLine(line, width = TEXT_WIDTH) {
     return [''];
   }
 
-  const wrapped = [];
+  const wrapped: string[] = [];
   let current = '';
 
   for (const word of words) {
@@ -62,7 +62,7 @@ function wrapLine(line, width = TEXT_WIDTH) {
     wrapped.push(current);
   }
 
-  const splitLongWords = [];
+  const splitLongWords: string[] = [];
   for (const item of wrapped) {
     if (item.length <= width) {
       splitLongWords.push(item);
@@ -77,17 +77,17 @@ function wrapLine(line, width = TEXT_WIDTH) {
   return splitLongWords;
 }
 
-function wrapTextBlock(text) {
+function wrapTextBlock(text: WekanDocumentField) {
   return normalizePdfText(text)
     .split('\n')
     .flatMap(line => wrapLine(line));
 }
 
-function paginateLines(lines) {
+function paginateLines(lines: string[]) {
   const linesPerPage = Math.floor(
     (PAGE_HEIGHT - PAGE_MARGIN * 2) / LINE_HEIGHT,
   );
-  const pages = [];
+  const pages: string[][] = [];
 
   for (let index = 0; index < lines.length; index += linesPerPage) {
     pages.push(lines.slice(index, index + linesPerPage));
@@ -96,10 +96,10 @@ function paginateLines(lines) {
   return pages.length > 0 ? pages : [['No data']];
 }
 
-function buildPdfBuffer(lines) {
+function buildPdfBuffer(lines: string[]) {
   const pages = paginateLines(lines);
-  const objects = [];
-  const addObject = content => {
+  const objects: string[] = [];
+  const addObject = (content: string) => {
     objects.push(content);
     return objects.length;
   };
@@ -110,7 +110,7 @@ function buildPdfBuffer(lines) {
     '<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>',
   );
 
-  const pageIds = [];
+  const pageIds: number[] = [];
 
   for (const pageLines of pages) {
     const textCommands = ['BT', `/F1 ${FONT_SIZE} Tf`, `${LINE_HEIGHT} TL`];
@@ -159,7 +159,7 @@ function buildPdfBuffer(lines) {
   return Buffer.from(pdf, 'utf8');
 }
 
-function formatDateValue(value) {
+function formatDateValue(value: WekanDocumentField) {
   if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
     return '-';
   }
@@ -167,7 +167,7 @@ function formatDateValue(value) {
   return value.toISOString().replace('T', ' ').slice(0, 16);
 }
 
-function formatUser(user) {
+function formatUser(user: WekanDocumentField) {
   if (!user) {
     return 'Unknown';
   }
@@ -176,7 +176,11 @@ function formatUser(user) {
 }
 
 class ExporterCardPDF {
-  constructor(boardId, listId, cardId) {
+  _boardId: string;
+  _listId: string;
+  _cardId: string;
+
+  constructor(boardId: string, listId: string, cardId: string) {
     this._boardId = boardId;
     this._listId = listId;
     this._cardId = cardId;
@@ -210,7 +214,7 @@ class ExporterCardPDF {
       { sort: { createdAt: 1 } },
     );
 
-    const checklistItemsByChecklistId = {};
+    const checklistItemsByChecklistId: Record<string, WekanDocumentField> = {};
     for (const checklist of checklists) {
       checklistItemsByChecklistId[checklist._id] = await ReactiveCache.getChecklistItems(
         { checklistId: checklist._id },
@@ -222,14 +226,14 @@ class ExporterCardPDF {
       card.userId,
       ...(card.members || []),
       ...(card.assignees || []),
-      ...comments.map(comment => comment.userId),
+      ...comments.map((comment: WekanDocumentField) => comment.userId),
     ]);
-    const usersById = {};
+    const usersById: Record<string, WekanDocumentField> = {};
 
     await Promise.all(
       [...userIds]
         .filter(Boolean)
-        .map(async userId => {
+        .map(async (userId: WekanDocumentField) => {
           usersById[userId] = await ReactiveCache.getUser({ _id: userId });
         }),
     );
@@ -246,7 +250,7 @@ class ExporterCardPDF {
     };
   }
 
-  async build(res) {
+  async build(res: WekanWebAppResponse) {
     const data = await this._getCardData();
     if (!data) {
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -257,8 +261,8 @@ class ExporterCardPDF {
     const { board, list, card, swimlane, checklists, checklistItemsByChecklistId, comments, usersById } = data;
     const labelsById = Object.fromEntries(
       (board.labels || [])
-        .filter(label => label && label._id)
-        .map(label => [label._id, label.name || label.color || label._id]),
+        .filter((label: WekanDocumentField) => label && label._id)
+        .map((label: WekanDocumentField) => [label._id, label.name || label.color || label._id]),
     );
 
     const lines = [
@@ -269,9 +273,9 @@ class ExporterCardPDF {
       `List: ${list.title || '-'}`,
       `Swimlane: ${swimlane?.title || '-'}`,
       `Created by: ${formatUser(usersById[card.userId])}`,
-      `Members: ${(card.members || []).map(userId => formatUser(usersById[userId])).join(', ') || '-'}`,
-      `Assignees: ${(card.assignees || []).map(userId => formatUser(usersById[userId])).join(', ') || '-'}`,
-      `Labels: ${(card.labelIds || []).map(labelId => labelsById[labelId] || labelId).join(', ') || '-'}`,
+      `Members: ${(card.members || []).map((userId: WekanDocumentField) => formatUser(usersById[userId])).join(', ') || '-'}`,
+      `Assignees: ${(card.assignees || []).map((userId: WekanDocumentField) => formatUser(usersById[userId])).join(', ') || '-'}`,
+      `Labels: ${(card.labelIds || []).map((labelId: WekanDocumentField) => labelsById[labelId] || labelId).join(', ') || '-'}`,
       `Created: ${formatDateValue(card.createdAt)}`,
       `Last activity: ${formatDateValue(card.dateLastActivity)}`,
       `Received: ${formatDateValue(card.receivedAt)}`,
@@ -325,7 +329,7 @@ class ExporterCardPDF {
     res.end(pdf);
   }
 
-  async canExport(user) {
+  async canExport(user: WekanDocumentField) {
     const board = await ReactiveCache.getBoard(this._boardId);
     return board && board.isVisibleBy(user);
   }
@@ -334,18 +338,20 @@ class ExporterCardPDF {
 // #395: board-level PDF export. Reuses the same simple PDF builder as the card
 // PDF export, writing the board title and each list's cards (title + description).
 class ExporterBoardPDF {
-  constructor(boardId) {
+  _boardId: string;
+
+  constructor(boardId: string) {
     this._boardId = boardId;
   }
 
-  async build(res) {
+  async build(res: WekanWebAppResponse) {
     const board = await ReactiveCache.getBoard(this._boardId);
     if (!board) {
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('Board not found');
       return;
     }
-    const lines = [];
+    const lines: string[] = [];
     lines.push(normalizePdfText(board.title));
     lines.push('');
 
@@ -362,7 +368,7 @@ class ExporterBoardPDF {
       for (const card of cards) {
         lines.push(`- ${normalizePdfText(card.title)}`);
         if (card.description) {
-          wrapTextBlock(card.description).forEach(l => lines.push(`    ${l}`));
+          wrapTextBlock(card.description).forEach((l: string) => lines.push(`    ${l}`));
         }
       }
       lines.push('');
@@ -376,7 +382,7 @@ class ExporterBoardPDF {
     res.end(pdf);
   }
 
-  async canExport(user) {
+  async canExport(user: WekanDocumentField) {
     const board = await ReactiveCache.getBoard(this._boardId);
     return board && board.isVisibleBy(user);
   }
