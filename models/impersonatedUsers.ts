@@ -1,7 +1,7 @@
 import { Mongo } from 'meteor/mongo';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const ImpersonatedUsers = new Mongo.Collection('impersonatedUsers');
+const ImpersonatedUsers = new Mongo.Collection<ImpersonatedUserDocument>('impersonatedUsers');
 
 /**
  * A Impersonated User in wekan
@@ -79,3 +79,15 @@ ImpersonatedUsers.attachSchema(
 );
 
 export default ImpersonatedUsers;
+
+interface ImpersonatedUserDocument {
+  _id?: string;
+  adminId?: string;
+  userId?: string;
+  boardId?: string;
+  attachmentId?: string;
+  reason?: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  [field: string]: WekanDocumentField;
+}

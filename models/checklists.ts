@@ -3,9 +3,9 @@ import { Mongo } from 'meteor/mongo';
 import { ReactiveCache, ReactiveMiniMongoIndex } from '/imports/reactiveCache';
 import Activities from '/models/activities';
 import ChecklistItems from '/models/checklistItems';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const Checklists = new Mongo.Collection('checklists');
+const Checklists = new Mongo.Collection<ChecklistDocument>('checklists');
 
 /**
  * A Checklist
@@ -101,7 +101,7 @@ Checklists.attachSchema(
 );
 
 Checklists.helpers({
-  async copy(newCardId) {
+  async copy(newCardId: string) {
     // #5688: copy the checklist and its items with `.direct` so the per-document
     // before/after.insert hooks do NOT fire. The after.insert hooks look up the
     // card and insert an activity per checklist item — for a card with many
@@ -135,7 +135,7 @@ Checklists.helpers({
     return ret;
   },
   items() {
-    const ret = ReactiveMiniMongoIndex.getChecklistItemsWithChecklistId(this._id, {}, { sort: ['sort'] });
+    const ret = ReactiveMiniMongoIndex.getChecklistItemsWithChecklistId(this._id!, {}, { sort: ['sort'] });
     return ret;
 
   },
@@ -148,7 +148,7 @@ Checklists.helpers({
     return ret;
   },
   finishedCount() {
-    const ret = this.items().filter(_item => _item.isFinished).length;
+    const ret = this.items().filter((_item: WekanDocumentField) => _item.isFinished).length;
     return ret;
   },
   /** returns the finished percent of the checklist */
@@ -180,10 +180,10 @@ Checklists.helpers({
   /** Should the given (checked/unchecked) item be hidden for THIS checklist?
    * An item is hidden only when it is checked and this checklist's toggle is
    * on. Mirrors the pure helper isItemHidden() in server/lib/checklistHide.js. */
-  isItemHidden(isChecked) {
+  isItemHidden(isChecked: boolean) {
     return isChecked === true && this.hideCheckedState() === true;
   },
-  showChecklist(hideFinishedChecklistIfItemsAreHidden) {
+  showChecklist(hideFinishedChecklistIfItemsAreHidden: boolean) {
     let ret = true;
     if (this.isFinished() && hideFinishedChecklistIfItemsAreHidden === true && (this.hideCheckedState() === true || this.hideAllChecklistItems)) {
       ret = false;
@@ -202,34 +202,34 @@ Checklists.helpers({
       await item.uncheck();
     }
   },
-  itemIndex(itemId) {
+  itemIndex(itemId: string) {
     const items = ReactiveCache.getChecklist({ _id: this._id }).items;
-    return items.map(item => item._id).indexOf(itemId);
+    return items.map((item: WekanDocumentField) => item._id).indexOf(itemId);
   },
 
-  async setTitle(title) {
-    return await Checklists.updateAsync(this._id, { $set: { title } });
+  async setTitle(title: string) {
+    return await Checklists.updateAsync(this._id!, { $set: { title } });
   },
   /** move the checklist to another card
    * @param newCardId move the checklist to this cardId
    */
-  async move(newCardId) {
+  async move(newCardId: string) {
     // Note: Activities and ChecklistItems updates are now handled server-side
     // in the moveChecklist Meteor method to avoid client-side permission issues
-    return await Checklists.updateAsync(this._id, { $set: { cardId: newCardId } });
+    return await Checklists.updateAsync(this._id!, { $set: { cardId: newCardId } });
   },
   async toggleHideCheckedChecklistItems() {
-    return await Checklists.updateAsync(this._id, {
+    return await Checklists.updateAsync(this._id!, {
       $set: { hideCheckedChecklistItems: !this.hideCheckedChecklistItems },
     });
   },
   async toggleHideAllChecklistItems() {
-    return await Checklists.updateAsync(this._id, {
+    return await Checklists.updateAsync(this._id!, {
       $set: { hideAllChecklistItems: !this.hideAllChecklistItems },
     });
   },
   async toggleShowChecklistAtMinicard() {
-    return await Checklists.updateAsync(this._id, {
+    return await Checklists.updateAsync(this._id!, {
       $set: { showChecklistAtMinicard: !this.showChecklistAtMinicard },
     });
   },
@@ -242,3 +242,19 @@ Checklists.before.insert((userId, doc) => {
   }
 });
 export default Checklists;
+
+interface ChecklistDocument {
+  _id?: string;
+  cardId: string;
+  boardId?: string;
+  title: string;
+  finishedAt?: Date;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  sort: number;
+  hideCheckedChecklistItems?: boolean;
+  hideAllChecklistItems?: boolean;
+  showChecklistAtMinicard: boolean;
+  userId?: string;
+  [field: string]: WekanDocumentField;
+}

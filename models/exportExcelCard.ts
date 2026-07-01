@@ -30,7 +30,7 @@ runOnServer(function() {
    */
   WebApp.handlers.get(
     '/api/boards/:boardId/lists/:listId/cards/:cardId/exportExcel',
-    async function (req, res) {
+    async function (req: WekanWebAppRequest, res: WekanWebAppResponse) {
       const boardId = req.params.boardId;
       const paramListId = req.params.listId;
       const paramCardId = req.params.cardId;

@@ -22,14 +22,21 @@ import Swimlanes from '/models/swimlanes';
 //                  "tags": [ ... ] }, ... ]
 //   }
 export class KanboardCreator {
-  constructor(data) {
+  private _nowDate: Date;
+  private members: Record<string, string>;
+  private lists: Record<string, string>;
+  private swimlanes: Record<string, string>;
+
+  constructor(data: WekanDocumentField) {
     this._nowDate = new Date();
     this.members = data && data.membersMapping ? data.membersMapping : {};
     this.lists = {};
     this.swimlanes = {};
   }
 
-  _now(dateString) {
+  // Kanboard date values are dynamic (unix-seconds string, ISO string, or
+  // number), so the argument is the documented interop alias.
+  _now(dateString?: WekanDocumentField) {
     if (dateString) {
       // Kanboard often uses unix timestamps (seconds) for dates.
       if (/^\d+$/.test(String(dateString))) {
@@ -41,22 +48,22 @@ export class KanboardCreator {
     return this._nowDate;
   }
 
-  _user(key) {
+  _user(key?: string) {
     if (key && this.members[key]) return this.members[key];
     return Meteor.userId();
   }
 
-  _tasks(data) {
+  _tasks(data: WekanDocumentField) {
     if (Array.isArray(data)) return data;
     return data.tasks || [];
   }
 
-  _columnNames(data) {
+  _columnNames(data: WekanDocumentField) {
     if (data.columns && data.columns.length) {
-      return data.columns.map(c => c.title || c.name).filter(Boolean);
+      return data.columns.map((c: WekanDocumentField) => c.title || c.name).filter(Boolean);
     }
     // Derive the column order from the tasks.
-    const names = [];
+    const names: string[] = [];
     for (const task of this._tasks(data)) {
       const name = task.column_name || task.column || 'Imported';
       if (!names.includes(name)) names.push(name);
@@ -64,11 +71,11 @@ export class KanboardCreator {
     return names.length ? names : ['Imported'];
   }
 
-  _swimlaneNames(data) {
+  _swimlaneNames(data: WekanDocumentField) {
     if (data.swimlanes && data.swimlanes.length) {
-      return data.swimlanes.map(s => s.name || s.title).filter(Boolean);
+      return data.swimlanes.map((s: WekanDocumentField) => s.name || s.title).filter(Boolean);
     }
-    const names = [];
+    const names: string[] = [];
     for (const task of this._tasks(data)) {
       const name = task.swimlane_name || task.swimlane || 'Default';
       if (!names.includes(name)) names.push(name);
@@ -76,11 +83,11 @@ export class KanboardCreator {
     return names.length ? names : ['Default'];
   }
 
-  async createBoard(data) {
+  async createBoard(data: WekanDocumentField) {
     const title =
       (data.board && (data.board.name || data.board.title)) ||
       `Imported Kanboard Board ${this._now()}`;
-    const boardToCreate = {
+    const boardToCreate: KbBoardToCreate = {
       archived: false,
       color: 'belize',
       createdAt: this._now(),
@@ -103,9 +110,9 @@ export class KanboardCreator {
       title,
     };
     // Tags -> board labels.
-    const tagNames = new Set();
+    const tagNames = new Set<string>();
     for (const task of this._tasks(data)) {
-      (task.tags || []).forEach(t => tagNames.add(typeof t === 'string' ? t : t.name));
+      (task.tags || []).forEach((t: WekanDocumentField) => tagNames.add(typeof t === 'string' ? t : t.name));
     }
     for (const name of tagNames) {
       if (name) boardToCreate.labels.push({ _id: Random.id(6), color: 'black', name });
@@ -122,7 +129,7 @@ export class KanboardCreator {
     return boardId;
   }
 
-  async createSwimlanes(data, boardId) {
+  async createSwimlanes(data: WekanDocumentField, boardId: string) {
     let sort = 0;
     for (const name of this._swimlaneNames(data)) {
       const swimlaneId = await Swimlanes.direct.insertAsync({
@@ -137,7 +144,7 @@ export class KanboardCreator {
     }
   }
 
-  async createLists(data, boardId) {
+  async createLists(data: WekanDocumentField, boardId: string) {
     let sort = 0;
     for (const name of this._columnNames(data)) {
       const listId = await Lists.direct.insertAsync({
@@ -152,13 +159,13 @@ export class KanboardCreator {
     }
   }
 
-  async createCards(data, boardId) {
+  async createCards(data: WekanDocumentField, boardId: string) {
     const board = await ReactiveCache.getBoard(boardId);
     const firstSwimlane = Object.values(this.swimlanes)[0];
     for (const task of this._tasks(data)) {
       const columnName = task.column_name || task.column || this._columnNames(data)[0];
       const swimlaneName = task.swimlane_name || task.swimlane || 'Default';
-      const cardToCreate = {
+      const cardToCreate: KbCardToCreate = {
         archived: false,
         boardId,
         dateLastActivity: this._now(),
@@ -185,7 +192,7 @@ export class KanboardCreator {
     }
   }
 
-  async create(board, currentBoardId) {
+  async create(board: WekanDocumentField, currentBoardId?: string) {
     const isSandstorm =
       Meteor.settings && Meteor.settings.public && Meteor.settings.public.sandstorm;
     if (isSandstorm && currentBoardId) {
@@ -198,4 +205,49 @@ export class KanboardCreator {
     await this.createCards(board, boardId);
     return boardId;
   }
+}
+
+interface KbBoardLabel {
+  _id: string;
+  color: string;
+  name: string;
+}
+
+interface KbBoardMember {
+  userId: string | null;
+  wekanId: string | null;
+  isActive: boolean;
+  isAdmin: boolean;
+  isNoComments: boolean;
+  isCommentOnly: boolean;
+  swimlaneId: boolean;
+}
+
+interface KbBoardToCreate {
+  archived: boolean;
+  color: string;
+  createdAt: Date;
+  labels: KbBoardLabel[];
+  members: KbBoardMember[];
+  modifiedAt: Date;
+  permission: string;
+  slug: string;
+  stars: number;
+  title: WekanDocumentField;
+}
+
+interface KbCardToCreate {
+  archived: boolean;
+  boardId: string;
+  dateLastActivity: Date;
+  description: WekanDocumentField;
+  listId: string;
+  swimlaneId: string;
+  sort: number;
+  title: WekanDocumentField;
+  userId: string | null;
+  labelIds: string[];
+  dueAt?: Date;
+  createdAt?: Date;
+  members?: string[];
 }

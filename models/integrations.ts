@@ -1,9 +1,9 @@
 import { Meteor } from 'meteor/meteor';
 import { Mongo } from 'meteor/mongo';
 import { ReactiveCache } from '/imports/reactiveCache';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const Integrations = new Mongo.Collection('integrations');
+const Integrations = new Mongo.Collection<IntegrationDocument>('integrations');
 
 /**
  * Integration with third-party applications
@@ -139,3 +139,18 @@ Integrations.Const = {
   },
 };
 export default Integrations;
+
+interface IntegrationDocument {
+  _id?: string;
+  enabled: boolean;
+  title?: string;
+  type: string;
+  activities: string[];
+  url?: string;
+  token?: string;
+  boardId: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  userId: string;
+  [field: string]: WekanDocumentField;
+}

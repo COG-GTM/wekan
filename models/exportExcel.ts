@@ -33,7 +33,7 @@ runOnServer(function() {
    * @param {string} boardId the ID of the board we are exporting
    * @param {string} authToken the loginToken
    */
-  WebApp.handlers.get('/api/boards/:boardId/exportExcel', async function (req, res) {
+  WebApp.handlers.get('/api/boards/:boardId/exportExcel', async function (req: WekanWebAppRequest, res: WekanWebAppResponse) {
     const boardId = req.params.boardId;
     let user = null;
     let impersonateDone = false;

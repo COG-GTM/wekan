@@ -9,12 +9,18 @@ import Lists from '/models/lists';
 import Swimlanes from '/models/swimlanes';
 
 export class CsvCreator {
-  constructor(data) {
+  private _nowDate: Date;
+  private fieldIndex: CsvFieldIndex;
+  private lists: Record<string, string>;
+  private members: Record<string, string>;
+  private swimlane: string | null;
+
+  constructor(data: CsvCreatorData) {
     // date to be used for timestamps during import
     this._nowDate = new Date();
     // index to help keep track of what information a column stores
     // each row represents a card
-    this.fieldIndex = {};
+    this.fieldIndex = { customFields: [] };
     this.lists = {};
     // Map of members using username => wekanid
     this.members = data.membersMapping ? data.membersMapping : {};
@@ -30,7 +36,7 @@ export class CsvCreator {
    *
    * @param {String} dateString a properly formatted Date
    */
-  _now(dateString) {
+  _now(dateString?: string | Date) {
     if (dateString) {
       return new Date(dateString);
     }
@@ -40,7 +46,7 @@ export class CsvCreator {
     return this._nowDate;
   }
 
-  _user(wekanUserId) {
+  _user(wekanUserId?: string) {
     if (wekanUserId && this.members[wekanUserId]) {
       return this.members[wekanUserId];
     }
@@ -56,9 +62,8 @@ export class CsvCreator {
    *
    * @param {Array} headerRow array from row of headers of imported CSV/TSV for cards
    */
-  mapHeadertoCardFieldIndex(headerRow) {
-    const index = {};
-    index.customFields = [];
+  mapHeadertoCardFieldIndex(headerRow: string[]) {
+    const index: CsvFieldIndex = { customFields: [] };
     for (let i = 0; i < headerRow.length; i++) {
       switch (headerRow[i].trim().toLowerCase()) {
         case 'title':
@@ -133,12 +138,12 @@ export class CsvCreator {
     }
     this.fieldIndex = index;
   }
-  async createCustomFields(boardId) {
+  async createCustomFields(boardId: string) {
     for (const customField of this.fieldIndex.customFields) {
       let settings = {};
       if (customField.type === 'dropdown') {
         settings = {
-          dropdownItems: customField.options.map(option => {
+          dropdownItems: customField.options!.map(option => {
             return { _id: Random.id(6), name: option };
           }),
         };
@@ -164,8 +169,8 @@ export class CsvCreator {
     }
   }
 
-  async createBoard(csvData) {
-    const boardToCreate = {
+  async createBoard(csvData: WekanDocumentField[]) {
+    const boardToCreate: ImportBoardToCreate = {
       archived: false,
       color: 'belize',
       createdAt: this._now(),
@@ -190,10 +195,10 @@ export class CsvCreator {
     };
 
     // create labels
-    const labelsToCreate = new Set();
+    const labelsToCreate = new Set<string>();
     for (let i = 1; i < csvData.length; i++) {
-      if (csvData[i][this.fieldIndex.labels]) {
-        for (const importedLabel of csvData[i][this.fieldIndex.labels].split(
+      if (csvData[i][this.fieldIndex.labels as number]) {
+        for (const importedLabel of csvData[i][this.fieldIndex.labels as number].split(
           ' ',
         )) {
           if (importedLabel && importedLabel.length > 0) {
@@ -240,7 +245,7 @@ export class CsvCreator {
     return boardId;
   }
 
-  async createSwimlanes(boardId) {
+  async createSwimlanes(boardId: string) {
     const swimlaneToCreate = {
       archived: false,
       boardId,
@@ -253,28 +258,28 @@ export class CsvCreator {
     this.swimlane = swimlaneId;
   }
 
-  async createLists(csvData, boardId) {
+  async createLists(csvData: WekanDocumentField[], boardId: string) {
     let numOfCreatedLists = 0;
     for (let i = 1; i < csvData.length; i++) {
-      const listToCreate = {
+      const listToCreate: { archived: boolean; boardId: string; createdAt: Date; title?: WekanDocumentField } = {
         archived: false,
         boardId,
         createdAt: this._now(),
       };
-      if (csvData[i][this.fieldIndex.stage]) {
+      if (csvData[i][this.fieldIndex.stage as number]) {
         const existingList = await ReactiveCache.getLists({
-          title: csvData[i][this.fieldIndex.stage],
+          title: csvData[i][this.fieldIndex.stage as number],
           boardId,
         });
         if (existingList.length > 0) {
           continue;
         } else {
-          listToCreate.title = csvData[i][this.fieldIndex.stage];
+          listToCreate.title = csvData[i][this.fieldIndex.stage as number];
         }
       } else listToCreate.title = `Imported List ${this._now()}`;
 
       const listId = await Lists.direct.insertAsync(listToCreate);
-      this.lists[csvData[i][this.fieldIndex.stage]] = listId;
+      this.lists[csvData[i][this.fieldIndex.stage as number]] = listId;
       numOfCreatedLists++;
       await Lists.direct.updateAsync(listId, {
         $set: {
@@ -285,17 +290,17 @@ export class CsvCreator {
     }
   }
 
-  async createCards(csvData, boardId) {
+  async createCards(csvData: WekanDocumentField[], boardId: string) {
     for (let i = 1; i < csvData.length; i++) {
-      const cardToCreate = {
+      const cardToCreate: ImportCardToCreate = {
         archived: false,
         boardId,
         dateLastActivity: this._now(),
-        description: csvData[i][this.fieldIndex.description],
-        listId: this.lists[csvData[i][this.fieldIndex.stage]],
+        description: csvData[i][this.fieldIndex.description as number],
+        listId: this.lists[csvData[i][this.fieldIndex.stage as number]],
         swimlaneId: this.swimlane,
         sort: -1,
-        title: csvData[i][this.fieldIndex.title],
+        title: csvData[i][this.fieldIndex.title as number],
         userId: this._user(),
         spentTime: null,
         labelIds: [],
@@ -303,30 +308,30 @@ export class CsvCreator {
       // Date columns are optional: only set them when the column exists for this
       // row and is non-empty (this.fieldIndex.<x> is undefined when the column is
       // absent, so the cell lookup yields undefined).
-      const createdAtCell = csvData[i][this.fieldIndex.createdAt];
+      const createdAtCell = csvData[i][this.fieldIndex.createdAt as number];
       if (createdAtCell && createdAtCell.length !== 0) {
         cardToCreate.createdAt = this._now(new Date(createdAtCell));
       }
-      const startAtCell = csvData[i][this.fieldIndex.startAt];
+      const startAtCell = csvData[i][this.fieldIndex.startAt as number];
       if (startAtCell && startAtCell.length !== 0) {
         cardToCreate.startAt = this._now(new Date(startAtCell));
       }
-      const dueAtCell = csvData[i][this.fieldIndex.dueAt];
+      const dueAtCell = csvData[i][this.fieldIndex.dueAt as number];
       if (dueAtCell && dueAtCell.length !== 0) {
         cardToCreate.dueAt = this._now(new Date(dueAtCell));
       }
-      const endAtCell = csvData[i][this.fieldIndex.endAt];
+      const endAtCell = csvData[i][this.fieldIndex.endAt as number];
       if (endAtCell && endAtCell.length !== 0) {
         cardToCreate.endAt = this._now(new Date(endAtCell));
       }
-      const modifiedAtCell = csvData[i][this.fieldIndex.modifiedAt];
+      const modifiedAtCell = csvData[i][this.fieldIndex.modifiedAt as number];
       if (modifiedAtCell && modifiedAtCell.length !== 0) {
         cardToCreate.modifiedAt = this._now(new Date(modifiedAtCell));
       }
       // add the labels
-      if (csvData[i][this.fieldIndex.labels]) {
+      if (csvData[i][this.fieldIndex.labels as number]) {
         const board = await ReactiveCache.getBoard(boardId);
-        for (const importedLabel of csvData[i][this.fieldIndex.labels].split(
+        for (const importedLabel of csvData[i][this.fieldIndex.labels as number].split(
           ' ',
         )) {
           if (importedLabel && importedLabel.length > 0) {
@@ -344,9 +349,9 @@ export class CsvCreator {
         }
       }
       // add the members
-      if (csvData[i][this.fieldIndex.members]) {
-        const wekanMembers = [];
-        for (const importedMember of csvData[i][this.fieldIndex.members].split(
+      if (csvData[i][this.fieldIndex.members as number]) {
+        const wekanMembers: string[] = [];
+        for (const importedMember of csvData[i][this.fieldIndex.members as number].split(
           ' ',
         )) {
           if (this.members[importedMember]) {
@@ -362,14 +367,14 @@ export class CsvCreator {
       }
       // add the custom fields
       if (this.fieldIndex.customFields.length > 0) {
-        const customFields = [];
+        const customFields: Array<{ _id?: string; value: WekanDocumentField }> = [];
         this.fieldIndex.customFields.forEach(customField => {
           if (csvData[i][customField.position] !== ' ') {
             if (customField.type === 'dropdown') {
               customFields.push({
                 _id: customField.id,
                 value: customField.settings.dropdownItems.find(
-                  ({ name }) => name === csvData[i][customField.position],
+                  ({ name }: WekanDocumentField) => name === csvData[i][customField.position],
                 )._id,
               });
             } else {
@@ -386,7 +391,7 @@ export class CsvCreator {
     }
   }
 
-  async create(board, currentBoardId) {
+  async create(board: WekanDocumentField[], currentBoardId?: string) {
     const isSandstorm =
       Meteor.settings &&
       Meteor.settings.public &&
@@ -403,4 +408,88 @@ export class CsvCreator {
     await this.createCards(board, boardId);
     return boardId;
   }
+}
+
+// The extra import payload (member id -> wekan user id map) passed to the
+// creator; its concrete shape is the untyped Meteor method argument.
+interface CsvCreatorData {
+  membersMapping?: Record<string, string>;
+  [key: string]: WekanDocumentField;
+}
+
+// A CustomField column parsed from the CSV header row.
+interface CsvCustomFieldColumn {
+  name: string;
+  type: string;
+  position: number;
+  options?: string[];
+  currencyCode?: string;
+  id?: string;
+  settings?: WekanDocumentField;
+}
+
+// Map of card-field name -> column index, built from the CSV header row.
+interface CsvFieldIndex {
+  title?: number;
+  description?: number;
+  stage?: number;
+  owner?: number;
+  members?: number;
+  labels?: number;
+  dueAt?: number;
+  startAt?: number;
+  endAt?: number;
+  createdAt?: number;
+  modifiedAt?: number;
+  customFields: CsvCustomFieldColumn[];
+}
+
+interface ImportBoardLabel {
+  _id: string;
+  color: string;
+  name: string;
+}
+
+interface ImportBoardMember {
+  userId: string | null;
+  wekanId: string | null;
+  isActive: boolean;
+  isAdmin: boolean;
+  isNoComments: boolean;
+  isCommentOnly: boolean;
+  swimlaneId: boolean;
+}
+
+interface ImportBoardToCreate {
+  archived: boolean;
+  color: string;
+  createdAt: Date;
+  labels: ImportBoardLabel[];
+  members: ImportBoardMember[];
+  modifiedAt: Date;
+  permission: string;
+  slug: string;
+  stars: number;
+  title: string;
+}
+
+interface ImportCardToCreate {
+  archived: boolean;
+  boardId: string;
+  dateLastActivity: Date;
+  description: WekanDocumentField;
+  listId: string;
+  swimlaneId: string | null;
+  sort: number;
+  title: WekanDocumentField;
+  userId: string | null;
+  spentTime: number | null;
+  labelIds: string[];
+  createdAt?: Date;
+  startAt?: Date;
+  dueAt?: Date;
+  endAt?: Date;
+  modifiedAt?: Date;
+  members?: string[];
+  customFields?: WekanDocumentField[];
 }

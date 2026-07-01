@@ -190,6 +190,7 @@ declare module 'meteor/ostrio:flow-router-extra' {
     route(path: string, definition: FlowRouteDefinition): void;
     go(pathName: string, params?: Record<string, string>): void;
     path(pathName: string, params?: Record<string, string>): string;
+    url(pathDef: string, params?: Record<string, string>, queryParams?: Record<string, string>): string;
     reload(): void;
     getRouteName(): string;
     getQueryParam(key: string): string;
@@ -454,6 +455,12 @@ interface WekanSimpleSchemaConstructor {
     definition: WekanSchemaDefinition,
     options?: object,
   ): WekanSimpleSchemaInstance;
+  // aldeed:simple-schema exposes a set of stock validation regexes (Email, Url,
+  // ...) as statics; the model schemas reference them by name.
+  RegEx: {
+    Email: WekanSchemaValue;
+    [pattern: string]: WekanSchemaValue;
+  };
 }
 
 // A Mongo update modifier ($set/$unset/$inc/...); its operator keys and values
@@ -517,3 +524,33 @@ declare const Utils: WekanDocumentField;
 // `typeof UserPositionHistory !== 'undefined'`; modelled as a documented
 // interop global.
 declare const UserPositionHistory: WekanDocumentField;
+
+// Wekan exposes the users collection (models/users) and the client-side board
+// Filter helper (client/lib/filter) as ambient globals referenced without an
+// import. Both surfaces are large and mostly client-only, so they are exposed
+// through the documented interop alias.
+declare const Users: WekanDocumentField;
+declare const Filter: WekanDocumentField;
+
+// ---------------------------------------------------------------------------
+// Shape of the connect/WebApp request & response objects handled by the board
+// export routes (models/export, models/exportExcel(Card), models/exportPDF).
+// `WebApp` is reached through `require('meteor/webapp')` (untyped), so the
+// handler callbacks annotate their params with these interfaces directly.
+// ---------------------------------------------------------------------------
+interface WekanWebAppRequest {
+  params: Record<string, string>;
+  query: Record<string, string>;
+  userId?: string;
+  // connect middleware augments the request with additional runtime members.
+  [prop: string]: WekanDocumentField;
+}
+
+interface WekanWebAppResponse {
+  writeHead(statusCode: number, headers?: Record<string, string>): WekanWebAppResponse;
+  write(chunk: string | Uint8Array): boolean;
+  end(chunk?: string | Uint8Array): void;
+  // The node ServerResponse surface is large; the export routes only touch the
+  // members above, the rest come through this documented index signature.
+  [prop: string]: WekanDocumentField;
+}

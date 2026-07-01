@@ -29,7 +29,11 @@ import {
 
 // exporter maybe is broken since Gridfs introduced, add fs and path
 export class Exporter {
-  constructor(boardId, attachmentId, options = {}) {
+  private _boardId: string;
+  private _attachmentId?: string;
+  private _excludeAttachments: boolean;
+
+  constructor(boardId: string, attachmentId?: string, options: { excludeAttachments?: boolean } = {}) {
     this._boardId = boardId;
     this._attachmentId = attachmentId;
     // #5870: when true, board export omits the base64-encoded attachment file
@@ -58,9 +62,12 @@ export class Exporter {
         boardId: 0,
       },
     };
+    // The export aggregates a board document merged (via Object.assign) with many
+    // heterogeneous query results and is built up progressively, so it is typed
+    // as the open ExportResult shape.
     const result = {
       _format: 'wekan-board-1.0.0',
-    };
+    } as ExportResult;
     Object.assign(
       result,
       await ReactiveCache.getBoard(this._boardId, {
@@ -73,7 +80,7 @@ export class Exporter {
     // [Old] for attachments we only export IDs and absolute url to original doc
     // [New] Encode attachment to base64
 
-    const getBase64Data = function (doc, callback) {
+    const getBase64Data = function (doc: WekanDocumentField, callback: (err: Error | null, res: string | null) => void) {
       let buffer = Buffer.allocUnsafe(0);
       buffer.fill(0);
 
@@ -84,7 +91,7 @@ export class Exporter {
       );
       const tmpWriteable = fs.createWriteStream(tmpFile);
       const readStream = fs.createReadStream(doc.versions.original.path);
-      readStream.on('data', function (chunk) {
+      readStream.on('data', function (chunk: WekanDocumentField) {
         buffer = Buffer.concat([buffer, chunk]);
       });
 
@@ -101,7 +108,7 @@ export class Exporter {
       });
       readStream.pipe(tmpWriteable);
     };
-    const getBase64DataAsync = (doc) => new Promise((resolve, reject) => {
+    const getBase64DataAsync = (doc: WekanDocumentField) => new Promise<string | null>((resolve, reject) => {
       getBase64Data(doc, (err, res) => err ? reject(err) : resolve(res));
     });
     const byBoardAndAttachment = this._attachmentId
@@ -110,7 +117,7 @@ export class Exporter {
     const attachmentDocs = await ReactiveCache.getAttachments(byBoardAndAttachment);
     result.attachments = [];
     for (const attachment of attachmentDocs) {
-      const attachmentExport = {
+      const attachmentExport: Record<string, WekanDocumentField> = {
         _id: attachment._id,
         cardId: attachment.meta.cardId,
         // `source` distinguishes board-level backgrounds ('board-background')
@@ -197,7 +204,7 @@ export class Exporter {
     // include id but we have to be careful:
     // 1- only exports users that are linked somehow to that board
     // 2- do not export any sensitive information
-    const users = {};
+    const users: Record<string, boolean> = {};
     result.members.forEach((member) => {
       users[member.userId] = true;
     });
@@ -207,7 +214,7 @@ export class Exporter {
     result.cards.forEach((card) => {
       users[card.userId] = true;
       if (card.members) {
-        card.members.forEach((memberId) => {
+        card.members.forEach((memberId: WekanDocumentField) => {
           users[memberId] = true;
         });
       }
@@ -238,7 +245,7 @@ export class Exporter {
       },
     };
     result.users = (await ReactiveCache.getUsers(byUserIds, userFields))
-      .map((user) => {
+      .map((user: WekanDocumentField) => {
         // user avatar is stored as a relative url, we export absolute
         if ((user.profile || {}).avatarUrl) {
           user.profile.avatarUrl = FlowRouter.url(user.profile.avatarUrl);
@@ -249,9 +256,9 @@ export class Exporter {
   }
 
   async buildCsv(userDelimiter = ',', userLanguage='en') {
-    const result = await this.build();
-    const columnHeaders = [];
-    const cardRows = [];
+    const result: ExportResult = await this.build();
+    const columnHeaders: WekanDocumentField[] = [];
+    const cardRows: WekanDocumentField[] = [];
 
     const papaconfig = {
       quotes: true,
@@ -286,7 +293,7 @@ export class Exporter {
       TAPi18n.__('voting','',userLanguage),
       TAPi18n.__('archived','',userLanguage),
     );
-    const customFieldMap = {};
+    const customFieldMap: Record<string, { position: number; type: WekanDocumentField }> = {};
     let i = 0;
     result.customFields.forEach((customField) => {
       customFieldMap[customField._id] = {
@@ -295,7 +302,7 @@ export class Exporter {
       };
       if (customField.type === 'dropdown') {
         let options = '';
-        customField.settings.dropdownItems.forEach((item) => {
+        customField.settings.dropdownItems.forEach((item: WekanDocumentField) => {
           options = options === '' ? item.name : `${`${options}/${item.name}`}`;
         });
         columnHeaders.push(
@@ -316,7 +323,7 @@ export class Exporter {
     cardRows.push(columnHeaders);
 
     result.cards.forEach((card) => {
-      const currentRow = [];
+      const currentRow: WekanDocumentField[] = [];
       currentRow.push(card.title);
       currentRow.push(card.description);
       currentRow.push(
@@ -331,19 +338,19 @@ export class Exporter {
       currentRow.push(card.requestedBy ? card.requestedBy : ' ');
       currentRow.push(card.assignedBy ? card.assignedBy : ' ');
       let usernames = '';
-      card.members.forEach((memberId) => {
+      card.members.forEach((memberId: WekanDocumentField) => {
         const user = result.users.find(({ _id }) => _id === memberId);
         usernames = `${usernames + user.username} `;
       });
       currentRow.push(usernames.trim());
       let assignees = '';
-      card.assignees.forEach((assigneeId) => {
+      card.assignees.forEach((assigneeId: WekanDocumentField) => {
         const user = result.users.find(({ _id }) => _id === assigneeId);
         assignees = `${assignees + user.username} `;
       });
       currentRow.push(assignees.trim());
       let labels = '';
-      card.labelIds.forEach((labelId) => {
+      card.labelIds.forEach((labelId: WekanDocumentField) => {
         const label = result.labels.find(({ _id }) => _id === labelId);
         labels = `${labels + label.name}-${label.color} `;
       });
@@ -361,11 +368,11 @@ export class Exporter {
       if (card.vote && card.vote.question !== '') {
         let positiveVoters = '';
         let negativeVoters = '';
-        card.vote.positive.forEach((userId) => {
+        card.vote.positive.forEach((userId: WekanDocumentField) => {
           const user = result.users.find(({ _id }) => _id === userId);
           positiveVoters = `${positiveVoters + user.username} `;
         });
-        card.vote.negative.forEach((userId) => {
+        card.vote.negative.forEach((userId: WekanDocumentField) => {
           const user = result.users.find(({ _id }) => _id === userId);
           negativeVoters = `${negativeVoters + user.username} `;
         });
@@ -385,7 +392,7 @@ export class Exporter {
       currentRow.push(card.archived ? 'true' : 'false');
       //Custom fields
       const customFieldValuesToPush = new Array(result.customFields.length);
-      card.customFields.forEach((field) => {
+      card.customFields.forEach((field: WekanDocumentField) => {
         if (field.value !== null) {
           if (customFieldMap[field._id].type === 'date') {
             customFieldValuesToPush[customFieldMap[field._id].position] =
@@ -395,7 +402,7 @@ export class Exporter {
               ({ _id }) => _id === field._id,
             ).settings.dropdownItems;
             const fieldObj = dropdownOptions.find(
-              ({ _id }) => _id === field.value,
+              ({ _id }: WekanDocumentField) => _id === field.value,
             );
             const fieldValue = (fieldObj && fieldObj.name) || null;
             customFieldValuesToPush[customFieldMap[field._id].position] =
@@ -424,8 +431,30 @@ export class Exporter {
     return Papa.unparse(cardRows, papaconfig);
   }
 
-  async canExport(user) {
+  async canExport(user: WekanDocumentField) {
     const board = await ReactiveCache.getBoard(this._boardId);
     return board && board.isVisibleBy(user);
   }
+}
+
+interface ExportResult {
+  _format: string;
+  attachments: WekanDocumentField[];
+  lists: WekanDocumentField[];
+  cards: WekanDocumentField[];
+  swimlanes: WekanDocumentField[];
+  customFields: WekanDocumentField[];
+  comments: WekanDocumentField[];
+  activities: WekanDocumentField[];
+  rules: WekanDocumentField[];
+  checklists: WekanDocumentField[];
+  checklistItems: WekanDocumentField[];
+  subtaskItems: WekanDocumentField[];
+  triggers: WekanDocumentField[];
+  actions: WekanDocumentField[];
+  users: WekanDocumentField[];
+  members: WekanDocumentField[];
+  labels: WekanDocumentField[];
+  title?: string;
+  [field: string]: WekanDocumentField;
 }

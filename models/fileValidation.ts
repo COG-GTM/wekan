@@ -3,8 +3,11 @@ import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'fs';
 
-let asyncExecFile;
-let asyncExec;
+// node:util.promisify returns overloaded callback-shaped functions whose exact
+// signatures are impractical to model here; they are the documented interop
+// alias and are only invoked on the server (guarded below).
+let asyncExecFile: WekanDocumentField;
+let asyncExec: WekanDocumentField;
 
 if (Meteor.isServer) {
   asyncExecFile = promisify(execFile);
@@ -14,7 +17,7 @@ if (Meteor.isServer) {
   asyncExec = promisify(exec);
 }
 
-async function detectMimeFromFile(filePath) {
+async function detectMimeFromFile(filePath: string) {
   if (!Meteor.isServer) return undefined;
 
   try {
@@ -31,12 +34,14 @@ async function detectMimeFromFile(filePath) {
   return undefined;
 }
 
-export async function isFileValid(fileObj, mimeTypesAllowed, sizeAllowed, externalCommandLine) {
+// fileObj is the ostrio:files file record (dynamic, includes runtime-only
+// fields such as `path`), so it is the documented interop alias.
+export async function isFileValid(fileObj: WekanDocumentField, mimeTypesAllowed?: string[], sizeAllowed?: number, externalCommandLine?: string) {
   let isValid = true;
   // Always validate uploads. The previous migration flag disabled validation and enabled XSS.
   try {
     // Helper: read up to a limit from a file as UTF-8 text
-    const readTextHead = (filePath, limit = parseInt(process.env.UPLOAD_DANGEROUS_MIME_SCAN_LIMIT || '1048576')) => new Promise((resolve, reject) => {
+    const readTextHead = (filePath: string, limit = parseInt(process.env.UPLOAD_DANGEROUS_MIME_SCAN_LIMIT || '1048576')) => new Promise<{ text: string; complete: boolean }>((resolve, reject) => {
       try {
         const stream = fs.createReadStream(filePath, { encoding: 'utf8', highWaterMark: 64 * 1024 });
         let data = '';
@@ -63,7 +68,7 @@ export async function isFileValid(fileObj, mimeTypesAllowed, sizeAllowed, extern
     });
 
     // Helper: quick content safety checks for HTML/SVG/XML
-    const containsJsOrXmlBombs = (text) => {
+    const containsJsOrXmlBombs = (text: string) => {
       if (!text) return false;
       const t = text.toLowerCase();
       // JavaScript execution vectors
@@ -84,7 +89,7 @@ export async function isFileValid(fileObj, mimeTypesAllowed, sizeAllowed, extern
       return false;
     };
 
-    const checkDangerousMimeAllowance = async (mime, filePath, fileSize) => {
+    const checkDangerousMimeAllowance = async (mime: string, filePath: string, fileSize: number) => {
       // Allow only if content is scanned and clean
       const { text, complete } = await readTextHead(filePath);
       if (!complete) {

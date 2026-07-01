@@ -11,28 +11,30 @@ import { getMembersToMap } from './wekanmapper';
 
 // Parse an uploaded .xlsx (base64) into the row-array shape the CsvCreator
 // consumes (board[0] is the header row). Excel import reuses the CSV creator.
-async function parseXlsxToRows(excelBase64) {
+async function parseXlsxToRows(excelBase64: string) {
   // eslint-disable-next-line global-require
   const ExcelJS = require('@wekanteam/exceljs');
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(Buffer.from(excelBase64, 'base64'));
   const worksheet = workbook.worksheets[0];
-  const rows = [];
+  const rows: string[][] = [];
   if (worksheet) {
-    worksheet.eachRow(row => {
+    worksheet.eachRow((row: WekanDocumentField) => {
       // row.values is 1-indexed (index 0 is empty); normalize to strings.
-      rows.push(row.values.slice(1).map(v => (v == null ? '' : String(v))));
+      rows.push(row.values.slice(1).map((v: WekanDocumentField) => (v == null ? '' : String(v))));
     });
   }
   return rows;
 }
 
 Meteor.methods({
-  async importBoard(board, data, importSource, currentBoard) {
+  async importBoard(board: WekanDocumentField, data: WekanDocumentField, importSource: string, currentBoard?: string) {
     check(data, Object);
     check(importSource, String);
     check(currentBoard, Match.Maybe(String));
-    let creator;
+    // creator is chosen dynamically across migrated and not-yet-migrated creator
+    // classes, so it is the documented interop alias.
+    let creator: WekanDocumentField;
     let importedBoard = board;
     switch (importSource) {
       case 'trello':
@@ -58,16 +60,16 @@ Meteor.methods({
       case 'excel':
         // board = { excelBase64 }; parse it into rows and reuse the CSV creator.
         check(board, Object);
-        importedBoard = await parseXlsxToRows(board.excelBase64);
+        importedBoard = await parseXlsxToRows((board as WekanDocumentField).excelBase64);
         creator = new CsvCreator(data);
         break;
       default:
         // NextCloud Deck / OpenProject / GitHub / GitLab / Gitea / Forgejo:
         // normalize the platform's JSON to the common Kanboard shape and reuse
         // the Kanboard creator.
-        if (EXTERNAL_PARSERS[importSource]) {
+        if (EXTERNAL_PARSERS[importSource as keyof typeof EXTERNAL_PARSERS]) {
           check(board, Match.OneOf(Object, Array));
-          importedBoard = EXTERNAL_PARSERS[importSource](board);
+          importedBoard = EXTERNAL_PARSERS[importSource as keyof typeof EXTERNAL_PARSERS](board as WekanDocumentField);
           creator = new KanboardCreator(data);
         }
         break;
@@ -88,7 +90,7 @@ Meteor.methods({
 });
 
 Meteor.methods({
-  async cloneBoard(sourceBoardId, currentBoardId) {
+  async cloneBoard(sourceBoardId: string, currentBoardId?: string) {
     check(sourceBoardId, String);
     check(currentBoardId, Match.Maybe(String));
 
@@ -107,15 +109,18 @@ Meteor.methods({
     }
 
     const data = await exporter.build();
-    const additionalData = {};
+    const additionalData: { membersMapping?: Record<string, string> } = {};
 
     //get the members to map
-    const membersMapping = getMembersToMap(data);
+    // getMembersToMap lives in the not-yet-migrated wekanmapper.js; its inferred
+    // Promise return type leaks here, so use the documented interop alias to keep
+    // the existing (unawaited) runtime behavior unchanged.
+    const membersMapping: WekanDocumentField = getMembersToMap(data);
 
     //now mirror the mapping done in finishImport in client/components/import/import.js:
     if (membersMapping) {
-      const mappingById = {};
-      membersMapping.forEach(member => {
+      const mappingById: Record<string, string> = {};
+      membersMapping.forEach((member: WekanDocumentField) => {
         if (member.wekanId) {
           mappingById[member.id] = member.wekanId;
         }

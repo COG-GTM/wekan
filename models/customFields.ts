@@ -1,8 +1,8 @@
 import { Mongo } from 'meteor/mongo';
 import Cards from '/models/cards';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const CustomFields = new Mongo.Collection('customFields');
+const CustomFields = new Mongo.Collection<CustomFieldDocument>('customFields');
 
 /**
  * A custom field on a card in the board
@@ -143,7 +143,7 @@ CustomFields.attachSchema(
   }),
 );
 
-CustomFields.addToAllCards = async cf => {
+CustomFields.addToAllCards = async (cf: CustomFieldDocument) => {
   await Cards.updateAsync(
     {
       boardId: { $in: cf.boardIds },
@@ -157,9 +157,9 @@ CustomFields.addToAllCards = async cf => {
 };
 
 CustomFields.helpers({
-  async addBoard(boardId) {
+  async addBoard(boardId: string) {
     if (boardId) {
-      return await CustomFields.updateAsync(this._id, {
+      return await CustomFields.updateAsync(this._id!, {
         $push: { boardIds: boardId },
       });
     }
@@ -168,3 +168,19 @@ CustomFields.helpers({
 });
 
 export default CustomFields;
+
+interface CustomFieldDocument {
+  _id?: string;
+  boardIds: string[];
+  name: string;
+  type: string;
+  settings: WekanDocumentField;
+  showOnCard: boolean;
+  automaticallyOnCard: boolean;
+  alwaysOnCard: boolean;
+  showLabelOnMiniCard: boolean;
+  showSumAtTopOfList: boolean;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  [field: string]: WekanDocumentField;
+}

@@ -12,28 +12,28 @@ if (Meteor.isServer) {
   // Build a Kanboard-style export object from a WeKan board: lists -> columns,
   // swimlanes -> swimlanes, cards -> tasks (this is the inverse of the Kanboard
   // importer, so a board round-trips through this format).
-  async function buildKanboardExport(boardId) {
+  async function buildKanboardExport(boardId: string) {
     const board = await ReactiveCache.getBoard(boardId);
     const lists = await ReactiveCache.getLists({ boardId, archived: false }, { sort: { sort: 1 } });
     const swimlanes = await ReactiveCache.getSwimlanes({ boardId, archived: false }, { sort: { sort: 1 } });
     const cards = await ReactiveCache.getCards({ boardId, archived: false }, { sort: { sort: 1 } });
-    const listById = {};
-    lists.forEach(l => { listById[l._id] = l.title; });
-    const swById = {};
-    swimlanes.forEach(s => { swById[s._id] = s.title; });
-    const labelById = {};
-    (board.labels || []).forEach(l => { labelById[l._id] = l.name; });
+    const listById: Record<string, WekanDocumentField> = {};
+    lists.forEach((l: WekanDocumentField) => { listById[l._id] = l.title; });
+    const swById: Record<string, WekanDocumentField> = {};
+    swimlanes.forEach((s: WekanDocumentField) => { swById[s._id] = s.title; });
+    const labelById: Record<string, WekanDocumentField> = {};
+    (board.labels || []).forEach((l: WekanDocumentField) => { labelById[l._id] = l.name; });
     return {
       board: { name: board.title },
-      columns: lists.map(l => ({ title: l.title })),
-      swimlanes: swimlanes.map(s => ({ name: s.title })),
-      tasks: cards.map(c => ({
+      columns: lists.map((l: WekanDocumentField) => ({ title: l.title })),
+      swimlanes: swimlanes.map((s: WekanDocumentField) => ({ name: s.title })),
+      tasks: cards.map((c: WekanDocumentField) => ({
         title: c.title,
         description: c.description || '',
         column_name: listById[c.listId] || '',
         swimlane_name: swById[c.swimlaneId] || 'Default',
         date_due: c.dueAt ? new Date(c.dueAt).toISOString() : undefined,
-        tags: (c.labelIds || []).map(id => labelById[id]).filter(Boolean),
+        tags: (c.labelIds || []).map((id: WekanDocumentField) => labelById[id]).filter(Boolean),
       })),
     };
   }
@@ -59,7 +59,7 @@ if (Meteor.isServer) {
    * @param {string} boardId the ID of the board we are exporting
    * @param {string} authToken the loginToken
    */
-  WebApp.handlers.get('/api/boards/:boardId/export', async function (req, res) {
+  WebApp.handlers.get('/api/boards/:boardId/export', async function (req: WekanWebAppRequest, res: WekanWebAppResponse) {
     const boardId = req.params.boardId;
     let user = null;
     let impersonateDone = false;
@@ -150,7 +150,7 @@ if (Meteor.isServer) {
    * @param {string} boardId the ID of the board we are exporting
    * @param {string} authToken the loginToken
    */
-  WebApp.handlers.get('/api/boards/:boardId/export/kanboard', async function (req, res) {
+  WebApp.handlers.get('/api/boards/:boardId/export/kanboard', async function (req: WekanWebAppRequest, res: WekanWebAppResponse) {
     const boardId = req.params.boardId;
     const board = await ReactiveCache.getBoard(boardId);
     if (!board) {
@@ -193,7 +193,7 @@ if (Meteor.isServer) {
 
   // Generalized export to other tools: NextCloud Deck, OpenProject, GitHub,
   // GitLab, Gitea, Forgejo. One shared auth handler, one route per format.
-  async function serveExternalExport(req, res, format) {
+  async function serveExternalExport(req: WekanWebAppRequest, res: WekanWebAppResponse, format: string) {
     const boardId = req.params.boardId;
     const board = await ReactiveCache.getBoard(boardId);
     if (!board) {
@@ -236,7 +236,7 @@ if (Meteor.isServer) {
     }
   }
 
-  EXTERNAL_EXPORT_FORMATS.forEach(format => {
+  EXTERNAL_EXPORT_FORMATS.forEach((format: string) => {
     /**
      * @operation exportExternal
      * @tag Boards
@@ -245,7 +245,7 @@ if (Meteor.isServer) {
      * @param {string} boardId the ID of the board we are exporting
      * @param {string} authToken the loginToken
      */
-    WebApp.handlers.get(`/api/boards/:boardId/export/${format}`, async function (req, res) {
+    WebApp.handlers.get(`/api/boards/:boardId/export/${format}`, async function (req: WekanWebAppRequest, res: WekanWebAppResponse) {
       await serveExternalExport(req, res, format);
     });
   });
@@ -272,7 +272,7 @@ if (Meteor.isServer) {
    */
   WebApp.handlers.get(
     '/api/boards/:boardId/attachments/:attachmentId/export',
-    async function (req, res) {
+    async function (req: WekanWebAppRequest, res: WekanWebAppResponse) {
       const boardId = req.params.boardId;
       const attachmentId = req.params.attachmentId;
       let user = null;
@@ -364,7 +364,7 @@ if (Meteor.isServer) {
    * @param {string} authToken the loginToken
    * @param {string} delimiter delimiter to use while building export. Default is comma ','
    */
-  WebApp.handlers.get('/api/boards/:boardId/export/csv', async function (req, res) {
+  WebApp.handlers.get('/api/boards/:boardId/export/csv', async function (req: WekanWebAppRequest, res: WekanWebAppResponse) {
     const boardId = req.params.boardId;
     let user = null;
     let impersonateDone = false;

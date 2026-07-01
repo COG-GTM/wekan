@@ -1,5 +1,5 @@
 import { Mongo } from 'meteor/mongo';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
 // All board-member role keys that a global admin may grant the "invite to
 // board" capability to. Order is the display order in the Admin Panel / People
@@ -24,7 +24,7 @@ export const INVITE_TO_BOARD_ROLES_ID = 'inviteToBoardRoles';
 // Secure default: only board admins and plain normal members may invite.
 export const INVITE_TO_BOARD_ROLES_DEFAULT = ['board-admin', 'normal'];
 
-const InviteToBoardRolesSettings = new Mongo.Collection('inviteToBoardRolesSettings');
+const InviteToBoardRolesSettings = new Mongo.Collection<InviteToBoardRolesSettingsDocument>('inviteToBoardRolesSettings');
 
 InviteToBoardRolesSettings.attachSchema(
   new SimpleSchema({
@@ -72,7 +72,7 @@ InviteToBoardRolesSettings.attachSchema(
 );
 
 InviteToBoardRolesSettings.helpers({
-  isRoleAllowed(role) {
+  isRoleAllowed(role: string) {
     return (this.allowedRoles || []).includes(role);
   },
 });
@@ -85,3 +85,12 @@ InviteToBoardRolesSettings.allowedRoles = async function() {
 };
 
 export default InviteToBoardRolesSettings;
+
+interface InviteToBoardRolesSettingsDocument {
+  _id?: string;
+  allowedRoles?: string[];
+  sort?: number;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  [field: string]: WekanDocumentField;
+}

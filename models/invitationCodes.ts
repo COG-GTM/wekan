@@ -1,8 +1,8 @@
 import { Mongo } from 'meteor/mongo';
 import { ReactiveCache } from '/imports/reactiveCache';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const InvitationCodes = new Mongo.Collection('invitation_codes');
+const InvitationCodes = new Mongo.Collection<InvitationCodeDocument>('invitation_codes');
 
 InvitationCodes.attachSchema(
   new SimpleSchema({
@@ -69,3 +69,15 @@ InvitationCodes.helpers({
 // });
 
 export default InvitationCodes;
+
+interface InvitationCodeDocument {
+  _id?: string;
+  code: string;
+  email: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  authorId: string;
+  boardsToBeInvited?: string[];
+  valid: boolean;
+  [field: string]: WekanDocumentField;
+}

@@ -5,9 +5,9 @@ import { LIST_COLORS } from '/models/metadata/colors';
 import PositionHistory from './positionHistory';
 import Boards from '/models/boards';
 import Cards from '/models/cards';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const Lists = new Mongo.Collection('lists');
+const Lists = new Mongo.Collection<ListDocument>('lists');
 
 // Pure, dependency-free helper for scoping a set of cards to a list and
 // (optionally) a swimlane (#5623). Defined here (an isomorphic model file) so
@@ -20,7 +20,7 @@ const Lists = new Mongo.Collection('lists');
 //   the given value, OR the card has no swimlane at all (null / '' / missing),
 //   mirroring `cards()` so orphaned/pre-migration cards stay selectable in
 //   every swimlane.
-export function filterCardsByListAndSwimlane(cards, listId, swimlaneId) {
+export function filterCardsByListAndSwimlane(cards: WekanDocumentField[], listId: string, swimlaneId?: string) {
   if (!Array.isArray(cards)) {
     return [];
   }
@@ -54,7 +54,7 @@ export const ALLOWED_LIST_COLORS = [...LIST_COLORS];
 
 const ALLOWED_LIST_COLOR_SET = new Set(ALLOWED_LIST_COLORS);
 
-export function normalizeListColor(color) {
+export function normalizeListColor(color: string) {
   if (typeof color !== 'string') {
     return '';
   }
@@ -234,7 +234,7 @@ Lists.attachSchema(
 );
 
 Lists.helpers({
-  async copy(boardId, swimlaneId, cardIdMap = null) {
+  async copy(boardId: string, swimlaneId: string, cardIdMap: Record<string, string> | null = null) {
     const oldId = this._id;
     const oldSwimlaneId = this.swimlaneId || null;
     this.boardId = boardId;
@@ -267,7 +267,7 @@ Lists.helpers({
     return _id;
   },
 
-  async move(boardId, swimlaneId) {
+  async move(boardId: string, swimlaneId: string) {
     const boardList = await ReactiveCache.getList({
       boardId,
       title: this.title,
@@ -297,8 +297,8 @@ Lists.helpers({
     }
   },
 
-  cards(swimlaneId) {
-    const selector = {
+  cards(swimlaneId?: string) {
+    const selector: Record<string, WekanDocumentField> = {
       listId: this._id,
       archived: false,
     };
@@ -320,8 +320,8 @@ Lists.helpers({
     return ret;
   },
 
-  cardsUnfiltered(swimlaneId) {
-    const selector = {
+  cardsUnfiltered(swimlaneId?: string) {
+    const selector: Record<string, WekanDocumentField> = {
       listId: this._id,
       archived: false,
     };
@@ -337,19 +337,19 @@ Lists.helpers({
     return ret;
   },
 
-  allCards(swimlaneId) {
+  allCards(swimlaneId?: string) {
     const ret = ReactiveCache.getCards({ listId: this._id });
     // When a swimlane context is given, scope the result to that swimlane
     // (plus orphaned cards) so "select all cards" stays contained within its
     // own swimlane. Without a swimlaneId, keep the historical list-wide result.
-    return filterCardsByListAndSwimlane(ret, this._id, swimlaneId);
+    return filterCardsByListAndSwimlane(ret, this._id!, swimlaneId);
   },
 
   board() {
     return ReactiveCache.getBoard(this.boardId);
   },
 
-  getWipLimit(option) {
+  getWipLimit(option?: string) {
     const list = ReactiveCache.getList(this._id);
     if (!list || !list.wipLimit) {
       // Necessary check to avoid exceptions for the case where the doc doesn't have the wipLimit field yet set
@@ -407,20 +407,20 @@ Lists.helpers({
     return await Lists.removeAsync({ _id: this._id });
   },
 
-  async rename(title) {
+  async rename(title: string) {
     // Basic client-side validation - server will handle full sanitization
     if (typeof title === 'string') {
       // Basic length check to prevent abuse
       const sanitizedTitle = title.length > 1000 ? title.substring(0, 1000) : title;
-      return await Lists.updateAsync(this._id, { $set: { title: sanitizedTitle } });
+      return await Lists.updateAsync(this._id!, { $set: { title: sanitizedTitle } });
     }
-    return await Lists.updateAsync(this._id, { $set: { title } });
+    return await Lists.updateAsync(this._id!, { $set: { title } });
   },
   async star(enable = true) {
-    return await Lists.updateAsync(this._id, { $set: { starred: !!enable } });
+    return await Lists.updateAsync(this._id!, { $set: { starred: !!enable } });
   },
   async collapse(enable = true) {
-    return await Lists.updateAsync(this._id, { $set: { collapsed: !!enable } });
+    return await Lists.updateAsync(this._id!, { $set: { collapsed: !!enable } });
   },
 
   async archive() {
@@ -429,7 +429,7 @@ Lists.helpers({
         await card.archive();
       }
     }
-    return await Lists.updateAsync(this._id, { $set: { archived: true, archivedAt: new Date() } });
+    return await Lists.updateAsync(this._id!, { $set: { archived: true, archivedAt: new Date() } });
   },
 
   async restore() {
@@ -438,32 +438,32 @@ Lists.helpers({
         await card.restore();
       }
     }
-    return await Lists.updateAsync(this._id, { $set: { archived: false } });
+    return await Lists.updateAsync(this._id!, { $set: { archived: false } });
   },
 
-  async toggleSoftLimit(toggle) {
-    return await Lists.updateAsync(this._id, { $set: { 'wipLimit.soft': toggle } });
+  async toggleSoftLimit(toggle: boolean) {
+    return await Lists.updateAsync(this._id!, { $set: { 'wipLimit.soft': toggle } });
   },
 
-  async toggleWipLimit(toggle) {
-    return await Lists.updateAsync(this._id, { $set: { 'wipLimit.enabled': toggle } });
+  async toggleWipLimit(toggle: boolean) {
+    return await Lists.updateAsync(this._id!, { $set: { 'wipLimit.enabled': toggle } });
   },
 
-  async setWipLimit(limit) {
-    return await Lists.updateAsync(this._id, { $set: { 'wipLimit.value': limit } });
+  async setWipLimit(limit: number) {
+    return await Lists.updateAsync(this._id!, { $set: { 'wipLimit.value': limit } });
   },
 
-  async setColor(newColor) {
+  async setColor(newColor: string) {
     // Normalize so an offered-but-unsupported color (or a removal) becomes None
     // instead of being silently saved as the wrong color or rejected (#5382).
     // normalizeListColor returns '' for None; store null so the optional,
     // allowedValues-constrained schema field accepts it (as cards do).
     const color = normalizeListColor(newColor) || null;
-    return await Lists.updateAsync(this._id, { $set: { color } });
+    return await Lists.updateAsync(this._id!, { $set: { color } });
   },
 });
 
-Lists.userArchivedLists = async userId => {
+Lists.userArchivedLists = async (userId: string) => {
   return await ReactiveCache.getLists({
     boardId: { $in: await Boards.userBoardIds(userId, null) },
     archived: true,
@@ -472,7 +472,7 @@ Lists.userArchivedLists = async userId => {
 
 Lists.userArchivedListIds = async () => {
   const lists = await Lists.userArchivedLists();
-  return lists.map(list => { return list._id; });
+  return lists.map((list: WekanDocumentField) => { return list._id; });
 };
 
 Lists.archivedLists = async () => {
@@ -481,7 +481,7 @@ Lists.archivedLists = async () => {
 
 Lists.archivedListIds = async () => {
   const lists = await Lists.archivedLists();
-  return lists.map(list => {
+  return lists.map((list: WekanDocumentField) => {
     return list._id;
   });
 };
@@ -512,7 +512,7 @@ Lists.helpers({
     };
 
     if (Meteor.isServer) {
-      return PositionHistory.findOneAsync(selector).then(existingHistory => {
+      return PositionHistory.findOneAsync(selector).then((existingHistory: WekanDocumentField) => {
         if (!existingHistory) {
           return PositionHistory.insertAsync(document);
         }
@@ -575,3 +575,24 @@ Lists.helpers({
 });
 
 export default Lists;
+
+interface ListDocument {
+  _id?: string;
+  title: string;
+  starred?: boolean;
+  archived?: boolean;
+  archivedAt?: Date;
+  boardId: string;
+  swimlaneId?: string;
+  createdAt?: Date;
+  sort?: number;
+  updatedAt?: Date;
+  modifiedAt?: Date;
+  wipLimit?: WekanDocumentField;
+  color?: string | null;
+  type: string;
+  width?: number;
+  collapsed?: boolean;
+  [field: string]: WekanDocumentField;
+}
+// note: color is stored as null (not undefined) to clear it — see setColor().

@@ -31,7 +31,13 @@ import {
 // card, Jira labels become board labels, and recognizable automation rules are
 // mapped to WeKan rules (best effort).
 export class JiraCreator {
-  constructor(data) {
+  private _nowDate: Date;
+  private members: Record<string, string>;
+  private lists: Record<string, string>;
+  private swimlane: string | null;
+  private cardsByKey: Record<string, string>;
+
+  constructor(data: WekanDocumentField) {
     this._nowDate = new Date();
     this.members = data && data.membersMapping ? data.membersMapping : {};
     this.lists = {};
@@ -41,23 +47,23 @@ export class JiraCreator {
     this.cardsByKey = {};
   }
 
-  _now(dateString) {
+  _now(dateString?: string | Date) {
     if (dateString) return new Date(dateString);
     if (!this._nowDate) this._nowDate = new Date();
     return this._nowDate;
   }
 
-  _user(jiraUserId) {
+  _user(jiraUserId?: string) {
     if (jiraUserId && this.members[jiraUserId]) return this.members[jiraUserId];
     return Meteor.userId();
   }
 
-  _issues(data) {
+  _issues(data: WekanDocumentField) {
     if (Array.isArray(data)) return data;
     return data.issues || [];
   }
 
-  async createBoard(data) {
+  async createBoard(data: WekanDocumentField) {
     const title =
       (data.board && data.board.name) ||
       (this._issues(data)[0] &&
@@ -66,7 +72,7 @@ export class JiraCreator {
         this._issues(data)[0].fields.project.name) ||
       `Imported Jira Board ${this._now()}`;
 
-    const boardToCreate = {
+    const boardToCreate: JiraBoardToCreate = {
       archived: false,
       color: 'belize',
       createdAt: this._now(),
@@ -90,10 +96,10 @@ export class JiraCreator {
     };
 
     // Jira labels => board labels.
-    const labelNames = new Set();
+    const labelNames = new Set<string>();
     for (const issue of this._issues(data)) {
       const labels = (issue.fields && issue.fields.labels) || [];
-      labels.forEach(l => labelNames.add(l));
+      labels.forEach((l: WekanDocumentField) => labelNames.add(l));
     }
     for (const name of labelNames) {
       boardToCreate.labels.push({ _id: Random.id(6), color: 'black', name });
@@ -110,7 +116,7 @@ export class JiraCreator {
     return boardId;
   }
 
-  async createSwimlanes(boardId) {
+  async createSwimlanes(boardId: string) {
     const swimlaneId = await Swimlanes.direct.insertAsync({
       archived: false,
       boardId,
@@ -121,7 +127,7 @@ export class JiraCreator {
     this.swimlane = swimlaneId;
   }
 
-  async createLists(data, boardId) {
+  async createLists(data: WekanDocumentField, boardId: string) {
     let sort = 0;
     for (const issue of this._issues(data)) {
       const statusName =
@@ -140,16 +146,16 @@ export class JiraCreator {
     }
   }
 
-  async createCards(data, boardId) {
+  async createCards(data: WekanDocumentField, boardId: string) {
     const board = await ReactiveCache.getBoard(boardId);
     for (const issue of this._issues(data)) {
       const fields = issue.fields || {};
       const statusName = (fields.status && fields.status.name) || 'Imported';
-      const titleParts = [];
+      const titleParts: string[] = [];
       if (issue.key) titleParts.push(`[${issue.key}]`);
       if (fields.summary) titleParts.push(fields.summary);
 
-      const cardToCreate = {
+      const cardToCreate: JiraCardToCreate = {
         archived: false,
         boardId,
         dateLastActivity: this._now(),
@@ -186,12 +192,12 @@ export class JiraCreator {
   // #3392: best-effort mapping of Jira issue links to card-to-card dependencies
   // ("Red Strings"). Jira link type names are matched loosely: "blocks" maps to
   // blocks / is-blocked-by depending on direction, everything else to related-to.
-  async createDependencies(data) {
+  async createDependencies(data: WekanDocumentField) {
     for (const issue of this._issues(data)) {
       const fromId = this.cardsByKey[issue.key];
       if (!fromId) continue;
       const links = (issue.fields || {}).issuelinks || [];
-      const deps = [];
+      const deps: WekanDocumentField[] = [];
       for (const link of links) {
         const typeName = ((link.type && link.type.name) || '').toLowerCase();
         let targetKey = null;
@@ -220,7 +226,7 @@ export class JiraCreator {
   // Best-effort: import automation rules that already use, or closely resemble,
   // the WeKan { title, trigger, action } shape. Jira's native automation export
   // is proprietary; rules that cannot be mapped are skipped.
-  async createRules(data, boardId) {
+  async createRules(data: WekanDocumentField, boardId: string) {
     const rules = data.automationRules || [];
     let imported = 0;
     for (const r of rules) {
@@ -238,7 +244,7 @@ export class JiraCreator {
     return imported;
   }
 
-  async create(board, currentBoardId) {
+  async create(board: WekanDocumentField, currentBoardId?: string) {
     const isSandstorm =
       Meteor.settings && Meteor.settings.public && Meteor.settings.public.sandstorm;
     if (isSandstorm && currentBoardId) {
@@ -253,4 +259,50 @@ export class JiraCreator {
     await this.createRules(board, boardId);
     return boardId;
   }
+}
+
+interface JiraBoardLabel {
+  _id: string;
+  color: string;
+  name: string;
+}
+
+interface JiraBoardMember {
+  userId: string | null;
+  wekanId: string | null;
+  isActive: boolean;
+  isAdmin: boolean;
+  isNoComments: boolean;
+  isCommentOnly: boolean;
+  swimlaneId: boolean;
+}
+
+interface JiraBoardToCreate {
+  archived: boolean;
+  color: string;
+  createdAt: Date;
+  labels: JiraBoardLabel[];
+  members: JiraBoardMember[];
+  modifiedAt: Date;
+  permission: string;
+  slug: string;
+  stars: number;
+  title: WekanDocumentField;
+}
+
+interface JiraCardToCreate {
+  archived: boolean;
+  boardId: string;
+  dateLastActivity: Date;
+  description: string;
+  listId: string;
+  swimlaneId: string | null;
+  sort: number;
+  title: string;
+  userId: string | null;
+  labelIds: string[];
+  createdAt?: Date;
+  dueAt?: Date;
+  modifiedAt?: Date;
+  members?: string[];
 }

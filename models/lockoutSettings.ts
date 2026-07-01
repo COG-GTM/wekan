@@ -1,8 +1,8 @@
 import { Mongo } from 'meteor/mongo';
 import { ReactiveCache } from '/imports/reactiveCache';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const LockoutSettings = new Mongo.Collection('lockoutSettings');
+const LockoutSettings = new Mongo.Collection<LockoutSettingDocument>('lockoutSettings');
 
 LockoutSettings.attachSchema(
   new SimpleSchema({
@@ -53,7 +53,7 @@ LockoutSettings.helpers({
       _id: { $in: ['known-failuresBeforeLockout', 'known-lockoutPeriod', 'known-failureWindow'] }
     }, { fields: { _id: 1, value: 1 } }).fetch();
 
-    const settingsMap = {};
+    const settingsMap: Record<string, number> = {};
     settings.forEach(s => { settingsMap[s._id] = s.value; });
 
     return {
@@ -68,7 +68,7 @@ LockoutSettings.helpers({
       _id: { $in: ['unknown-failuresBeforeLockout', 'unknown-lockoutPeriod', 'unknown-failureWindow'] }
     }, { fields: { _id: 1, value: 1 } }).fetch();
 
-    const settingsMap = {};
+    const settingsMap: Record<string, number> = {};
     settings.forEach(s => { settingsMap[s._id] = s.value; });
 
     return {
@@ -80,3 +80,13 @@ LockoutSettings.helpers({
 });
 
 export default LockoutSettings;
+
+interface LockoutSettingDocument {
+  _id: string;
+  value: number;
+  category?: string;
+  sort?: number;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  [field: string]: WekanDocumentField;
+}
