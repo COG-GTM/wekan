@@ -6,13 +6,13 @@ import InviteToBoardRolesSettings, {
   INVITE_TO_BOARD_ROLES_DEFAULT,
 } from '/models/inviteToBoardRolesSettings';
 // import { Index, MongoDBEngine } from 'meteor/easy:search'; // Temporarily disabled due to compatibility issues
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 const Users = Meteor.users;
 const getUtils = () => require('/client/lib/utils').Utils;
 
 // Public-board collapse persistence helpers (cookie-based for non-logged-in users)
 if (Meteor.isClient) {
-  const readCookieMap = name => {
+  const readCookieMap = (name: string) => {
     try {
       const stored = typeof document !== 'undefined' ? document.cookie : '';
       const cookies = stored.split(';').map(c => c.trim());
@@ -30,7 +30,7 @@ if (Meteor.isClient) {
     }
   };
 
-  const writeCookieMap = (name, data) => {
+  const writeCookieMap = (name: string, data: WekanDocumentField) => {
     try {
       const serialized = encodeURIComponent(JSON.stringify(data || {}));
       const maxAge = 60 * 60 * 24 * 365; // 1 year
@@ -40,7 +40,7 @@ if (Meteor.isClient) {
     }
   };
 
-  Users.getPublicCollapsedList = (boardId, listId) => {
+  Users.getPublicCollapsedList = (boardId: string, listId: string) => {
     if (!boardId || !listId) return null;
     const data = readCookieMap('wekan-collapsed-lists');
     if (data[boardId] && typeof data[boardId][listId] === 'boolean') {
@@ -49,7 +49,7 @@ if (Meteor.isClient) {
     return null;
   };
 
-  Users.setPublicCollapsedList = (boardId, listId, collapsed) => {
+  Users.setPublicCollapsedList = (boardId: string, listId: string, collapsed: boolean) => {
     if (!boardId || !listId) return false;
     const data = readCookieMap('wekan-collapsed-lists');
     if (!data[boardId]) data[boardId] = {};
@@ -58,7 +58,7 @@ if (Meteor.isClient) {
     return true;
   };
 
-  Users.getPublicCollapsedSwimlane = (boardId, swimlaneId) => {
+  Users.getPublicCollapsedSwimlane = (boardId: string, swimlaneId: string) => {
     if (!boardId || !swimlaneId) return null;
     const data = readCookieMap('wekan-collapsed-swimlanes');
     if (data[boardId] && typeof data[boardId][swimlaneId] === 'boolean') {
@@ -67,7 +67,7 @@ if (Meteor.isClient) {
     return null;
   };
 
-  Users.setPublicCollapsedSwimlane = (boardId, swimlaneId, collapsed) => {
+  Users.setPublicCollapsedSwimlane = (boardId: string, swimlaneId: string, collapsed: boolean) => {
     if (!boardId || !swimlaneId) return false;
     const data = readCookieMap('wekan-collapsed-swimlanes');
     if (!data[boardId]) data[boardId] = {};
@@ -81,7 +81,7 @@ if (Meteor.isClient) {
     return typeof data.state === 'boolean' ? data.state : null;
   };
 
-  Users.setPublicCardCollapsed = collapsed => {
+  Users.setPublicCardCollapsed = (collapsed: boolean) => {
     writeCookieMap('wekan-card-collapsed', { state: !!collapsed });
     return true;
   };
@@ -770,14 +770,14 @@ export const USER_UPDATE_FORBIDDEN_PREFIXES = [
   'sessionData',
 ];
 
-export function isUserUpdateAllowed(fields) {
+export function isUserUpdateAllowed(fields: string[]) {
   const result = fields.every((f) =>
     USER_UPDATE_ALLOWED_EXACT.includes(f) || USER_UPDATE_ALLOWED_PREFIXES.some((p) => f.startsWith(p))
   );
   return result;
 }
 
-export function hasForbiddenUserUpdateField(fields) {
+export function hasForbiddenUserUpdateField(fields: string[]) {
   const result = fields.some((f) => USER_UPDATE_FORBIDDEN_PREFIXES.some((p) => f === p || f.startsWith(p + '.')));
   return result;
 }
@@ -815,7 +815,7 @@ export function hasForbiddenUserUpdateField(fields) {
 
 // Temporary fallback - create a simple search index object
 export const UserSearchIndex = {
-  search: function(query, options) {
+  search: function(query: string, options?: WekanDocumentField) {
     // Simple fallback search using MongoDB find
     const searchRegex = new RegExp(query, 'i');
     return Users.find({
@@ -945,7 +945,7 @@ if (Meteor.isClient) {
   });
 }
 
-Users.parseImportUsernames = (usernamesString) => {
+Users.parseImportUsernames = (usernamesString: string) => {
   return usernamesString.trim().split(new RegExp('\\s*[,;]\\s*'));
 };
 
@@ -959,7 +959,7 @@ Users.helpers({
   teamIds() {
     if (this.teams) {
       // TODO: Should the Team collection be queried to determine if the team isActive?
-      return this.teams.map((team) => {
+      return this.teams.map((team: WekanDocumentField) => {
         return team.teamId;
       });
     }
@@ -968,7 +968,7 @@ Users.helpers({
   orgIds() {
     if (this.orgs) {
       // TODO: Should the Org collection be queried to determine if the organization isActive?
-      return this.orgs.map((org) => {
+      return this.orgs.map((org: WekanDocumentField) => {
         return org.orgId;
       });
     }
@@ -986,20 +986,20 @@ Users.helpers({
     const otherOrgs =
       typeof otherUser.orgIds === 'function'
         ? otherUser.orgIds()
-        : (otherUser.orgs || []).map(org => org.orgId);
+        : (otherUser.orgs || []).map((org: WekanDocumentField) => org.orgId);
     const otherTeams =
       typeof otherUser.teamIds === 'function'
         ? otherUser.teamIds()
-        : (otherUser.teams || []).map(team => team.teamId);
+        : (otherUser.teams || []).map((team: WekanDocumentField) => team.teamId);
     return (
-      otherOrgs.some(orgId => myOrgs.has(orgId)) ||
-      otherTeams.some(teamId => myTeams.has(teamId))
+      otherOrgs.some((orgId: WekanDocumentField) => myOrgs.has(orgId)) ||
+      otherTeams.some((teamId: WekanDocumentField) => myTeams.has(teamId))
     );
   },
   // #5850: the email-address domain(s) of this user, used for domain-based board
   // sharing (board.domains). Lower-cased; primary email's domain.
   emailDomains() {
-    const domains = [];
+    const domains: string[] = [];
     (this.emails || []).forEach((email) => {
       const addr = (email && email.address) || '';
       const at = addr.lastIndexOf('@');
@@ -1015,7 +1015,7 @@ Users.helpers({
   orgsUserBelongs() {
     if (this.orgs) {
       return this.orgs
-        .map(function (org) {
+        .map(function (org: WekanDocumentField) {
           return org.orgDisplayName;
         })
         .sort()
@@ -1026,14 +1026,14 @@ Users.helpers({
   orgIdsUserBelongs() {
     let ret = '';
     if (this.orgs) {
-      ret = this.orgs.map(org => org.orgId).join(',');
+      ret = this.orgs.map((org: WekanDocumentField) => org.orgId).join(',');
     }
     return ret;
   },
   teamsUserBelongs() {
     if (this.teams) {
       return this.teams
-        .map(function (team) {
+        .map(function (team: WekanDocumentField) {
           return team.teamDisplayName;
         })
         .sort()
@@ -1044,7 +1044,7 @@ Users.helpers({
   teamIdsUserBelongs() {
     let ret = '';
     if (this.teams) {
-      ret = this.teams.map(team => team.teamId).join(',');
+      ret = this.teams.map((team: WekanDocumentField) => team.teamId).join(',');
     }
     return ret;
   },
@@ -1126,7 +1126,7 @@ Users.helpers({
   sortBoardsForUser(boardsArr) {
     const arr = (boardsArr || []).slice();
     const mode = this.getAllBoardsSortBy();
-    const byTitle = (a, b) =>
+    const byTitle = (a: WekanDocumentField, b: WekanDocumentField) =>
       (a.title || '').localeCompare(b.title || '', undefined, {
         sensitivity: 'base',
       });
@@ -1135,11 +1135,11 @@ Users.helpers({
       return arr;
     }
     if (mode === 'title-desc') {
-      arr.sort((a, b) => byTitle(b, a));
+      arr.sort((a: WekanDocumentField, b: WekanDocumentField) => byTitle(b, a));
       return arr;
     }
     const mapping = (this.profile && this.profile.boardSortIndex) || {};
-    arr.sort((a, b) => {
+    arr.sort((a: WekanDocumentField, b: WekanDocumentField) => {
       const ia = typeof mapping[a._id] === 'number' ? mapping[a._id] : Number.POSITIVE_INFINITY;
       const ib = typeof mapping[b._id] === 'number' ? mapping[b._id] : Number.POSITIVE_INFINITY;
       if (ia !== ib) return ia - ib;
@@ -1196,52 +1196,6 @@ Users.helpers({
       return swimlaneHeights[boardId][listId];
     } else {
       return -1;
-    }
-  },
-
-  getSwimlaneHeightFromStorage(boardId, swimlaneId) {
-    // For logged-in users, get from profile
-    if (this._id) {
-      return this.getSwimlaneHeight(boardId, swimlaneId);
-    }
-
-    // For non-logged-in users, get from localStorage
-    try {
-      const stored = localStorage.getItem('wekan-swimlane-heights');
-      if (stored) {
-        const heights = JSON.parse(stored);
-        if (heights[boardId] && heights[boardId][swimlaneId]) {
-          return heights[boardId][swimlaneId];
-        }
-      }
-    } catch (e) {
-      console.warn('Error reading swimlane heights from localStorage:', e);
-    }
-
-    return -1;
-  },
-
-  setSwimlaneHeightToStorage(boardId, swimlaneId, height) {
-    // For logged-in users, save to profile
-    if (this._id) {
-      return this.setSwimlaneHeight(boardId, swimlaneId, height);
-    }
-
-    // For non-logged-in users, save to localStorage
-    try {
-      const stored = localStorage.getItem('wekan-swimlane-heights');
-      let heights = stored ? JSON.parse(stored) : {};
-
-      if (!heights[boardId]) {
-        heights[boardId] = {};
-      }
-      heights[boardId][swimlaneId] = height;
-
-      localStorage.setItem('wekan-swimlane-heights', JSON.stringify(heights));
-      return true;
-    } catch (e) {
-      console.warn('Error saving swimlane height to localStorage:', e);
-      return false;
     }
   },
 
@@ -1304,7 +1258,7 @@ Users.helpers({
     // activityObj (activity.user, activity._id, …), so a single orphaned entry
     // threw and broke the whole notifications popup.
     // newest first. don't use reverse() because it changes the array inplace, so sometimes the array is reversed twice and oldest items at top again
-    const ret = notifications.filter(notification => notification.activityObj).toReversed();
+    const ret = notifications.filter((notification: WekanDocumentField) => notification.activityObj).toReversed();
     return ret;
   },
 
@@ -1365,12 +1319,12 @@ Users.helpers({
     else if (profile.fullname) {
       return profile.fullname
         .split(/\s+/)
-        .reduce((memo, word) => {
+        .reduce((memo: string, word: string) => {
           return memo + word[0];
         }, '')
         .toUpperCase();
     } else {
-      return this.username[0].toUpperCase();
+      return this.username![0].toUpperCase();
     }
   },
 
@@ -1617,7 +1571,7 @@ Users.helpers({
           break;
         }
       }
-      let data = {};
+      let data: Record<string, WekanDocumentField> = {};
       try { data = JSON.parse(json || '{}'); } catch (e) { data = {}; }
       if (!data[boardId]) data[boardId] = {};
       data[boardId][listId] = !!collapsed;
@@ -1674,7 +1628,7 @@ Users.helpers({
           break;
         }
       }
-      let data = {};
+      let data: Record<string, WekanDocumentField> = {};
       try { data = JSON.parse(json || '{}'); } catch (e) { data = {}; }
       if (!data[boardId]) data[boardId] = {};
       data[boardId][swimlaneId] = !!collapsed;

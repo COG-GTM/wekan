@@ -43,9 +43,21 @@ type MeteorConnectFn = (url: string, options?: object) => any;
 declare module 'meteor/meteor' {
   namespace Meteor {
     let connect: MeteorConnectFn;
-    // Wekan flags site administrators directly on the user document.
+    // The user's `profile` subdocument holds a large, evolving set of wekan
+    // preferences (per-board list widths, collapse state, sort modes, dialog
+    // options, …) that @types/meteor leaves intentionally empty, so they are
+    // exposed through this documented open shape.
+    interface UserProfile {
+      [field: string]: WekanDocumentField;
+    }
+    // Wekan flags site administrators directly on the user document. The user
+    // document also carries many wekan-specific fields (profile settings, org
+    // and team memberships, per-board preferences, import bookkeeping, …) that
+    // @types/meteor does not model, so they are exposed through this documented
+    // open shape.
     interface User {
       isAdmin?: boolean;
+      [field: string]: WekanDocumentField;
     }
   }
 }
@@ -147,6 +159,27 @@ interface WekanReactiveCache {
 declare const Attachments: WekanFilesCollection;
 declare const ReactiveCache: WekanReactiveCache;
 declare const Random: { id(n?: number): string };
+
+// Client localStorage validation helpers (client/lib/localStorageValidator) are
+// referenced from models/users' anonymous-user fallbacks as optional globals,
+// always behind a `typeof … === 'function'` guard.
+declare const getValidatedLocalStorageData: (
+  key: string,
+  validator?: WekanDocumentField,
+) => WekanDocumentField;
+declare const setValidatedLocalStorageData: (
+  key: string,
+  data: WekanDocumentField,
+  validator?: WekanDocumentField,
+) => WekanDocumentField;
+declare const validators: Record<string, WekanDocumentField>;
+
+// Legacy global referenced only by the (effectively dead) Users `remove` helper
+// in models/users; modelled as the users collection it is meant to be so the
+// migration adds no runtime behavior.
+declare const User: import('meteor/mongo').Mongo.Collection<
+  import('meteor/meteor').Meteor.User
+>;
 
 // Meteor's `check` package registers `check` and `Match` as globals when loaded.
 // @types/meteor only models them as exports of the 'meteor/check' module, so
