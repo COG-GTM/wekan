@@ -5,7 +5,7 @@ import { LIST_COLORS } from '/models/metadata/colors';
 import PositionHistory from './positionHistory';
 import Boards from '/models/boards';
 import Cards from '/models/cards';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
 const Lists = new Mongo.Collection('lists');
 
@@ -20,11 +20,11 @@ const Lists = new Mongo.Collection('lists');
 //   the given value, OR the card has no swimlane at all (null / '' / missing),
 //   mirroring `cards()` so orphaned/pre-migration cards stay selectable in
 //   every swimlane.
-export function filterCardsByListAndSwimlane(cards, listId, swimlaneId) {
+export function filterCardsByListAndSwimlane(cards: any[], listId: string, swimlaneId?: string) {
   if (!Array.isArray(cards)) {
     return [];
   }
-  return cards.filter(card => {
+  return cards.filter((card: any) => {
     if (!card || card.listId !== listId) {
       return false;
     }
@@ -54,7 +54,8 @@ export const ALLOWED_LIST_COLORS = [...LIST_COLORS];
 
 const ALLOWED_LIST_COLOR_SET = new Set(ALLOWED_LIST_COLORS);
 
-export function normalizeListColor(color) {
+// `color` may be any offered value; guarded by the typeof check below.
+export function normalizeListColor(color: any) {
   if (typeof color !== 'string') {
     return '';
   }
@@ -234,7 +235,7 @@ Lists.attachSchema(
 );
 
 Lists.helpers({
-  async copy(boardId, swimlaneId, cardIdMap = null) {
+  async copy(boardId: string, swimlaneId: string, cardIdMap: any = null) {
     const oldId = this._id;
     const oldSwimlaneId = this.swimlaneId || null;
     this.boardId = boardId;
@@ -267,7 +268,7 @@ Lists.helpers({
     return _id;
   },
 
-  async move(boardId, swimlaneId) {
+  async move(boardId: string, swimlaneId: string) {
     const boardList = await ReactiveCache.getList({
       boardId,
       title: this.title,
@@ -297,8 +298,8 @@ Lists.helpers({
     }
   },
 
-  cards(swimlaneId) {
-    const selector = {
+  cards(swimlaneId?: string) {
+    const selector: { [key: string]: any } = {
       listId: this._id,
       archived: false,
     };
@@ -320,8 +321,8 @@ Lists.helpers({
     return ret;
   },
 
-  cardsUnfiltered(swimlaneId) {
-    const selector = {
+  cardsUnfiltered(swimlaneId?: string) {
+    const selector: { [key: string]: any } = {
       listId: this._id,
       archived: false,
     };
@@ -337,7 +338,7 @@ Lists.helpers({
     return ret;
   },
 
-  allCards(swimlaneId) {
+  allCards(swimlaneId?: string) {
     const ret = ReactiveCache.getCards({ listId: this._id });
     // When a swimlane context is given, scope the result to that swimlane
     // (plus orphaned cards) so "select all cards" stays contained within its
@@ -349,7 +350,7 @@ Lists.helpers({
     return ReactiveCache.getBoard(this.boardId);
   },
 
-  getWipLimit(option) {
+  getWipLimit(option?: string) {
     const list = ReactiveCache.getList(this._id);
     if (!list || !list.wipLimit) {
       // Necessary check to avoid exceptions for the case where the doc doesn't have the wipLimit field yet set
@@ -407,7 +408,7 @@ Lists.helpers({
     return await Lists.removeAsync({ _id: this._id });
   },
 
-  async rename(title) {
+  async rename(title: string) {
     // Basic client-side validation - server will handle full sanitization
     if (typeof title === 'string') {
       // Basic length check to prevent abuse
@@ -416,10 +417,10 @@ Lists.helpers({
     }
     return await Lists.updateAsync(this._id, { $set: { title } });
   },
-  async star(enable = true) {
+  async star(enable: boolean = true) {
     return await Lists.updateAsync(this._id, { $set: { starred: !!enable } });
   },
-  async collapse(enable = true) {
+  async collapse(enable: boolean = true) {
     return await Lists.updateAsync(this._id, { $set: { collapsed: !!enable } });
   },
 
@@ -441,19 +442,19 @@ Lists.helpers({
     return await Lists.updateAsync(this._id, { $set: { archived: false } });
   },
 
-  async toggleSoftLimit(toggle) {
+  async toggleSoftLimit(toggle: boolean) {
     return await Lists.updateAsync(this._id, { $set: { 'wipLimit.soft': toggle } });
   },
 
-  async toggleWipLimit(toggle) {
+  async toggleWipLimit(toggle: boolean) {
     return await Lists.updateAsync(this._id, { $set: { 'wipLimit.enabled': toggle } });
   },
 
-  async setWipLimit(limit) {
+  async setWipLimit(limit: number) {
     return await Lists.updateAsync(this._id, { $set: { 'wipLimit.value': limit } });
   },
 
-  async setColor(newColor) {
+  async setColor(newColor: any) {
     // Normalize so an offered-but-unsupported color (or a removal) becomes None
     // instead of being silently saved as the wrong color or rejected (#5382).
     // normalizeListColor returns '' for None; store null so the optional,
@@ -463,25 +464,27 @@ Lists.helpers({
   },
 });
 
-Lists.userArchivedLists = async userId => {
+// `userArchivedLists`/`archivedLists` etc. are custom Lists statics not on
+// Mongo.Collection.
+(Lists as any).userArchivedLists = async (userId?: string) => {
   return await ReactiveCache.getLists({
-    boardId: { $in: await Boards.userBoardIds(userId, null) },
+    boardId: { $in: await (Boards as any).userBoardIds(userId, null) },
     archived: true,
   })
 };
 
-Lists.userArchivedListIds = async () => {
-  const lists = await Lists.userArchivedLists();
-  return lists.map(list => { return list._id; });
+(Lists as any).userArchivedListIds = async () => {
+  const lists = await (Lists as any).userArchivedLists();
+  return lists.map((list: any) => { return list._id; });
 };
 
-Lists.archivedLists = async () => {
+(Lists as any).archivedLists = async () => {
   return await ReactiveCache.getLists({ archived: true });
 };
 
-Lists.archivedListIds = async () => {
-  const lists = await Lists.archivedLists();
-  return lists.map(list => {
+(Lists as any).archivedListIds = async () => {
+  const lists = await (Lists as any).archivedLists();
+  return lists.map((list: any) => {
     return list._id;
   });
 };
@@ -512,7 +515,7 @@ Lists.helpers({
     };
 
     if (Meteor.isServer) {
-      return PositionHistory.findOneAsync(selector).then(existingHistory => {
+      return PositionHistory.findOneAsync(selector).then((existingHistory: any) => {
         if (!existingHistory) {
           return PositionHistory.insertAsync(document);
         }

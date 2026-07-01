@@ -280,3 +280,21 @@ interface WekanFilesCollection {
 // The global Attachments FilesCollection (ostrio:files) comes from the untyped
 // models/attachments module.
 declare const Attachments: WekanFilesCollection;
+
+// The client-side card Filter (client/lib/filter.js) is referenced as a global
+// by isomorphic model files (lists/swimlanes) behind a `typeof Filter` guard.
+// Its fields are dynamic SetFilter/DateFilter/… instances, covered by the index
+// signature; `mongoSelector` is the one method the models call.
+interface WekanFilter {
+  mongoSelector(selector: any): any;
+  [key: string]: any;
+}
+declare const Filter: WekanFilter;
+
+// The Users model collection (models/users) is referenced as a global by some
+// model files that do not import it. Its custom statics/helpers are dynamic
+// (legacy collection API), so it is modelled with an index signature.
+interface WekanUsersCollection {
+  [key: string]: any;
+}
+declare const Users: WekanUsersCollection;

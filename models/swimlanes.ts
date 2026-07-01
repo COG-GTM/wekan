@@ -8,7 +8,7 @@ import Boards from '/models/boards';
 import Cards from '/models/cards';
 import Lists, { normalizeListColor } from '/models/lists';
 import { remapLabelIds } from '/server/lib/labelRemap';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
 const Swimlanes = new Mongo.Collection('swimlanes');
 
@@ -137,7 +137,7 @@ Swimlanes.attachSchema(
 );
 
 Swimlanes.helpers({
-  async copy(boardId, targetSwimlaneId = null, position = 'below', title = '', cardIdMap = null) {
+  async copy(boardId: string, targetSwimlaneId: any = null, position: string = 'below', title: string = '', cardIdMap: any = null) {
     const oldId = this._id;
     const oldBoardId = this.boardId;
     const desiredTitle = typeof title === 'string' && title.trim().length > 0
@@ -160,12 +160,12 @@ Swimlanes.helpers({
       { boardId, archived: false },
       { sort: { sort: 1 } },
     ))
-      .sort((a, b) => a.sort - b.sort);
+      .sort((a: any, b: any) => a.sort - b.sort);
 
     let targetSort = boardSwimlanes.length;
     if (targetSwimlaneId) {
       const targetIndex = boardSwimlanes.findIndex(
-        swimlane => swimlane._id === targetSwimlaneId,
+        (swimlane: any) => swimlane._id === targetSwimlaneId,
       );
       if (targetIndex >= 0) {
         const selected = boardSwimlanes[targetIndex];
@@ -202,7 +202,7 @@ Swimlanes.helpers({
 
     // Copy all lists in swimlane
     const sourceLists = (await ReactiveCache.getLists(listQuery, { sort: { sort: 1 } }))
-      .sort((a, b) => a.sort - b.sort);
+      .sort((a: any, b: any) => a.sort - b.sort);
 
     if (process.env.DEBUG === 'true') {
       console.log('[copySwimlane] source lists found', {
@@ -223,7 +223,7 @@ Swimlanes.helpers({
       const destBoard = await ReactiveCache.getBoard(boardId);
       if (destBoard) {
         // Collect every label id referenced by the cards being copied.
-        const referencedLabelIds = new Set();
+        const referencedLabelIds = new Set<any>();
         for (const sourceList of sourceLists) {
           const cards = await ReactiveCache.getCards({
             listId: sourceList._id,
@@ -245,7 +245,7 @@ Swimlanes.helpers({
 
         for (const name of missingNames) {
           const sourceLabel = sourceBoardLabels.find(
-            label => label && label.name === name,
+            (label: any) => label && label.name === name,
           );
           await destBoard.addLabel(name, sourceLabel && sourceLabel.color);
         }
@@ -281,7 +281,7 @@ Swimlanes.helpers({
     return newSwimlaneId;
   },
 
-  async move(toBoardId, targetSwimlaneId = null, position = 'below', title = '') {
+  async move(toBoardId: string, targetSwimlaneId: any = null, position: string = 'below', title: string = '') {
     const desiredTitle = typeof title === 'string' && title.trim().length > 0
       ? title.trim()
       : this.title;
@@ -289,13 +289,13 @@ Swimlanes.helpers({
       { boardId: toBoardId, archived: false },
       { sort: { sort: 1 } },
     ))
-      .filter(swimlane => swimlane._id !== this._id)
-      .sort((a, b) => a.sort - b.sort);
+      .filter((swimlane: any) => swimlane._id !== this._id)
+      .sort((a: any, b: any) => a.sort - b.sort);
 
     let targetSort = boardSwimlanes.length;
     if (targetSwimlaneId) {
       const targetIndex = boardSwimlanes.findIndex(
-        swimlane => swimlane._id === targetSwimlaneId,
+        (swimlane: any) => swimlane._id === targetSwimlaneId,
       );
       if (targetIndex >= 0) {
         const selected = boardSwimlanes[targetIndex];
@@ -416,7 +416,7 @@ Swimlanes.helpers({
   // (e.g. the swimlane was deleted after the per-swimlane migration).
   // These are collected separately so the template can display them in the
   // first swimlane as a fallback — keeping them visible without touching DB.
-  orphanedSwimlaneLists(validSwimlaneIds) {
+  orphanedSwimlaneLists(validSwimlaneIds: any[]) {
     // validSwimlaneIds: array of _id strings for currently-existing swimlanes.
     // A list is "orphaned" when its swimlaneId is a non-empty string that is
     // not among the valid IDs (so it can never appear via myLists()).
@@ -491,7 +491,7 @@ Swimlanes.helpers({
     return await Swimlanes.removeAsync({ _id: this._id });
   },
 
-  async rename(title) {
+  async rename(title: string) {
     return await Swimlanes.updateAsync(this._id, { $set: { title } });
   },
 
@@ -516,7 +516,7 @@ Swimlanes.helpers({
     return await Swimlanes.updateAsync(this._id, { $set: { archived: false } });
   },
 
-  async setColor(newColor) {
+  async setColor(newColor: any) {
     // Normalize so an offered-but-unsupported color (or a removal) becomes None
     // instead of being silently saved as the wrong color or rejected (#5382).
     // normalizeListColor returns '' for None; store null so the optional,
@@ -526,25 +526,27 @@ Swimlanes.helpers({
   },
 });
 
-Swimlanes.userArchivedSwimlanes = async userId => {
+// `userArchivedSwimlanes`/`archivedSwimlanes` etc. are custom Swimlanes statics
+// not on Mongo.Collection.
+(Swimlanes as any).userArchivedSwimlanes = async (userId?: string) => {
   return await ReactiveCache.getSwimlanes({
-    boardId: { $in: await Boards.userBoardIds(userId, null) },
+    boardId: { $in: await (Boards as any).userBoardIds(userId, null) },
     archived: true,
   })
 };
 
-Swimlanes.userArchivedSwimlaneIds = async () => {
-  const swimlanes = await Swimlanes.userArchivedSwimlanes();
-  return swimlanes.map(swim => { return swim._id; });
+(Swimlanes as any).userArchivedSwimlaneIds = async () => {
+  const swimlanes = await (Swimlanes as any).userArchivedSwimlanes();
+  return swimlanes.map((swim: any) => { return swim._id; });
 };
 
-Swimlanes.archivedSwimlanes = async () => {
+(Swimlanes as any).archivedSwimlanes = async () => {
   return await ReactiveCache.getSwimlanes({ archived: true });
 };
 
-Swimlanes.archivedSwimlaneIds = async () => {
-  const swimlanes = await Swimlanes.archivedSwimlanes();
-  return swimlanes.map(swim => {
+(Swimlanes as any).archivedSwimlaneIds = async () => {
+  const swimlanes = await (Swimlanes as any).archivedSwimlanes();
+  return swimlanes.map((swim: any) => {
     return swim._id;
   });
 };
@@ -576,7 +578,7 @@ Swimlanes.helpers({
     };
 
     if (Meteor.isServer) {
-      return PositionHistory.findOneAsync(selector).then(existingHistory => {
+      return PositionHistory.findOneAsync(selector).then((existingHistory: any) => {
         if (!existingHistory) {
           return PositionHistory.insertAsync(document);
         }
