@@ -421,7 +421,7 @@ interface ModalOpenOptions {
   onCloseGoTo?: string;
 }
 interface ModalStatic {
-  getHeaderName(): string | undefined;
+  getHeaderName(): string | null | undefined;
   getTemplateName(): string | null | undefined;
   isOpen(): boolean;
   isWide(): boolean;
@@ -448,6 +448,12 @@ interface AccountsStatic {
   // Internal Meteor helper used by the export routes to match a login token
   // against its stored hash.
   _hashLoginToken(loginToken: string): string;
+  // Client login-token helpers (accounts-base) used by client/00-startup.ts to
+  // mirror the Meteor login token into a same-origin cookie.
+  _storedLoginToken(): string | null;
+  _storeLoginToken(userId: string, token: string, tokenExpires?: Date): void;
+  onLogin(callback: () => void): { stop(): void };
+  onLogout(callback: () => void): { stop(): void };
 }
 
 declare const Accounts: AccountsStatic;
@@ -575,8 +581,9 @@ declare module 'meteor/reactive-var' {
 // `Blaze.registerHelper`; @types/meteor only declares it on `Template`.
 declare module 'meteor/blaze' {
   namespace Blaze {
-    // A Blaze helper receives arbitrary Spacebars args and returns any value.
-    function registerHelper(name: string, func: (...args: any[]) => any): void;
+    // A Blaze helper is either a function that receives arbitrary Spacebars
+    // args and returns any value, or a plain object/value exposed to templates.
+    function registerHelper(name: string, func: ((...args: any[]) => any) | object): void;
     // Blaze's TemplateInstance.$ is jQuery-backed and accepts anything jQuery
     // does (DOM elements, JQuery objects, ...); @types/meteor types it as
     // `string` only. Add the real element/JQuery overload used by app code.
@@ -603,7 +610,7 @@ interface Window {
   __wekanDragscrollTouch?: boolean;
   isMobileViewport?: (width: number, breakpoint?: number) => boolean;
   isMobileViewportNow?: (breakpoint?: number) => boolean;
-  fixDuplicateLists?: (boardId: string) => void;
+  fixDuplicateLists?: typeof import('/client/lib/fixDuplicateLists').fixDuplicateLists;
   subscribeToAttachmentMigrationStatus?: (boardId: string) => void;
   // client/lib/exportHTML.ts installs an export-HTML factory that receives the
   // Popup singleton and returns the popup event handler. `tpl` is the Blaze

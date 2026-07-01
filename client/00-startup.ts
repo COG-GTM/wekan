@@ -74,7 +74,7 @@ Meteor.startup(() => {
   const USER_ID_COOKIE = 'meteor_user_id';
   const TOKEN_EXPIRES_COOKIE = 'meteor_login_token_expires';
 
-  const getCookie = (name) => {
+  const getCookie = (name: string) => {
     try {
       const parts = document.cookie ? document.cookie.split(';') : [];
       for (const part of parts) {
@@ -97,11 +97,11 @@ Meteor.startup(() => {
     return attrs.join('; ');
   };
 
-  const setCookie = (name, value) => {
+  const setCookie = (name: string, value: string) => {
     if (!value) return;
     document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; ${cookieAttrs()}`;
   };
-  const clearCookie = (name) => {
+  const clearCookie = (name: string) => {
     document.cookie = `${encodeURIComponent(name)}=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; ${cookieAttrs()}`;
   };
 

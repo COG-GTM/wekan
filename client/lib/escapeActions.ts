@@ -8,7 +8,7 @@ const hotkeys = require('hotkeys-js').default;
 export const EscapeActions = {
   _nextclickPrevented: false,
 
-  _actions: [],
+  _actions: [] as EscapeAction[],
 
   // Executed in order
   hierarchy: [
@@ -22,7 +22,12 @@ export const EscapeActions = {
     'sidebarView',
   ],
 
-  register(label, action, condition = () => true, options = {}) {
+  register(
+    label: string,
+    action: () => void,
+    condition: () => boolean = () => true,
+    options: EscapeActionOptions = {},
+  ) {
     const priority = this.hierarchy.indexOf(label);
     if (priority === -1) {
       throw Error('You must define the label in the EscapeActions hierarchy');
@@ -59,14 +64,14 @@ export const EscapeActions = {
     });
   },
 
-  executeUpTo(maxLabel) {
+  executeUpTo(maxLabel: string) {
     return this._execute({
       maxLabel,
       multipleActions: true,
     });
   },
 
-  clickExecute(target, maxLabel) {
+  clickExecute(target: EventTarget | null, maxLabel: string) {
     if (this._nextclickPrevented) {
       this._nextclickPrevented = false;
       return false;
@@ -84,12 +89,13 @@ export const EscapeActions = {
     this._nextclickPrevented = true;
   },
 
-  _stopClick(action, clickTarget) {
+  _stopClick(action: EscapeAction, clickTarget: EventTarget | null | undefined) {
     if (typeof action.noClickEscapeOn !== 'string') return false;
-    else return $(clickTarget).closest(action.noClickEscapeOn).length > 0;
+    // clickTarget is the clicked DOM node at runtime; jQuery accepts it directly.
+    else return $(clickTarget as Element).closest(action.noClickEscapeOn).length > 0;
   },
 
-  _execute(options) {
+  _execute(options: ExecuteOptions) {
     const maxLabel = options.maxLabel;
     const multipleActions = options.multipleActions;
     const isClick = Boolean(options.isClick);
@@ -139,3 +145,23 @@ $(document).on('click', evt => {
 $(document).on('click', 'a[href=\\#]', evt => {
   evt.preventDefault();
 });
+
+// A registered escape action and the options accepted when registering it.
+interface EscapeActionOptions {
+  enabledOnClick?: boolean;
+  noClickEscapeOn?: string;
+}
+interface EscapeAction {
+  priority: number;
+  condition: () => boolean;
+  action: () => void;
+  noClickEscapeOn?: string;
+  enabledOnClick?: boolean;
+}
+// Options bag passed to the internal _execute() dispatcher.
+interface ExecuteOptions {
+  maxLabel?: string;
+  multipleActions?: boolean;
+  isClick?: boolean;
+  clickTarget?: EventTarget | null;
+}

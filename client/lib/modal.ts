@@ -5,8 +5,11 @@ import { ReactiveVar } from 'meteor/reactive-var';
 import { EscapeActions } from '/client/lib/escapeActions';
 
 window.Modal = new (class {
+  _currentModal: ReactiveVar<ModalState | null>;
+  _onCloseGoTo: string;
+  _isWideModal: boolean;
   constructor() {
-    this._currentModal = new ReactiveVar(closedValue);
+    this._currentModal = new ReactiveVar<ModalState | null>(closedValue);
     this._onCloseGoTo = '';
     this._isWideModal = false;
   }
@@ -36,13 +39,13 @@ window.Modal = new (class {
     }
   }
 
-  openWide(modalName, { header = '', onCloseGoTo = '' } = {}) {
+  openWide(modalName: string, { header = '', onCloseGoTo = '' }: ModalOpenOptions = {}) {
     this._currentModal.set({ header, modalName });
     this._onCloseGoTo = onCloseGoTo;
     this._isWideModal = true;
   }
 
-  open(modalName, { header = '', onCloseGoTo = '' } = {}) {
+  open(modalName: string, { header = '', onCloseGoTo = '' }: ModalOpenOptions = {}) {
     this._currentModal.set({ header, modalName });
     this._onCloseGoTo = onCloseGoTo;
   }
@@ -56,3 +59,9 @@ EscapeActions.register(
   () => Modal.isOpen(),
   { noClickEscapeOn: '.modal-container,.model-content' },
 );
+
+// The currently-open modal's header and template name.
+interface ModalState {
+  header: string;
+  modalName: string;
+}

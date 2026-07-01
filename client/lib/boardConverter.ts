@@ -15,9 +15,10 @@ export const conversionEstimatedTime = new ReactiveVar('');
 export const isConverting = new ReactiveVar(false);
 
 // Global tracking of converted boards (persistent across component reinitializations)
-const globalConvertedBoards = new Set();
+const globalConvertedBoards = new Set<string>();
 
 class BoardConverter {
+  conversionCache: Map<string, boolean>;
   constructor() {
     this.conversionCache = new Map(); // Cache converted board IDs
   }
@@ -27,7 +28,7 @@ class BoardConverter {
    * @param {string} boardId - The board ID
    * @returns {boolean} - True if board has been converted
    */
-  isBoardConverted(boardId) {
+  isBoardConverted(boardId: string) {
     return globalConvertedBoards.has(boardId);
   }
 
@@ -36,7 +37,7 @@ class BoardConverter {
    * @param {string} boardId - The board ID to check
    * @returns {boolean} - True if board needs conversion
    */
-  needsConversion(boardId) {
+  needsConversion(boardId: string) {
     if (this.conversionCache.has(boardId)) {
       return false; // Already converted
     }
@@ -67,7 +68,7 @@ class BoardConverter {
    * @param {string} boardId - The board ID to convert
    * @returns {Promise<boolean>} - True if conversion was successful
    */
-  async convertBoard(boardId) {
+  async convertBoard(boardId: string) {
     // Check if board has already been converted
     if (this.isBoardConverted(boardId)) {
       console.log(`Board ${boardId} has already been converted, skipping`);
@@ -174,7 +175,7 @@ class BoardConverter {
    * @param {Array} batch - Array of lists to convert
    * @param {string} defaultSwimlaneId - Default swimlane ID
    */
-  async processBatch(batch, defaultSwimlaneId) {
+  async processBatch(batch: Array<{ _id: string }>, defaultSwimlaneId: string) {
     const updates = batch.map(list => ({
       _id: list._id,
       swimlaneId: defaultSwimlaneId
@@ -193,7 +194,7 @@ class BoardConverter {
    * @param {number} ms - Time in milliseconds
    * @returns {string} - Formatted time string
    */
-  formatTime(ms) {
+  formatTime(ms: number) {
     if (ms < 1000) {
       return `${Math.round(ms)}ms`;
     }

@@ -3,7 +3,7 @@ import { Tracker } from 'meteor/tracker';
 import { ReactiveCache } from '/imports/reactiveCache';
 
 export const BoardMultiSelection = {
-  _selectedBoards: new ReactiveVar([]),
+  _selectedBoards: new ReactiveVar<string[]>([]),
 
   _isActive: new ReactiveVar(false),
 
@@ -41,19 +41,22 @@ export const BoardMultiSelection = {
     }
   },
 
-  add(boardIds) {
+  add(boardIds: string | string[]) {
     return this.toggle(boardIds, { add: true, remove: false });
   },
 
-  remove(boardIds) {
+  remove(boardIds: string | string[]) {
     return this.toggle(boardIds, { add: false, remove: true });
   },
 
-  toogle(boardIds) {
+  toogle(boardIds: string | string[]) {
     return this.toggle(boardIds, { add: true, remove: true });
   },
 
-  toggle(boardIds, { add, remove } = {}) {
+  toggle(
+    boardIds: string | string[],
+    { add, remove }: { add?: boolean; remove?: boolean } = {},
+  ) {
     boardIds = typeof boardIds === 'string' ? [boardIds] : boardIds;
     let selectedBoards = this._selectedBoards.get();
 
@@ -69,7 +72,7 @@ export const BoardMultiSelection = {
     this._selectedBoards.set(selectedBoards);
   },
 
-  isSelected(boardId) {
+  isSelected(boardId: string) {
     return this._selectedBoards.get().includes(boardId);
   },
 };

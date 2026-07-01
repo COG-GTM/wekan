@@ -17,7 +17,9 @@ const MAX_ITEMS_PER_BOARD = 100;
 /**
  * Validate that a value is a valid positive number
  */
-function isValidNumber(value, min = 0, max = 10000) {
+// `value` is untrusted parsed-JSON input, so it is `any` at this boundary; the
+// body type-guards it before use.
+function isValidNumber(value: any, min = 0, max = 10000) {
   if (typeof value !== 'number') return false;
   if (isNaN(value)) return false;
   if (!isFinite(value)) return false;
@@ -28,7 +30,8 @@ function isValidNumber(value, min = 0, max = 10000) {
 /**
  * Validate that a value is a valid boolean
  */
-function isValidBoolean(value) {
+// `value` is untrusted parsed-JSON input, so it is `any` at this boundary.
+function isValidBoolean(value: any) {
   return typeof value === 'boolean';
 }
 
@@ -36,10 +39,11 @@ function isValidBoolean(value) {
  * Validate and clean swimlane heights data
  * Structure: { boardId: { swimlaneId: height, ... }, ... }
  */
-function validateSwimlaneHeights(data) {
+// `data` is untrusted parsed-JSON input, hence `any`; it is validated below.
+function validateSwimlaneHeights(data: any) {
   if (!data || typeof data !== 'object') return {};
   
-  const cleaned = {};
+  const cleaned: Record<string, Record<string, number>> = {};
   const boardIds = Object.keys(data).slice(0, MAX_BOARDS_PER_KEY);
   
   for (const boardId of boardIds) {
@@ -49,7 +53,7 @@ function validateSwimlaneHeights(data) {
     if (!boardData || typeof boardData !== 'object') continue;
     
     const swimlaneIds = Object.keys(boardData).slice(0, MAX_ITEMS_PER_BOARD);
-    const cleanedBoard = {};
+    const cleanedBoard: Record<string, number> = {};
     
     for (const swimlaneId of swimlaneIds) {
       if (typeof swimlaneId !== 'string' || swimlaneId.length === 0) continue;
@@ -73,10 +77,11 @@ function validateSwimlaneHeights(data) {
  * Validate and clean list widths data
  * Structure: { boardId: { listId: width, ... }, ... }
  */
-function validateListWidths(data) {
+// `data` is untrusted parsed-JSON input, hence `any`; it is validated below.
+function validateListWidths(data: any) {
   if (!data || typeof data !== 'object') return {};
   
-  const cleaned = {};
+  const cleaned: Record<string, Record<string, number>> = {};
   const boardIds = Object.keys(data).slice(0, MAX_BOARDS_PER_KEY);
   
   for (const boardId of boardIds) {
@@ -86,7 +91,7 @@ function validateListWidths(data) {
     if (!boardData || typeof boardData !== 'object') continue;
     
     const listIds = Object.keys(boardData).slice(0, MAX_ITEMS_PER_BOARD);
-    const cleanedBoard = {};
+    const cleanedBoard: Record<string, number> = {};
     
     for (const listId of listIds) {
       if (typeof listId !== 'string' || listId.length === 0) continue;
@@ -110,10 +115,11 @@ function validateListWidths(data) {
  * Validate and clean collapsed states data
  * Structure: { boardId: { itemId: boolean, ... }, ... }
  */
-function validateCollapsedStates(data) {
+// `data` is untrusted parsed-JSON input, hence `any`; it is validated below.
+function validateCollapsedStates(data: any) {
   if (!data || typeof data !== 'object') return {};
   
-  const cleaned = {};
+  const cleaned: Record<string, Record<string, boolean>> = {};
   const boardIds = Object.keys(data).slice(0, MAX_BOARDS_PER_KEY);
   
   for (const boardId of boardIds) {
@@ -123,7 +129,7 @@ function validateCollapsedStates(data) {
     if (!boardData || typeof boardData !== 'object') continue;
     
     const itemIds = Object.keys(boardData).slice(0, MAX_ITEMS_PER_BOARD);
-    const cleanedBoard = {};
+    const cleanedBoard: Record<string, boolean> = {};
     
     for (const itemId of itemIds) {
       if (typeof itemId !== 'string' || itemId.length === 0) continue;
@@ -145,7 +151,7 @@ function validateCollapsedStates(data) {
 /**
  * Validate and clean a single localStorage key
  */
-function validateAndCleanKey(key, validator) {
+function validateAndCleanKey(key: string, validator: LocalStorageValidator) {
   try {
     const stored = localStorage.getItem(key);
     if (!stored) return;
@@ -228,7 +234,7 @@ export function shouldRunCleanup() {
 /**
  * Get validated data from localStorage
  */
-export function getValidatedLocalStorageData(key, validator) {
+export function getValidatedLocalStorageData(key: string, validator: LocalStorageValidator) {
   if (typeof localStorage === 'undefined') return {};
   
   try {
@@ -246,7 +252,12 @@ export function getValidatedLocalStorageData(key, validator) {
 /**
  * Set validated data to localStorage
  */
-export function setValidatedLocalStorageData(key, data, validator) {
+export function setValidatedLocalStorageData(
+  key: string,
+  // `data` is caller-supplied and re-validated before storage, hence `any`.
+  data: any,
+  validator: LocalStorageValidator,
+) {
   if (typeof localStorage === 'undefined') return false;
   
   try {
@@ -267,6 +278,10 @@ export const validators = {
   isValidNumber,
   isValidBoolean,
 };
+
+// A validator maps untrusted parsed-JSON (`any`) to a cleaned object. Input is
+// `any` because it comes from JSON.parse / callers; the return is a plain object.
+type LocalStorageValidator = (data: any) => object;
 
 // Auto-cleanup on module load if needed
 if (Meteor.isClient) {

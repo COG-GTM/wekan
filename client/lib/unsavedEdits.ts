@@ -26,7 +26,7 @@ export const UnsavedEdits = {
   //
   // _collection: UnsavedEditCollection,
 
-  get({ fieldName, docId }, defaultTo = '') {
+  get({ fieldName, docId }: UnsavedEditKey, defaultTo = '') {
     const unsavedValue = this._getCollectionDocument(fieldName, docId);
     if (unsavedValue) {
       return unsavedValue.value;
@@ -35,11 +35,11 @@ export const UnsavedEdits = {
     }
   },
 
-  has({ fieldName, docId }) {
+  has({ fieldName, docId }: UnsavedEditKey) {
     return Boolean(this.get({ fieldName, docId }));
   },
 
-  set({ fieldName, docId }, value) {
+  set({ fieldName, docId }: UnsavedEditKey, value: string) {
     const currentDoc = this._getCollectionDocument(fieldName, docId);
     if (currentDoc) {
       UnsavedEditCollection.update(currentDoc._id, { $set: { value } });
@@ -52,17 +52,23 @@ export const UnsavedEdits = {
     }
   },
 
-  reset({ fieldName, docId }) {
+  reset({ fieldName, docId }: UnsavedEditKey) {
     const currentDoc = this._getCollectionDocument(fieldName, docId);
     if (currentDoc) {
       UnsavedEditCollection.remove(currentDoc._id);
     }
   },
 
-  _getCollectionDocument(fieldName, docId) {
+  _getCollectionDocument(fieldName: string, docId: string) {
     return UnsavedEditCollection.findOne({ fieldName, docId });
   },
 };
+
+// Composite key identifying a single unsaved-edit draft.
+interface UnsavedEditKey {
+  fieldName: string;
+  docId: string;
+}
 
 Blaze.registerHelper('getUnsavedValue', (fieldName, docId, defaultTo) => {
   // Workaround some blaze feature that pass a list of keywords arguments as the

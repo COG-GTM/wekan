@@ -19,7 +19,9 @@
 //      "<svg/onload=...") is never matched by the regex at all and would survive,
 //      so any stray "<"/">" left over is removed afterwards.
 // Together these guarantee no "<tag" (complete or partial) can remain.
-function stripHtml(s) {
+// `s` is arbitrary parsed input (string/null/number), hence `any`; it is
+// stringified before use.
+function stripHtml(s: any) {
   let str = String(s == null ? '' : s);
   let prev;
   do {
@@ -29,7 +31,8 @@ function stripHtml(s) {
   return str.replace(/[<>]/g, '').trim();
 }
 
-function lineFromObject(o) {
+// `o` is one entry of an untrusted parsed-JSON dependency export, hence `any`.
+function lineFromObject(o: any) {
   return {
     from: o.from || o.fromId || o.source || null,
     to: o.to || o.toId || o.target || null,
@@ -48,9 +51,10 @@ function lineFromObject(o) {
 // Connectors are mapped to lines and item ids resolved to titles so they can be
 // matched to WeKan cards by title. A connector caption containing "block"/"fix"
 // is mapped to the corresponding relation type.
-function parseMiro(data) {
+// `data` is untrusted parsed JSON from a Miro export, hence `any`.
+function parseMiro(data: any) {
   const items = data.items || data.data || [];
-  const titleById = {};
+  const titleById: Record<string, string> = {};
   (Array.isArray(items) ? items : []).forEach(it => {
     if (!it || !it.id) return;
     const title = stripHtml(
@@ -58,9 +62,11 @@ function parseMiro(data) {
     );
     if (title) titleById[it.id] = title;
   });
-  const connectors = Array.isArray(data) ? data : data.connectors || [];
+  // Untrusted parsed connectors array (Miro export), hence `any[]`.
+  const connectors: any[] = Array.isArray(data) ? data : data.connectors || [];
   return (connectors || [])
-    .map(c => {
+    // `c` is an untrusted parsed connector entry, hence `any`.
+    .map((c: any) => {
       const from = c.startItem && c.startItem.id;
       const to = c.endItem && c.endItem.id;
       const caption =
@@ -80,7 +86,8 @@ function parseMiro(data) {
     .filter(l => l.from || l.to || l.fromTitle || l.toTitle);
 }
 
-function looksLikeMiro(data) {
+// `data` is untrusted parsed JSON, hence `any`.
+function looksLikeMiro(data: any) {
   if (data && Array.isArray(data.connectors)) return true;
   if (
     Array.isArray(data) &&
@@ -91,7 +98,7 @@ function looksLikeMiro(data) {
   return false;
 }
 
-function parseJson(text) {
+function parseJson(text: string) {
   const data = JSON.parse(text);
   if (looksLikeMiro(data)) return parseMiro(data);
   if (Array.isArray(data)) return data.map(lineFromObject);
@@ -99,10 +106,10 @@ function parseJson(text) {
   return [];
 }
 
-function parseSvg(text) {
+function parseSvg(text: string) {
   const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
   const paths = doc.querySelectorAll('path.dependency-line, path[data-from]');
-  const lines = [];
+  const lines: ParsedDependencyLine[] = [];
   paths.forEach(p => {
     const from = p.getAttribute('data-from');
     const to = p.getAttribute('data-to');
@@ -124,11 +131,25 @@ function parseSvg(text) {
 
 // Auto-detect by content (SVG starts with '<'; JSON otherwise). `filename` is an
 // optional hint used to disambiguate.
-export function parseDependencyLines(text, filename = '') {
+export function parseDependencyLines(text: string, filename = '') {
   const trimmed = (text || '').trim();
   if (!trimmed) return [];
   const looksSvg =
     /\.svg$/i.test(filename) || trimmed.startsWith('<');
   if (looksSvg) return parseSvg(trimmed);
   return parseJson(trimmed);
+}
+
+// A single parsed card-dependency line; every field is optional because the
+// various source formats populate different subsets.
+interface ParsedDependencyLine {
+  from?: string | null;
+  to?: string | null;
+  fromCardNumber?: string | number | null;
+  toCardNumber?: string | number | null;
+  fromTitle?: string | null;
+  toTitle?: string | null;
+  type?: string;
+  color?: string;
+  icon?: string;
 }

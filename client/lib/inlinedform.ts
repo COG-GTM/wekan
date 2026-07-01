@@ -15,21 +15,25 @@
 import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Tracker } from 'meteor/tracker';
+import { Blaze } from 'meteor/blaze';
 import { EscapeActions } from '/client/lib/escapeActions';
 
 // We can only have one inlined form element opened at a time
-const currentlyOpenedForm = new ReactiveVar(null);
+const currentlyOpenedForm = new ReactiveVar<InlinedFormInstance | null>(null);
 
-Template.inlinedForm.onCreated(function () {
+Template.inlinedForm.onCreated(function (this: InlinedFormInstance) {
   this.isOpen = new ReactiveVar(false);
 });
 
-Template.inlinedForm.onRendered(function () {
+Template.inlinedForm.onRendered(function (this: InlinedFormInstance) {
   const tpl = this;
   tpl.autorun(() => {
     if (tpl.isOpen.get()) {
       Tracker.afterFlush(() => {
-        const input = tpl.find('textarea,input[type=text]');
+        const input = tpl.find('textarea,input[type=text]') as
+          | HTMLInputElement
+          | HTMLTextAreaElement
+          | null;
         if (input && typeof input.focus === 'function') {
           setTimeout(() => {
             input.focus();
@@ -49,27 +53,27 @@ Template.inlinedForm.onDestroyed(function () {
 
 Template.inlinedForm.helpers({
   isOpen() {
-    return Template.instance().isOpen;
+    return (Template.instance() as InlinedFormInstance).isOpen;
   },
 });
 
 Template.inlinedForm.events({
-  'click .js-close-inlined-form'(evt, tpl) {
+  'click .js-close-inlined-form'(evt: JQuery.TriggeredEvent, tpl: InlinedFormInstance) {
     tpl.isOpen.set(false);
     currentlyOpenedForm.set(null);
   },
-  'click .js-open-inlined-form'(evt, tpl) {
+  'click .js-open-inlined-form'(evt: JQuery.TriggeredEvent, tpl: InlinedFormInstance) {
     evt.preventDefault();
     EscapeActions.clickExecute(evt.target, 'inlinedForm');
     tpl.isOpen.set(true);
     currentlyOpenedForm.set(tpl);
   },
-  'keydown form textarea'(evt, tpl) {
+  'keydown form textarea'(evt: JQuery.TriggeredEvent, tpl: InlinedFormInstance) {
     if (evt.keyCode === 13 && (evt.metaKey || evt.ctrlKey)) {
       tpl.find('button[type=submit]').click();
     }
   },
-  submit(evt, tpl) {
+  submit(evt: JQuery.TriggeredEvent, tpl: InlinedFormInstance) {
     const data = Template.currentData();
     if (data.autoclose !== false) {
       Tracker.afterFlush(() => {
@@ -99,3 +103,8 @@ EscapeActions.register(
     enabledOnClick: false,
   },
 );
+
+// The inlinedForm Blaze template instance carries an `isOpen` reactive flag.
+interface InlinedFormInstance extends Blaze.TemplateInstance {
+  isOpen: ReactiveVar<boolean>;
+}

@@ -21,7 +21,7 @@ export const fixDuplicateLists = {
   /**
    * Fix duplicate lists for a specific board
    */
-  async fixBoard(boardId) {
+  async fixBoard(boardId: string) {
     try {
       const result = await Meteor.callAsync('fixDuplicateLists.fixBoard', boardId);
       console.log(`Fixed duplicate lists for board ${boardId}:`, result);
@@ -62,14 +62,14 @@ export const fixDuplicateLists = {
       }
 
       console.log(`Found ${report.boardsWithDuplicates} boards with duplicate lists:`);
-      report.report.forEach(board => {
+      report.report.forEach((board: DuplicateListsBoardReport) => {
         console.log(`- Board "${board.boardTitle}" (${board.boardId}): ${board.duplicateSwimlanes} duplicate swimlanes, ${board.duplicateLists} duplicate lists`);
       });
 
       // Ask for confirmation
       const confirmed = confirm(
         `Found ${report.boardsWithDuplicates} boards with duplicate lists. ` +
-        `This will fix ${report.report.reduce((sum, board) => sum + board.duplicateSwimlanes + board.duplicateLists, 0)} duplicates. ` +
+        `This will fix ${report.report.reduce((sum: number, board: DuplicateListsBoardReport) => sum + board.duplicateSwimlanes + board.duplicateLists, 0)} duplicates. ` +
         'Continue?'
       );
 
@@ -90,5 +90,13 @@ export const fixDuplicateLists = {
 // Make it available globally for console access
 if (typeof window !== 'undefined') {
   window.fixDuplicateLists = fixDuplicateLists;
+}
+
+// Per-board entry in the server 'fixDuplicateLists.getReport' response.
+interface DuplicateListsBoardReport {
+  boardTitle: string;
+  boardId: string;
+  duplicateSwimlanes: number;
+  duplicateLists: number;
 }
 
