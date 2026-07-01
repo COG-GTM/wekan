@@ -3036,9 +3036,11 @@ async function cardMove(
   userId: string,
   doc: any,
   fieldNames: string[],
-  oldListId: string,
-  oldSwimlaneId: string,
-  oldBoardId: string,
+  // Trailing "old location" args are optional: some callers (e.g. a same-list
+  // move) invoke cardMove with only the changed fields, leaving the rest undefined.
+  oldListId?: string,
+  oldSwimlaneId?: string,
+  oldBoardId?: string,
 ) {
   if (fieldNames.includes('boardId') && doc.boardId !== oldBoardId) {
     const newBoard = await ReactiveCache.getBoard(doc.boardId);

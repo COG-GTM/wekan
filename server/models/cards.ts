@@ -6,7 +6,7 @@ import { ReactiveCache } from '/imports/reactiveCache';
 import { add, now } from '/imports/lib/dateUtils';
 import { Authentication } from '/server/authentication';
 import { sendJsonResult } from '/server/apiMiddleware';
-import { allowIsBoardMember, allowIsBoardMemberCommentOnly, allowIsBoardMemberWithWriteAccess, computeSortForIndex, mergeLabelIds, canAssignCardMember, isCardDateClear } from '/server/lib/utils';
+import { allowIsBoardMember, allowIsBoardMemberCommentOnly, allowIsBoardMemberWithWriteAccess, computeSortForIndex, mergeLabelIds, canAssignCardMember, isCardDateClear, BoardAccess } from '/server/lib/utils';
 import { computeTopSort, normalizeMoveParams, parseCardDate } from '/server/lib/restCardHelpers';
 const { coerceRestArrayParam } = require('/server/lib/restArrayParam');
 const { applyCardBoardConsistency } = require('/server/lib/cardBoardConsistency');
@@ -56,7 +56,7 @@ Meteor.methods({
     const parentBoard = await Boards.findOneAsync(parentCard.boardId);
     if (!parentBoard) throw new Meteor.Error('not-found');
     // The author must have write access to the parent card's board.
-    if (!allowIsBoardMemberWithWriteAccess(this.userId, parentBoard))
+    if (!allowIsBoardMemberWithWriteAccess(this.userId, parentBoard as BoardAccess))
       throw new Meteor.Error('not-authorized');
 
     // Resolve (and, on the server, lazily create ONCE) the default subtasks
@@ -91,7 +91,9 @@ Meteor.methods({
     const boardCustomFields = await CustomFields.find({
       boardIds: targetBoard._id,
     }).fetchAsync();
-    const customFields = subtaskCustomFields(boardCustomFields);
+    // boardCustomFields is a Document[] from the query; subtaskCustomFields expects
+    // its local (non-exported) BoardCustomField[] shape, hence the `any` cast.
+    const customFields = subtaskCustomFields(boardCustomFields as any);
 
     const cardNumber = await targetBoard.getNextCardNumber();
     const _id = await Cards.insertAsync({
@@ -122,7 +124,7 @@ Meteor.methods({
     if (!this.userId) throw new Meteor.Error('not-authorized');
     const destBoard = await Boards.findOneAsync(boardId);
     if (!destBoard) throw new Meteor.Error('not-found');
-    if (!allowIsBoardMemberWithWriteAccess(this.userId, destBoard))
+    if (!allowIsBoardMemberWithWriteAccess(this.userId, destBoard as BoardAccess))
       throw new Meteor.Error('not-authorized');
 
     const card = {
@@ -469,10 +471,10 @@ Meteor.methods({
     const card = await ReactiveCache.getCard(cardId);
     if (!card) throw new Meteor.Error('not-found');
     const sourceBoard = await Boards.findOneAsync(card.boardId);
-    if (!allowIsBoardMember(this.userId, sourceBoard))
+    if (!allowIsBoardMember(this.userId, sourceBoard as BoardAccess | undefined))
       throw new Meteor.Error('not-authorized');
     const destBoard = await Boards.findOneAsync(boardId);
-    if (!allowIsBoardMemberWithWriteAccess(this.userId, destBoard))
+    if (!allowIsBoardMemberWithWriteAccess(this.userId, destBoard as BoardAccess | undefined))
       throw new Meteor.Error('not-authorized');
     Object.assign(card, mergeCardValues);
 
@@ -524,7 +526,8 @@ Cards.after.update(async (userId, doc, fieldNames) => {
   await ChecklistItems.direct.updateAsync({ cardId: doc._id }, { $set: { boardId } }, { multi: true });
 });
 
-Cards.after.update(async function(userId, doc, fieldNames) {
+// `this` is the collection-hooks after-update context (carries `.previous`), hence `any`.
+Cards.after.update(async function(this: any, userId, doc, fieldNames) {
   const previous = this.previous || {};
   const oldListId = previous.listId || doc.listId;
   const oldSwimlaneId = previous.swimlaneId || doc.swimlaneId;
@@ -542,19 +545,21 @@ Cards.after.update(async function(userId, doc, fieldNames) {
 // to the destination board, falling back to its default swimlane / first list.
 // Corrective only: a move whose targets already belong to the destination board
 // is left untouched. Server-only (uses the pure helper in server/lib).
-async function enforceCardBoardConsistency(doc, fieldNames, modifier) {
+// `doc` is a raw card Mongo document and `modifier` a raw update modifier
+// (both dynamic shapes), hence `any`.
+async function enforceCardBoardConsistency(doc: any, fieldNames: string[], modifier: any) {
   await applyCardBoardConsistency(doc, fieldNames, modifier, {
-    swimlaneBelongs: async (swimlaneId, boardId) =>
+    swimlaneBelongs: async (swimlaneId: string, boardId: string) =>
       !!(await ReactiveCache.getSwimlane({ _id: swimlaneId, boardId })),
-    listBelongs: async (listId, boardId) =>
+    listBelongs: async (listId: string, boardId: string) =>
       !!(await ReactiveCache.getList({ _id: listId, boardId })),
-    getDefaultSwimlaneId: async boardId => {
+    getDefaultSwimlaneId: async (boardId: string) => {
       const board = await ReactiveCache.getBoard(boardId);
       if (!board) return undefined;
       const swimlane = await board.getDefaultSwimlineAsync();
       return swimlane && swimlane._id;
     },
-    getFirstListId: async boardId => {
+    getFirstListId: async (boardId: string) => {
       const list = await ReactiveCache.getList(
         { boardId, archived: false },
         { sort: { sort: 1 } },
@@ -697,7 +702,7 @@ WebApp.handlers.get(
     );
     sendJsonResult(res, {
       code: 200,
-      data: cards.map(doc => ({
+      data: cards.map((doc: any) => ({
         _id: doc._id,
         title: doc.title,
         description: doc.description,
@@ -727,7 +732,7 @@ WebApp.handlers.get('/api/boards/:boardId/lists/:listId/cards', async function(r
   );
   sendJsonResult(res, {
     code: 200,
-    data: cards.map(doc => ({
+    data: cards.map((doc: any) => ({
       _id: doc._id,
       title: doc.title,
       description: doc.description,
@@ -821,8 +826,8 @@ WebApp.handlers.post('/api/boards/:boardId/lists/:listId/cards', async function(
   const nextCardNumber = await board.getNextCardNumber();
 
   const customFields = await ReactiveCache.getCustomFields({ boardIds: paramBoardId });
-  const customFieldsArr = [];
-  (customFields || []).forEach(field => {
+  const customFieldsArr: { _id: string; value: null }[] = [];
+  (customFields || []).forEach((field: any) => {
     if (field.automaticallyOnCard || field.alwaysOnCard) {
       customFieldsArr.push({ _id: field._id, value: null });
     }
@@ -844,7 +849,7 @@ WebApp.handlers.post('/api/boards/:boardId/lists/:listId/cards', async function(
     // as Date, so a raw request string is stripped by schema cleaning and the
     // date never persists. Parse each into a real Date and only include the
     // ones that parsed, so an invalid/absent date simply leaves the field unset.
-    const dateFieldsOnCreate = {};
+    const dateFieldsOnCreate: { [key: string]: Date } = {};
     ['receivedAt', 'startAt', 'dueAt', 'endAt'].forEach(dateField => {
       if (Object.prototype.hasOwnProperty.call(req.body, dateField)) {
         const parsed = parseCardDate(req.body[dateField]);
@@ -911,8 +916,8 @@ WebApp.handlers.post(
     }
 
     const customFields = await ReactiveCache.getCustomFields({ boardIds: paramBoardId });
-    const customFieldsArr = [];
-    (customFields || []).forEach(field => {
+    const customFieldsArr: { _id: string; value: null }[] = [];
+    (customFields || []).forEach((field: any) => {
       if (field.automaticallyOnCard || field.alwaysOnCard) {
         customFieldsArr.push({ _id: field._id, value: null });
       }
@@ -1202,7 +1207,7 @@ WebApp.handlers.put(
         { boardId: paramBoardId, listId: destListId, archived: false },
         { sort: ['sort'] },
       );
-      const topSort = computeTopSort((destSiblings || []).map(c => c.sort));
+      const topSort = computeTopSort((destSiblings || []).map((c: any) => c.sort));
       await Cards.direct.updateAsync(
         { _id: paramCardId, listId: paramListId, boardId: paramBoardId, archived: false },
         { $set: { listId: destListId, sort: topSort } },
@@ -1248,7 +1253,7 @@ WebApp.handlers.put(
         { boardId: newBoardId, listId: newListId, archived: false },
         { sort: ['sort'] },
       );
-      const topSort = computeTopSort((destSiblings || []).map(c => c.sort));
+      const topSort = computeTopSort((destSiblings || []).map((c: any) => c.sort));
       await Cards.direct.updateAsync(
         { _id: paramCardId, listId: paramListId, boardId: paramBoardId, archived: false },
         { $set: { boardId: newBoardId, swimlaneId: newSwimlaneId, listId: newListId, sort: topSort } },
@@ -1298,8 +1303,9 @@ WebApp.handlers.put(
       if (typeof locations === 'string') locations = JSON.parse(locations);
       // Each location entry requires an `_id` (schema), and coordinates must be
       // numbers (form-encoded values arrive as strings).
-      locations = locations.map(loc => {
-        const out = {
+      locations = locations.map((loc: any) => {
+        // Dynamic location entry: coordinate fields are added conditionally below.
+        const out: { [key: string]: any } = {
           _id: loc._id || Random.id(),
           name: loc.name || '',
           address: loc.address || '',
@@ -1449,8 +1455,8 @@ WebApp.handlers.post('/api/boards/:boardId/cards/labels', async function(req, re
 
   // Validate that every label being added actually exists on this board.
   const board = await ReactiveCache.getBoard(paramBoardId);
-  const boardLabelIds = new Set((board.labels || []).map(label => label._id));
-  const invalidLabelIds = addLabelIds.filter(labelId => !boardLabelIds.has(labelId));
+  const boardLabelIds = new Set((board.labels || []).map((label: any) => label._id));
+  const invalidLabelIds = addLabelIds.filter((labelId: string) => !boardLabelIds.has(labelId));
   if (invalidLabelIds.length > 0) {
     sendJsonResult(res, {
       code: 400,
@@ -1517,7 +1523,7 @@ WebApp.handlers.post(
     if (!card) {
       throw new Meteor.Error(404, 'Card not found');
     }
-    const updatedCustomFields = (card.customFields || []).map(cf =>
+    const updatedCustomFields = (card.customFields || []).map((cf: any) =>
       cf._id === paramCustomFieldId ? { _id: cf._id, value: paramCustomFieldValue } : cf,
     );
     await Cards.direct.updateAsync(
@@ -1583,7 +1589,7 @@ WebApp.handlers.post(
 // or assignee, MERGE-style ($addToSet/$pull via Card.assignMember etc.), so
 // callers don't have to read-modify-write the whole members/assignees array.
 // The userId must be an active member of the card's board, otherwise 400.
-async function cardMemberFieldHandler(req, res, field, paramUserKey, addNotRemove) {
+async function cardMemberFieldHandler(req: WekanConnectRequest, res: WekanConnectResponse, field: string, paramUserKey: string, addNotRemove: boolean) {
   const paramBoardId = req.params.boardId;
   const paramListId = req.params.listId;
   const paramCardId = req.params.cardId;
@@ -1710,7 +1716,8 @@ WebApp.handlers.get('/api/user/cards', async function(req, res) {
   }
   const userId = req.userId;
 
-  const selector = {
+  // Dynamic Mongo selector: `dueAt` constraints are added conditionally below.
+  const selector: { [key: string]: any } = {
     archived: false,
     $or: [{ members: userId }, { assignees: userId }],
   };
@@ -1734,7 +1741,7 @@ WebApp.handlers.get('/api/user/cards', async function(req, res) {
   const cards = await ReactiveCache.getCards(selector, { sort: { dueAt: 1 } });
   sendJsonResult(res, {
     code: 200,
-    data: (cards || []).map(card => ({
+    data: (cards || []).map((card: any) => ({
       _id: card._id,
       title: card.title,
       boardId: card.boardId,

@@ -219,6 +219,9 @@ interface WekanConnectRequest extends import('http').IncomingMessage {
   // Request body parsed by wekan's api middleware; the shape varies per route,
   // hence `any`.
   body?: any;
+  // Request URL (always set on an incoming connect request); handlers parse
+  // query params from it via `new URL(req.url, ...)`.
+  url: string;
   // Route params extracted from `:name` path segments by the connect router.
   params: { [key: string]: string };
   query?: { [key: string]: string | string[] | undefined };
