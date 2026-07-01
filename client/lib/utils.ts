@@ -1,12 +1,19 @@
 import { ReactiveCache } from '/imports/reactiveCache';
+import { Meteor } from 'meteor/meteor';
+import { Blaze } from 'meteor/blaze';
 import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
 import { Tracker } from 'meteor/tracker';
 import { findWhere, where, uniqBy, groupBy, indexBy, debounce, once } from '/imports/lib/collectionHelpers';
 import Settings from '/models/settings';
 import Users from '/models/users';
 
+// The public (logged-out) collapsed-state helpers are attached to the Users
+// collection at runtime in models/users.ts via `(Users as any).xxx = ...`, so
+// they are not present on the typed collection. Mirror that boundary here.
+const UsersPublic: UsersPublicStatics = Users as any;
+
 export const Utils = {
-  async setBackgroundImage(url) {
+  async setBackgroundImage(url: string) {
     const currentBoard = Utils.getCurrentBoard();
     if (currentBoard.backgroundImageURL !== undefined) {
       $(".board-wrapper").css({"background":"url(" + currentBoard.backgroundImageURL + ")","background-size":"cover"});
@@ -28,7 +35,7 @@ export const Utils = {
     }
     return ret;
   },
-  getCurrentCardId(ignorePopupCard) {
+  getCurrentCardId(ignorePopupCard?: boolean) {
     let ret = Session.get('currentCard');
     if (!ret && !ignorePopupCard) {
       ret = Utils.getPopupCardId();
@@ -51,7 +58,7 @@ export const Utils = {
     const ret = ReactiveCache.getBoard(boardId);
     return ret;
   },
-  getCurrentCard(ignorePopupCard) {
+  getCurrentCard(ignorePopupCard?: boolean) {
     const cardId = Utils.getCurrentCardId(ignorePopupCard);
     if (!cardId) {
       return null;
@@ -71,7 +78,7 @@ export const Utils = {
     return stored ? parseFloat(stored) : 1.0;
   },
 
-  setZoomLevel(level) {
+  setZoomLevel(level: number) {
     const user = ReactiveCache.getCurrentUser();
     if (user) {
       // Update user profile
@@ -111,14 +118,14 @@ export const Utils = {
     // NOTE: requires the width=device-width viewport meta (see
     // server/lib/customHeadRender.js); without it window.innerWidth reports ~980
     // on phones and this would never trigger.
-    const mq = q =>
+    const mq = (q: string) =>
       typeof window !== 'undefined' && window.matchMedia && window.matchMedia(q).matches;
     const narrow = mq('(max-width: 800px)');
     const coarse = mq('(pointer: coarse)');
     return Boolean(narrow || (coarse && window.innerWidth <= 1024));
   },
 
-  setMobileMode(enabled) {
+  setMobileMode(enabled: boolean) {
     const user = ReactiveCache.getCurrentUser();
     if (user) {
       // Update user profile
@@ -143,7 +150,7 @@ export const Utils = {
     return stored ? parseFloat(stored) : 1.0;
   },
 
-  setCardZoom(level) {
+  setCardZoom(level: number) {
     const user = ReactiveCache.getCurrentUser();
     if (user) {
       user.setCardZoom(level);
@@ -153,15 +160,15 @@ export const Utils = {
     Session.set('wekan-card-zoom', level);
   },
 
-  applyCardZoom(level) {
-    const cardDetails = document.querySelector('.card-details');
+  applyCardZoom(level: number) {
+    const cardDetails = document.querySelector<HTMLElement>('.card-details');
     if (cardDetails) {
       cardDetails.style.fontSize = `${level}em`;
     }
   },
 
-  applyZoomLevel(level) {
-    const boardWrapper = document.querySelector('.board-wrapper');
+  applyZoomLevel(level: number) {
+    const boardWrapper = document.querySelector<HTMLElement>('.board-wrapper');
     const body = document.body;
     const isMobileMode = body.classList.contains('mobile-mode');
 
@@ -173,14 +180,14 @@ export const Utils = {
         boardWrapper.style.transformOrigin = '';
 
         // Apply zoom to text and icon elements instead
-        const textElements = boardWrapper.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, div, .minicard, .list-header-name, .board-header-btn, .fa, .icon');
+        const textElements = boardWrapper.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6, p, span, div, .minicard, .list-header-name, .board-header-btn, .fa, .icon');
         textElements.forEach(element => {
           element.style.transform = `scale(${level})`;
           element.style.transformOrigin = 'center';
         });
 
         // Reset board-canvas height
-        const boardCanvas = document.querySelector('.board-canvas');
+        const boardCanvas = document.querySelector<HTMLElement>('.board-canvas');
         if (boardCanvas) {
           boardCanvas.style.height = '';
         }
@@ -212,7 +219,7 @@ export const Utils = {
         }
 
         // Adjust container height to prevent scroll issues
-        const boardCanvas = document.querySelector('.board-canvas');
+        const boardCanvas = document.querySelector<HTMLElement>('.board-canvas');
         if (boardCanvas) {
           boardCanvas.style.height = `${100 / level}%`;
 
@@ -221,7 +228,7 @@ export const Utils = {
             boardCanvas.style.overflowX = 'auto';
             boardCanvas.style.overflowY = 'auto';
             // Ensure the content area can scroll both horizontally and vertically
-            const content = document.querySelector('#content');
+            const content = document.querySelector<HTMLElement>('#content');
             if (content) {
               content.style.overflowX = 'auto';
               content.style.overflowY = 'auto';
@@ -230,7 +237,7 @@ export const Utils = {
             // Reset overflow for normal zoom levels
             boardCanvas.style.overflowX = '';
             boardCanvas.style.overflowY = '';
-            const content = document.querySelector('#content');
+            const content = document.querySelector<HTMLElement>('#content');
             if (content) {
               content.style.overflowX = '';
               content.style.overflowY = '';
@@ -241,7 +248,7 @@ export const Utils = {
     }
   },
 
-  applyMobileMode(enabled) {
+  applyMobileMode(enabled: boolean) {
     const body = document.body;
     if (enabled) {
       body.classList.add('mobile-mode');
@@ -266,9 +273,9 @@ export const Utils = {
     if (
       typeof window !== 'undefined' &&
       window.matchMedia &&
-      !Utils._mobileModeAutoBound
+      !(Utils as UtilsInternal)._mobileModeAutoBound
     ) {
-      Utils._mobileModeAutoBound = true;
+      (Utils as UtilsInternal)._mobileModeAutoBound = true;
       const reapply = () => {
         const stored = localStorage.getItem('wekan-mobile-mode');
         const user = ReactiveCache.getCurrentUser();
@@ -337,7 +344,7 @@ export const Utils = {
     // we can override Utils.reload to prevent reload during tests.
     window.location.reload();
   },
-  setBoardView(view) {
+  setBoardView(view: string) {
     const currentUser = ReactiveCache.getCurrentUser();
 
     if (currentUser) {
@@ -345,7 +352,7 @@ export const Utils = {
       window.localStorage.setItem('boardView', view);
 
       // Update user profile via Meteor method
-      Meteor.call('setBoardView', view, (error) => {
+      Meteor.call('setBoardView', view, (error?: Meteor.Error | Error) => {
         if (error) {
           console.error('[setBoardView] Update failed:', error);
         } else {
@@ -406,7 +413,7 @@ export const Utils = {
     }
   },
 
-  getListCollapseState(list) {
+  getListCollapseState(list: CollapsibleEntity) {
     if (!list) return false;
     const key = `collapsedList-${list._id}`;
     const sessionVal = Session.get(key);
@@ -418,8 +425,8 @@ export const Utils = {
     let stored = null;
     if (user && user.getCollapsedListFromStorage) {
       stored = user.getCollapsedListFromStorage(list.boardId, list._id);
-    } else if (Users.getPublicCollapsedList) {
-      stored = Users.getPublicCollapsedList(list.boardId, list._id);
+    } else if (UsersPublic.getPublicCollapsedList) {
+      stored = UsersPublic.getPublicCollapsedList(list.boardId, list._id);
     }
 
     if (typeof stored === 'boolean') {
@@ -432,19 +439,19 @@ export const Utils = {
     return fallback;
   },
 
-  setListCollapseState(list, collapsed) {
+  setListCollapseState(list: CollapsibleEntity, collapsed: boolean) {
     if (!list) return;
     const key = `collapsedList-${list._id}`;
     Session.set(key, !!collapsed);
     const user = ReactiveCache.getCurrentUser();
     if (user) {
       Meteor.call('setListCollapsedState', list.boardId, list._id, !!collapsed);
-    } else if (Users.setPublicCollapsedList) {
-      Users.setPublicCollapsedList(list.boardId, list._id, !!collapsed);
+    } else if (UsersPublic.setPublicCollapsedList) {
+      UsersPublic.setPublicCollapsedList(list.boardId, list._id, !!collapsed);
     }
   },
 
-  getSwimlaneCollapseState(swimlane) {
+  getSwimlaneCollapseState(swimlane: CollapsibleEntity) {
     if (!swimlane) return false;
     const key = `collapsedSwimlane-${swimlane._id}`;
     const sessionVal = Session.get(key);
@@ -459,8 +466,8 @@ export const Utils = {
         swimlane.boardId,
         swimlane._id,
       );
-    } else if (Users.getPublicCollapsedSwimlane) {
-      stored = Users.getPublicCollapsedSwimlane(swimlane.boardId, swimlane._id);
+    } else if (UsersPublic.getPublicCollapsedSwimlane) {
+      stored = UsersPublic.getPublicCollapsedSwimlane(swimlane.boardId, swimlane._id);
     }
 
     if (typeof stored === 'boolean') {
@@ -473,15 +480,15 @@ export const Utils = {
     return fallback;
   },
 
-  setSwimlaneCollapseState(swimlane, collapsed) {
+  setSwimlaneCollapseState(swimlane: CollapsibleEntity, collapsed: boolean) {
     if (!swimlane) return;
     const key = `collapsedSwimlane-${swimlane._id}`;
     Session.set(key, !!collapsed);
     const user = ReactiveCache.getCurrentUser();
     if (user) {
       Meteor.call('setSwimlaneCollapsedState', swimlane.boardId, swimlane._id, !!collapsed);
-    } else if (Users.setPublicCollapsedSwimlane) {
-      Users.setPublicCollapsedSwimlane(swimlane.boardId, swimlane._id, !!collapsed);
+    } else if (UsersPublic.setPublicCollapsedSwimlane) {
+      UsersPublic.setPublicCollapsedSwimlane(swimlane.boardId, swimlane._id, !!collapsed);
     }
   },
 
@@ -503,13 +510,13 @@ export const Utils = {
     }
   },
 
-  setMyCardsSort(sort) {
+  setMyCardsSort(sort: string) {
     window.localStorage.setItem('myCardsSort', sort);
     Utils.reload();
   },
 
   archivedBoardIds() {
-    const ret = ReactiveCache.getBoards({ archived: false }).map(board => board._id);
+    const ret = ReactiveCache.getBoards({ archived: false }).map((board: { _id: string }) => board._id);
     return ret;
   },
 
@@ -523,7 +530,7 @@ export const Utils = {
     return view;
   },
 
-  setDueCardsView(view) {
+  setDueCardsView(view: string) {
     window.localStorage.setItem('dueCardsView', view);
     Utils.reload();
   },
@@ -538,7 +545,7 @@ export const Utils = {
     return view && ['me', 'all'].includes(view) ? view : 'all';
   },
 
-  setGlobalSearchView(view) {
+  setGlobalSearchView(view: string) {
     const next = ['me', 'all'].includes(view) ? view : 'all';
     window.localStorage.setItem('globalSearchView', next);
     Session.set('globalSearchView', next);
@@ -554,13 +561,13 @@ export const Utils = {
     return view;
   },
 
-  setMyCardsView(view) {
+  setMyCardsView(view: string) {
     window.localStorage.setItem('myCardsView', view);
     Utils.reload();
   },
 
   // XXX We should remove these two methods
-  goBoardId(_id) {
+  goBoardId(_id: string) {
     const board = ReactiveCache.getBoard(_id);
     return (
       board &&
@@ -571,7 +578,7 @@ export const Utils = {
     );
   },
 
-  goCardId(_id) {
+  goCardId(_id: string) {
     const card = ReactiveCache.getCard(_id);
     const board = ReactiveCache.getBoard(card.boardId);
     return (
@@ -585,8 +592,8 @@ export const Utils = {
       })
     );
   },
-  getCommonAttachmentMetaFrom(card) {
-    const meta = {};
+  getCommonAttachmentMetaFrom(card: AttachmentMetaCard) {
+    const meta: AttachmentMeta = {};
     if (card.isLinkedCard()) {
       meta.boardId = ReactiveCache.getCard(card.linkedId).boardId;
       meta.cardId = card.linkedId;
@@ -609,16 +616,16 @@ export const Utils = {
 
   MAX_IMAGE_PIXEL: Meteor.settings.public.MAX_IMAGE_PIXEL,
   COMPRESS_RATIO: Meteor.settings.public.IMAGE_COMPRESS_RATIO,
-  shrinkImage(options) {
+  shrinkImage(options: ShrinkImageOptions) {
     // shrink image to certain size
     const dataurl = options.dataurl,
       callback = options.callback,
       toBlob = options.toBlob;
-    let canvas = document.createElement('canvas'),
-      image = document.createElement('img');
+    let canvas: HTMLCanvasElement | null = document.createElement('canvas'),
+      image: HTMLImageElement | null = document.createElement('img');
     const maxSize = options.maxSize || 1024;
     const ratio = options.ratio || 1.0;
-    const next = function (result) {
+    const next = function (result: string | boolean | Blob | null) {
       image = null;
       canvas = null;
       if (typeof callback === 'function') {
@@ -626,8 +633,9 @@ export const Utils = {
       }
     };
     image.onload = function () {
-      let width = this.width,
-        height = this.height;
+      const img = this as HTMLImageElement;
+      let width = img.width,
+        height = img.height;
       let changed = false;
       if (width > height) {
         if (width > maxSize) {
@@ -640,15 +648,15 @@ export const Utils = {
         height = maxSize;
         changed = true;
       }
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext('2d').drawImage(this, 0, 0, width, height);
+      canvas!.width = width;
+      canvas!.height = height;
+      canvas!.getContext('2d')!.drawImage(img, 0, 0, width, height);
       if (changed === true) {
         const type = 'image/jpeg';
         if (toBlob) {
-          canvas.toBlob(next, type, ratio);
+          canvas!.toBlob(next, type, ratio);
         } else {
-          next(canvas.toDataURL(type, ratio));
+          next(canvas!.toDataURL(type, ratio));
         }
       } else {
         next(changed);
@@ -659,7 +667,7 @@ export const Utils = {
     };
     image.src = dataurl;
   },
-  capitalize(string) {
+  capitalize(string: string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
   },
 
@@ -718,20 +726,28 @@ export const Utils = {
   isTouchScreen() {
     // NEW TOUCH DEVICE DETECTION:
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Browser_detection_using_the_user_agent
+    // Cast to a shape where the touch-detection properties are OPTIONAL so the
+    // legacy feature-detection branches (msMaxTouchPoints / UA fallback) are not
+    // treated as dead code by narrowing on Navigator's required maxTouchPoints.
+    const nav = navigator as {
+      maxTouchPoints?: number;
+      msMaxTouchPoints?: number;
+      userAgent: string;
+    };
     var hasTouchScreen = false;
-    if ("maxTouchPoints" in navigator) {
-      hasTouchScreen = navigator.maxTouchPoints > 0;
-    } else if ("msMaxTouchPoints" in navigator) {
-      hasTouchScreen = navigator.msMaxTouchPoints > 0;
+    if ("maxTouchPoints" in nav) {
+      hasTouchScreen = nav.maxTouchPoints! > 0;
+    } else if ("msMaxTouchPoints" in nav) {
+      hasTouchScreen = nav.msMaxTouchPoints! > 0;
     } else {
-      var mQ = window.matchMedia && matchMedia("(pointer:coarse)");
+      var mQ = typeof window.matchMedia === 'function' && matchMedia("(pointer:coarse)");
       if (mQ && mQ.media === "(pointer:coarse)") {
         hasTouchScreen = !!mQ.matches;
       } else if ('orientation' in window) {
         hasTouchScreen = true; // deprecated, but good fallback
       } else {
         // Only as a last resort, fall back to user agent sniffing
-        var UA = navigator.userAgent;
+        var UA = nav.userAgent;
         hasTouchScreen = (
           /\b(BlackBerry|webOS|iPhone|IEMobile)\b/i.test(UA) ||
           /\b(Android|Windows Phone|iPad|iPod)\b/i.test(UA)
@@ -743,7 +759,7 @@ export const Utils = {
 
   // returns if desktop drag handles are enabled
   isShowDesktopDragHandles() {
-    const currentUser = Meteor.user();
+    const currentUser = Meteor.user() as (Meteor.User & UserDragHandleMethods) | null;
     if (currentUser) {
       return currentUser.hasShowDesktopDragHandles();
     } else {
@@ -757,7 +773,11 @@ export const Utils = {
     return Utils.isTouchScreen() || Utils.isShowDesktopDragHandles();
   },
 
-  calculateIndexData(prevData, nextData, nItems = 1) {
+  calculateIndexData(
+    prevData: SortIndexData | null | undefined,
+    nextData: SortIndexData | null | undefined,
+    nItems = 1,
+  ) {
     let base, increment;
     // If we drop the card to an empty column
     if (!prevData && !nextData) {
@@ -765,32 +785,32 @@ export const Utils = {
       increment = 1;
       // If we drop the card in the first position
     } else if (!prevData) {
-      const nextSortIndex = nextData.sort;
+      const nextSortIndex = nextData!.sort;
       const ceil = Math.ceil(nextSortIndex - 1);
       if (ceil < nextSortIndex) {
         increment = nextSortIndex - ceil;
         base = nextSortIndex - increment;
       } else {
-        base = nextData.sort - 1;
+        base = nextData!.sort - 1;
         increment = -1;
       }
       // If we drop the card in the last position
     } else if (!nextData) {
-      const prevSortIndex = prevData.sort;
+      const prevSortIndex = prevData!.sort;
       const floor = Math.floor(prevSortIndex + 1);
       if (floor > prevSortIndex) {
         increment = prevSortIndex - floor;
         base = prevSortIndex - increment;
       } else {
-        base = prevData.sort + 1;
+        base = prevData!.sort + 1;
         increment = 1;
       }
     }
     // In the general case take the average of the previous and next element
     // sort indexes.
     else {
-      const prevSortIndex = prevData.sort;
-      const nextSortIndex = nextData.sort;
+      const prevSortIndex = prevData!.sort;
+      const nextSortIndex = nextData!.sort;
       if (nItems == 1 ) {
         if (prevSortIndex < 0 ) {
           const ceil = Math.ceil(nextSortIndex - 1);
@@ -820,14 +840,18 @@ export const Utils = {
   },
 
   // Determine the new sort index
-  calculateIndex(prevCardDomElement, nextCardDomElement, nCards = 1) {
-    let prevData = null;
-    let nextData = null;
+  calculateIndex(
+    prevCardDomElement: HTMLElement | null | undefined,
+    nextCardDomElement: HTMLElement | null | undefined,
+    nCards = 1,
+  ) {
+    let prevData: SortIndexData | null = null;
+    let nextData: SortIndexData | null = null;
     if (prevCardDomElement) {
-      prevData = Blaze.getData(prevCardDomElement)
+      prevData = Blaze.getData(prevCardDomElement) as SortIndexData
     }
     if (nextCardDomElement) {
-      nextData = Blaze.getData(nextCardDomElement);
+      nextData = Blaze.getData(nextCardDomElement) as SortIndexData;
     }
     const ret = Utils.calculateIndexData(prevData, nextData, nCards);
     return ret;
@@ -845,7 +869,7 @@ export const Utils = {
     });
   },
 
-  setCustomUI(data) {
+  setCustomUI(data: { productName?: string } | null | undefined) {
     const productName = (data && data.productName) ? data.productName : 'Wekan';
     const currentBoard = Utils.getCurrentBoard();
     if (currentBoard) {
@@ -855,7 +879,7 @@ export const Utils = {
     }
   },
 
-  setMatomo(data) {
+  setMatomo(data: MatomoData) {
     window._paq = window._paq || [];
     window._paq.push(['setDoNotTrack', data.doNotTrack]);
     if (data.withUserName) {
@@ -878,7 +902,7 @@ export const Utils = {
       });
 
       const s = document.getElementsByTagName('script')[0];
-      s.parentNode.insertBefore(script, s);
+      s.parentNode!.insertBefore(script, s);
     })();
 
     Session.set('matomo', true);
@@ -910,7 +934,7 @@ export const Utils = {
     });
   },
 
-  getTriggerActionDesc(event, tempInstance) {
+  getTriggerActionDesc(event: JQuery.TriggeredEvent, tempInstance: Blaze.TemplateInstance) {
     const jqueryEl = tempInstance.$(event.currentTarget.parentNode);
     const triggerEls = jqueryEl.find('.trigger-content').children();
     let finalString = '';
@@ -947,7 +971,7 @@ export const Utils = {
     return finalString;
   },
 
-  fallbackCopyTextToClipboard(text) {
+  fallbackCopyTextToClipboard(text: string) {
     var textArea = document.createElement("textarea");
     textArea.value = text;
 
@@ -975,7 +999,7 @@ export const Utils = {
    * @param string copy this text to the clipboard
    * @return Promise
    */
-  copyTextToClipboard(text) {
+  copyTextToClipboard(text: string) {
     let ret;
     if (navigator.clipboard) {
       ret = navigator.clipboard.writeText(text).then(function () {
@@ -992,7 +1016,7 @@ export const Utils = {
    * @param promise the promise of Utils.copyTextToClipboard
    * @param $tooltip jQuery tooltip element
    */
-  showCopied(promise, $tooltip) {
+  showCopied(promise: Promise<boolean | void> | null | undefined, $tooltip: JQuery) {
     if (promise) {
       promise.then(() => {
         $tooltip.show(100);
@@ -1009,3 +1033,82 @@ export const Utils = {
 // of a window resize. This is the equivalent of a "Signal" in some other
 // programming environments (eg, elm).
 $(window).on('resize', () => Utils.windowResizeDep.changed());
+
+// A dynamic flag set once on Utils to bind the mobile-mode viewport listener.
+interface UtilsInternal {
+  _mobileModeAutoBound?: boolean;
+}
+
+// Public (logged-out) collapsed-state helpers attached to the Users collection
+// at runtime in models/users.ts. Optional because they only exist for anonymous
+// users and are feature-detected before use.
+interface UsersPublicStatics {
+  getPublicCollapsedList?: (boardId: string, listId: string) => boolean | null;
+  setPublicCollapsedList?: (
+    boardId: string,
+    listId: string,
+    collapsed: boolean,
+  ) => boolean;
+  getPublicCollapsedSwimlane?: (
+    boardId: string,
+    swimlaneId: string,
+  ) => boolean | null;
+  setPublicCollapsedSwimlane?: (
+    boardId: string,
+    swimlaneId: string,
+    collapsed: boolean,
+  ) => boolean;
+}
+
+// A board/list/swimlane whose collapsed state can be persisted.
+interface CollapsibleEntity {
+  _id: string;
+  boardId: string;
+  collapsed?: boolean;
+}
+
+// The card surface used by getCommonAttachmentMetaFrom().
+interface AttachmentMetaCard {
+  _id: string;
+  boardId: string;
+  swimlaneId?: string;
+  listId?: string;
+  linkedId?: string;
+  isLinkedCard: () => boolean;
+}
+
+// Attachment metadata copied from a card.
+interface AttachmentMeta {
+  boardId?: string;
+  cardId?: string;
+  swimlaneId?: string;
+  listId?: string;
+}
+
+// Options for Utils.shrinkImage().
+interface ShrinkImageOptions {
+  dataurl: string;
+  callback?: (result: string | boolean | Blob | null) => void;
+  toBlob?: boolean;
+  maxSize?: number;
+  ratio?: number;
+}
+
+// Matomo (Piwik) analytics configuration.
+interface MatomoData {
+  address: string;
+  siteId: string | number;
+  doNotTrack: boolean;
+  withUserName?: boolean;
+}
+
+// Previous/next sort anchors used by calculateIndexData().
+interface SortIndexData {
+  sort: number;
+}
+
+// User-document helper (defined via Users.helpers in models/users.ts) that is
+// not part of the base Meteor.User type.
+interface UserDragHandleMethods {
+  hasShowDesktopDragHandles: () => boolean;
+}

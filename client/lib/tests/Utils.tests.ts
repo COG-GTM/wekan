@@ -21,12 +21,14 @@ describe('Utils', function () {
     it('sets the board view if the user exists', function (done) {
       const viewId = Random.id();
       const user = {
-        setBoardView: (view) => {
+        setBoardView: (view: string) => {
           expect(view).to.equal(viewId);
           done();
         },
       };
-      sinon.stub(Meteor, 'user').callsFake(() => user);
+      // Meteor.user() returns a full User document at runtime; these tests only
+      // need a partial stub, so the fake is cast to `any` at the sinon boundary.
+      sinon.stub(Meteor, 'user').callsFake((() => user) as any);
       Utils.setBoardView(viewId);
 
       expect(window.localStorage.getItem(boardView)).to.equal(viewId);
@@ -39,7 +41,7 @@ describe('Utils', function () {
         'board-view-cal'
       ];
 
-      sinon.stub(Meteor, 'user').callsFake(() => { });
+      sinon.stub(Meteor, 'user').callsFake((() => { }) as any);
 
       views.forEach(viewName => {
         Utils.setBoardView(viewName);
@@ -48,7 +50,7 @@ describe('Utils', function () {
     });
 
     it('sets a default view if no user and no view are given', function () {
-      sinon.stub(Meteor, 'user').callsFake(() => { });
+      sinon.stub(Meteor, 'user').callsFake((() => { }) as any);
       Utils.setBoardView();
       expect(window.localStorage.getItem(boardView)).to.equal('board-view-swimlanes');
     });
@@ -69,8 +71,8 @@ describe('Utils', function () {
   describe(Utils.boardView.name, function () {
     it('returns the user\'s board view if a user exists', function () {
       const viewId = Random.id();
-      const user = {};
-      sinon.stub(Meteor, 'user').callsFake(() => user);
+      const user: { profile?: { boardView?: string } } = {};
+      sinon.stub(Meteor, 'user').callsFake((() => user) as any);
       expect(Utils.boardView()).to.equal(undefined);
 
       const boardView = Random.id();
@@ -85,7 +87,7 @@ describe('Utils', function () {
         'board-view-cal'
       ];
 
-      sinon.stub(Meteor, 'user').callsFake(() => { });
+      sinon.stub(Meteor, 'user').callsFake((() => { }) as any);
 
       views.forEach(viewName => {
         window.localStorage.setItem(boardView, viewName);
@@ -93,7 +95,7 @@ describe('Utils', function () {
       });
     });
     it('returns a default if nothing is set', function () {
-      sinon.stub(Meteor, 'user').callsFake(() => { });
+      sinon.stub(Meteor, 'user').callsFake((() => { }) as any);
       expect(Utils.boardView()).to.equal('board-view-swimlanes');
       expect(window.localStorage.getItem(boardView)).to.equal('board-view-swimlanes');
     });

@@ -577,6 +577,12 @@ declare module 'meteor/blaze' {
   namespace Blaze {
     // A Blaze helper receives arbitrary Spacebars args and returns any value.
     function registerHelper(name: string, func: (...args: any[]) => any): void;
+    // Blaze's TemplateInstance.$ is jQuery-backed and accepts anything jQuery
+    // does (DOM elements, JQuery objects, ...); @types/meteor types it as
+    // `string` only. Add the real element/JQuery overload used by app code.
+    interface TemplateInstance {
+      $(selector: Element | JQuery): JQuery;
+    }
   }
 }
 
