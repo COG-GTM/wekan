@@ -20,7 +20,7 @@ WebApp.handlers.get('/api/boards/:boardId/integrations', async function(req, res
     const data = (await ReactiveCache.getIntegrations(
       { boardId: paramBoardId },
       { fields: { token: 0 } },
-    )).map(function(doc) {
+    )).map(function(doc: WekanDocumentField) {
       return doc;
     });
 

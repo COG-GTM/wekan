@@ -21,7 +21,8 @@ import { ensureIndex } from '/server/lib/mongoStartup';
 Meteor.startup(async () => {
   await ensureIndex(AccessibilitySettings, { modifiedAt: -1 });
   if (!(await AccessibilitySettings.findOneAsync({}))) {
-    await AccessibilitySettings.insertAsync({ enabled: false, sort: 0 });
+    const accessibilityDefault = { enabled: false, sort: 0 };
+    await AccessibilitySettings.insertAsync(accessibilityDefault);
   }
 
   await ensureIndex(AccountSettings, { modifiedAt: -1 });
@@ -90,7 +91,7 @@ Meteor.startup(async () => {
     { _id: 'unknown-failuresBeforeLockout' },
     {
       $setOnInsert: {
-        value: (correctVar || typoVar) ? parseInt(correctVar || typoVar, 10) : 3,
+        value: (correctVar || typoVar) ? parseInt((correctVar || typoVar) as string, 10) : 3,
         category: 'unknown',
         sort: 0,
       },

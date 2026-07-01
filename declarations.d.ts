@@ -629,3 +629,29 @@ interface WekanWebAppResponse {
   // members above, the rest come through this documented index signature.
   [prop: string]: WekanDocumentField;
 }
+
+// Meteor 3 exposes a connect-style router at `WebApp.handlers` with per-verb
+// registration methods (get/post/put/delete/use). @types/meteor only models the
+// legacy `connectHandlers`, so the router that the server/models REST routes
+// register on is added here. Handler callbacks are contextually typed with the
+// shared Wekan request/response shapes above.
+declare module 'meteor/webapp' {
+  type WekanWebAppRouteHandler = (
+    req: WekanWebAppRequest,
+    res: WekanWebAppResponse,
+    next: (error?: WekanDocumentField) => void,
+  ) => void | Promise<void>;
+
+  interface WekanWebAppHandlers {
+    use(handler: WekanWebAppRouteHandler): void;
+    use(path: string, handler: WekanWebAppRouteHandler): void;
+    get(path: string, handler: WekanWebAppRouteHandler): void;
+    post(path: string, handler: WekanWebAppRouteHandler): void;
+    put(path: string, handler: WekanWebAppRouteHandler): void;
+    delete(path: string, handler: WekanWebAppRouteHandler): void;
+  }
+
+  namespace WebApp {
+    const handlers: WekanWebAppHandlers;
+  }
+}

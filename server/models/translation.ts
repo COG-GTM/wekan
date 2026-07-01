@@ -5,7 +5,7 @@ import { ensureIndex } from '/server/lib/mongoStartup';
 const getReactiveCache = () => require('/imports/reactiveCache').ReactiveCache;
 
 Meteor.methods({
-  async setCreateTranslation(language, text, translationText) {
+  async setCreateTranslation(language: string, text: string, translationText: string) {
     check(language, String);
     check(text, String);
     check(translationText, String);
@@ -26,7 +26,7 @@ Meteor.methods({
     });
   },
 
-  async setTranslationText(translation, translationText) {
+  async setTranslationText(translation: WekanDocumentField, translationText: string) {
     check(translation, Object);
     check(translationText, String);
 
@@ -39,7 +39,7 @@ Meteor.methods({
     });
   },
 
-  async deleteTranslation(translationId) {
+  async deleteTranslation(translationId: string) {
     check(translationId, String);
 
     if (!(await getReactiveCache().getCurrentUser())?.isAdmin) {

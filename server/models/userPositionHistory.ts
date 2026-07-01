@@ -10,7 +10,7 @@ import { ensureIndex } from '/server/lib/mongoStartup';
 // Without this, any authenticated user could create/read position-history
 // checkpoints scoped to an arbitrary board they have no access to (the same
 // PositionHistoryBleed class listed in the Hall of Fame).
-const requireBoardVisible = async (userId, boardId) => {
+const requireBoardVisible = async (userId: string, boardId: string) => {
   const board = await ReactiveCache.getBoard(boardId);
   if (!board || !board.isVisibleBy({ _id: userId })) {
     throw new Meteor.Error('not-authorized', 'You do not have access to this board.');
@@ -25,7 +25,7 @@ Meteor.startup(async () => {
   await ensureIndex(UserPositionHistory, { createdAt: 1 });
 });
 
-UserPositionHistory.trackChange = async function(options) {
+UserPositionHistory.trackChange = async function(options: WekanDocumentField) {
   const {
     userId,
     boardId,
@@ -41,7 +41,7 @@ UserPositionHistory.trackChange = async function(options) {
     throw new Meteor.Error('invalid-params', 'Missing required parameters');
   }
 
-  const historyEntry = {
+  const historyEntry: Record<string, WekanDocumentField> = {
     userId,
     boardId,
     entityType,
@@ -100,7 +100,7 @@ UserPositionHistory.cleanup = async function() {
 if (Meteor.settings.public?.enableHistoryCleanup !== false) {
   Meteor.setInterval(() => {
     try {
-      UserPositionHistory.cleanup().catch(error => {
+      UserPositionHistory.cleanup().catch((error: WekanDocumentField) => {
         console.error('Error during history cleanup:', error);
       });
     } catch (e) {
@@ -110,7 +110,7 @@ if (Meteor.settings.public?.enableHistoryCleanup !== false) {
 }
 
 Meteor.methods({
-  async 'userPositionHistory.createCheckpoint'(boardId, checkpointName) {
+  async 'userPositionHistory.createCheckpoint'(boardId: string, checkpointName: string) {
     check(boardId, String);
     check(checkpointName, String);
 
@@ -134,7 +134,7 @@ Meteor.methods({
     });
   },
 
-  async 'userPositionHistory.undo'(historyId) {
+  async 'userPositionHistory.undo'(historyId: string) {
     check(historyId, String);
 
     if (!this.userId) {
@@ -149,7 +149,7 @@ Meteor.methods({
     return await history.undo();
   },
 
-  async 'userPositionHistory.getRecent'(boardId, limit = 50) {
+  async 'userPositionHistory.getRecent'(boardId: string, limit = 50) {
     check(boardId, String);
     check(limit, Number);
 
@@ -165,7 +165,7 @@ Meteor.methods({
     ).fetchAsync();
   },
 
-  async 'userPositionHistory.getCheckpoints'(boardId) {
+  async 'userPositionHistory.getCheckpoints'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -180,7 +180,7 @@ Meteor.methods({
     ).fetchAsync();
   },
 
-  async 'userPositionHistory.restoreToCheckpoint'(checkpointId) {
+  async 'userPositionHistory.restoreToCheckpoint'(checkpointId: string) {
     check(checkpointId, String);
 
     if (!this.userId) {

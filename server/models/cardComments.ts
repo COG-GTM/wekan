@@ -12,7 +12,7 @@ import Activities from '/models/activities';
 import CardComments from '/models/cardComments';
 import { ensureIndex } from '/server/lib/mongoStartup';
 
-async function commentCreation(userId, doc) {
+async function commentCreation(userId: string | undefined, doc: WekanDocumentField) {
   const card = await ReactiveCache.getCard(doc.cardId);
   if (!card) {
     console.warn('[commentCreation] Card not found for cardId:', doc.cardId, '— skipping activity insert.');
@@ -90,7 +90,7 @@ WebApp.handlers.get('/api/boards/:boardId/cards/:cardId/comments', async functio
       data: (await ReactiveCache.getCardComments({
         boardId: paramBoardId,
         cardId: paramCardId,
-      })).map(doc => ({
+      })).map((doc: WekanDocumentField) => ({
         _id: doc._id,
         comment: doc.text,
         authorId: doc.userId,

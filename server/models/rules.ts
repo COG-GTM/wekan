@@ -23,15 +23,15 @@ import Actions from '/models/actions';
 
 const STRIP = ['_id', 'boardId', 'createdAt', 'modifiedAt', 'updatedAt'];
 
-function strip(doc) {
-  const out = {};
+function strip(doc: WekanDocumentField) {
+  const out: Record<string, WekanDocumentField> = {};
   Object.keys(doc || {}).forEach(k => {
     if (!STRIP.includes(k)) out[k] = doc[k];
   });
   return out;
 }
 
-async function serializeRule(rule) {
+async function serializeRule(rule: WekanDocumentField) {
   const trigger = await ReactiveCache.getTrigger(rule.triggerId);
   const action = await ReactiveCache.getAction(rule.actionId);
   return {
@@ -114,7 +114,7 @@ if (Meteor.isServer) {
         throw new Meteor.Error('bad-request', 'trigger and action are required');
       }
       const triggerId = await Triggers.insertAsync({ ...strip(trigger), boardId: paramBoardId });
-      const actionId = await Actions.insertAsync({ ...strip(action), boardId: paramBoardId });
+      const actionId = await Actions.insertAsync({ ...strip(action), boardId: paramBoardId } as Record<string, WekanDocumentField>);
       const ruleId = await Rules.insertAsync({
         title: title || 'API rule',
         triggerId,
