@@ -22,14 +22,22 @@ import Swimlanes from '/models/swimlanes';
 //                  "tags": [ ... ] }, ... ]
 //   }
 export class KanboardCreator {
-  constructor(data) {
+  _nowDate: Date;
+  members: { [key: string]: any };
+  lists: { [key: string]: any };
+  swimlanes: { [key: string]: any };
+
+  // `data` is the parsed Kanboard export payload (dynamic shape), hence `any`.
+  constructor(data: any) {
     this._nowDate = new Date();
     this.members = data && data.membersMapping ? data.membersMapping : {};
     this.lists = {};
     this.swimlanes = {};
   }
 
-  _now(dateString) {
+  // `dateString` may be a unix-timestamp string/number or a date string
+  // (dynamic from the export), hence `any`.
+  _now(dateString?: any) {
     if (dateString) {
       // Kanboard often uses unix timestamps (seconds) for dates.
       if (/^\d+$/.test(String(dateString))) {
@@ -41,22 +49,22 @@ export class KanboardCreator {
     return this._nowDate;
   }
 
-  _user(key) {
+  _user(key?: string) {
     if (key && this.members[key]) return this.members[key];
     return Meteor.userId();
   }
 
-  _tasks(data) {
+  _tasks(data: any) {
     if (Array.isArray(data)) return data;
     return data.tasks || [];
   }
 
-  _columnNames(data) {
+  _columnNames(data: any) {
     if (data.columns && data.columns.length) {
-      return data.columns.map(c => c.title || c.name).filter(Boolean);
+      return data.columns.map((c: any) => c.title || c.name).filter(Boolean);
     }
     // Derive the column order from the tasks.
-    const names = [];
+    const names: any[] = [];
     for (const task of this._tasks(data)) {
       const name = task.column_name || task.column || 'Imported';
       if (!names.includes(name)) names.push(name);
@@ -64,11 +72,11 @@ export class KanboardCreator {
     return names.length ? names : ['Imported'];
   }
 
-  _swimlaneNames(data) {
+  _swimlaneNames(data: any) {
     if (data.swimlanes && data.swimlanes.length) {
-      return data.swimlanes.map(s => s.name || s.title).filter(Boolean);
+      return data.swimlanes.map((s: any) => s.name || s.title).filter(Boolean);
     }
-    const names = [];
+    const names: any[] = [];
     for (const task of this._tasks(data)) {
       const name = task.swimlane_name || task.swimlane || 'Default';
       if (!names.includes(name)) names.push(name);
@@ -76,11 +84,12 @@ export class KanboardCreator {
     return names.length ? names : ['Default'];
   }
 
-  async createBoard(data) {
+  async createBoard(data: any) {
     const title =
       (data.board && (data.board.name || data.board.title)) ||
       `Imported Kanboard Board ${this._now()}`;
-    const boardToCreate = {
+    // `boardToCreate` is a board document assembled incrementally, hence `any`.
+    const boardToCreate: { [key: string]: any } = {
       archived: false,
       color: 'belize',
       createdAt: this._now(),
@@ -103,9 +112,10 @@ export class KanboardCreator {
       title,
     };
     // Tags -> board labels.
-    const tagNames = new Set();
+    // Tags may be plain strings or { name } objects, hence `Set<any>`.
+    const tagNames = new Set<any>();
     for (const task of this._tasks(data)) {
-      (task.tags || []).forEach(t => tagNames.add(typeof t === 'string' ? t : t.name));
+      (task.tags || []).forEach((t: any) => tagNames.add(typeof t === 'string' ? t : t.name));
     }
     for (const name of tagNames) {
       if (name) boardToCreate.labels.push({ _id: Random.id(6), color: 'black', name });
@@ -122,7 +132,7 @@ export class KanboardCreator {
     return boardId;
   }
 
-  async createSwimlanes(data, boardId) {
+  async createSwimlanes(data: any, boardId: string) {
     let sort = 0;
     for (const name of this._swimlaneNames(data)) {
       const swimlaneId = await Swimlanes.direct.insertAsync({
@@ -137,7 +147,7 @@ export class KanboardCreator {
     }
   }
 
-  async createLists(data, boardId) {
+  async createLists(data: any, boardId: string) {
     let sort = 0;
     for (const name of this._columnNames(data)) {
       const listId = await Lists.direct.insertAsync({
@@ -152,13 +162,14 @@ export class KanboardCreator {
     }
   }
 
-  async createCards(data, boardId) {
+  async createCards(data: any, boardId: string) {
     const board = await ReactiveCache.getBoard(boardId);
     const firstSwimlane = Object.values(this.swimlanes)[0];
     for (const task of this._tasks(data)) {
       const columnName = task.column_name || task.column || this._columnNames(data)[0];
       const swimlaneName = task.swimlane_name || task.swimlane || 'Default';
-      const cardToCreate = {
+      // `cardToCreate` is a card document assembled incrementally, hence `any`.
+      const cardToCreate: { [key: string]: any } = {
         archived: false,
         boardId,
         dateLastActivity: this._now(),
@@ -185,7 +196,7 @@ export class KanboardCreator {
     }
   }
 
-  async create(board, currentBoardId) {
+  async create(board: any, currentBoardId?: string | null) {
     const isSandstorm =
       Meteor.settings && Meteor.settings.public && Meteor.settings.public.sandstorm;
     if (isSandstorm && currentBoardId) {
