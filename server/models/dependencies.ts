@@ -27,7 +27,9 @@ import {
 // color : any CSS color (e.g. "#eb144c")
 // icon  : a FontAwesome 4.7 icon name without the "fa-" prefix (e.g. "link")
 
-async function dependencyLine(sourceCard, dep) {
+// `sourceCard` is a card model instance and `dep` a raw dependency entry
+// (both dynamic shapes), hence `any`.
+async function dependencyLine(sourceCard: any, dep: any) {
   const target = await ReactiveCache.getCard(dep.cardId);
   return {
     from: sourceCard._id,
@@ -50,14 +52,14 @@ async function dependencyLine(sourceCard, dep) {
 Meteor.methods({
   async importBoardDependencies(boardId, lines) {
     check(boardId, String);
-    check(lines, [Object]);
+    check(lines as object[], [Object]);
     await Authentication.checkBoardWriteAccess(this.userId, boardId);
 
     const cards = await ReactiveCache.getCards({ boardId, archived: false });
-    const byId = {};
-    const byNumber = {};
-    const byTitle = {};
-    cards.forEach(card => {
+    const byId: { [key: string]: string } = {};
+    const byNumber: { [key: string]: string } = {};
+    const byTitle: { [key: string]: string } = {};
+    cards.forEach((card: any) => {
       byId[card._id] = card._id;
       if (card.cardNumber !== undefined && card.cardNumber !== null) {
         byNumber[String(card.cardNumber)] = card._id;
@@ -65,7 +67,8 @@ Meteor.methods({
       if (card.title) byTitle[card.title] = card._id;
     });
 
-    const resolve = (id, number, title) => {
+    // `id`, `number` and `title` are pulled from untyped import line fields, hence `any`.
+    const resolve = (id: any, number: any, title: any) => {
       if (id && byId[id]) return byId[id];
       if (number !== undefined && number !== null && byNumber[String(number)]) {
         return byNumber[String(number)];
@@ -88,7 +91,8 @@ Meteor.methods({
         type: line.type,
         color: line.color,
         icon: line.icon,
-      });
+        // toId is guaranteed truthy above, so normalizeDependency never returns null here.
+      })!;
       const source = await ReactiveCache.getCard(fromId);
       const existing = normalizeDependencies(source && source.cardDependencies);
       if (existing.find(d => d.cardId === toId)) {
@@ -221,7 +225,8 @@ if (Meteor.isServer) {
         type: req.body.type || (existing && existing.type),
         color: req.body.color || (existing && existing.color),
         icon: req.body.icon || (existing && existing.icon),
-      });
+        // cardId (targetId) is set above, so normalizeDependency never returns null here.
+      })!;
       if (existing) {
         await Cards.updateAsync(
           { _id: paramCardId, 'cardDependencies.cardId': targetId },
@@ -271,7 +276,8 @@ if (Meteor.isServer) {
       if (req.body.type && !DEPENDENCY_TYPE_IDS.includes(req.body.type)) {
         throw new Meteor.Error('bad-request', `type must be one of: ${DEPENDENCY_TYPE_IDS.join(', ')}`);
       }
-      const modifier = {};
+      // Dynamic positional-$set modifier keyed by `cardDependencies.$.<field>`.
+      const modifier: { [key: string]: any } = {};
       ['type', 'color', 'icon'].forEach(key => {
         if (req.body[key] !== undefined) {
           modifier[`cardDependencies.$.${key}`] = req.body[key];

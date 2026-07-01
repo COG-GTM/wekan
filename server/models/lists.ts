@@ -11,7 +11,8 @@ import Lists from '/models/lists';
 import { ensureIndex } from '/server/lib/mongoStartup';
 import { computeSortForIndex, allowIsBoardMemberWithWriteAccess } from '/server/lib/utils';
 
-const hasBoardWriteAccess = (userId, board) => {
+// `board` is a board model instance (dynamic helper surface), hence `any`.
+const hasBoardWriteAccess = (userId: string, board: any) => {
   if (!userId || !board) {
     return false;
   }
@@ -69,8 +70,9 @@ Meteor.methods({
       throw new Meteor.Error('not-authorized', 'Access denied');
     }
 
-    const normalizeSwimlaneId = value => value || '';
-    const getResolvedSwimlaneId = (list, fallback = '') => {
+    const normalizeSwimlaneId = (value: string | undefined) => value || '';
+    // `list` is a list model instance (dynamic helper surface), hence `any`.
+    const getResolvedSwimlaneId = (list: any, fallback: string = '') => {
       if (!list) return normalizeSwimlaneId(fallback);
       if (typeof list.getEffectiveSwimlaneId === 'function') {
         return normalizeSwimlaneId(list.getEffectiveSwimlaneId() || fallback);
@@ -103,8 +105,8 @@ Meteor.methods({
         boardId,
         archived: false,
       }))
-        .filter(list => getResolvedSwimlaneId(list, targetSwimlaneId) === targetSwimlaneId)
-        .sort((a, b) => a.sort - b.sort);
+        .filter((list: any) => getResolvedSwimlaneId(list, targetSwimlaneId) === targetSwimlaneId)
+        .sort((a: any, b: any) => a.sort - b.sort);
 
       let nextList = null;
       if (nextListId) {
@@ -122,7 +124,7 @@ Meteor.methods({
       }
 
       if (!nextList) {
-        const selectedIndex = swimlaneLists.findIndex(list => list._id === selectedList._id);
+        const selectedIndex = swimlaneLists.findIndex((list: any) => list._id === selectedList._id);
         nextList = selectedIndex >= 0 ? swimlaneLists[selectedIndex + 1] : null;
       }
 
@@ -143,8 +145,8 @@ Meteor.methods({
         boardId,
         archived: false,
       }))
-        .filter(list => getResolvedSwimlaneId(list, targetSwimlaneId) === targetSwimlaneId)
-        .sort((a, b) => a.sort - b.sort);
+        .filter((list: any) => getResolvedSwimlaneId(list, targetSwimlaneId) === targetSwimlaneId)
+        .sort((a: any, b: any) => a.sort - b.sort);
 
       const last = swimlaneLists[swimlaneLists.length - 1];
       sort = Number.isFinite(last?.sort) ? last.sort + 1 : 0;
@@ -195,8 +197,8 @@ Meteor.methods({
       const neighborList = await ReactiveCache.getList({ _id: neighborListId, boardId, archived: false });
       if (neighborList && Number.isFinite(neighborList.sort)) {
         const allLists = (await ReactiveCache.getLists({ boardId, swimlaneId, archived: false }))
-          .sort((a, b) => a.sort - b.sort);
-        const neighborIndex = allLists.findIndex(l => l._id === neighborListId);
+          .sort((a: any, b: any) => a.sort - b.sort);
+        const neighborIndex = allLists.findIndex((l: any) => l._id === neighborListId);
         if (position === 'left') {
           const prev = allLists[neighborIndex - 1];
           sort = prev && Number.isFinite(prev.sort)
@@ -272,9 +274,9 @@ Meteor.methods({
       const neighborList = await ReactiveCache.getList({ _id: neighborListId, boardId, archived: false });
       if (movedList && neighborList && Number.isFinite(neighborList.sort)) {
         const allLists = (await ReactiveCache.getLists({ boardId, swimlaneId, archived: false }))
-          .filter(l => l._id !== movedList._id)
-          .sort((a, b) => a.sort - b.sort);
-        const neighborIndex = allLists.findIndex(l => l._id === neighborListId);
+          .filter((l: any) => l._id !== movedList._id)
+          .sort((a: any, b: any) => a.sort - b.sort);
+        const neighborIndex = allLists.findIndex((l: any) => l._id === neighborListId);
         let newSort;
         if (position === 'left') {
           const prev = allLists[neighborIndex - 1];
@@ -362,18 +364,20 @@ Meteor.methods({
   async myLists() {
     const lists = await ReactiveCache.getLists(
       {
-        boardId: { $in: await Boards.userBoardIds(this.userId) },
+        // `userBoardIds` is a custom static on the Boards collection (not part
+        // of Mongo.Collection), hence the `any` cast.
+        boardId: { $in: await (Boards as any).userBoardIds(this.userId) },
         archived: false,
       },
       { fields: { title: 1 } },
     );
-    return [...new Set(lists.map(list => list.title))].sort();
+    return [...new Set(lists.map((list: any) => list.title))].sort();
   },
 
   async updateListSort(listId, boardId, updateData) {
     check(listId, String);
     check(boardId, String);
-    check(updateData, Object);
+    check(updateData as object, Object);
 
     if (!this.userId) {
       throw new Meteor.Error('not-authorized', 'You must be logged in.');
@@ -542,7 +546,7 @@ WebApp.handlers.get('/api/boards/:boardId/lists', async function(req, res) {
 
     sendJsonResult(res, {
       code: 200,
-      data: (await ReactiveCache.getLists({ boardId: paramBoardId, archived: false })).map(doc => ({
+      data: (await ReactiveCache.getLists({ boardId: paramBoardId, archived: false })).map((doc: any) => ({
         _id: doc._id,
         title: doc.title,
       })),
@@ -666,7 +670,7 @@ WebApp.handlers.delete('/api/boards/:boardId/lists/:listId', async function(req,
 
 // Reposition a list at a 0-based `position` counted from the left of the
 // destination board, by setting its sort between siblings.
-async function repositionList(listId, toBoardId, position) {
+async function repositionList(listId: string, toBoardId: string, position: number | null | undefined) {
   if (position === undefined || position === null) {
     return;
   }
