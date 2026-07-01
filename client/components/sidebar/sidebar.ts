@@ -1,5 +1,6 @@
 import { Meteor } from 'meteor/meteor';
 import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
@@ -25,13 +26,16 @@ import {
   setSidebarInstance,
 } from '/client/features/sidebar/service';
 
-export let Sidebar = null;
+// Sidebar: any — the sidebar template instance (see SidebarInstance), exposed
+// globally for programmatic access; null until the template is created.
+export let Sidebar: any = null;
 
 const defaultView = 'home';
 const MCB = '.materialCheckBox';
 const CKCLS = 'is-checked';
 
-function getMinicardSetting(board, onMinicardField, cardField, defaultValue) {
+// board: any — a Board document; onMinicardField/cardField are dynamic keys.
+function getMinicardSetting(board: any, onMinicardField: any, cardField: any, defaultValue: any) {
   if (!board) return false;
   if (board[onMinicardField] !== null && board[onMinicardField] !== undefined) {
     return board[onMinicardField];
@@ -42,7 +46,7 @@ function getMinicardSetting(board, onMinicardField, cardField, defaultValue) {
   return defaultValue;
 }
 
-const viewTitles = {
+const viewTitles: Record<string, string> = {
   filter: 'filter-cards',
   search: 'search-cards',
   multiselection: 'multi-selection',
@@ -50,7 +54,7 @@ const viewTitles = {
   archives: 'archives',
 };
 
-Template.sidebar.onCreated(function() {
+Template.sidebar.onCreated(function(this: SidebarInstance) {
   this._isOpen = new ReactiveVar(false);
   this._view = new ReactiveVar(defaultView);
   this._hideCardCounterList = new ReactiveVar(false);
@@ -111,7 +115,7 @@ Template.sidebar.onCreated(function() {
     return this._view.get();
   };
 
-  this.setView = function(view) {
+  this.setView = function(this: SidebarInstance, view?: any) {
     view = typeof view === 'string' ? view : defaultView;
     if (this._view.get() !== view) {
       this._view.set(view);
@@ -139,7 +143,7 @@ Template.sidebar.onCreated(function() {
   };
 });
 
-Template.sidebar.onDestroyed(function() {
+Template.sidebar.onDestroyed(function(this: SidebarInstance) {
   clearSidebarInstance(this);
   Sidebar = null;
 });
@@ -178,13 +182,13 @@ Template.sidebar.helpers({
 });
 
 Template.sidebar.events({
-  'click .js-hide-sidebar'(event, tpl) {
+  'click .js-hide-sidebar'(event: JQuery.TriggeredEvent, tpl: SidebarInstance) {
     tpl.hide();
   },
-  'click .js-toggle-sidebar'(event, tpl) {
+  'click .js-toggle-sidebar'(event: JQuery.TriggeredEvent, tpl: SidebarInstance) {
     tpl.toggle();
   },
-  'click .js-back-home'(event, tpl) {
+  'click .js-back-home'(event: JQuery.TriggeredEvent, tpl: SidebarInstance) {
     tpl.setView();
   },
   'click .js-toggle-minicard-label-text'() {
@@ -218,14 +222,14 @@ Template.sidebar.events({
       window.localStorage.setItem('showWeekOfYear', String(!current));
     }
   },
-  'click .sidebar-accessibility'(event, tpl) {
+  'click .sidebar-accessibility'(event: JQuery.TriggeredEvent, tpl: SidebarInstance) {
     FlowRouter.go('accessibility');
     tpl.toggle();
   },
-  'click .js-close-sidebar'(event, tpl) {
+  'click .js-close-sidebar'(event: JQuery.TriggeredEvent, tpl: SidebarInstance) {
     tpl.toggle();
   },
-  'scroll .js-board-sidebar-content'(event, tpl) {
+  'scroll .js-board-sidebar-content'(event: JQuery.TriggeredEvent, tpl: SidebarInstance) {
     tpl.infiniteScrolling.checkScrollPosition(event.currentTarget, () => {
       tpl.reachNextPeak();
     });
@@ -371,8 +375,9 @@ Template.boardMenuPopup.events({
     const allLists = ReactiveCache.getLists({ boardId: currentBoard._id, archived: false });
 
     // Group lists by title to find duplicates
-    const listsByTitle = {};
-    allLists.forEach(list => {
+    // listsByTitle: any[] values — List documents grouped by their title.
+    const listsByTitle: Record<string, any[]> = {};
+    allLists.forEach((list: any) => {
       if (!listsByTitle[list.title]) {
         listsByTitle[list.title] = [];
       }
@@ -424,9 +429,10 @@ Template.boardMenuPopup.events({
   'click .js-export-board': Popup.open('exportBoard'),
 });
 
-Template.boardMenuPopup.onCreated(function() {
+Template.boardMenuPopup.onCreated(function(this: BoardMenuPopupInstance) {
   this.apiEnabled = new ReactiveVar(false);
-  Meteor.call('_isApiEnabled', (e, result) => {
+  // e/result: any — untyped Meteor method callback.
+  Meteor.call('_isApiEnabled', (e: any, result: any) => {
     this.apiEnabled.set(result);
   });
 });
@@ -436,7 +442,7 @@ Template.boardMenuPopup.helpers({
     return ReactiveCache.getCurrentUser()?.isBoardAdmin();
   },
   withApi() {
-    return Template.instance().apiEnabled.get();
+    return (Template.instance() as BoardMenuPopupInstance).apiEnabled.get();
   },
   exportUrl() {
     const params = {
@@ -454,19 +460,21 @@ Template.boardMenuPopup.helpers({
 });
 
 Template.memberPopup.events({
-  'click .js-filter-member'() {
+  // this: any — the member data context exposes `userId`.
+  'click .js-filter-member'(this: any) {
     Filter.members.toggle(this.userId);
     Popup.back();
   },
   'click .js-change-role': Popup.open('changePermissions'),
-  'click .js-remove-member': Popup.afterConfirm('removeMember', async function() {
+  // this: any — the member data context exposes `userId`.
+  'click .js-remove-member': Popup.afterConfirm('removeMember', async function(this: any) {
     // This works from removing member from board, card members and assignees.
     const boardId = Session.get('currentBoard');
     const memberId = this.userId;
-    ReactiveCache.getCards({ boardId, members: memberId }).forEach(card => {
+    ReactiveCache.getCards({ boardId, members: memberId }).forEach((card: any) => {
       card.unassignMember(memberId);
     });
-    ReactiveCache.getCards({ boardId, assignees: memberId }).forEach(card => {
+    ReactiveCache.getCards({ boardId, assignees: memberId }).forEach((card: any) => {
       card.unassignAssignee(memberId);
     });
     await ReactiveCache.getBoard(boardId).removeMember(memberId);
@@ -483,7 +491,8 @@ Template.memberPopup.events({
 });
 
 Template.removeMemberPopup.helpers({
-  user() {
+  // this: any — the member data context exposes `userId`.
+  user(this: any) {
     return ReactiveCache.getUser(this.userId);
   },
   board() {
@@ -497,7 +506,7 @@ Template.leaveBoardPopup.helpers({
   },
 });
 
-Template.membersWidget.onCreated(function() {
+Template.membersWidget.onCreated(function(this: OrgTeamPopupInstance) {
   this.error = new ReactiveVar('');
   this.loading = new ReactiveVar(false);
   this.findOrgsOptions = new ReactiveVar({});
@@ -515,21 +524,21 @@ Template.membersWidget.onCreated(function() {
     this.subscribe('team', this.findTeamsOptions.get(), limitTeams, () => {});
   });
 
-  this.setError = function(error) {
+  this.setError = function(this: OrgTeamPopupInstance, error: any) {
     this.error.set(error);
   };
 
-  this.setLoading = function(w) {
+  this.setLoading = function(this: OrgTeamPopupInstance, w: any) {
     this.loading.set(w);
   };
 
-  this.isLoading = function() {
+  this.isLoading = function(this: OrgTeamPopupInstance) {
     return this.loading.get();
   };
 });
 
 Template.membersWidget.onRendered(function() {
-  const tpl = Template.instance();
+  const tpl = Template.instance() as OrgTeamPopupInstance;
   if (tpl.setLoading) tpl.setLoading(false);
 });
 
@@ -541,7 +550,8 @@ Template.membersWidget.helpers({
   isWorker() {
     const user = ReactiveCache.getCurrentUser();
     if (user) {
-      return Meteor.call(Boards.hasWorker(user.memberId));
+      // Boards as any — hasWorker is a model helper not on the Collection type.
+      return Meteor.call((Boards as any).hasWorker(user.memberId));
     } else {
       return false;
     }
@@ -586,7 +596,8 @@ Template.membersWidget.events({
     Modal.open('archivedBoards');
   },
   'click .sandstorm-powerbox-request-identity'() {
-    window.sandstormRequestIdentity();
+    // window as any — sandstormRequestIdentity is injected by the Sandstorm host.
+    (window as any).sandstormRequestIdentity();
   },
   'click .js-member-invite-accept'() {
     const boardId = Session.get('currentBoard');
@@ -594,7 +605,8 @@ Template.membersWidget.events({
   },
   'click .js-member-invite-decline'() {
     const boardId = Session.get('currentBoard');
-    Meteor.call('quitBoard', boardId, (err, ret) => {
+    // err/ret: any — untyped Meteor method callback.
+    Meteor.call('quitBoard', boardId, (err: any, ret: any) => {
       if (!err && ret) {
         ReactiveCache.getCurrentUser().removeInvite(boardId);
         FlowRouter.go('home');
@@ -605,18 +617,19 @@ Template.membersWidget.events({
 
 Template.outgoingWebhooksPopup.helpers({
   boardId() {
-    return Session.get('currentBoard') || Integrations.Const.GLOBAL_WEBHOOK_ID;
+    return Session.get('currentBoard') || (Integrations as any).Const.GLOBAL_WEBHOOK_ID;
   },
   integrations() {
-    const boardId = Session.get('currentBoard') || Integrations.Const.GLOBAL_WEBHOOK_ID;
+    const boardId = Session.get('currentBoard') || (Integrations as any).Const.GLOBAL_WEBHOOK_ID;
     const ret = ReactiveCache.getIntegrations({ boardId });
     return ret;
   },
   types() {
-    return Integrations.Const.WEBHOOK_TYPES;
+    return (Integrations as any).Const.WEBHOOK_TYPES;
   },
-  integration(cond) {
-    const boardId = Session.get('currentBoard') || Integrations.Const.GLOBAL_WEBHOOK_ID;
+  // cond: any — a partial Integration query merged with the current boardId.
+  integration(cond: any) {
+    const boardId = Session.get('currentBoard') || (Integrations as any).Const.GLOBAL_WEBHOOK_ID;
     const condition = { boardId, ...cond };
     for (const k in condition) {
       if (!condition[k]) delete condition[k];
@@ -626,14 +639,15 @@ Template.outgoingWebhooksPopup.helpers({
 });
 
 Template.outgoingWebhooksPopup.events({
-  'click .js-toggle-webhook-enabled'(evt) {
+  'click .js-toggle-webhook-enabled'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     $(evt.currentTarget).find(MCB).toggleClass(CKCLS);
   },
-  async submit(evt) {
+  // evt: any — the submit event; evt.target is the webhook <form> with named inputs.
+  async submit(evt: any) {
     evt.preventDefault();
     const url = evt.target.url.value.trim();
-    const boardId = Session.get('currentBoard') || Integrations.Const.GLOBAL_WEBHOOK_ID;
+    const boardId = Session.get('currentBoard') || (Integrations as any).Const.GLOBAL_WEBHOOK_ID;
     let id = null;
     let integration = null;
     const title = evt.target.title.value.trim();
@@ -652,8 +666,8 @@ Template.outgoingWebhooksPopup.events({
       enabled,
     };
 
-    const findIntegration = function(cond) {
-      const condition = { boardId, ...cond };
+    const findIntegration = function(cond: any) {
+      const condition: Record<string, any> = { boardId, ...cond };
       for (const k in condition) {
         if (!condition[k]) delete condition[k];
       }
@@ -693,7 +707,9 @@ Template.outgoingWebhooksPopup.events({
 
 Template.exportBoardPopup.helpers({
   withApi() {
-    return Template.instance().apiEnabled.get();
+    // Template.instance() as any — exportBoardPopup has no apiEnabled var; this
+    // helper reads it defensively (undefined until set elsewhere).
+    return (Template.instance() as any).apiEnabled.get();
   },
   exportUrl() {
     const params = {
@@ -758,14 +774,14 @@ Template.exportBoardPopup.helpers({
   },
   // Generalized export URL/filename for the external tools (Deck, OpenProject,
   // GitHub, GitLab, Gitea, Forgejo).
-  exportUrlExternal(format) {
+  exportUrlExternal(format: any) {
     return FlowRouter.path(
       `/api/boards/:boardId/export/${format}`,
       { boardId: Session.get('currentBoard') },
       { authToken: Accounts._storedLoginToken() },
     );
   },
-  exportFilenameExternal(format) {
+  exportFilenameExternal(format: any) {
     return `export-board-${format}-${Session.get('currentBoard')}.json`;
   },
   exportFilenameExcel() {
@@ -829,17 +845,18 @@ Template.exportBoardPopup.helpers({
 });
 
 Template.exportBoardPopup.events({
-  'click .html-export-board': async event => {
+  'click .html-export-board': async (event: JQuery.TriggeredEvent) => {
     event.preventDefault();
-    await ExportHtml(Popup)();
+    // window as any — ExportHtml is a global installed on window by exportHTML.ts.
+    await (window as any).ExportHtml(Popup)();
   },
   // #3392: export the board's card dependency ("Red Strings") lines.
-  'click .js-export-dependencies-json'(event) {
+  'click .js-export-dependencies-json'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     exportDependenciesJson(Session.get('currentBoard'));
     Popup.close();
   },
-  'click .js-export-dependencies-svg'(event) {
+  'click .js-export-dependencies-svg'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     exportDependenciesSvg(Session.get('currentBoard'));
     Popup.close();
@@ -852,7 +869,7 @@ Template.chooseBoardSourcePopup.events({
   'click .js-import-dependencies': Popup.open('importDependencies'),
 });
 
-Template.importDependenciesPopup.onCreated(function () {
+Template.importDependenciesPopup.onCreated(function (this: ImportDependenciesPopupInstance) {
   this.fileText = new ReactiveVar('');
   this.importResult = new ReactiveVar('');
 });
@@ -866,27 +883,29 @@ Template.importDependenciesPopup.helpers({
     );
   },
   importResult() {
-    return Template.instance().importResult.get();
+    return (Template.instance() as ImportDependenciesPopupInstance).importResult.get();
   },
 });
 
 Template.importDependenciesPopup.events({
-  'change .js-import-dependencies-file'(event, tpl) {
-    const file = event.currentTarget.files && event.currentTarget.files[0];
+  'change .js-import-dependencies-file'(event: JQuery.TriggeredEvent, tpl: ImportDependenciesPopupInstance) {
+    const target = event.currentTarget as HTMLInputElement;
+    const file = target.files && target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = e => tpl.fileText.set(e.target.result || '');
+    // e: any — the FileReader load event; e.target.result is the file text.
+    reader.onload = (e: any) => tpl.fileText.set(e.target.result || '');
     reader.readAsText(file);
   },
-  'submit .js-import-dependencies-form'(event, tpl) {
+  'submit .js-import-dependencies-form'(event: JQuery.TriggeredEvent, tpl: ImportDependenciesPopupInstance) {
     event.preventDefault();
-    const boardId = tpl.find('.js-import-dependencies-board').value;
-    const fileEl = tpl.find('.js-import-dependencies-file');
+    const boardId = (tpl.find('.js-import-dependencies-board') as HTMLInputElement).value;
+    const fileEl = tpl.find('.js-import-dependencies-file') as HTMLInputElement | null;
     const filename =
       fileEl && fileEl.files && fileEl.files[0] ? fileEl.files[0].name : '';
     const text =
-      tpl.fileText.get() || tpl.find('.js-import-dependencies-text').value || '';
-    let lines = [];
+      tpl.fileText.get() || (tpl.find('.js-import-dependencies-text') as HTMLInputElement).value || '';
+    let lines: any[] = [];
     try {
       lines = parseDependencyLines(text, filename);
     } catch (e) {
@@ -897,7 +916,8 @@ Template.importDependenciesPopup.events({
       tpl.importResult.set(TAPi18n.__('import-dependencies-empty'));
       return;
     }
-    Meteor.call('importBoardDependencies', boardId, lines, (err, res) => {
+    // err/res: any — untyped Meteor method callback.
+    Meteor.call('importBoardDependencies', boardId, lines, (err: any, res: any) => {
       if (err) {
         tpl.importResult.set(err.reason || err.message || String(err));
         return;
@@ -928,7 +948,8 @@ Template.labelsWidget.helpers({
 // plugin any time a draggable member or label is modified or removed we use a
 // autorun function and register a dependency on the both members and labels
 // fields of the current board document.
-function draggableMembersLabelsWidgets() {
+// this: any — bound to the membersWidget/labelsWidget Blaze instance via onRendered.
+function draggableMembersLabelsWidgets(this: any) {
   this.autorun(() => {
     const currentBoardId = Tracker.nonreactive(() => {
       return Session.get('currentBoard');
@@ -978,7 +999,8 @@ Template.boardChangeColorPopup.helpers({
 });
 
 Template.boardChangeColorPopup.events({
-  async 'click .js-select-background'(evt) {
+  // this: any — the color-string data context.
+  async 'click .js-select-background'(this: any, evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     evt.stopPropagation();
     const currentBoard = Utils.getCurrentBoard();
@@ -988,15 +1010,17 @@ Template.boardChangeColorPopup.events({
 });
 
 Template.boardChangeBackgroundImagePopup.events({
-  async submit(event, tpl) {
+  async submit(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const currentBoard = Utils.getCurrentBoard();
-    const backgroundImageURL = tpl.find('.js-board-background-image-url').value.trim();
+    const backgroundImageURL = (tpl.find('.js-board-background-image-url') as HTMLInputElement).value.trim();
     await currentBoard.setBackgroundImageURL(backgroundImageURL);
-    Utils.setBackgroundImage();
+    // as any — Utils.setBackgroundImage's url param is optional at runtime
+    // (it reads the board's own URL); callers invoke it with no args.
+    (Utils.setBackgroundImage as any)();
     Popup.back();
     event.preventDefault();
   },
-  'click .js-remove-background-image'() {
+  'click .js-remove-background-image'(event: JQuery.TriggeredEvent) {
     const currentBoard = Utils.getCurrentBoard();
     currentBoard.setBackgroundImageURL("");
     Popup.back();
@@ -1015,7 +1039,7 @@ Template.boardChangeBackgroundImagePopup.helpers({
 // Manage the board's stored background images (upload / set active / download /
 // delete). Backgrounds are board-level Attachments (meta.boardId, no cardId,
 // meta.source === 'board-background') in the default attachments storage.
-Template.boardBackgroundsPopup.onCreated(function () {
+Template.boardBackgroundsPopup.onCreated(function (this: BoardBackgroundsPopupInstance) {
   this.uploading = new ReactiveVar(false);
   this.error = new ReactiveVar('');
   const board = Utils.getCurrentBoard();
@@ -1027,42 +1051,45 @@ Template.boardBackgroundsPopup.onCreated(function () {
 
 Template.boardBackgroundsPopup.helpers({
   uploading() {
-    return Template.instance().uploading;
+    return (Template.instance() as BoardBackgroundsPopupInstance).uploading;
   },
   error() {
-    return Template.instance().error;
+    return (Template.instance() as BoardBackgroundsPopupInstance).error;
   },
   backgrounds() {
     // Raw collection docs don't carry the .link() helper, so compute the URL.
     return Attachments.collection
       .find({
-        'meta.boardId': Template.instance().boardId,
+        'meta.boardId': (Template.instance() as BoardBackgroundsPopupInstance).boardId,
         'meta.source': 'board-background',
       })
       .fetch()
-      .map(att => ({
+      .map((att: any) => ({
         _id: att._id,
         name: att.name,
         link: generateUniversalAttachmentUrl(att._id),
       }));
   },
-  isActiveBackground() {
+  // this: any — the background attachment data context exposes `_id`.
+  isActiveBackground(this: any) {
     const board = Utils.getCurrentBoard();
     return board && board.backgroundImageId === this._id;
   },
 });
 
 Template.boardBackgroundsPopup.events({
-  'click .js-bg-upload-button'(event, tpl) {
+  'click .js-bg-upload-button'(event: JQuery.TriggeredEvent, tpl: BoardBackgroundsPopupInstance) {
     event.preventDefault();
     tpl.find('.js-bg-upload-input').click();
   },
-  async 'change .js-bg-upload-input'(event, tpl) {
-    const file = event.currentTarget.files && event.currentTarget.files[0];
+  async 'change .js-bg-upload-input'(event: JQuery.TriggeredEvent, tpl: BoardBackgroundsPopupInstance) {
+    const target = event.currentTarget as HTMLInputElement;
+    const file = target.files && target.files[0];
     if (!file) return;
     tpl.error.set('');
     tpl.uploading.set(true);
-    const uploader = await Attachments.insertAsync(
+    // uploader: any — the ostrio:files upload handle.
+    const uploader: any = await Attachments.insertAsync(
       {
         file,
         chunkSize: 'dynamic',
@@ -1070,30 +1097,34 @@ Template.boardBackgroundsPopup.events({
       },
       false,
     );
-    uploader.on('end', (err) => {
+    uploader.on('end', (err: any) => {
       tpl.uploading.set(false);
       if (err) tpl.error.set(err.reason || 'upload-failed');
     });
-    uploader.on('error', (err) => {
+    uploader.on('error', (err: any) => {
       tpl.uploading.set(false);
       tpl.error.set((err && err.reason) || 'upload-failed');
     });
     uploader.start();
     // allow re-selecting the same file later
-    event.currentTarget.value = '';
+    target.value = '';
   },
-  async 'click .js-set-board-background'() {
+  // this: any — the background attachment data context exposes `_id`.
+  async 'click .js-set-board-background'(this: any) {
     const board = Utils.getCurrentBoard();
     await board.setBackgroundImage(this._id);
-    Utils.setBackgroundImage();
+    // as any — Utils.setBackgroundImage's url param is optional at runtime
+    // (it reads the board's own URL); callers invoke it with no args.
+    (Utils.setBackgroundImage as any)();
   },
-  'click .js-delete-board-background': Popup.afterConfirm('deleteBoardBackground', function () {
+  // this: any — the background attachment data context exposes `_id`.
+  'click .js-delete-board-background': Popup.afterConfirm('deleteBoardBackground', function (this: any) {
     Meteor.call('removeBoardBackground', this._id);
     Popup.back();
   }),
 });
 
-Template.boardInfoOnMyBoardsPopup.onCreated(function() {
+Template.boardInfoOnMyBoardsPopup.onCreated(function(this: CurrentBoardPopupInstance) {
   this.currentBoard = Utils.getCurrentBoard();
 });
 
@@ -1105,34 +1136,34 @@ Template.boardInfoOnMyBoardsPopup.helpers({
     return Utils.isMiniScreen() && Session.get('currentBoard');
   },
   allowsCardCounterList() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CurrentBoardPopupInstance;
     return tpl.currentBoard.allowsCardCounterList;
   },
   cardAging() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CurrentBoardPopupInstance;
     return tpl.currentBoard.cardAging;
   },
   cardAgingDays1() {
-    return Template.instance().currentBoard.cardAgingDays1 ?? 7;
+    return (Template.instance() as CurrentBoardPopupInstance).currentBoard.cardAgingDays1 ?? 7;
   },
   cardAgingDays2() {
-    return Template.instance().currentBoard.cardAgingDays2 ?? 14;
+    return (Template.instance() as CurrentBoardPopupInstance).currentBoard.cardAgingDays2 ?? 14;
   },
   cardAgingDays3() {
-    return Template.instance().currentBoard.cardAgingDays3 ?? 28;
+    return (Template.instance() as CurrentBoardPopupInstance).currentBoard.cardAgingDays3 ?? 28;
   },
   allowsBoardMemberList() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CurrentBoardPopupInstance;
     return tpl.currentBoard.allowsBoardMemberList;
   },
   allowsPersonalListWidth() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CurrentBoardPopupInstance;
     return tpl.currentBoard.allowsPersonalListWidth;
   },
 });
 
 Template.boardInfoOnMyBoardsPopup.events({
-  'click .js-field-has-personal-list-width'(evt, tpl) {
+  'click .js-field-has-personal-list-width'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     // #6409: toggle whether list widths are shared (board default, everyone
     // sees the same) or personal (per user).
     evt.preventDefault();
@@ -1150,7 +1181,7 @@ Template.boardInfoOnMyBoardsPopup.events({
       tpl.currentBoard.allowsPersonalListWidth,
     );
   },
-  'click .js-field-has-cardcounterlist'(evt, tpl) {
+  'click .js-field-has-cardcounterlist'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     tpl.currentBoard.allowsCardCounterList = !tpl.currentBoard
       .allowsCardCounterList;
@@ -1166,21 +1197,21 @@ Template.boardInfoOnMyBoardsPopup.events({
       tpl.currentBoard.allowsCardCounterList,
     );
   },
-  'click .js-field-has-cardaging'(evt, tpl) {
+  'click .js-field-has-cardaging'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     tpl.currentBoard.cardAging = !tpl.currentBoard.cardAging;
     tpl.currentBoard.setCardAging(tpl.currentBoard.cardAging);
     $(`.js-field-has-cardaging ${MCB}`).toggleClass(CKCLS, tpl.currentBoard.cardAging);
     $('.js-field-has-cardaging').toggleClass(CKCLS, tpl.currentBoard.cardAging);
   },
-  'change .js-card-aging-days'(evt, tpl) {
+  'change .js-card-aging-days'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     // #3984: save the three board-configurable card-aging day thresholds.
     const vals = $('.js-card-aging-days')
-      .map((i, el) => parseInt(el.value, 10) || 0)
+      .map((i: number, el: any) => parseInt(el.value, 10) || 0)
       .get();
     tpl.currentBoard.setCardAgingDays(vals[0], vals[1], vals[2]);
   },
-  'click .js-field-has-boardmemberlist'(evt, tpl) {
+  'click .js-field-has-boardmemberlist'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     tpl.currentBoard.allowsBoardMemberList = !tpl.currentBoard
       .allowsBoardMemberList;
@@ -1198,7 +1229,7 @@ Template.boardInfoOnMyBoardsPopup.events({
   },
 });
 
-Template.boardSubtaskSettingsPopup.onCreated(function() {
+Template.boardSubtaskSettingsPopup.onCreated(function(this: CurrentBoardPopupInstance) {
   // Same reactive-snapshot fix as boardCardSettingsPopup (#6385): the
   // allowsSubtasks toggle reads tpl.currentBoard, so keep it current in an
   // autorun so the setting can be reversed without a page refresh.
@@ -1216,15 +1247,15 @@ Template.boardSubtaskSettingsPopup.helpers({
     return result;
   },
   allowsReceivedDate() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CurrentBoardPopupInstance;
     return tpl.currentBoard.allowsReceivedDate;
   },
   isBoardSelected() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CurrentBoardPopupInstance;
     return tpl.currentBoard.subtasksDefaultBoardId === Template.currentData()._id;
   },
   isNullBoardSelected() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CurrentBoardPopupInstance;
     return (
       tpl.currentBoard.subtasksDefaultBoardId === null ||
       tpl.currentBoard.subtasksDefaultBoardId === undefined
@@ -1243,7 +1274,7 @@ Template.boardSubtaskSettingsPopup.helpers({
     return ret;
   },
   lists() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CurrentBoardPopupInstance;
     // The landing list belongs to the configured deposit board
     // (subtasksDefaultBoardId), which may differ from the current board
     // (#3414): when a different deposit board is chosen, show its lists.
@@ -1260,7 +1291,7 @@ Template.boardSubtaskSettingsPopup.helpers({
     );
   },
   hasLists() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CurrentBoardPopupInstance;
     const depositBoardId =
       tpl.currentBoard.subtasksDefaultBoardId || tpl.currentBoard._id;
     const lists = ReactiveCache.getLists(
@@ -1277,7 +1308,7 @@ Template.boardSubtaskSettingsPopup.helpers({
   isListSelected() {
     // #3876 / #4947: the selected landing list must be compared against
     // subtasksDefaultListId (the stored list id), NOT subtasksDefaultBoardId.
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CurrentBoardPopupInstance;
     return tpl.currentBoard.subtasksDefaultListId === Template.currentData()._id;
   },
   presentParentTask() {
@@ -1294,7 +1325,7 @@ Template.boardSubtaskSettingsPopup.helpers({
 });
 
 Template.boardSubtaskSettingsPopup.events({
-  'click .js-field-has-subtasks'(evt, tpl) {
+  'click .js-field-has-subtasks'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsSubtasks;
     Boards.update(tpl.currentBoard._id, { $set: { allowsSubtasks: newValue } });
@@ -1303,8 +1334,8 @@ Template.boardSubtaskSettingsPopup.events({
       !newValue,
     );
   },
-  'change .js-field-deposit-board'(evt, tpl) {
-    let value = evt.target.value;
+  'change .js-field-deposit-board'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
+    let value = (evt.target as HTMLSelectElement).value as any;
     if (value === 'null') {
       value = null;
     }
@@ -1318,18 +1349,19 @@ Template.boardSubtaskSettingsPopup.events({
     tpl.currentBoard.setSubtasksDefaultBoardId(value);
     evt.preventDefault();
   },
-  'change .js-field-deposit-list'(evt, tpl) {
-    let value = evt.target.value;
+  'change .js-field-deposit-list'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
+    let value = (evt.target as HTMLSelectElement).value as any;
     if (value === 'null' || value === '') {
       value = null;
     }
     tpl.currentBoard.setSubtasksDefaultListId(value);
     evt.preventDefault();
   },
-  'click .js-field-show-parent-in-minicard'(evt, tpl) {
+  'click .js-field-show-parent-in-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     // Get the ID from the anchor element, not the span
     const anchorElement = $(evt.target).closest('.js-field-show-parent-in-minicard')[0];
     const value = anchorElement ? anchorElement.id : null;
+    // value is the anchor element id used as the presentParentTask setting.
 
     if (value) {
       Boards.update(tpl.currentBoard._id, { $set: { presentParentTask: value } });
@@ -1338,7 +1370,7 @@ Template.boardSubtaskSettingsPopup.events({
   },
 });
 
-Template.boardCardSettingsPopup.onCreated(function() {
+Template.boardCardSettingsPopup.onCreated(function(this: CurrentBoardPopupInstance) {
   // Keep currentBoard reactive. The toggle handlers compute the new value from
   // tpl.currentBoard.allowsX, so a one-time snapshot went stale after the first
   // toggle: reversing a setting (e.g. "Mark as complete") recomputed !oldValue
@@ -1582,7 +1614,7 @@ Template.boardCardSettingsPopup.helpers({
     return ret;
   },
   lists() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CurrentBoardPopupInstance;
     return ReactiveCache.getLists(
       {
         boardId: tpl.currentBoard._id,
@@ -1594,7 +1626,7 @@ Template.boardCardSettingsPopup.helpers({
     );
   },
   hasLists() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CurrentBoardPopupInstance;
     const lists = ReactiveCache.getLists(
       {
         boardId: tpl.currentBoard._id,
@@ -1607,7 +1639,7 @@ Template.boardCardSettingsPopup.helpers({
     return lists.length > 0;
   },
   isListSelected() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CurrentBoardPopupInstance;
     return (
       tpl.currentBoard.dateSettingsDefaultBoardId === Template.currentData()._id
     );
@@ -1615,212 +1647,212 @@ Template.boardCardSettingsPopup.helpers({
 });
 
 Template.boardCardSettingsPopup.events({
-  'click .js-field-has-receiveddate'(evt, tpl) {
+  'click .js-field-has-receiveddate'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsReceivedDate;
     Boards.update(tpl.currentBoard._id, { $set: { allowsReceivedDate: newValue } });
   },
-  'click .js-field-has-duecomplete'(evt, tpl) {
+  'click .js-field-has-duecomplete'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsDueComplete;
     Boards.update(tpl.currentBoard._id, { $set: { allowsDueComplete: newValue } });
   },
-  'click .js-field-has-duecomplete-on-minicard'(evt, tpl) {
+  'click .js-field-has-duecomplete-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsDueCompleteOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsDueCompleteOnMinicard: newValue } });
   },
-  'click .js-field-has-receiveddate-on-minicard'(evt, tpl) {
+  'click .js-field-has-receiveddate-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsReceivedDateOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsReceivedDateOnMinicard: newValue } });
   },
-  'click .js-field-has-startdate'(evt, tpl) {
+  'click .js-field-has-startdate'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsStartDate;
     Boards.update(tpl.currentBoard._id, { $set: { allowsStartDate: newValue } });
   },
-  'click .js-field-has-startdate-on-minicard'(evt, tpl) {
+  'click .js-field-has-startdate-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsStartDateOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsStartDateOnMinicard: newValue } });
   },
-  'click .js-field-has-enddate'(evt, tpl) {
+  'click .js-field-has-enddate'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsEndDate;
     Boards.update(tpl.currentBoard._id, { $set: { allowsEndDate: newValue } });
   },
-  'click .js-field-has-enddate-on-minicard'(evt, tpl) {
+  'click .js-field-has-enddate-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsEndDateOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsEndDateOnMinicard: newValue } });
   },
-  'click .js-field-has-duedate'(evt, tpl) {
+  'click .js-field-has-duedate'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsDueDate;
     Boards.update(tpl.currentBoard._id, { $set: { allowsDueDate: newValue } });
   },
-  'click .js-field-has-duedate-on-minicard'(evt, tpl) {
+  'click .js-field-has-duedate-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsDueDateOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsDueDateOnMinicard: newValue } });
   },
-  'click .js-field-has-subtasks'(evt, tpl) {
+  'click .js-field-has-subtasks'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsSubtasks;
     Boards.update(tpl.currentBoard._id, { $set: { allowsSubtasks: newValue } });
   },
-  'click .js-field-has-subtasks-on-minicard'(evt, tpl) {
+  'click .js-field-has-subtasks-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsSubtasksOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsSubtasksOnMinicard: newValue } });
   },
-  'click .js-field-has-creator'(evt, tpl) {
+  'click .js-field-has-creator'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsCreator;
     Boards.update(tpl.currentBoard._id, { $set: { allowsCreator: newValue } });
   },
-  'click .js-field-has-creator-on-minicard'(evt, tpl) {
+  'click .js-field-has-creator-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsCreatorOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsCreatorOnMinicard: newValue } });
   },
-  'click .js-field-has-members'(evt, tpl) {
+  'click .js-field-has-members'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsMembers;
     Boards.update(tpl.currentBoard._id, { $set: { allowsMembers: newValue } });
   },
-  'click .js-field-has-members-on-minicard'(evt, tpl) {
+  'click .js-field-has-members-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsMembersOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsMembersOnMinicard: newValue } });
   },
-  'click .js-field-has-assignee'(evt, tpl) {
+  'click .js-field-has-assignee'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsAssignee;
     Boards.update(tpl.currentBoard._id, { $set: { allowsAssignee: newValue } });
   },
-  'click .js-field-has-assignee-on-minicard'(evt, tpl) {
+  'click .js-field-has-assignee-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsAssigneeOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsAssigneeOnMinicard: newValue } });
   },
-  'click .js-field-has-assigned-by'(evt, tpl) {
+  'click .js-field-has-assigned-by'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsAssignedBy;
     Boards.update(tpl.currentBoard._id, { $set: { allowsAssignedBy: newValue } });
   },
-  'click .js-field-has-assigned-by-on-minicard'(evt, tpl) {
+  'click .js-field-has-assigned-by-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsAssignedByOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsAssignedByOnMinicard: newValue } });
   },
-  'click .js-field-has-requested-by'(evt, tpl) {
+  'click .js-field-has-requested-by'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsRequestedBy;
     Boards.update(tpl.currentBoard._id, { $set: { allowsRequestedBy: newValue } });
   },
-  'click .js-field-has-requested-by-on-minicard'(evt, tpl) {
+  'click .js-field-has-requested-by-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsRequestedByOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsRequestedByOnMinicard: newValue } });
   },
-  'click .js-field-has-card-sorting-by-number'(evt, tpl) {
+  'click .js-field-has-card-sorting-by-number'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsCardSortingByNumber;
     Boards.update(tpl.currentBoard._id, { $set: { allowsCardSortingByNumber: newValue } });
   },
-  'click .js-field-has-card-show-lists'(evt, tpl) {
+  'click .js-field-has-card-show-lists'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsShowLists;
     Boards.update(tpl.currentBoard._id, { $set: { allowsShowLists: newValue } });
   },
-  'click .js-field-has-labels'(evt, tpl) {
+  'click .js-field-has-labels'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsLabels;
     Boards.update(tpl.currentBoard._id, { $set: { allowsLabels: newValue } });
   },
-  'click .js-field-has-labels-on-minicard'(evt, tpl) {
+  'click .js-field-has-labels-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsLabelsOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsLabelsOnMinicard: newValue } });
   },
-  'click .js-field-has-card-show-lists-on-minicard'(evt, tpl) {
+  'click .js-field-has-card-show-lists-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsShowListsOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsShowListsOnMinicard: newValue } });
   },
-  'click .js-field-has-description-title'(evt, tpl) {
+  'click .js-field-has-description-title'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsDescriptionTitle;
     Boards.update(tpl.currentBoard._id, { $set: { allowsDescriptionTitle: newValue } });
   },
-  'click .js-field-has-description-title-on-minicard'(evt, tpl) {
+  'click .js-field-has-description-title-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsDescriptionTitleOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsDescriptionTitleOnMinicard: newValue } });
   },
-  'click .js-field-has-card-number'(evt, tpl) {
+  'click .js-field-has-card-number'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsCardNumber;
     Boards.update(tpl.currentBoard._id, { $set: { allowsCardNumber: newValue } });
   },
-  'click .js-field-has-card-number-on-minicard'(evt, tpl) {
+  'click .js-field-has-card-number-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsCardNumberOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsCardNumberOnMinicard: newValue } });
   },
-  'click .js-field-has-description-text-on-minicard'(evt, tpl) {
+  'click .js-field-has-description-text-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsDescriptionTextOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsDescriptionTextOnMinicard: newValue } });
   },
-  'click .js-field-has-description-text'(evt, tpl) {
+  'click .js-field-has-description-text'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsDescriptionText;
     Boards.update(tpl.currentBoard._id, { $set: { allowsDescriptionText: newValue } });
   },
-  'click .js-field-has-checklists'(evt, tpl) {
+  'click .js-field-has-checklists'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsChecklists;
     Boards.update(tpl.currentBoard._id, { $set: { allowsChecklists: newValue } });
   },
-  'click .js-field-has-checklists-on-minicard'(evt, tpl) {
+  'click .js-field-has-checklists-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsChecklistsOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsChecklistsOnMinicard: newValue } });
   },
-  'click .js-field-has-attachments'(evt, tpl) {
+  'click .js-field-has-attachments'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsAttachments;
     Boards.update(tpl.currentBoard._id, { $set: { allowsAttachments: newValue } });
   },
-  'click .js-field-has-attachments-on-minicard'(evt, tpl) {
+  'click .js-field-has-attachments-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsAttachmentsOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsAttachmentsOnMinicard: newValue } });
   },
-  'click .js-field-has-comments'(evt, tpl) {
+  'click .js-field-has-comments'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsComments;
     Boards.update(tpl.currentBoard._id, { $set: { allowsComments: newValue } });
   },
-  'click .js-field-has-activities'(evt, tpl) {
+  'click .js-field-has-activities'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsActivities;
     Boards.update(tpl.currentBoard._id, { $set: { allowsActivities: newValue } });
   },
-  'click .js-field-has-cover-attachment-on-minicard'(evt, tpl) {
+  'click .js-field-has-cover-attachment-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsCoverAttachmentOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsCoverAttachmentOnMinicard: newValue } });
   },
-  'click .js-field-has-badge-attachment-on-minicard'(evt, tpl) {
+  'click .js-field-has-badge-attachment-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsBadgeAttachmentOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsBadgeAttachmentOnMinicard: newValue } });
   },
-  'click .js-field-has-card-sorting-by-number-on-minicard'(evt, tpl) {
+  'click .js-field-has-card-sorting-by-number-on-minicard'(evt: JQuery.TriggeredEvent, tpl: CurrentBoardPopupInstance) {
     evt.preventDefault();
     const newValue = !tpl.currentBoard.allowsCardSortingByNumberOnMinicard;
     Boards.update(tpl.currentBoard._id, { $set: { allowsCardSortingByNumberOnMinicard: newValue } });
@@ -1835,7 +1867,7 @@ Session.setDefault('addMemberPopup.loading', false);
 Session.setDefault('addMemberPopup.error', '');
 
 
-Template.addMemberPopup.onCreated(function() {
+Template.addMemberPopup.onCreated(function(this: AddMemberPopupInstance) {
   // Use Session variables
   this.searchTimeout = null;
   Session.set('addMemberPopup.searchResults', []);
@@ -1844,11 +1876,11 @@ Template.addMemberPopup.onCreated(function() {
   Session.set('addMemberPopup.loading', false);
   Session.set('addMemberPopup.error', '');
 
-  this.setError = function(error) {
+  this.setError = function(error: any) {
     Session.set('addMemberPopup.error', error);
   };
 
-  this.setLoading = function(w) {
+  this.setLoading = function(w: any) {
     Session.set('addMemberPopup.loading', w);
   };
 
@@ -1856,11 +1888,11 @@ Template.addMemberPopup.onCreated(function() {
     return Session.get('addMemberPopup.loading');
   };
 
-  this.isValidEmail = function(email) {
+  this.isValidEmail = function(email: any) {
     return /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(email);
   };
 
-  this.performSearch = function(query) {
+  this.performSearch = function(query: any) {
     if (!query || query.length < 2) {
       Session.set('addMemberPopup.searchResults', []);
       Session.set('addMemberPopup.noResults', false);
@@ -1871,7 +1903,8 @@ Template.addMemberPopup.onCreated(function() {
     Session.set('addMemberPopup.noResults', false);
 
     const boardId = Session.get('currentBoard');
-    Meteor.call('searchUsers', query, boardId, (error, results) => {
+    // error/results: any — untyped Meteor method callback.
+    Meteor.call('searchUsers', query, boardId, (error: any, results: any) => {
       Session.set('addMemberPopup.searching', false);
       if (error) {
         console.error('Search error:', error);
@@ -1886,11 +1919,12 @@ Template.addMemberPopup.onCreated(function() {
     });
   };
 
-  this.inviteUser = function(idNameEmail) {
+  this.inviteUser = function(this: AddMemberPopupInstance, idNameEmail: any) {
     const boardId = Session.get('currentBoard');
     this.setLoading(true);
     const self = this;
-    Meteor.call('inviteUserToBoard', idNameEmail, boardId, (err, ret) => {
+    // err/ret: any — untyped Meteor method callback.
+    Meteor.call('inviteUserToBoard', idNameEmail, boardId, (err: any, ret: any) => {
       self.setLoading(false);
       if (err) {
         self.setError(err.error);
@@ -1901,7 +1935,7 @@ Template.addMemberPopup.onCreated(function() {
   };
 });
 
-Template.addMemberPopup.onDestroyed(function() {
+Template.addMemberPopup.onDestroyed(function(this: AddMemberPopupInstance) {
   if (this.searchTimeout) {
     clearTimeout(this.searchTimeout);
   }
@@ -1909,15 +1943,15 @@ Template.addMemberPopup.onDestroyed(function() {
   Session.set('addMemberPopup.loading', false);
 });
 
-Template.addMemberPopup.onRendered(function() {
-  this.find('.js-search-member-input').focus();
+Template.addMemberPopup.onRendered(function(this: AddMemberPopupInstance) {
+  (this.find('.js-search-member-input') as HTMLInputElement).focus();
   this.setLoading(false);
 });
 
 Template.addMemberPopup.events({
-  'keyup .js-search-member-input'(event, tpl) {
+  'keyup .js-search-member-input'(event: JQuery.TriggeredEvent, tpl: AddMemberPopupInstance) {
     Session.set('addMemberPopup.error', '');
-    const query = event.target.value.trim();
+    const query = (event.target as HTMLInputElement).value.trim();
 
     // Clear previous timeout
     if (tpl.searchTimeout) {
@@ -1929,12 +1963,14 @@ Template.addMemberPopup.events({
       tpl.performSearch(query);
     }, 300);
   },
-  'click .js-select-member'(event, tpl) {
+  // this: any — the search-result data context exposes `_id`.
+  'click .js-select-member'(this: any, event: JQuery.TriggeredEvent, tpl: AddMemberPopupInstance) {
     const userId = this._id;
     tpl.inviteUser(userId);
   },
-  'click .js-email-invite'(event, tpl) {
-    const idNameEmail = $('.js-search-member-input').val();
+  'click .js-email-invite'(event: JQuery.TriggeredEvent, tpl: AddMemberPopupInstance) {
+    // idNameEmail: any — the raw input value from the search box.
+    const idNameEmail: any = $('.js-search-member-input').val();
     if (idNameEmail.indexOf('@') < 0 || tpl.isValidEmail(idNameEmail)) {
       tpl.inviteUser(idNameEmail);
     } else Session.set('addMemberPopup.error', 'email-invalid');
@@ -1972,7 +2008,7 @@ Template.addMemberPopupTest.helpers({
   }
 })
 
-Template.addBoardOrgPopup.onCreated(function() {
+Template.addBoardOrgPopup.onCreated(function(this: OrgTeamPopupInstance) {
   this.error = new ReactiveVar('');
   this.loading = new ReactiveVar(false);
   this.findOrgsOptions = new ReactiveVar({});
@@ -1983,20 +2019,20 @@ Template.addBoardOrgPopup.onCreated(function() {
     this.subscribe('org', this.findOrgsOptions.get(), limitOrgs, () => {});
   });
 
-  this.setError = function(error) {
+  this.setError = function(this: OrgTeamPopupInstance, error: any) {
     this.error.set(error);
   };
 
-  this.setLoading = function(w) {
+  this.setLoading = function(this: OrgTeamPopupInstance, w: any) {
     this.loading.set(w);
   };
 
-  this.isLoading = function() {
+  this.isLoading = function(this: OrgTeamPopupInstance) {
     return this.loading.get();
   };
 });
 
-Template.addBoardOrgPopup.onRendered(function() {
+Template.addBoardOrgPopup.onRendered(function(this: OrgTeamPopupInstance) {
   this.setLoading(false);
 });
 
@@ -2008,22 +2044,23 @@ Template.addBoardOrgPopup.helpers({
 });
 
 Template.addBoardOrgPopup.events({
-  'keyup input'(event, tpl) {
+  'keyup input'(event: JQuery.TriggeredEvent, tpl: OrgTeamPopupInstance) {
     tpl.setError('');
   },
   'change #jsBoardOrgs'() {
     let currentBoard = Utils.getCurrentBoard();
-    let selectElt = document.getElementById("jsBoardOrgs");
+    let selectElt = document.getElementById("jsBoardOrgs") as HTMLSelectElement;
     let selectedOrgId = selectElt.options[selectElt.selectedIndex].value;
     let selectedOrgDisplayName = selectElt.options[selectElt.selectedIndex].text;
-    let boardOrganizations = [];
+    // boardOrganizations: any[] — the board's org membership records.
+    let boardOrganizations: any[] = [];
     if(currentBoard.orgs !== undefined){
       for(let i = 0; i < currentBoard.orgs.length; i++){
         boardOrganizations.push(currentBoard.orgs[i]);
       }
     }
 
-    if(!boardOrganizations.some((org) => org.orgDisplayName == selectedOrgDisplayName)){
+    if(!boardOrganizations.some((org: any) => org.orgDisplayName == selectedOrgDisplayName)){
       boardOrganizations.push({
         "orgId": selectedOrgId,
         "orgDisplayName": selectedOrgDisplayName,
@@ -2039,7 +2076,7 @@ Template.addBoardOrgPopup.events({
   },
 });
 
-Template.removeBoardOrgPopup.onCreated(function() {
+Template.removeBoardOrgPopup.onCreated(function(this: OrgTeamPopupInstance) {
   this.error = new ReactiveVar('');
   this.loading = new ReactiveVar(false);
   this.findOrgsOptions = new ReactiveVar({});
@@ -2057,20 +2094,20 @@ Template.removeBoardOrgPopup.onCreated(function() {
     this.subscribe('people', this.findUsersOptions.get(), limitUsers, () => {});
   });
 
-  this.setError = function(error) {
+  this.setError = function(this: OrgTeamPopupInstance, error: any) {
     this.error.set(error);
   };
 
-  this.setLoading = function(w) {
+  this.setLoading = function(this: OrgTeamPopupInstance, w: any) {
     this.loading.set(w);
   };
 
-  this.isLoading = function() {
+  this.isLoading = function(this: OrgTeamPopupInstance) {
     return this.loading.get();
   };
 });
 
-Template.removeBoardOrgPopup.onRendered(function() {
+Template.removeBoardOrgPopup.onRendered(function(this: OrgTeamPopupInstance) {
   this.setLoading(false);
 });
 
@@ -2081,13 +2118,14 @@ Template.removeBoardOrgPopup.helpers({
 });
 
 Template.removeBoardOrgPopup.events({
-  'keyup input'(event, tpl) {
+  'keyup input'(event: JQuery.TriggeredEvent, tpl: OrgTeamPopupInstance) {
     tpl.setError('');
   },
   'click #leaveBoardBtn'(){
-    let stringOrgId = document.getElementById('hideOrgId').value;
+    let stringOrgId = (document.getElementById('hideOrgId') as HTMLInputElement).value;
     let currentBoard = Utils.getCurrentBoard();
-    let boardOrganizations = [];
+    // boardOrganizations: any[] — the board's org membership records.
+    let boardOrganizations: any[] = [];
     if(currentBoard.orgs !== undefined){
       for(let i = 0; i < currentBoard.orgs.length; i++){
         if(currentBoard.orgs[i].orgId != stringOrgId){
@@ -2108,27 +2146,27 @@ Template.removeBoardOrgPopup.events({
 // #5850: free-form "share board with an email domain" popups. Unlike orgs/teams
 // (which are a managed collection shown in a <select>), the owner simply types a
 // domain such as example.com.
-Template.addBoardDomainPopup.onCreated(function() {
+Template.addBoardDomainPopup.onCreated(function(this: OrgTeamPopupInstance) {
   this.error = new ReactiveVar('');
 
-  this.setError = function(error) {
+  this.setError = function(this: OrgTeamPopupInstance, error: any) {
     this.error.set(error);
   };
 });
 
 Template.addBoardDomainPopup.helpers({
   error() {
-    return { get: () => Template.instance().error.get() };
+    return { get: () => (Template.instance() as OrgTeamPopupInstance).error.get() };
   },
 });
 
 Template.addBoardDomainPopup.events({
-  'keyup input'(event, tpl) {
+  'keyup input'(event: JQuery.TriggeredEvent, tpl: OrgTeamPopupInstance) {
     tpl.setError('');
   },
-  'submit .js-add-board-domain'(event, tpl) {
+  'submit .js-add-board-domain'(event: JQuery.TriggeredEvent, tpl: OrgTeamPopupInstance) {
     event.preventDefault();
-    const input = document.getElementById('jsBoardDomainInput');
+    const input = document.getElementById('jsBoardDomainInput') as HTMLInputElement | null;
     const domain = (input ? input.value : '').trim().toLowerCase();
 
     // Basic validation: must contain a '.', and no '@' or whitespace.
@@ -2143,14 +2181,15 @@ Template.addBoardDomainPopup.events({
     }
 
     const currentBoard = Utils.getCurrentBoard();
-    const boardDomains = [];
+    // boardDomains: any[] — the board's shared email-domain records.
+    const boardDomains: any[] = [];
     if (currentBoard.domains !== undefined) {
       for (let i = 0; i < currentBoard.domains.length; i++) {
         boardDomains.push(currentBoard.domains[i]);
       }
     }
 
-    if (!boardDomains.some(d => d.domain === domain)) {
+    if (!boardDomains.some((d: any) => d.domain === domain)) {
       boardDomains.push({
         domain,
         isActive: true,
@@ -2163,13 +2202,14 @@ Template.addBoardDomainPopup.events({
 });
 
 Template.removeBoardDomainPopup.events({
-  'keyup input'(event, tpl) {
+  'keyup input'(event: JQuery.TriggeredEvent, tpl: OrgTeamPopupInstance) {
     // no-op, kept for parity with the org/team remove popups
   },
   'click #leaveBoardDomainBtn'(){
-    const stringDomain = document.getElementById('hideDomain').value;
+    const stringDomain = (document.getElementById('hideDomain') as HTMLInputElement).value;
     const currentBoard = Utils.getCurrentBoard();
-    const boardDomains = [];
+    // boardDomains: any[] — the board's shared email-domain records.
+    const boardDomains: any[] = [];
     if (currentBoard.domains !== undefined) {
       for (let i = 0; i < currentBoard.domains.length; i++) {
         if (currentBoard.domains[i].domain != stringDomain) {
@@ -2187,7 +2227,7 @@ Template.removeBoardDomainPopup.events({
   },
 });
 
-Template.addBoardTeamPopup.onCreated(function() {
+Template.addBoardTeamPopup.onCreated(function(this: OrgTeamPopupInstance) {
   this.error = new ReactiveVar('');
   this.loading = new ReactiveVar(false);
   this.findOrgsOptions = new ReactiveVar({});
@@ -2205,20 +2245,20 @@ Template.addBoardTeamPopup.onCreated(function() {
     this.subscribe('people', this.findUsersOptions.get(), limitUsers, () => {});
   });
 
-  this.setError = function(error) {
+  this.setError = function(this: OrgTeamPopupInstance, error: any) {
     this.error.set(error);
   };
 
-  this.setLoading = function(w) {
+  this.setLoading = function(this: OrgTeamPopupInstance, w: any) {
     this.loading.set(w);
   };
 
-  this.isLoading = function() {
+  this.isLoading = function(this: OrgTeamPopupInstance) {
     return this.loading.get();
   };
 });
 
-Template.addBoardTeamPopup.onRendered(function() {
+Template.addBoardTeamPopup.onRendered(function(this: OrgTeamPopupInstance) {
   this.setLoading(false);
 });
 
@@ -2230,22 +2270,23 @@ Template.addBoardTeamPopup.helpers({
 });
 
 Template.addBoardTeamPopup.events({
-  'keyup input'(event, tpl) {
+  'keyup input'(event: JQuery.TriggeredEvent, tpl: OrgTeamPopupInstance) {
     tpl.setError('');
   },
   'change #jsBoardTeams'() {
     let currentBoard = Utils.getCurrentBoard();
-    let selectElt = document.getElementById("jsBoardTeams");
+    let selectElt = document.getElementById("jsBoardTeams") as HTMLSelectElement;
     let selectedTeamId = selectElt.options[selectElt.selectedIndex].value;
     let selectedTeamDisplayName = selectElt.options[selectElt.selectedIndex].text;
-    let boardTeams = [];
+    // boardTeams: any[] — the board's team membership records.
+    let boardTeams: any[] = [];
     if(currentBoard.teams !== undefined){
       for(let i = 0; i < currentBoard.teams.length; i++){
         boardTeams.push(currentBoard.teams[i]);
       }
     }
 
-    if(!boardTeams.some((team) => team.teamDisplayName == selectedTeamDisplayName)){
+    if(!boardTeams.some((team: any) => team.teamDisplayName == selectedTeamDisplayName)){
       boardTeams.push({
         "teamId": selectedTeamId,
         "teamDisplayName": selectedTeamDisplayName,
@@ -2256,7 +2297,7 @@ Template.addBoardTeamPopup.events({
         let members = currentBoard.members;
 
         let query = {
-          "teams.teamId": { $in: boardTeams.map(t => t.teamId) },
+          "teams.teamId": { $in: boardTeams.map((t: any) => t.teamId) },
         };
 
         const boardTeamUsers = ReactiveCache.getUsers(query, {
@@ -2266,8 +2307,8 @@ Template.addBoardTeamPopup.events({
         if(boardTeams !== undefined && boardTeams.length > 0){
           let index;
           if (boardTeamUsers && boardTeamUsers.length > 0) {
-            boardTeamUsers.forEach((u) => {
-              index = members.findIndex(function(m){ return m.userId == u._id});
+            boardTeamUsers.forEach((u: any) => {
+              index = members.findIndex(function(m: any){ return m.userId == u._id});
               if(index == -1){
                 members.push({
                   "isActive": true,
@@ -2289,7 +2330,7 @@ Template.addBoardTeamPopup.events({
   },
 });
 
-Template.removeBoardTeamPopup.onCreated(function() {
+Template.removeBoardTeamPopup.onCreated(function(this: OrgTeamPopupInstance) {
   this.error = new ReactiveVar('');
   this.loading = new ReactiveVar(false);
   this.findOrgsOptions = new ReactiveVar({});
@@ -2307,20 +2348,20 @@ Template.removeBoardTeamPopup.onCreated(function() {
     this.subscribe('people', this.findUsersOptions.get(), limitUsers, () => {});
   });
 
-  this.setError = function(error) {
+  this.setError = function(this: OrgTeamPopupInstance, error: any) {
     this.error.set(error);
   };
 
-  this.setLoading = function(w) {
+  this.setLoading = function(this: OrgTeamPopupInstance, w: any) {
     this.loading.set(w);
   };
 
-  this.isLoading = function() {
+  this.isLoading = function(this: OrgTeamPopupInstance) {
     return this.loading.get();
   };
 });
 
-Template.removeBoardTeamPopup.onRendered(function() {
+Template.removeBoardTeamPopup.onRendered(function(this: OrgTeamPopupInstance) {
   this.setLoading(false);
 });
 
@@ -2331,13 +2372,14 @@ Template.removeBoardTeamPopup.helpers({
 });
 
 Template.removeBoardTeamPopup.events({
-  'keyup input'(event, tpl) {
+  'keyup input'(event: JQuery.TriggeredEvent, tpl: OrgTeamPopupInstance) {
     tpl.setError('');
   },
   'click #leaveBoardTeamBtn'(){
-    let stringTeamId = document.getElementById('hideTeamId').value;
+    let stringTeamId = (document.getElementById('hideTeamId') as HTMLInputElement).value;
     let currentBoard = Utils.getCurrentBoard();
-    let boardTeams = [];
+    // boardTeams: any[] — the board's team membership records.
+    let boardTeams: any[] = [];
     if(currentBoard.teams !== undefined){
       for(let i = 0; i < currentBoard.teams.length; i++){
         if(currentBoard.teams[i].teamId != stringTeamId){
@@ -2358,8 +2400,8 @@ Template.removeBoardTeamPopup.events({
     if(currentBoard.teams !== undefined && currentBoard.teams.length > 0){
       let index;
       if (boardTeamUsers && boardTeamUsers.length > 0) {
-        boardTeamUsers.forEach((u) => {
-          index = members.findIndex(function(m){ return m.userId == u._id});
+        boardTeamUsers.forEach((u: any) => {
+          index = members.findIndex(function(m: any){ return m.userId == u._id});
           if(index !== -1 && !members[index].isAdmin){
             members.splice(index, 1);
           }
@@ -2377,8 +2419,10 @@ Template.removeBoardTeamPopup.events({
 });
 
 Template.changePermissionsPopup.events({
+  // this: any — the member data context exposes `userId`.
   async 'click .js-set-admin, click .js-set-normal, click .js-set-normal-assigned-only, click .js-set-no-comments, click .js-set-comment-only, click .js-set-comment-assigned-only, click .js-set-read-only, click .js-set-read-assigned-only, click .js-set-worker'(
-    event,
+    this: any,
+    event: JQuery.TriggeredEvent,
   ) {
     const currentBoard = Utils.getCurrentBoard();
     const memberId = this.userId;
@@ -2493,3 +2537,85 @@ Template.changePermissionsPopup.helpers({
     );
   },
 });
+
+// The `sidebar` template instance and the programmatic API exposed via the
+// `Sidebar` global. Most methods are attached in onCreated.
+// A Blaze popup instance that snapshots the current Board document as
+// `currentBoard` (see the board settings / info popups).
+interface CurrentBoardPopupInstance extends Blaze.TemplateInstance {
+  // currentBoard: any — a Board model document.
+  currentBoard: any;
+}
+
+// boardMenuPopup instance: tracks whether the REST API is enabled.
+interface BoardMenuPopupInstance extends Blaze.TemplateInstance {
+  apiEnabled: ReactiveVar<any>;
+}
+
+// importDependenciesPopup instance: holds the pasted/loaded file text and the
+// human-readable import result string.
+interface ImportDependenciesPopupInstance extends Blaze.TemplateInstance {
+  fileText: ReactiveVar<any>;
+  importResult: ReactiveVar<any>;
+}
+
+// boardBackgroundsPopup instance: upload state and the target board id.
+interface BoardBackgroundsPopupInstance extends Blaze.TemplateInstance {
+  uploading: ReactiveVar<any>;
+  error: ReactiveVar<any>;
+  // boardId: any — the current board id (or falsy when none).
+  boardId: any;
+}
+
+// Shared instance shape for the org/team/domain membership popups (and
+// membersWidget). Each template assigns only the subset it uses.
+interface OrgTeamPopupInstance extends Blaze.TemplateInstance {
+  error: ReactiveVar<any>;
+  loading: ReactiveVar<any>;
+  findOrgsOptions: ReactiveVar<any>;
+  findTeamsOptions: ReactiveVar<any>;
+  findUsersOptions: ReactiveVar<any>;
+  page: ReactiveVar<any>;
+  teamPage: ReactiveVar<any>;
+  userPage: ReactiveVar<any>;
+  setError: (error: any) => void;
+  setLoading: (w: any) => void;
+  isLoading: () => any;
+}
+
+// addMemberPopup instance: debounced search + invite helpers.
+interface AddMemberPopupInstance extends Blaze.TemplateInstance {
+  // searchTimeout: any — a setTimeout handle (or null).
+  searchTimeout: any;
+  setError: (error: any) => void;
+  setLoading: (w: any) => void;
+  isLoading: () => any;
+  isValidEmail: (email: any) => boolean;
+  performSearch: (query: any) => void;
+  inviteUser: (idNameEmail: any) => void;
+}
+
+interface SidebarInstance extends Blaze.TemplateInstance {
+  _isOpen: ReactiveVar<boolean>;
+  _view: ReactiveVar<string>;
+  _hideCardCounterList: ReactiveVar<boolean>;
+  _hideBoardMemberList: ReactiveVar<boolean>;
+  // infiniteScrolling: an InfiniteScrolling instance; activitiesInstance: the
+  // activities child template instance (or null).
+  infiniteScrolling: any;
+  activitiesInstance: any;
+  isOpen: () => boolean;
+  open: () => void;
+  hide: () => void;
+  toggle: () => void;
+  calculateNextPeak: () => void;
+  reachNextPeak: () => void;
+  isTongueHidden: () => boolean;
+  scrollTop: () => void;
+  getView: () => string;
+  setView: (view?: any) => void;
+  isDefaultView: () => boolean;
+  getViewTemplate: () => string;
+  getViewTitle: () => string;
+  showTongueTitle: () => string;
+}
