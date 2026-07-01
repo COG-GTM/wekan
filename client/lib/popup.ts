@@ -6,6 +6,11 @@ import { EscapeActions } from '/client/lib/escapeActions';
 import { Utils } from '/client/lib/utils';
 
 window.Popup = new (class {
+  // Blaze template used to render popups, and the live Blaze view (or null).
+  template: any;
+  current: any;
+  _stack: PopupStackFrame[];
+  _dep: Tracker.Dependency;
   constructor() {
     // The template we use to render popups
     this.template = Template.popup;
@@ -31,17 +36,17 @@ window.Popup = new (class {
   ///     'click .elementClass': Popup.open("popupName"),
   ///   });
   /// The popup inherit the data context of its parent.
-  open(name) {
+  open(name: string) {
     const self = this;
     const popupName = `${name}Popup`;
-    function clickFromPopup(evt) {
-      return $(evt.target).closest('.js-pop-over').length !== 0;
+    function clickFromPopup(evt: Event) {
+      return $(evt.target as Element).closest('.js-pop-over').length !== 0;
     }
     /** opens the popup
      * @param evt the current event
      * @param options options (dataContextIfCurrentDataIsUndefined use this dataContext if this.currentData() is undefined)
      */
-    return function(evt, options) {
+    return function(this: any, evt: Event, options?: { dataContextIfCurrentDataIsUndefined?: any }) {
       // If a popup is already opened, clicking again on the opener element
       // should close it -- and interrupt the current `open` function.
       if (self.isOpen()) {
@@ -61,7 +66,8 @@ window.Popup = new (class {
       // if the popup has no parent, or from the parent `openerElement` if it
       // has one. This allows us to position a sub-popup exactly at the same
       // position than its parent.
-      let openerElement;
+      // The opener may be a DOM Element or an event target, hence `any`.
+      let openerElement: any;
       if (clickFromPopup(evt) && self._getTopStack()) {
         openerElement = self._getTopStack().openerElement;
       } else {
@@ -130,10 +136,11 @@ window.Popup = new (class {
   ///       // What to do after the user has confirmed the action
   ///     }),
   ///   });
-  afterConfirm(name, action) {
+  // `action` is a caller-supplied confirm callback forwarded verbatim.
+  afterConfirm(name: string, action: (...args: any[]) => void) {
     const self = this;
 
-    return function(evt, tpl) {
+    return function(this: any, evt: Event, tpl?: any) {
       const context = (this.currentData && this.currentData()) || this;
       context.__afterConfirmAction = action;
       self.open(name).call(context, evt, tpl);
@@ -159,14 +166,14 @@ window.Popup = new (class {
         const stack = this._stack[this._stack.length - n];
         // scrollTopMax and scrollLeftMax only available at Firefox (https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollTopMax)
         const scrollTopMax = contentWrapper.scrollTopMax || contentWrapper.scrollHeight - contentWrapper.clientHeight;
-        if (scrollTopMax && stack.scrollTop > scrollTopMax) {
+        if (scrollTopMax && stack.scrollTop! > scrollTopMax) {
           // sometimes scrollTopMax is lower than scrollTop, so i need this dirty hack
           setTimeout(() => {
-            $contentWrapper.scrollTop(stack.scrollTop);
+            $contentWrapper.scrollTop(stack.scrollTop!);
           }, 6);
         }
         // restore the old popup scroll position
-        $contentWrapper.scrollTop(stack.scrollTop);
+        $contentWrapper.scrollTop(stack.scrollTop!);
       }
       for (let i = 0; i < n; i++) this._stack.pop();
       this._dep.changed();
@@ -217,15 +224,16 @@ window.Popup = new (class {
   // We automatically calculate the popup offset from the reference element
   // position and dimensions. We also reactively use the window dimensions to
   // ensure that the popup is always visible on the screen.
-  _getOffset(element, popupName) {
+  // `element` is the opener DOM element (may be undefined for programmatic opens).
+  _getOffset(element: any, popupName: string) {
     const $element = $(element);
     return () => {
       Utils.windowResizeDep.depend();
 
       if (Utils.isMiniScreen()) return { left: 0, top: 0 };
 
-      const viewportWidth = $(window).width();
-      const viewportHeight = $(window).height();
+      const viewportWidth = $(window).width()!;
+      const viewportHeight = $(window).height()!;
       const viewportPadding = 10;
       // Calculate actual popup width based on CSS: min(380px, 55vw)
       const popupWidth = Math.min(380, viewportWidth * 0.55);
@@ -254,9 +262,9 @@ window.Popup = new (class {
         };
       }
 
-      const offset = $element.offset();
+      const offset = $element.offset()!;
       const openerTop = offset.top;
-      const openerBottom = offset.top + $element.outerHeight();
+      const openerBottom = offset.top + $element.outerHeight()!;
       const clampedLeft = Math.max(
         viewportPadding,
         Math.min(offset.left, viewportWidth - popupWidth - viewportPadding),
@@ -330,7 +338,7 @@ window.Popup = new (class {
   // We get the title from the translation files. Instead of returning the
   // result, we return a function that compute the result and since `TAPi18n.__`
   // is a reactive data source, the title will be changed reactively.
-  _getTitle(popupName) {
+  _getTitle(popupName: string) {
     return () => {
       const translationKey = `${popupName}-title`;
 

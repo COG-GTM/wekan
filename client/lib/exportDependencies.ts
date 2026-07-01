@@ -10,7 +10,7 @@ import {
 // The SVG embeds each card and each line's metadata as data-* attributes so the
 // same file can be re-imported (All Boards / New / Import → Dependencies).
 
-function saveAs(blob, filename) {
+function saveAs(blob: Blob, filename: string) {
   const dl = document.createElement('a');
   dl.href = window.URL.createObjectURL(blob);
   dl.style.display = 'none';
@@ -20,7 +20,8 @@ function saveAs(blob, filename) {
   document.body.removeChild(dl);
 }
 
-function xmlEscape(value) {
+// `value` may be a string, number, null, etc. from untyped card/dep data.
+function xmlEscape(value: any) {
   return String(value == null ? '' : value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -29,14 +30,15 @@ function xmlEscape(value) {
 }
 
 // Collect the board's dependency lines as plain objects.
-export function collectDependencyLines(boardId) {
+export function collectDependencyLines(boardId: string) {
   const cards = ReactiveCache.getCards({ boardId, archived: false });
-  const cardById = {};
-  cards.forEach(card => {
+  // Cards come from an untyped collection query, hence `any`.
+  const cardById: Record<string, any> = {};
+  cards.forEach((card: any) => {
     cardById[card._id] = card;
   });
-  const lines = [];
-  cards.forEach(card => {
+  const lines: DependencyLine[] = [];
+  cards.forEach((card: any) => {
     normalizeDependencies(card.cardDependencies).forEach(dep => {
       const target = cardById[dep.cardId];
       lines.push({
@@ -55,7 +57,7 @@ export function collectDependencyLines(boardId) {
   return lines;
 }
 
-export function exportDependenciesJson(boardId) {
+export function exportDependenciesJson(boardId: string) {
   const board = ReactiveCache.getBoard(boardId);
   const payload = {
     _format: 'wekan-dependencies-1.0.0',
@@ -71,7 +73,7 @@ export function exportDependenciesJson(boardId) {
 
 // Lay the participating cards out on a simple grid (one column per list, rows by
 // card sort order) so the SVG is meaningful without needing the live DOM.
-function layoutCards(boardId) {
+function layoutCards(boardId: string) {
   const lists = ReactiveCache.getLists(
     { boardId, archived: false },
     { sort: { sort: 1 } },
@@ -82,13 +84,13 @@ function layoutCards(boardId) {
   const gapY = 20;
   const marginX = 20;
   const marginY = 20;
-  const pos = {};
-  lists.forEach((list, colIndex) => {
+  const pos: Record<string, CardBox> = {};
+  lists.forEach((list: any, colIndex: number) => {
     const cards = ReactiveCache.getCards(
       { boardId, listId: list._id, archived: false },
       { sort: { sort: 1 } },
     );
-    cards.forEach((card, rowIndex) => {
+    cards.forEach((card: any, rowIndex: number) => {
       pos[card._id] = {
         x: marginX + colIndex * (boxW + gapX),
         y: marginY + rowIndex * (boxH + gapY),
@@ -102,7 +104,7 @@ function layoutCards(boardId) {
   return { pos, boxW, boxH };
 }
 
-export function exportDependenciesSvg(boardId) {
+export function exportDependenciesSvg(boardId: string) {
   const board = ReactiveCache.getBoard(boardId);
   const lines = collectDependencyLines(boardId);
   const { pos } = layoutCards(boardId);
@@ -114,13 +116,14 @@ export function exportDependenciesSvg(boardId) {
     height = Math.max(height, p.y + p.h + 20);
   });
 
-  const markers = {};
-  const pathEls = [];
+  const markers: Record<string, string> = {};
+  const pathEls: string[] = [];
   lines.forEach(line => {
     const from = pos[line.from];
     const to = pos[line.to];
     if (!from || !to) return; // only draw lines between cards on this board
-    const meta = dependencyTypeMeta(line.type);
+    // The DEFAULT_DEPENDENCY_TYPE fallback guarantees a match, so meta is defined.
+    const meta = dependencyTypeMeta(line.type)!;
     const prereq = meta.forward ? from : to;
     const dependent = meta.forward ? to : from;
     const x1 = prereq.x + prereq.w;
@@ -176,4 +179,27 @@ export function exportDependenciesSvg(boardId) {
 
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   saveAs(blob, `wekan-dependencies-${boardId}.svg`);
+}
+
+// One card-to-card dependency line collected for export.
+interface DependencyLine {
+  from: string;
+  fromTitle: string;
+  fromCardNumber: string | number | undefined;
+  to: string;
+  toTitle: string | null;
+  toCardNumber: string | number | null;
+  type: string;
+  color: string;
+  icon: string;
+}
+// Laid-out card box geometry used to render the SVG export.
+interface CardBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  title: string;
+  // Card number from the untyped card doc.
+  cardNumber: any;
 }

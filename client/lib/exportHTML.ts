@@ -1,10 +1,10 @@
 const JSZip = require('jszip');
 
 window.ExportHtml = Popup => {
-  const saveAs = function(blob, filename) {
+  const saveAs = function(blob: Blob, filename: string) {
     const dl = document.createElement('a');
     dl.href = window.URL.createObjectURL(blob);
-    dl.onclick = event => document.body.removeChild(event.target);
+    dl.onclick = event => document.body.removeChild(event.target as Node);
     dl.style.display = 'none';
     dl.target = '_blank';
     dl.download = filename;
@@ -12,18 +12,21 @@ window.ExportHtml = Popup => {
     dl.click();
   };
 
-  const asyncForEach = async function(array, callback) {
+  const asyncForEach = async function<T>(
+    array: T[],
+    callback: (item: T, index: number, array: T[]) => Promise<void> | void,
+  ) {
     for (let index = 0; index < array.length; index++) {
       await callback(array[index], index, array);
     }
   };
 
-  const getPageHtmlString = (clonedElement = null) => {
+  const getPageHtmlString = (clonedElement: Element | null = null) => {
     const element = clonedElement || window.document.querySelector('html');
-    return `<!doctype html>${element.outerHTML}`;
+    return `<!doctype html>${element!.outerHTML}`;
   };
 
-  const removeAnchors = htmlString => {
+  const removeAnchors = (htmlString: string) => {
     const replaceOpenAnchor = htmlString.replace(
       new RegExp('<a ', 'gim'),
       '<span ',
@@ -31,7 +34,7 @@ window.ExportHtml = Popup => {
     return replaceOpenAnchor.replace(new RegExp('</a', 'gim'), '</span');
   };
 
-  const ensureSidebarRemoved = (element = null) => {
+  const ensureSidebarRemoved = (element: Document | Element | null = null) => {
     const target = element || document;
     const sidebar = target.querySelector('.board-sidebar.sidebar');
     if (sidebar) {
@@ -39,7 +42,7 @@ window.ExportHtml = Popup => {
     }
   };
 
-  const cleanBoardHtmlClone = (clonedElement) => {
+  const cleanBoardHtmlClone = (clonedElement: Element) => {
     // Work on cloned element only, not live DOM
     Array.from(clonedElement.querySelectorAll('script')).forEach(elem =>
       elem.remove(),
@@ -77,7 +80,7 @@ window.ExportHtml = Popup => {
     Array.from(clonedElement.querySelectorAll('[href]:not(link)')).forEach(elem =>
       elem.attributes.removeNamedItem('href'),
     );
-    Array.from(clonedElement.querySelectorAll('[href]')).forEach(elem => {
+    Array.from(clonedElement.querySelectorAll('[href]')).forEach((elem: ExportDomElement) => {
       // eslint-disable-next-line no-self-assign
       elem.href = elem.href;
       // eslint-disable-next-line no-self-assign
@@ -88,9 +91,9 @@ window.ExportHtml = Popup => {
     });
   };
 
-  const addJsonExportToZip = async (zip, boardSlug, zipDirName) => {
-    const downloadJSONLink = document.querySelector('.download-json-link');
-    const downloadJSONURL = downloadJSONLink.href;
+  const addJsonExportToZip = async (zip: ExportZip, boardSlug: string, zipDirName: string) => {
+    const downloadJSONLink = document.querySelector('.download-json-link') as HTMLAnchorElement | null;
+    const downloadJSONURL = downloadJSONLink!.href;
     const response = await fetch(downloadJSONURL);
     const responseBody = await response.text();
     zip.file(`${zipDirName}/data/${boardSlug}.json`, responseBody);
@@ -103,7 +106,7 @@ window.ExportHtml = Popup => {
       return boardId;
     }
     // Fallback to URL slug if session is not available
-    return window.location.href.split('/').pop();
+    return window.location.href.split('/').pop()!;
   };
 
   const getBoardTitle = () => {
@@ -121,7 +124,7 @@ window.ExportHtml = Popup => {
     return getBoardSlug();
   };
 
-  const sanitizeFilename = (filename) => {
+  const sanitizeFilename = (filename: string) => {
     // Remove or replace invalid filename characters
     // Keep alphanumeric, hyphens, underscores, and spaces
     return filename
@@ -142,7 +145,7 @@ window.ExportHtml = Popup => {
     return Array.from(document.querySelectorAll('[src]'));
   };
 
-  const downloadStylesheets = async (stylesheets, zip, clonedHtmlElement, zipDirName) => {
+  const downloadStylesheets = async (stylesheets: ExportDomElement[], zip: ExportZip, clonedHtmlElement: Element | null, zipDirName: string) => {
     await asyncForEach(stylesheets, async elem => {
       const response = await fetch(elem.href);
       let responseBody = await response.text();
@@ -201,14 +204,14 @@ window.ExportHtml = Popup => {
       // Update the cloned HTML element, not the live one
       if (clonedHtmlElement) {
         const clonedElements = clonedHtmlElement.querySelectorAll(`link[href="${elem.href}"]`);
-        clonedElements.forEach(clonedElem => {
+        clonedElements.forEach((clonedElem: ExportDomElement) => {
           clonedElem.href = `./style/${filename}`;
         });
       }
     });
   };
 
-  const downloadSrcAttached = async (elements, zip, boardSlug, clonedHtmlElement, zipDirName) => {
+  const downloadSrcAttached = async (elements: ExportDomElement[], zip: ExportZip, boardSlug: string, clonedHtmlElement: Element | null, zipDirName: string) => {
     await asyncForEach(elements, async elem => {
       const response = await fetch(elem.src);
       const responseBody = await response.blob();
@@ -223,14 +226,14 @@ window.ExportHtml = Popup => {
       // Update the cloned HTML element, not the live one
       if (clonedHtmlElement) {
         const clonedElements = clonedHtmlElement.querySelectorAll(`[src="${elem.src}"]`);
-        clonedElements.forEach(clonedElem => {
+        clonedElements.forEach((clonedElem: ExportDomElement) => {
           clonedElem.src = `./${elem.tagName.toLowerCase()}/${filename}`;
         });
       }
     });
   };
 
-  const removeCssUrlSurround = url => {
+  const removeCssUrlSurround = (url: string) => {
     const working = url || '';
     return working
       .split('url(')
@@ -249,7 +252,7 @@ window.ExportHtml = Popup => {
 
   const getCardCovers = () => {
     return Array.from(document.querySelectorAll('.minicard-cover')).filter(
-      elem => elem.style['background-image'],
+      (elem: ExportDomElement) => elem.style['background-image'],
     );
   };
 
@@ -263,11 +266,11 @@ window.ExportHtml = Popup => {
       try {
         for (let rule of sheet.cssRules) {
           if (rule.type === CSSRule.FONT_FACE_RULE) {
-            let src = rule.style.getPropertyValue('src');
+            let src = (rule as CSSFontFaceRule).style.getPropertyValue('src');
             let urlMatch = src.match(/url\(["']?(.+?)["']?\)/);
             if (urlMatch) {
               let fontUrl = urlMatch[1];
-              let fontFamily = rule.style.getPropertyValue('font-family').replace(/["']/g, '');
+              let fontFamily = (rule as CSSFontFaceRule).style.getPropertyValue('font-family').replace(/["']/g, '');
 
               // Resolve the URL relative to the stylesheet's base URL
               let resolvedUrl = new URL(fontUrl, baseUrl);
@@ -286,7 +289,7 @@ window.ExportHtml = Popup => {
     return fonts;
   };
 
-  const downloadFonts = async(elements, zip, zipDirName) => {
+  const downloadFonts = async(elements: ExportDomElement[], zip: ExportZip, zipDirName: string) => {
     let fontIndex = 1;
     await asyncForEach(elements, async (fontObj, idx) => {
       const elem = fontObj.url;
@@ -306,7 +309,7 @@ window.ExportHtml = Popup => {
       // First, try to extract filename from URL path (for normal URLs)
       if (!elem.startsWith('data:')) {
         const pathname = new URL(elem).pathname;
-        const urlFilename = pathname.split('/').pop().split('?')[0].split('#')[0];
+        const urlFilename = pathname.split('/').pop()!.split('?')[0].split('#')[0];
         if (urlFilename && urlFilename.length > 0 && !urlFilename.match(/^[a-f0-9]+$/i)) {
           // Only use URL filename if it's not a hash
           filename = urlFilename;
@@ -333,7 +336,7 @@ window.ExportHtml = Popup => {
     });
   }
 
-  const downloadFontAwesomeFonts = async (zip, zipDirName) => {
+  const downloadFontAwesomeFonts = async (zip: ExportZip, zipDirName: string) => {
     // List of Font Awesome webfont files to include
     const fontAwesomeFiles = [
       'fa-solid-900.woff2',
@@ -347,7 +350,7 @@ window.ExportHtml = Popup => {
     ];
 
     try {
-      await asyncForEach(fontAwesomeFiles, async (filename) => {
+      await asyncForEach(fontAwesomeFiles, async (filename: string) => {
         try {
           // Try to fetch from the Meteor bundle webfont location
           const fontUrls = [
@@ -390,7 +393,7 @@ window.ExportHtml = Popup => {
     }
   }
 
-  const downloadCardCovers = async (elements, zip, boardSlug, clonedHtmlElement, zipDirName) => {
+  const downloadCardCovers = async (elements: ExportDomElement[], zip: ExportZip, boardSlug: string, clonedHtmlElement: Element | null, zipDirName: string) => {
     await asyncForEach(elements, async elem => {
       const response = await fetch(
         removeCssUrlSurround(elem.style['background-image']),
@@ -398,9 +401,9 @@ window.ExportHtml = Popup => {
       const responseBody = await response.blob();
       const filename = removeCssUrlSurround(elem.style['background-image'])
         .split('/')
-        .pop()
+        .pop()!
         .split('?')
-        .shift()
+        .shift()!
         .split('#')
         .shift();
       const fileFullPath = `${zipDirName}/covers/${filename}`;
@@ -410,7 +413,7 @@ window.ExportHtml = Popup => {
       if (clonedHtmlElement) {
         const bgImage = removeCssUrlSurround(elem.style['background-image']);
         const clonedElements = clonedHtmlElement.querySelectorAll('.minicard-cover');
-        clonedElements.forEach(clonedElem => {
+        clonedElements.forEach((clonedElem: ExportDomElement) => {
           if (removeCssUrlSurround(clonedElem.style['background-image']) === bgImage) {
             clonedElem.style.backgroundImage = `url('./covers/${filename}')`;
           }
@@ -419,7 +422,7 @@ window.ExportHtml = Popup => {
     });
   };
 
-  const addBoardHTMLToZip = (boardSlug, zip, clonedElement, zipDirName) => {
+  const addBoardHTMLToZip = (boardSlug: string, zip: ExportZip, clonedElement: Element, zipDirName: string) => {
     ensureSidebarRemoved(clonedElement);
 
     // Get the HTML string
@@ -528,7 +531,7 @@ body { font-family: sans-serif !important; }
 
     // Clone the HTML element to process for export without modifying live DOM
     const htmlElement = window.document.querySelector('html');
-    const clonedHtmlElement = htmlElement.cloneNode(true);
+    const clonedHtmlElement = htmlElement!.cloneNode(true) as Element;
 
     await addJsonExportToZip(zip, boardSlug, zipDirName);
     Popup.back();
@@ -554,3 +557,9 @@ body { font-family: sans-serif !important; }
     // No page reload - impersonation session is preserved!
   };
 };
+
+// DOM nodes pulled from the live/cloned document are accessed by tag-specific
+// properties (href/src/style) across mixed tag types, hence `any`.
+type ExportDomElement = any;
+// JSZip archive instance from the untyped `jszip` require, hence `any`.
+type ExportZip = any;

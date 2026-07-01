@@ -8,10 +8,11 @@ import { MultiSelection } from '/client/lib/multiSelection';
 import { Utils } from '/client/lib/utils';
 
 // Late-bind Sidebar to avoid circular dependency (sidebar.js needs its template first)
-let _Sidebar;
+// The sidebar service is loaded lazily via require() and is untyped, hence `any`.
+let _Sidebar: (() => any) | undefined;
 function getSidebar() {
   if (!_Sidebar) _Sidebar = require('/client/features/sidebar/service').getSidebarInstance;
-  return _Sidebar();
+  return _Sidebar!();
 }
 const hotkeys = require('hotkeys-js').default;
 
@@ -21,7 +22,7 @@ const hotkeys = require('hotkeys-js').default;
 // Configure hotkeys filter (replaces Mousetrap.stopCallback)
 // CRITICAL: Return values are INVERTED from Mousetrap's stopCallback
 // hotkeys filter: true = ALLOW shortcut, false = STOP shortcut
-hotkeys.filter = (event) => {
+hotkeys.filter = (event: KeyboardEvent) => {
   // Are shortcuts enabled for the user?
   if (ReactiveCache.getCurrentUser() && !ReactiveCache.getCurrentUser().isKeyboardShortcuts())
     return false;
@@ -31,11 +32,11 @@ hotkeys.filter = (event) => {
     return true;
 
   // Make sure there are no selected characters
-  if (window.getSelection().type === "Range")
+  if (window.getSelection()!.type === "Range")
     return false;
 
   // Decide what the current element is
-  const currentElement = event.target || document.activeElement;
+  const currentElement = (event.target || document.activeElement) as HTMLElement;
 
   // If the current element is editable, we don't want to trigger an event
   if (currentElement.isContentEditable)
@@ -73,19 +74,19 @@ window.addEventListener('keydown', (e) => {
 function getHoveredCardId() {
   const card = $('.js-minicard:hover').get(0);
   if (!card) return null;
-  return Blaze.getData(card)._id;
+  return (Blaze.getData(card) as { _id: string })._id;
 }
 
 function getSelectedCardId() {
   return Session.get('currentCard') || Session.get('selectedCard') || getHoveredCardId();
 }
 
-hotkeys('?', (event) => {
+hotkeys('?', (event: KeyboardEvent) => {
   event.preventDefault();
   FlowRouter.go('shortcuts');
 });
 
-hotkeys('w', (event) => {
+hotkeys('w', (event: KeyboardEvent) => {
   event.preventDefault();
   if (getSidebar().isOpen() && getSidebar().getView() === 'home') {
     getSidebar().toggle();
@@ -94,7 +95,7 @@ hotkeys('w', (event) => {
   }
 });
 
-hotkeys('q', (event) => {
+hotkeys('q', (event: KeyboardEvent) => {
   event.preventDefault();
   const currentBoardId = Session.get('currentBoard');
   const currentUserId = Meteor.userId();
@@ -103,7 +104,7 @@ hotkeys('q', (event) => {
   }
 });
 
-hotkeys('a', (event) => {
+hotkeys('a', (event: KeyboardEvent) => {
   event.preventDefault();
   const currentBoardId = Session.get('currentBoard');
   const currentUserId = Meteor.userId();
@@ -112,14 +113,14 @@ hotkeys('a', (event) => {
   }
 });
 
-hotkeys('x', (event) => {
+hotkeys('x', (event: KeyboardEvent) => {
   event.preventDefault();
   if (Filter.isActive()) {
     Filter.reset();
   }
 });
 
-hotkeys('f', (event) => {
+hotkeys('f', (event: KeyboardEvent) => {
   event.preventDefault();
   if (getSidebar().isOpen() && getSidebar().getView() === 'filter') {
     getSidebar().toggle();
@@ -128,7 +129,7 @@ hotkeys('f', (event) => {
   }
 });
 
-hotkeys('/', (event) => {
+hotkeys('/', (event: KeyboardEvent) => {
   event.preventDefault();
   if (getSidebar().isOpen() && getSidebar().getView() === 'search') {
     getSidebar().toggle();
@@ -137,7 +138,7 @@ hotkeys('/', (event) => {
   }
 });
 
-hotkeys('down,up', (event, handler) => {
+hotkeys('down,up', (event: KeyboardEvent, handler: KeyboardHotkeyHandler) => {
   event.preventDefault();
   if (!Utils.getCurrentCardId()) {
     return;
@@ -148,14 +149,14 @@ hotkeys('down,up', (event, handler) => {
     [nextFunc]('.js-minicard')
     .get(0);
   if (nextCard) {
-    const nextCardId = Blaze.getData(nextCard)._id;
+    const nextCardId = (Blaze.getData(nextCard) as { _id: string })._id;
     Utils.goCardId(nextCardId);
   }
 });
 
 // Shift + number keys to remove labels in multiselect
 const shiftNums = Array.from({length: 9}, (_, i) => `shift+${i + 1}`).join(',');
-hotkeys(shiftNums, (event, handler) => {
+hotkeys(shiftNums, (event: KeyboardEvent, handler: KeyboardHotkeyHandler) => {
   event.preventDefault();
   const num = parseInt(handler.key.split('+')[1]);
   const currentUserId = Meteor.userId();
@@ -170,7 +171,7 @@ hotkeys(shiftNums, (event, handler) => {
     for (const cardId of cardIds) {
       const card = Cards.findOne(cardId);
       if (num <= board.labels.length) {
-        card.removeLabel(labels[num - 1]["_id"]);
+        card!.removeLabel(labels[num - 1]["_id"]);
       }
     }
   }
@@ -178,7 +179,7 @@ hotkeys(shiftNums, (event, handler) => {
 
 // Number keys to toggle labels
 const nums = Array.from({length: 9}, (_, i) => i + 1).join(',');
-hotkeys(nums, (event, handler) => {
+hotkeys(nums, (event: KeyboardEvent, handler: KeyboardHotkeyHandler) => {
   event.preventDefault();
   const num = parseInt(handler.key);
   const currentUserId = Meteor.userId();
@@ -193,7 +194,7 @@ hotkeys(nums, (event, handler) => {
     for (const cardId of cardIds) {
       const card = Cards.findOne(cardId);
       if (num <= board.labels.length) {
-        card.addLabel(labels[num - 1]["_id"]);
+        card!.addLabel(labels[num - 1]["_id"]);
       }
     }
     return;
@@ -206,14 +207,14 @@ hotkeys(nums, (event, handler) => {
   if (ReactiveCache.getCurrentUser().isBoardMember()) {
     const card = Cards.findOne(cardId);
     if (num <= board.labels.length) {
-      card.toggleLabel(labels[num - 1]["_id"]);
+      card!.toggleLabel(labels[num - 1]["_id"]);
     }
   }
 });
 
 // Ctrl+Alt + number keys to toggle assignees
 const ctrlAltNums = Array.from({length: 9}, (_, i) => `ctrl+alt+${i + 1}`).join(',');
-hotkeys(ctrlAltNums, (event, handler) => {
+hotkeys(ctrlAltNums, (event: KeyboardEvent, handler: KeyboardHotkeyHandler) => {
   event.preventDefault();
   // Make sure the current user is defined
   if (!ReactiveCache.getCurrentUser())
@@ -223,9 +224,10 @@ hotkeys(ctrlAltNums, (event, handler) => {
   if (!ReactiveCache.getCurrentUser().isBoardMember())
     return;
 
-  const memberIndex = parseInt(handler.key.split("+").pop()) - 1;
+  const memberIndex = parseInt(handler.key.split("+").pop()!) - 1;
   const currentBoard = Utils.getCurrentBoard();
-  const validBoardMembers = currentBoard.memberUsers().filter(member => member.isBoardMember());
+  // memberUsers() returns untyped user docs, hence `any`.
+  const validBoardMembers = currentBoard.memberUsers().filter((member: any) => member.isBoardMember());
 
   if (memberIndex >= validBoardMembers.length)
     return;
@@ -234,18 +236,18 @@ hotkeys(ctrlAltNums, (event, handler) => {
 
   if (MultiSelection.isActive()) {
     for (const cardId of MultiSelection.getSelectedCardIds())
-      Cards.findOne(cardId).toggleAssignee(memberId);
+      Cards.findOne(cardId)!.toggleAssignee(memberId);
   } else {
     const cardId = getSelectedCardId();
 
     if (!cardId)
       return;
 
-    Cards.findOne(cardId).toggleAssignee(memberId);
+    Cards.findOne(cardId)!.toggleAssignee(memberId);
   }
 });
 
-hotkeys('m', (event) => {
+hotkeys('m', (event: KeyboardEvent) => {
   event.preventDefault();
   const cardId = getSelectedCardId();
   if (!cardId) {
@@ -259,11 +261,11 @@ hotkeys('m', (event) => {
 
   if (ReactiveCache.getCurrentUser().isBoardMember()) {
     const card = Cards.findOne(cardId);
-    card.toggleAssignee(currentUserId);
+    card!.toggleAssignee(currentUserId);
   }
 });
 
-hotkeys('space', (event) => {
+hotkeys('space', (event: KeyboardEvent) => {
   event.preventDefault();
   const cardId = getSelectedCardId();
   if (!cardId) {
@@ -277,11 +279,11 @@ hotkeys('space', (event) => {
 
   if (ReactiveCache.getCurrentUser().isBoardMember()) {
     const card = Cards.findOne(cardId);
-    card.toggleMember(currentUserId);
+    card!.toggleMember(currentUserId);
   }
 });
 
-const archiveCard = async (event) => {
+const archiveCard = async (event: KeyboardEvent) => {
   event.preventDefault();
   const cardId = getSelectedCardId();
   if (!cardId) {
@@ -295,7 +297,7 @@ const archiveCard = async (event) => {
 
   if (Utils.canModifyBoard()) {
     const card = Cards.findOne(cardId);
-    await card.archive();
+    await card!.archive();
   }
 };
 
@@ -307,7 +309,7 @@ hotkeys('-', archiveCard);
 // https://github.com/wekan/wekan/pull/5589#issuecomment-2516776519
 hotkeys('\xf7', archiveCard);
 
-hotkeys('n', (event) => {
+hotkeys('n', (event: KeyboardEvent) => {
   event.preventDefault();
   const cardId = getSelectedCardId();
   if (!cardId) {
@@ -324,9 +326,14 @@ hotkeys('n', (event) => {
     const card = Cards.findOne(cardId);
 
     // Find the button and click it
-    $(`#js-list-${card.listId} .list-body .minicards .open-minicard-composer`).click();
+    $(`#js-list-${card!.listId} .list-body .minicards .open-minicard-composer`).click();
   }
 });
+
+// hotkeys-js passes a HotkeysEvent whose `key` is the matched combo string.
+interface KeyboardHotkeyHandler {
+  key: string;
+}
 
 Template.keyboardShortcuts.helpers({
   mapping: [
