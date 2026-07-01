@@ -227,7 +227,33 @@ declare module 'meteor/webapp' {
   }
 }
 
-interface WekanConnectRequest extends import('http').IncomingMessage {
+// meteor/accounts-express — populates the connect request with an authenticated
+// `userId` from Meteor login tokens for HTTP routes (no bundled types). Returns
+// a connect middleware mounted via `WebApp.handlers.use('/api', …)`.
+declare module 'meteor/accounts-express' {
+  function createAuthMiddleware(): (
+    req: import('http').IncomingMessage,
+    res: import('http').ServerResponse,
+    next: (err?: any) => void,
+  ) => void;
+  export { createAuthMiddleware };
+}
+
+// meteor/meteor — `Meteor.absolutePath` is the server-side absolute path of the
+// running app bundle, used to locate on-disk `public/` assets. It is a real
+// server global but is not declared by @types/meteor, so declare it here.
+declare module 'meteor/meteor' {
+  namespace Meteor {
+    const absolutePath: string;
+  }
+}
+
+// An incoming connect request (Node IncomingMessage) augmented by Meteor + the
+// wekan api middleware. Expressed as an intersection type alias rather than an
+// `interface ... extends import('http').IncomingMessage` because an interface
+// cannot extend an `import(...)` type expression (TS2499); the intersection
+// preserves all IncomingMessage members (headers/method/on/…) plus the extras.
+type WekanConnectRequest = import('http').IncomingMessage & {
   // Populated by wekan's Authentication middleware before the REST handlers run;
   // modelled as a plain string since every handler operates on an authenticated
   // request (they call Authentication.checkLoggedIn / return 401 otherwise).
@@ -241,7 +267,7 @@ interface WekanConnectRequest extends import('http').IncomingMessage {
   // Route params extracted from `:name` path segments by the connect router.
   params: { [key: string]: string };
   query?: { [key: string]: string | string[] | undefined };
-}
+};
 
 type WekanConnectResponse = import('http').ServerResponse;
 

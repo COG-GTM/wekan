@@ -9,7 +9,7 @@ import {
   isTrustedHeaderLoginSource,
 } from '/server/lib/headerLoginAuth';
 import { fileStoreStrategyFactory } from '/models/attachments.server';
-import { Settings } from '../../models/settings';
+import Settings from '../../models/settings';
 import { moveToStorage } from '/models/lib/fileStoreStrategy';
 import { STORAGE_NAME_FILESYSTEM, STORAGE_NAME_GRIDFS, STORAGE_NAME_S3 } from '/models/lib/fileStoreStrategy';
 import AttachmentStorageSettings from '/models/attachmentStorageSettings';
@@ -20,14 +20,16 @@ import { ObjectId } from 'bson';
 const HARD_MAX_API_FILE_BYTES = 64 * 1024 * 1024;
 const HARD_MAX_API_UPLOAD_BODY_BYTES = 96 * 1024 * 1024;
 
-function normalizeConfiguredLimit(configuredValue, fallbackValue = 0) {
+// `configuredValue` is an admin-configured limit read from settings; it may be a
+// number, null, or absent, so it is `any` and validated via Number.isFinite.
+function normalizeConfiguredLimit(configuredValue: any, fallbackValue = 0) {
   if (Number.isFinite(configuredValue) && configuredValue >= 0) {
     return configuredValue;
   }
   return Number.isFinite(fallbackValue) && fallbackValue >= 0 ? fallbackValue : 0;
 }
 
-function getEffectiveApiFileLimit(maxBytes) {
+function getEffectiveApiFileLimit(maxBytes: number) {
   if (Number.isFinite(maxBytes) && maxBytes > 0) {
     return Math.min(maxBytes, HARD_MAX_API_FILE_BYTES);
   }
@@ -35,13 +37,15 @@ function getEffectiveApiFileLimit(maxBytes) {
   return HARD_MAX_API_FILE_BYTES;
 }
 
-function maxBase64LengthForBytes(maxBytes) {
+function maxBase64LengthForBytes(maxBytes: number) {
   const safeBytes = Number.isFinite(maxBytes) && maxBytes > 0 ? maxBytes : HARD_MAX_API_FILE_BYTES;
   return Math.ceil((safeBytes * 4) / 3) + 4;
 }
 
-function parseNonNegativeInt(value, fallback = 0) {
-  const parsed = Number.parseInt(value, 10);
+function parseNonNegativeInt(value: string | undefined, fallback = 0) {
+  // `value` may be undefined (from process.env); parseInt(undefined) yields NaN,
+  // which the guard below handles.
+  const parsed = Number.parseInt(value as string, 10);
   if (!Number.isFinite(parsed) || parsed < 0) {
     return fallback;
   }
@@ -93,7 +97,7 @@ async function getApiTransferLimits() {
 
 // Attachment API HTTP routes
 // Helper function to authenticate API requests using X-User-Id and X-Auth-Token
-async function authenticateApiRequest(req) {
+async function authenticateApiRequest(req: ApiAuthRequest) {
   // Preferred path: accounts-express middleware populated authenticated user context.
   if (req?.userId) {
     return req.userId;
@@ -105,9 +109,10 @@ async function authenticateApiRequest(req) {
     return headerLoginUserId;
   }
 
-  // Legacy path kept for backward compatibility.
-  const userId = req.headers['x-user-id'];
-  const authToken = req.headers['x-auth-token'];
+  // Legacy path kept for backward compatibility. These custom auth headers are
+  // single-valued in practice, so narrow the `string | string[]` header type.
+  const userId = req.headers['x-user-id'] as string;
+  const authToken = req.headers['x-auth-token'] as string;
 
   if (!userId || !authToken) {
     throw new Meteor.Error('unauthorized', 'Missing X-User-Id or X-Auth-Token headers');
@@ -128,13 +133,13 @@ async function authenticateApiRequest(req) {
 }
 
 // Helper function to send JSON response
-function sendJsonResponse(res, statusCode, data) {
+function sendJsonResponse(res: WekanConnectResponse, statusCode: number, data: object) {
   res.writeHead(statusCode, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
 }
 
 // Helper function to send error response
-function sendErrorResponse(res, statusCode, message) {
+function sendErrorResponse(res: WekanConnectResponse, statusCode: number, message: string) {
   sendJsonResponse(res, statusCode, { success: false, error: message });
 }
 
@@ -142,12 +147,12 @@ function sendErrorResponse(res, statusCode, message) {
 // attachments), mirroring Authentication.checkBoardWriteAccess: an active member
 // who is not read-only, comment-only, no-comments, worker, or assigned-only —
 // or a global site admin. Read operations should keep using board.hasMember().
-async function userHasBoardWriteAccess(board, userId) {
+async function userHasBoardWriteAccess(board: BoardWriteAccessDoc | undefined | null, userId: string) {
   if (!board || !userId) {
     return false;
   }
   const writeAccess = board.members.some(
-    m =>
+    (m: BoardMemberAccess) =>
       m.userId === userId &&
       m.isActive &&
       !m.isNoComments &&
@@ -167,7 +172,7 @@ async function userHasBoardWriteAccess(board, userId) {
 // Upload attachment endpoint
 WebApp.handlers.use('/api', createAuthMiddleware());
 
-WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
+WebApp.handlers.use('/api/attachment/upload', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
     if (req.method !== 'POST') {
       return next();
     }
@@ -195,7 +200,7 @@ WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
       let bodyBytes = 0;
       let bodyComplete = false;
 
-      req.on('data', chunk => {
+      req.on('data', (chunk: Buffer) => {
         if (bodyComplete) {
           return;
         }
@@ -344,7 +349,7 @@ WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
         }
       });
 
-      req.on('error', (error) => {
+      req.on('error', (error: Error) => {
         clearTimeout(timeout);
         if (!res.headersSent) {
           console.error('Request error:', error);
@@ -360,7 +365,7 @@ WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
   // Upload a board BACKGROUND image (board-level, no card). This is the
   // background counterpart of /api/attachment/upload: it stores a board-level
   // attachment and sets it as the board's active background. Board-admin gated.
-  WebApp.handlers.use('/api/attachment/upload-background', async (req, res, next) => {
+  WebApp.handlers.use('/api/attachment/upload-background', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
     if (req.method !== 'POST') {
       return next();
     }
@@ -378,7 +383,7 @@ WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
       let body = '';
       let bodyBytes = 0;
       let bodyComplete = false;
-      req.on('data', chunk => {
+      req.on('data', (chunk: Buffer) => {
         if (bodyComplete) return;
         bodyBytes += chunk.length || 0;
         if (bodyBytes > HARD_MAX_API_UPLOAD_BODY_BYTES) {
@@ -469,7 +474,7 @@ WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
         }
       });
 
-      req.on('error', (error) => {
+      req.on('error', (error: Error) => {
         clearTimeout(timeout);
         if (!res.headersSent) sendErrorResponse(res, 400, 'Request error');
       });
@@ -480,7 +485,7 @@ WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
   });
 
   // Download a board's current BACKGROUND image (board members), as base64.
-  WebApp.handlers.use('/api/attachment/download-background/:boardId', async (req, res, next) => {
+  WebApp.handlers.use('/api/attachment/download-background/:boardId', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
     if (req.method !== 'GET') {
       return next();
     }
@@ -510,16 +515,16 @@ WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
       if (Number.isFinite(attachment.size) && attachment.size > effectiveApiDownloadMaxBytes) {
         return sendErrorResponse(res, 413, 'Background exceeds API download limit');
       }
-      const chunks = [];
+      const chunks: Buffer[] = [];
       let totalBytes = 0;
       let responseSent = false;
-      const fail = (statusCode, message) => {
+      const fail = (statusCode: number, message: string) => {
         if (responseSent || res.headersSent) return;
         responseSent = true;
         try { readStream.destroy(); } catch (e) { /* ignore */ }
         sendErrorResponse(res, statusCode, message);
       };
-      readStream.on('data', (chunk) => {
+      readStream.on('data', (chunk: Buffer) => {
         totalBytes += chunk.length || 0;
         if (totalBytes > effectiveApiDownloadMaxBytes) {
           fail(413, 'Background exceeds API download limit');
@@ -542,7 +547,7 @@ WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
           storageBackend: strategy.getStorageName(),
         });
       });
-      readStream.on('error', (error) => {
+      readStream.on('error', (error: Error) => {
         console.error('Background download error:', error);
         sendErrorResponse(res, 500, error.message);
       });
@@ -552,7 +557,7 @@ WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
   });
 
   // Download attachment endpoint
-  WebApp.handlers.use('/api/attachment/download/:attachmentId', async (req, res, next) => {
+  WebApp.handlers.use('/api/attachment/download/:attachmentId', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
     if (req.method !== 'GET') {
       return next();
     }
@@ -594,11 +599,11 @@ WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
       }
 
       // Read file data
-      const chunks = [];
+      const chunks: Buffer[] = [];
       let totalBytes = 0;
       let responseSent = false;
 
-      const fail = (statusCode, message) => {
+      const fail = (statusCode: number, message: string) => {
         if (responseSent || res.headersSent) {
           return;
         }
@@ -611,7 +616,7 @@ WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
         sendErrorResponse(res, statusCode, message);
       };
 
-      readStream.on('data', (chunk) => {
+      readStream.on('data', (chunk: Buffer) => {
         totalBytes += chunk.length || 0;
         if (totalBytes > effectiveApiDownloadMaxBytes) {
           fail(413, 'Attachment exceeds API download limit');
@@ -639,7 +644,7 @@ WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
         });
       });
 
-      readStream.on('error', (error) => {
+      readStream.on('error', (error: Error) => {
         console.error('Download error:', error);
         sendErrorResponse(res, 500, error.message);
       });
@@ -649,7 +654,7 @@ WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
   });
 
   // List attachments endpoint
-  const handleAttachmentList = async (req, res, next) => {
+  const handleAttachmentList = async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
     if (req.method !== 'GET') {
       return next();
     }
@@ -675,7 +680,7 @@ WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
         }
       }
 
-      let query = { 'meta.boardId': boardId };
+      let query: MongoQuery = { 'meta.boardId': boardId };
 
       if (swimlaneId && swimlaneId !== 'null') {
         query['meta.swimlaneId'] = swimlaneId;
@@ -691,7 +696,7 @@ WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
 
       const attachments = await ReactiveCache.getAttachments(query);
 
-      const attachmentList = attachments.map(attachment => {
+      const attachmentList = attachments.map((attachment: any) => { // ostrio:files doc (dynamic shape), passed to untyped getFileStrategy
         const strategy = fileStoreStrategyFactory.getFileStrategy(attachment, 'original');
         return {
           attachmentId: attachment._id,
@@ -723,7 +728,7 @@ WebApp.handlers.use('/api/attachment/upload', async (req, res, next) => {
   WebApp.handlers.use('/api/attachment/list/:boardId/:swimlaneId/:listId', handleAttachmentList);
   WebApp.handlers.use('/api/attachment/list/:boardId/:swimlaneId/:listId/:cardId', handleAttachmentList);
 // Board attachments endpoint (legacy)
-WebApp.handlers.use('/api/boards/:boardId/attachments', async (req, res, next) => {
+WebApp.handlers.use('/api/boards/:boardId/attachments', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
   if (req.method !== 'GET') {
     return next();
   }
@@ -736,7 +741,7 @@ WebApp.handlers.use('/api/boards/:boardId/attachments', async (req, res, next) =
     }
     const query = { 'meta.boardId': boardId };
     const attachments = await ReactiveCache.getAttachments(query);
-    const attachmentList = attachments.map(attachment => {
+    const attachmentList = attachments.map((attachment: any) => { // ostrio:files doc (dynamic shape), passed to untyped getFileStrategy
       const strategy = fileStoreStrategyFactory.getFileStrategy(attachment, 'original');
       return {
         attachmentId: attachment._id,
@@ -759,7 +764,7 @@ WebApp.handlers.use('/api/boards/:boardId/attachments', async (req, res, next) =
 });
 
   // Copy attachment endpoint
-  WebApp.handlers.use('/api/attachment/copy', async (req, res, next) => {
+  WebApp.handlers.use('/api/attachment/copy', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
     if (req.method !== 'POST') {
       return next();
     }
@@ -787,7 +792,7 @@ WebApp.handlers.use('/api/boards/:boardId/attachments', async (req, res, next) =
       let body = '';
       let bodyComplete = false;
 
-      req.on('data', chunk => {
+      req.on('data', (chunk: Buffer) => {
         body += chunk.toString();
         if (body.length > 10 * 1024 * 1024) { // 10MB limit for metadata
           req.connection.destroy();
@@ -855,8 +860,8 @@ WebApp.handlers.use('/api/boards/:boardId/attachments', async (req, res, next) =
           }
 
           // Read source file data
-          const chunks = [];
-          readStream.on('data', (chunk) => {
+          const chunks: Buffer[] = [];
+          readStream.on('data', (chunk: Buffer) => {
             chunks.push(chunk);
           });
 
@@ -906,7 +911,7 @@ WebApp.handlers.use('/api/boards/:boardId/attachments', async (req, res, next) =
             }
           });
 
-          readStream.on('error', (error) => {
+          readStream.on('error', (error: Error) => {
             sendErrorResponse(res, 500, error.message);
           });
         } catch (error) {
@@ -915,7 +920,7 @@ WebApp.handlers.use('/api/boards/:boardId/attachments', async (req, res, next) =
         }
       });
 
-      req.on('error', (error) => {
+      req.on('error', (error: Error) => {
         clearTimeout(timeout);
         if (!res.headersSent) {
           console.error('Request error:', error);
@@ -929,7 +934,7 @@ WebApp.handlers.use('/api/boards/:boardId/attachments', async (req, res, next) =
   });
 
   // Move attachment endpoint
-  WebApp.handlers.use('/api/attachment/move', async (req, res, next) => {
+  WebApp.handlers.use('/api/attachment/move', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
     if (req.method !== 'POST') {
       return next();
     }
@@ -946,7 +951,7 @@ WebApp.handlers.use('/api/boards/:boardId/attachments', async (req, res, next) =
       let body = '';
       let bodyComplete = false;
 
-      req.on('data', chunk => {
+      req.on('data', (chunk: Buffer) => {
         body += chunk.toString();
         if (body.length > 10 * 1024 * 1024) {
           req.connection.destroy();
@@ -1034,7 +1039,7 @@ WebApp.handlers.use('/api/boards/:boardId/attachments', async (req, res, next) =
         }
       });
 
-      req.on('error', (error) => {
+      req.on('error', (error: Error) => {
         clearTimeout(timeout);
         if (!res.headersSent) {
           console.error('Request error:', error);
@@ -1048,7 +1053,7 @@ WebApp.handlers.use('/api/boards/:boardId/attachments', async (req, res, next) =
   });
 
   // Delete attachment endpoint
-  WebApp.handlers.use('/api/attachment/delete/:attachmentId', async (req, res, next) => {
+  WebApp.handlers.use('/api/attachment/delete/:attachmentId', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
     if (req.method !== 'DELETE') {
       return next();
     }
@@ -1084,7 +1089,7 @@ WebApp.handlers.use('/api/boards/:boardId/attachments', async (req, res, next) =
   });
 
   // Get attachment info endpoint
-  WebApp.handlers.use('/api/attachment/info/:attachmentId', async (req, res, next) => {
+  WebApp.handlers.use('/api/attachment/info/:attachmentId', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
     if (req.method !== 'GET') {
       return next();
     }
@@ -1137,3 +1142,33 @@ export {
   findOrCreateHeaderLoginUser,
   isTrustedHeaderLoginSource,
 };
+
+// A board member entry, with the access-restriction flags consulted when
+// deciding write access.
+interface BoardMemberAccess {
+  userId: string;
+  isActive?: boolean;
+  isNoComments?: boolean;
+  isCommentOnly?: boolean;
+  isWorker?: boolean;
+  isReadOnly?: boolean;
+  isReadAssignedOnly?: boolean;
+}
+
+// The subset of a board document read by userHasBoardWriteAccess.
+interface BoardWriteAccessDoc {
+  members: BoardMemberAccess[];
+}
+
+// The request shape authenticateApiRequest depends on: a real WekanConnectRequest
+// satisfies it, and so do the lightweight mocks in the auth-context tests. Kept
+// loose (a superset of headerLoginAuth's RequestLike plus the express `userId`).
+interface ApiAuthRequest {
+  userId?: string;
+  headers: { [key: string]: string | string[] | undefined };
+  socket?: { remoteAddress?: string };
+  connection?: { remoteAddress?: string };
+  method?: string;
+  url?: string;
+}
+

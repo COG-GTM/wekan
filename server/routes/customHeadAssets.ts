@@ -4,10 +4,10 @@ import fs from 'fs';
 import path from 'path';
 import Settings from '/models/settings';
 
-const shouldServeContent = (value) =>
+const shouldServeContent = (value: string | null | undefined) =>
   typeof value === 'string' && value.trim().length > 0;
 
-const getDefaultFileContent = (filename) => {
+const getDefaultFileContent = (filename: string) => {
   try {
     if (typeof filename !== 'string' || filename.trim().length === 0) {
       return null;
@@ -27,7 +27,7 @@ const getDefaultFileContent = (filename) => {
   return null;
 };
 
-const respondWithText = (res, contentType, body) => {
+const respondWithText = (res: WekanConnectResponse, contentType: string, body: string) => {
   res.writeHead(200, {
     'Content-Type': `${contentType}; charset=utf-8`,
     'Access-Control-Allow-Origin': '*',
@@ -35,7 +35,7 @@ const respondWithText = (res, contentType, body) => {
   res.end(body);
 };
 
-WebApp.handlers.use('/site.webmanifest', async (req, res, next) => {
+WebApp.handlers.use('/site.webmanifest', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
   const setting = await Settings.findOneAsync(
     {},
@@ -62,7 +62,7 @@ WebApp.handlers.use('/site.webmanifest', async (req, res, next) => {
   return next();
 });
 
-WebApp.handlers.use('/.well-known/assetlinks.json', async (req, res, next) => {
+WebApp.handlers.use('/.well-known/assetlinks.json', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
   const setting = await Settings.findOneAsync(
     {},

@@ -19,8 +19,10 @@ import { getAttachmentWithBackwardCompatibility, getOldAttachmentStream } from '
 import fs from 'fs';
 import path from 'path';
 
-function parseNonNegativeInt(value, fallback = 0) {
-  const parsed = Number.parseInt(value, 10);
+function parseNonNegativeInt(value: string | undefined, fallback = 0) {
+  // `value` may be undefined (from process.env); parseInt(undefined) yields NaN,
+  // which the guard below handles.
+  const parsed = Number.parseInt(value as string, 10);
   if (!Number.isFinite(parsed) || parsed < 0) {
     return fallback;
   }
@@ -72,7 +74,7 @@ if (Meteor.isServer) {
   /**
    * Helper function to set appropriate headers for file serving
    */
-  function setFileHeaders(res, fileObj, isAttachment = false) {
+  function setFileHeaders(res: WekanConnectResponse, fileObj: FileServeObj, isAttachment = false) {
     // Decide safe serving strategy
     const nameLower = (fileObj.name || '').toLowerCase();
     const typeLower = (fileObj.type || '').toLowerCase();
@@ -167,7 +169,7 @@ if (Meteor.isServer) {
   /**
    * Helper function to handle conditional requests
    */
-  function handleConditionalRequest(req, res, fileObj) {
+  function handleConditionalRequest(req: WekanConnectRequest, res: WekanConnectResponse, fileObj: FileServeObj) {
     const ifNoneMatch = req.headers['if-none-match'];
     if (ifNoneMatch && ifNoneMatch === `"${fileObj._id}"`) {
       res.writeHead(304);
@@ -181,7 +183,7 @@ if (Meteor.isServer) {
    * Extract first path segment (file id) from request URL.
    * Works whether req.url is the full path or already trimmed by the mount path.
    */
-  function extractFirstIdFromUrl(req, mountPrefix) {
+  function extractFirstIdFromUrl(req: WekanConnectRequest, mountPrefix: string) {
     // Strip query string
     let urlPath = (req.url || '').split('?')[0];
     // If url still contains the mount prefix, remove it
@@ -200,7 +202,7 @@ if (Meteor.isServer) {
    * Check if the request explicitly asks to download the file
    * Recognizes ?download=true or ?download=1 (case-insensitive for key)
    */
-  function isDownloadRequested(req) {
+  function isDownloadRequested(req: WekanConnectRequest) {
     const q = (req.url || '').split('?')[1] || '';
     if (!q) return false;
     const pairs = q.split('&');
@@ -223,7 +225,7 @@ if (Meteor.isServer) {
    *  - Else if avatar's owner belongs to at least one public board -> allow
    *  - Otherwise -> deny
    */
-  async function isAuthorizedForAvatar(req, avatar) {
+  async function isAuthorizedForAvatar(req: WekanConnectRequest, avatar: AvatarAuthDoc | null | undefined) {
     try {
       if (!avatar) return false;
 
@@ -266,9 +268,9 @@ if (Meteor.isServer) {
   /**
    * Parse cookies from request headers into an object map
    */
-  function parseCookies(req) {
+  function parseCookies(req: WekanConnectRequest) {
     const header = req.headers && req.headers.cookie;
-    const out = {};
+    const out: { [key: string]: string } = {};
     if (!header) return out;
     const parts = header.split(';');
     for (const part of parts) {
@@ -284,8 +286,8 @@ if (Meteor.isServer) {
   /**
    * Get query parameters as a simple object
    */
-  function parseQuery(req) {
-    const out = {};
+  function parseQuery(req: WekanConnectRequest) {
+    const out: { [key: string]: string } = {};
     const q = (req.url || '').split('?')[1] || '';
     if (!q) return out;
     const pairs = q.split('&');
@@ -307,7 +309,7 @@ if (Meteor.isServer) {
    * - authToken query parameter
    * - meteor_login_token or wekan_login_token cookie
    */
-  function extractLoginToken(req) {
+  function extractLoginToken(req: WekanConnectRequest) {
     // Authorization: Bearer <token>
     const authz = req.headers && (req.headers.authorization || req.headers.Authorization);
     if (authz && typeof authz === 'string') {
@@ -334,7 +336,7 @@ if (Meteor.isServer) {
   /**
    * Resolve a user from a raw login token string
    */
-  async function getUserFromToken(rawToken) {
+  async function getUserFromToken(rawToken: string | null) {
     try {
       if (!rawToken || typeof rawToken !== 'string' || rawToken.length < 10) return null;
       const hashed = Accounts._hashLoginToken(rawToken);
@@ -356,7 +358,7 @@ if (Meteor.isServer) {
    * - Public boards: allow
    * - Private boards: require valid user who is a member
    */
-  async function isAuthorizedForBoard(req, board) {
+  async function isAuthorizedForBoard(req: WekanConnectRequest, board: BoardAuthDoc | null | undefined) {
     try {
       if (!board) return false;
       if (board.isPublic && board.isPublic()) return true;
@@ -382,7 +384,7 @@ if (Meteor.isServer) {
    * - Non-ASCII: sanitizeFilenameForHeader('現有檔案.odt') => 'file.odt'; filename*=UTF-8''%E7%8F%BE%E6%9C%89%E6%AA%94%E6%A1%88.odt
    * - Control chars: sanitizeFilenameForHeader('test\nfile.txt') => 'testfile.txt'
    */
-  function sanitizeFilenameForHeader(filename) {
+  function sanitizeFilenameForHeader(filename: string | null | undefined) {
     if (!filename || typeof filename !== 'string') {
       return 'download';
     }
@@ -411,7 +413,7 @@ if (Meteor.isServer) {
    * Helper function to build a complete Content-Disposition header value with RFC 5987 support
    * Handles the special format returned by sanitizeFilenameForHeader for non-ASCII filenames
    */
-  function buildContentDispositionHeader(disposition, sanitizedFilename) {
+  function buildContentDispositionHeader(disposition: string, sanitizedFilename: string) {
     if (sanitizedFilename.includes('|RFC5987:')) {
       const [fallback, encoded] = sanitizedFilename.split('|RFC5987:');
       return `${disposition}; filename="${fallback}"; filename*=UTF-8''${encoded}`;
@@ -422,8 +424,8 @@ if (Meteor.isServer) {
   /**
    * Helper function to stream file with error handling
    */
-  function streamFile(res, readStream, fileObj) {
-    readStream.on('error', (error) => {
+  function streamFile(res: WekanConnectResponse, readStream: NodeJS.ReadableStream, fileObj: FileServeObj) {
+    readStream.on('error', (error: Error) => {
       console.error('File stream error:', error);
       if (!res.headersSent) {
         res.writeHead(500);
@@ -448,7 +450,7 @@ if (Meteor.isServer) {
    * Serve attachments from new Meteor-Files structure
    * Route: /cdn/storage/attachments/{fileId} or /cdn/storage/attachments/{fileId}/original/{filename}
    */
-  WebApp.handlers.use('/cdn/storage/attachments', async (req, res, next) => {
+  WebApp.handlers.use('/cdn/storage/attachments', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
     if (req.method !== 'GET') {
       return next();
     }
@@ -574,7 +576,7 @@ if (Meteor.isServer) {
    * Serve avatars from new Meteor-Files structure
    * Route: /cdn/storage/avatars/{fileId} or /cdn/storage/avatars/{fileId}/original/{filename}
    */
-  WebApp.handlers.use('/cdn/storage/avatars', async (req, res, next) => {
+  WebApp.handlers.use('/cdn/storage/avatars', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
     if (req.method !== 'GET') {
       return next();
     }
@@ -639,7 +641,7 @@ if (Meteor.isServer) {
    * Serve legacy attachments from CollectionFS structure
    * Route: /cfs/files/attachments/{attachmentId}
    */
-  WebApp.handlers.use('/cfs/files/attachments', async (req, res, next) => {
+  WebApp.handlers.use('/cfs/files/attachments', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
     if (req.method !== 'GET') {
       return next();
     }
@@ -715,7 +717,7 @@ if (Meteor.isServer) {
    * Serve legacy avatars from CollectionFS structure
    * Route: /cfs/files/avatars/{avatarId}
    */
-  WebApp.handlers.use('/cfs/files/avatars', async (req, res, next) => {
+  WebApp.handlers.use('/cfs/files/avatars', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
     if (req.method !== 'GET') {
       return next();
     }
@@ -784,7 +786,7 @@ if (Meteor.isServer) {
    * Alternative attachment route for different URL patterns
    * Route: /attachments/{fileId}
    */
-  WebApp.handlers.use('/attachments', (req, res, next) => {
+  WebApp.handlers.use('/attachments', (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
     if (req.method !== 'GET') {
       return next();
     }
@@ -806,7 +808,7 @@ if (Meteor.isServer) {
    * Alternative avatar route for different URL patterns
    * Route: /avatars/{fileId}
    */
-  WebApp.handlers.use('/avatars', (req, res, next) => {
+  WebApp.handlers.use('/avatars', (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
     if (req.method !== 'GET') {
       return next();
     }
@@ -823,4 +825,23 @@ if (Meteor.isServer) {
   });
 
   console.log('Universal file server initialized successfully');
+}
+
+// The subset of a file document (attachment/avatar) read while serving it.
+interface FileServeObj {
+  _id: string;
+  name?: string;
+  type?: string;
+  size?: number;
+}
+
+// The subset of a board document consulted by the authorization helpers.
+interface BoardAuthDoc {
+  isPublic?: () => boolean;
+  hasMember?: (userId: string) => boolean;
+}
+
+// The subset of an avatar document consulted by isAuthorizedForAvatar.
+interface AvatarAuthDoc {
+  userId?: string;
 }

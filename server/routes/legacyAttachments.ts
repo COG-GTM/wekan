@@ -14,7 +14,7 @@ if (process.env.DEBUG === 'true') {
  * For non-ASCII filenames, uses RFC 5987 encoding to preserve the original filename.
  * This prevents ERR_INVALID_CHAR errors when filenames contain control characters.
  */
-function sanitizeFilenameForHeader(filename) {
+function sanitizeFilenameForHeader(filename: string | null | undefined) {
   if (!filename || typeof filename !== 'string') {
     return 'download';
   }
@@ -43,7 +43,7 @@ function sanitizeFilenameForHeader(filename) {
  * Helper function to build a complete Content-Disposition header value with RFC 5987 support
  * Handles the special format returned by sanitizeFilenameForHeader for non-ASCII filenames
  */
-function buildContentDispositionHeader(disposition, sanitizedFilename) {
+function buildContentDispositionHeader(disposition: string, sanitizedFilename: string) {
   if (sanitizedFilename.includes('|RFC5987:')) {
     const [fallback, encoded] = sanitizedFilename.split('|RFC5987:');
     return `${disposition}; filename="${fallback}"; filename*=UTF-8''${encoded}`;
@@ -58,7 +58,7 @@ function buildContentDispositionHeader(disposition, sanitizedFilename) {
 
 if (Meteor.isServer) {
   // Handle legacy attachment downloads
-  WebApp.handlers.use('/cfs/files/attachments', async (req, res, next) => {
+  WebApp.handlers.use('/cfs/files/attachments', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
     const attachmentId = req.url.split('/').pop();
 
     if (!attachmentId) {

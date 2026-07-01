@@ -13,7 +13,7 @@ import { getOldAttachmentData, getOldAttachmentStream } from '/models/lib/attach
 // Serve a legacy CollectionFS avatar (cfs.avatars.filerecord + cfs_gridfs.avatars
 // bucket) in place, without migrating it. Returns true when it handled the
 // response, false when there is no such legacy avatar.
-async function serveLegacyAvatar(fileId, req, res) {
+async function serveLegacyAvatar(fileId: string, req: WekanConnectRequest, res: WekanConnectResponse) {
   const legacy = await getOldAttachmentData(fileId, 'avatars');
   if (!legacy) {
     return false;
@@ -45,7 +45,7 @@ async function serveLegacyAvatar(fileId, req, res) {
 }
 
 // Handle avatar file downloads
-WebApp.handlers.use('/cdn/storage/avatars/:fileName', async (req, res, next) => {
+WebApp.handlers.use('/cdn/storage/avatars/:fileName', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
   if (req.method !== 'GET') {
     return next();
   }
@@ -117,7 +117,7 @@ WebApp.handlers.use('/cdn/storage/avatars/:fileName', async (req, res, next) => 
     res.writeHead(200);
     readStream.pipe(res);
 
-    readStream.on('error', (error) => {
+    readStream.on('error', (error: Error) => {
       console.error('Avatar stream error:', error);
       if (!res.headersSent) {
         res.writeHead(500);
@@ -138,7 +138,7 @@ WebApp.handlers.use('/cdn/storage/avatars/:fileName', async (req, res, next) => 
 // migrated-from-6.x installs is '/cfs/files/avatars/<filerecordId>', so serve
 // the CollectionFS binary in place. If it isn't a legacy avatar, fall back to
 // redirecting to the new URL format (e.g. for already-migrated avatars).
-WebApp.handlers.use('/cfs/files/avatars/:fileName', async (req, res, next) => {
+WebApp.handlers.use('/cfs/files/avatars/:fileName', async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
   if (req.method !== 'GET') {
     return next();
   }
