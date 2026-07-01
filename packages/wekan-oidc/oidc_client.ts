@@ -5,14 +5,14 @@ Oidc = {};
 // @param credentialRequestCompleteCallback {Function} Callback function to call on
 //   completion. Takes one argument, credentialToken on success, or Error on
 //   error.
-Oidc.requestCredential = function (options, credentialRequestCompleteCallback) {
+Oidc.requestCredential = function (options: any /* legacy dual (options, callback) | (callback) signature; reassigned within the body */, credentialRequestCompleteCallback?: OidcCredentialCallback) {
   // support both (options, callback) and (callback).
   if (!credentialRequestCompleteCallback && typeof options === 'function') {
     credentialRequestCompleteCallback = options;
     options = {};
   }
 
-  Meteor.call("getServiceConfiguration", "oidc",(_, result) => {
+  Meteor.call("getServiceConfiguration", "oidc",(_: Error | null, result?: Configuration) => {
     if (result) {
       var config = result;
       var credentialToken = Random.secret();

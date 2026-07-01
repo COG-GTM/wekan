@@ -45,7 +45,10 @@
     "puppeteer": "^25.0.4",
     "sinon": "^22.0.0",
     "sinon-chai": "^4.0.1",
-    "style-loader": "^4.0.0"
+    "style-loader": "^4.0.0",
+    "@types/meteor": "^2.9.9",
+    "@types/node": "^20.19.0",
+    "typescript": "^5.7.3"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1071.0",
