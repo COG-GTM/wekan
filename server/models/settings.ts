@@ -18,29 +18,31 @@ const { SimpleSchema } = require('/imports/simpleSchema');
 const isSandstorm =
   Meteor.settings && Meteor.settings.public && Meteor.settings.public.sandstorm;
 
-function getRandomNum(min, max) {
+function getRandomNum(min: number, max: number) {
   const range = max - min;
   const rand = Math.random();
   return min + Math.round(rand * range);
 }
 
-function getEnvVar(name) {
+function getEnvVar(name: string) {
   const value = process.env[name];
   if (value) {
     return value;
   }
+  // Pre-existing runtime misuse: Meteor.Error expects (error, reason, details)
+  // but wekan passes a single array here; cast to `any` to preserve behavior.
   throw new Meteor.Error([
     'var-not-exist',
     `The environment variable ${name} does not exist`,
-  ]);
+  ] as any);
 }
 
-function loadOidcConfig(service) {
+function loadOidcConfig(service: string) {
   check(service, String);
   return ServiceConfiguration.configurations.findOneAsync({ service });
 }
 
-async function sendInvitationEmail(_id) {
+async function sendInvitationEmail(_id: string) {
   const icode = await getReactiveCache().getInvitationCode(_id);
   const author = await getReactiveCache().getCurrentUser();
   try {
@@ -74,7 +76,8 @@ async function sendInvitationEmail(_id) {
   }
 }
 
-async function isNonAdminAllowedToSendMail(currentUser) {
+// `currentUser` is a Wekan user model instance (dynamic helper surface), hence `any`.
+async function isNonAdminAllowedToSendMail(currentUser: any) {
   const currSett = await getReactiveCache().getCurrentSetting();
   let isAllowed = false;
   if (
@@ -94,22 +97,27 @@ async function isNonAdminAllowedToSendMail(currentUser) {
 }
 
 function isLdapEnabled() {
-  return process.env.LDAP_ENABLE === 'true' || process.env.LDAP_ENABLE === true;
+  // The `=== true` (boolean) branch is a pre-existing dead comparison (the env
+  // var is a string); the `as any` cast preserves it without a runtime change.
+  return process.env.LDAP_ENABLE === 'true' || (process.env.LDAP_ENABLE as any) === true;
 }
 
 function isOauth2Enabled() {
   return (
     process.env.OAUTH2_ENABLED === 'true' ||
-    process.env.OAUTH2_ENABLED === true
+    // Pre-existing dead comparison (env string vs boolean); cast preserves it.
+    (process.env.OAUTH2_ENABLED as any) === true
   );
 }
 
 function isCasEnabled() {
-  return process.env.CAS_ENABLED === 'true' || process.env.CAS_ENABLED === true;
+  // Pre-existing dead comparison (env string vs boolean); cast preserves it.
+  return process.env.CAS_ENABLED === 'true' || (process.env.CAS_ENABLED as any) === true;
 }
 
 function isApiEnabled() {
-  return process.env.WITH_API === 'true' || process.env.WITH_API === true;
+  // Pre-existing dead comparison (env string vs boolean); cast preserves it.
+  return process.env.WITH_API === 'true' || (process.env.WITH_API as any) === true;
 }
 
 Meteor.startup(async () => {
@@ -117,7 +125,9 @@ Meteor.startup(async () => {
   const setting = await getReactiveCache().getCurrentSetting();
   if (!setting) {
     const now = new Date();
-    const domain = process.env.ROOT_URL.match(/\/\/(?:www\.)?(.*)?(?:\/)?/)[1];
+    // ROOT_URL is always set at startup and the URL always matches, so assert
+    // both are non-null to satisfy the typed process.env / match() signatures.
+    const domain = (process.env.ROOT_URL as string).match(/\/\/(?:www\.)?(.*)?(?:\/)?/)![1];
     const from = `Boards Support <support@${domain}>`;
     const defaultSetting = {
       disableRegistration: false,
@@ -145,12 +155,14 @@ Meteor.startup(async () => {
       ? process.env.MAIL_FROM
       : newSetting.mailServer.from;
   } else {
-    Accounts.emailTemplates.from = process.env.MAIL_FROM;
+    // MAIL_FROM is an optional env string assigned to the typed `from` field;
+    // cast preserves the original (possibly-undefined) assignment.
+    Accounts.emailTemplates.from = process.env.MAIL_FROM as string;
   }
 });
 
 if (isSandstorm) {
-  Settings.after.update((userId, doc, fieldNames) => {
+  Settings.after.update((userId: string, doc: any, fieldNames: string[]) => {
     if (fieldNames.includes('mailServer') && doc.mailServer.host) {
       const protocol = doc.mailServer.enableTLS ? 'smtps://' : 'smtp://';
       if (!doc.mailServer.username && !doc.mailServer.password) {
@@ -403,8 +415,10 @@ const REST_SETTINGS_FIELDS = [
   'supportPageText',
 ];
 
-function pickSettingsFields(doc) {
-  const out = { _id: doc && doc._id };
+// `doc` is a raw settings Mongo document (dynamic shape) and `out` collects a
+// dynamic subset of its fields, so both values are `any`.
+function pickSettingsFields(doc: any) {
+  const out: { [key: string]: any } = { _id: doc && doc._id };
   if (doc) {
     REST_SETTINGS_FIELDS.forEach(field => {
       if (doc[field] !== undefined) {
@@ -458,7 +472,8 @@ WebApp.handlers.put('/api/settings', async function(req, res) {
       return;
     }
     const body = req.body || {};
-    const $set = {};
+    // Dynamic subset of request-body fields to persist (values are `any`).
+    const $set: { [key: string]: any } = {};
     REST_SETTINGS_FIELDS.forEach(field => {
       if (body[field] !== undefined) {
         $set[field] = body[field];

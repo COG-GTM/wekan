@@ -10,7 +10,7 @@ import { ensureIndex } from '/server/lib/mongoStartup';
 // Without this, any authenticated user could create/read position-history
 // checkpoints scoped to an arbitrary board they have no access to (the same
 // PositionHistoryBleed class listed in the Hall of Fame).
-const requireBoardVisible = async (userId, boardId) => {
+const requireBoardVisible = async (userId: string, boardId: string) => {
   const board = await ReactiveCache.getBoard(boardId);
   if (!board || !board.isVisibleBy({ _id: userId })) {
     throw new Meteor.Error('not-authorized', 'You do not have access to this board.');
@@ -25,7 +25,10 @@ Meteor.startup(async () => {
   await ensureIndex(UserPositionHistory, { createdAt: 1 });
 });
 
-UserPositionHistory.trackChange = async function(options) {
+// `trackChange` is a custom static attached to the collection (not part of
+// Mongo.Collection), hence the `any` cast. `options` is a caller-supplied
+// dynamic bag of position-history fields, hence `any`.
+(UserPositionHistory as any).trackChange = async function(options: any) {
   const {
     userId,
     boardId,
@@ -41,7 +44,9 @@ UserPositionHistory.trackChange = async function(options) {
     throw new Meteor.Error('invalid-params', 'Missing required parameters');
   }
 
-  const historyEntry = {
+  // Assembled from the dynamic options bag; fields are added conditionally
+  // below, so the entry is an open string-keyed map (dynamic `any` values).
+  const historyEntry: { [key: string]: any } = {
     userId,
     boardId,
     entityType,
@@ -72,7 +77,9 @@ UserPositionHistory.trackChange = async function(options) {
   return await UserPositionHistory.insertAsync(historyEntry);
 };
 
-UserPositionHistory.cleanup = async function() {
+// `cleanup` is a custom static attached to the collection (not part of
+// Mongo.Collection), hence the `any` cast.
+(UserPositionHistory as any).cleanup = async function() {
   const users = await Meteor.users.find({}, { fields: { _id: 1 } }).fetchAsync();
 
   for (const user of users) {
@@ -100,7 +107,9 @@ UserPositionHistory.cleanup = async function() {
 if (Meteor.settings.public?.enableHistoryCleanup !== false) {
   Meteor.setInterval(() => {
     try {
-      UserPositionHistory.cleanup().catch(error => {
+      // `cleanup` is the custom static attached above, hence the `any` cast.
+      // `error` is a rejected-promise reason of unknown concrete type, hence `any`.
+      (UserPositionHistory as any).cleanup().catch((error: any) => {
         console.error('Error during history cleanup:', error);
       });
     } catch (e) {
