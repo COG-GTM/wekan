@@ -12,7 +12,7 @@ if (Meteor.isServer) {
   // Resolve the board an attachment/card belongs to and verify the caller is
   // allowed to act on it. Without this, any authenticated user could migrate
   // (read + re-insert) attachments on boards they have no access to.
-  const requireBoardAccess = async (userId, boardId) => {
+  const requireBoardAccess = async (userId: string, boardId: string) => {
     if (!boardId) {
       throw new Meteor.Error('not-authorized', 'Attachment is not associated with a board');
     }
@@ -29,7 +29,7 @@ if (Meteor.isServer) {
      * @param {string} attachmentId - The old attachment ID
      * @returns {Object} - Migration result
      */
-    async migrateAttachment(attachmentId) {
+    async migrateAttachment(attachmentId: string) {
       if (!this.userId) {
         throw new Meteor.Error('not-authorized', 'Must be logged in');
       }
@@ -57,7 +57,10 @@ if (Meteor.isServer) {
         }
 
         // Create new attachment using Meteor-Files
-        const fileObj = new File([fileData], oldAttachment.name, {
+        // NOTE: `getOldAttachmentDataBuffer` is async but is intentionally left
+        // un-awaited here to preserve the pre-existing runtime behavior; cast to
+        // `any` so the un-awaited value still satisfies the `File` constructor.
+        const fileObj = new File([fileData as any], oldAttachment.name, {
           type: oldAttachment.type
         });
 
@@ -90,7 +93,7 @@ if (Meteor.isServer) {
      * @param {string} cardId - The card ID
      * @returns {Object} - Migration results
      */
-    async migrateCardAttachments(cardId) {
+    async migrateCardAttachments(cardId: string) {
       if (!this.userId) {
         throw new Meteor.Error('not-authorized', 'Must be logged in');
       }
@@ -99,7 +102,7 @@ if (Meteor.isServer) {
       const card = await ReactiveCache.getCard(cardId);
       await requireBoardAccess(this.userId, card && card.boardId);
 
-      const results = {
+      const results: CardAttachmentsMigrationResults = {
         success: 0,
         failed: 0,
         errors: []
@@ -135,7 +138,7 @@ if (Meteor.isServer) {
      * @param {string} cardId - The card ID (optional)
      * @returns {Object} - Migration status
      */
-    async getAttachmentMigrationStatus(cardId) {
+    async getAttachmentMigrationStatus(cardId: string) {
       if (!this.userId) {
         throw new Meteor.Error('not-authorized', 'Must be logged in');
       }
@@ -181,4 +184,15 @@ if (Meteor.isServer) {
       }
     }
   });
+}
+
+interface AttachmentMigrationError {
+  attachmentId: string;
+  error: string;
+}
+
+interface CardAttachmentsMigrationResults {
+  success: number;
+  failed: number;
+  errors: AttachmentMigrationError[];
 }

@@ -9,6 +9,8 @@
  * This is similar to the existing rescue migration but specifically for swimlaneId validation
  */
 
+import { Meteor } from 'meteor/meteor';
+import { Mongo } from 'meteor/mongo';
 import Activities from '/models/activities';
 import Boards from '/models/boards';
 import Cards from '/models/cards';
@@ -44,7 +46,7 @@ export const MIGRATION_VERSION = 1;
 /**
  * Get or create a "Rescued Data" swimlane for a board
  */
-async function getOrCreateRescuedSwimlane(boardId) {
+async function getOrCreateRescuedSwimlane(boardId: string) {
     const board = await Boards.findOneAsync(boardId);
     if (!board) return null;
 
@@ -276,7 +278,10 @@ async function getOrCreateRescuedSwimlane(boardId) {
       console.log('Migration results:');
       console.log(`- Fixed ${cardResults.fixedCount} cards without swimlaneId`);
       console.log(`- Fixed ${listResults.fixedCount} lists without swimlaneId`);
-      console.log(`- Rescued ${rescueResults.rescuedCount} orphaned cards`);
+      // `rescueOrphanedCards` can early-return `undefined` for a pre-existing
+      // edge case; by this point the earlier fixes guarantee a result object, so
+      // we assert non-null to preserve the original runtime behavior.
+      console.log(`- Rescued ${rescueResults!.rescuedCount} orphaned cards`);
 
       // Record migration completion
       await Migrations.upsertAsync(
@@ -289,7 +294,7 @@ async function getOrCreateRescuedSwimlane(boardId) {
             results: {
               cardsFixed: cardResults.fixedCount,
               listsFixed: listResults.fixedCount,
-              cardsRescued: rescueResults.rescuedCount,
+              cardsRescued: rescueResults!.rescuedCount,
             },
           },
         }
@@ -301,7 +306,7 @@ async function getOrCreateRescuedSwimlane(boardId) {
         success: true,
         cardsFixed: cardResults.fixedCount,
         listsFixed: listResults.fixedCount,
-        cardsRescued: rescueResults.rescuedCount,
+        cardsRescued: rescueResults!.rescuedCount,
       };
     } catch (error) {
       console.error(`Migration ${MIGRATION_NAME} failed:`, error);

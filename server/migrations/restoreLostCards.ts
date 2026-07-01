@@ -16,6 +16,9 @@ import Cards from '/models/cards';
 import Swimlanes from '/models/swimlanes';
 
 class RestoreLostCardsMigration {
+  name: string;
+  version: number;
+
   constructor() {
     this.name = 'restoreLostCards';
     this.version = 1;
@@ -24,19 +27,19 @@ class RestoreLostCardsMigration {
   /**
    * Check if migration is needed for a board
    */
-  async needsMigration(boardId) {
+  async needsMigration(boardId: string) {
     try {
       const cards = await ReactiveCache.getCards({ boardId, archived: false });
       const lists = await ReactiveCache.getLists({ boardId, archived: false });
 
       // Check for cards missing swimlaneId or listId
-      const lostCards = cards.filter(card => !card.swimlaneId || !card.listId);
+      const lostCards = cards.filter((card: any) => !card.swimlaneId || !card.listId);
       if (lostCards.length > 0) {
         return true;
       }
 
       // Check for lists missing swimlaneId
-      const lostLists = lists.filter(list => !list.swimlaneId);
+      const lostLists = lists.filter((list: any) => !list.swimlaneId);
       if (lostLists.length > 0) {
         return true;
       }
@@ -44,7 +47,7 @@ class RestoreLostCardsMigration {
       // Check for orphaned cards (cards whose list doesn't exist)
       for (const card of cards) {
         if (card.listId) {
-          const listExists = lists.some(list => list._id === card.listId);
+          const listExists = lists.some((list: any) => list._id === card.listId);
           if (!listExists) {
             return true;
           }
@@ -61,7 +64,7 @@ class RestoreLostCardsMigration {
   /**
    * Execute the migration
    */
-  async executeMigration(boardId) {
+  async executeMigration(boardId: string) {
     try {
       const results = {
         lostCardsSwimlaneCreated: false,
@@ -81,9 +84,9 @@ class RestoreLostCardsMigration {
       const swimlanes = await ReactiveCache.getSwimlanes({ boardId, archived: false });
 
       // Detect items to restore BEFORE creating anything
-      const lostLists = lists.filter(list => !list.swimlaneId);
-      const lostCards = cards.filter(card => !card.swimlaneId || !card.listId);
-      const orphanedCards = cards.filter(card => card.listId && !lists.some(list => list._id === card.listId));
+      const lostLists = lists.filter((list: any) => !list.swimlaneId);
+      const lostCards = cards.filter((card: any) => !card.swimlaneId || !card.listId);
+      const orphanedCards = cards.filter((card: any) => card.listId && !lists.some((list: any) => list._id === card.listId));
 
       const hasCardsWork = lostCards.length > 0 || orphanedCards.length > 0;
       const hasListsWork = lostLists.length > 0;
@@ -105,7 +108,7 @@ class RestoreLostCardsMigration {
       }
 
       // Find or create "Lost Cards" swimlane (only if there is actual work)
-      let lostCardsSwimlane = swimlanes.find(s => s.title === TAPi18n.__('lost-cards'));
+      let lostCardsSwimlane = swimlanes.find((s: any) => s.title === TAPi18n.__('lost-cards'));
       if (!lostCardsSwimlane) {
         const swimlaneId = await Swimlanes.insertAsync({
           title: TAPi18n.__('lost-cards'),
@@ -142,7 +145,7 @@ class RestoreLostCardsMigration {
       // Create default list only if we need to move cards
       let defaultList = null;
       if (hasCardsWork) {
-        defaultList = lists.find(l =>
+        defaultList = lists.find((l: any) =>
           l.swimlaneId === lostCardsSwimlane._id &&
           l.title === TAPi18n.__('lost-cards-list')
         );
@@ -166,7 +169,7 @@ class RestoreLostCardsMigration {
       // Restore cards missing swimlaneId or listId
       if (hasCardsWork) {
         for (const card of lostCards) {
-          const updateFields = { updatedAt: new Date() };
+          const updateFields: CardRestoreUpdateFields = { updatedAt: new Date() };
           if (!card.swimlaneId) updateFields.swimlaneId = lostCardsSwimlane._id;
           if (!card.listId) updateFields.listId = defaultList._id;
           await Cards.updateAsync(card._id, { $set: updateFields });
@@ -215,7 +218,7 @@ const restoreLostCardsMigration = new RestoreLostCardsMigration();
 
 // Register Meteor methods
 Meteor.methods({
-  async 'restoreLostCards.needsMigration'(boardId) {
+  async 'restoreLostCards.needsMigration'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -225,7 +228,7 @@ Meteor.methods({
     return await restoreLostCardsMigration.needsMigration(boardId);
   },
 
-  async 'restoreLostCards.execute'(boardId) {
+  async 'restoreLostCards.execute'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -245,7 +248,7 @@ Meteor.methods({
 
     // Only board admins can run migrations
     const isBoardAdmin = board.members && board.members.some(
-      member => member.userId === this.userId && member.isAdmin
+      (member: any) => member.userId === this.userId && member.isAdmin
     );
 
     if (!isBoardAdmin && !user.isAdmin) {
@@ -255,5 +258,11 @@ Meteor.methods({
     return await restoreLostCardsMigration.executeMigration(boardId);
   }
 });
+
+interface CardRestoreUpdateFields {
+  updatedAt: Date;
+  swimlaneId?: string;
+  listId?: string;
+}
 
 export default restoreLostCardsMigration;

@@ -14,6 +14,9 @@ import Cards from '/models/cards';
 import { generateUniversalAttachmentUrl, generateUniversalAvatarUrl, cleanFileUrl, extractFileIdFromUrl, isUniversalFileUrl } from '/models/lib/universalUrlGenerator';
 
 class FixAllFileUrlsMigration {
+  name: string;
+  version: number;
+
   constructor() {
     this.name = 'fixAllFileUrls';
     this.version = 1;
@@ -22,14 +25,14 @@ class FixAllFileUrlsMigration {
   /**
    * Check if migration is needed for a board
    */
-  async needsMigration(boardId) {
+  async needsMigration(boardId: string) {
     // Get all users who are members of this board
     const board = await ReactiveCache.getBoard(boardId);
     if (!board || !board.members) {
       return false;
     }
 
-    const memberIds = board.members.map(m => m.userId);
+    const memberIds = board.members.map((m: any) => m.userId);
 
     // Check for problematic avatar URLs for board members
     const users = await ReactiveCache.getUsers({ _id: { $in: memberIds } });
@@ -44,7 +47,7 @@ class FixAllFileUrlsMigration {
 
     // Check for problematic attachment URLs on this board
     const cards = await ReactiveCache.getCards({ boardId });
-    const cardIds = cards.map(c => c._id);
+    const cardIds = cards.map((c: any) => c._id);
     const attachments = await ReactiveCache.getAttachments({ cardId: { $in: cardIds } });
     
     for (const attachment of attachments) {
@@ -59,7 +62,7 @@ class FixAllFileUrlsMigration {
   /**
    * Check if a URL has problematic patterns
    */
-  hasProblematicUrl(url) {
+  hasProblematicUrl(url: string) {
     if (!url) return false;
 
     // Check for auth parameters
@@ -95,9 +98,9 @@ class FixAllFileUrlsMigration {
   /**
    * Execute the migration for a board
    */
-  async execute(boardId) {
+  async execute(boardId: string) {
     let filesFixed = 0;
-    let errors = [];
+    let errors: string[] = [];
 
     console.log(`Starting universal file URL migration for board ${boardId}...`);
 
@@ -132,13 +135,13 @@ class FixAllFileUrlsMigration {
   /**
    * Fix avatar URLs in user profiles for board members
    */
-  async fixAvatarUrls(boardId) {
+  async fixAvatarUrls(boardId: string) {
     const board = await ReactiveCache.getBoard(boardId);
     if (!board || !board.members) {
       return 0;
     }
 
-    const memberIds = board.members.map(m => m.userId);
+    const memberIds = board.members.map((m: any) => m.userId);
     const users = await ReactiveCache.getUsers({ _id: { $in: memberIds } });
     let avatarsFixed = 0;
 
@@ -188,9 +191,9 @@ class FixAllFileUrlsMigration {
   /**
    * Fix attachment URLs in attachment records for this board
    */
-  async fixAttachmentUrls(boardId) {
+  async fixAttachmentUrls(boardId: string) {
     const cards = await ReactiveCache.getCards({ boardId });
-    const cardIds = cards.map(c => c._id);
+    const cardIds = cards.map((c: any) => c._id);
     const attachments = await ReactiveCache.getAttachments({ cardId: { $in: cardIds } });
     let attachmentsFixed = 0;
 
@@ -228,9 +231,9 @@ class FixAllFileUrlsMigration {
   /**
    * Fix attachment URLs in the Attachments collection for this board
    */
-  async fixCardAttachmentUrls(boardId) {
+  async fixCardAttachmentUrls(boardId: string) {
     const cards = await ReactiveCache.getCards({ boardId });
-    const cardIds = cards.map(c => c._id);
+    const cardIds = cards.map((c: any) => c._id);
     const attachments = await ReactiveCache.getAttachments({ cardId: { $in: cardIds } });
     let attachmentsFixed = 0;
 
@@ -270,7 +273,7 @@ export const fixAllFileUrlsMigration = new FixAllFileUrlsMigration();
 
 // Meteor methods
 Meteor.methods({
-  async 'fixAllFileUrls.execute'(boardId) {
+  async 'fixAllFileUrls.execute'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -290,7 +293,7 @@ Meteor.methods({
 
     // Only board admins can run migrations
     const isBoardAdmin = board.members && board.members.some(
-      member => member.userId === this.userId && member.isAdmin
+      (member: any) => member.userId === this.userId && member.isAdmin
     );
 
     if (!isBoardAdmin && !user.isAdmin) {
@@ -300,7 +303,7 @@ Meteor.methods({
     return await fixAllFileUrlsMigration.execute(boardId);
   },
 
-  async 'fixAllFileUrls.needsMigration'(boardId) {
+  async 'fixAllFileUrls.needsMigration'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {

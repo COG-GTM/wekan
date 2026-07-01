@@ -23,6 +23,9 @@ import Lists from '/models/lists';
 import Cards from '/models/cards';
 
 class FixMissingListsMigration {
+  name: string;
+  version: number;
+
   constructor() {
     this.name = 'fix-missing-lists';
     this.version = 1;
@@ -31,7 +34,7 @@ class FixMissingListsMigration {
   /**
    * Check if migration is needed for a board
    */
-  async needsMigration(boardId) {
+  async needsMigration(boardId: string) {
     try {
       const board = await ReactiveCache.getBoard(boardId);
       if (!board) return false;
@@ -47,7 +50,7 @@ class FixMissingListsMigration {
       
       // Create a map of listId -> swimlaneId for existing lists
       const listSwimlaneMap = new Map();
-      lists.forEach(list => {
+      lists.forEach((list: any) => {
         listSwimlaneMap.set(list._id, list.swimlaneId || '');
       });
 
@@ -72,7 +75,7 @@ class FixMissingListsMigration {
   /**
    * Execute the migration for a board
    */
-  async executeMigration(boardId) {
+  async executeMigration(boardId: string) {
     try {
       if (process.env.DEBUG === 'true') {
         console.log(`Starting fix missing lists migration for board ${boardId}`);
@@ -91,7 +94,7 @@ class FixMissingListsMigration {
       const listSwimlaneMap = new Map();
       const swimlaneListsMap = new Map();
 
-      lists.forEach(list => {
+      lists.forEach((list: any) => {
         listSwimlaneMap.set(list._id, list.swimlaneId || '');
         if (!swimlaneListsMap.has(list.swimlaneId || '')) {
           swimlaneListsMap.set(list.swimlaneId || '', []);
@@ -101,7 +104,7 @@ class FixMissingListsMigration {
 
       // Group cards by swimlaneId
       const cardsBySwimlane = new Map();
-      cards.forEach(card => {
+      cards.forEach((card: any) => {
         if (!cardsBySwimlane.has(card.swimlaneId)) {
           cardsBySwimlane.set(card.swimlaneId, []);
         }
@@ -117,11 +120,11 @@ class FixMissingListsMigration {
 
         // Get existing lists for this swimlane
         const existingLists = swimlaneListsMap.get(swimlaneId) || [];
-        const existingListTitles = new Set(existingLists.map(list => list.title));
+        const existingListTitles = new Set(existingLists.map((list: any) => list.title));
 
         // Group cards by their current listId
         const cardsByListId = new Map();
-        swimlaneCards.forEach(card => {
+        swimlaneCards.forEach((card: any) => {
           if (!cardsByListId.has(card.listId)) {
             cardsByListId.set(card.listId, []);
           }
@@ -130,7 +133,7 @@ class FixMissingListsMigration {
 
         // For each listId used by cards in this swimlane
         for (const [listId, cardsInList] of cardsByListId) {
-          const originalList = lists.find(l => l._id === listId);
+          const originalList = lists.find((l: any) => l._id === listId);
           if (!originalList) continue;
 
           // Check if this list's swimlaneId matches the card's swimlaneId
@@ -141,11 +144,11 @@ class FixMissingListsMigration {
           }
 
           // Check if we already have a list with the same title in this swimlane
-          let targetList = existingLists.find(list => list.title === originalList.title);
+          let targetList = existingLists.find((list: any) => list.title === originalList.title);
 
           if (!targetList) {
             // Create a new list for this swimlane
-            const newListData = {
+            const newListData: FixMissingListData = {
               title: originalList.title,
               boardId: boardId,
               swimlaneId: swimlaneId,
@@ -214,7 +217,7 @@ class FixMissingListsMigration {
   /**
    * Get migration status for a board
    */
-  async getMigrationStatus(boardId) {
+  async getMigrationStatus(boardId: string) {
     try {
       const board = await ReactiveCache.getBoard(boardId);
       if (!board) {
@@ -245,7 +248,7 @@ export const fixMissingListsMigration = new FixMissingListsMigration();
 
 // Meteor methods
 Meteor.methods({
-  async 'fixMissingListsMigration.check'(boardId) {
+  async 'fixMissingListsMigration.check'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -262,7 +265,7 @@ Meteor.methods({
     return await fixMissingListsMigration.getMigrationStatus(boardId);
   },
 
-  async 'fixMissingListsMigration.execute'(boardId) {
+  async 'fixMissingListsMigration.execute'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -278,7 +281,7 @@ Meteor.methods({
     }
     const user = await ReactiveCache.getUser(this.userId);
     const isBoardAdmin = board.members && board.members.some(
-      member => member.userId === this.userId && member.isAdmin
+      (member: any) => member.userId === this.userId && member.isAdmin
     );
     if (!isBoardAdmin && !(user && user.isAdmin)) {
       throw new Meteor.Error('not-authorized', 'Only board administrators can run migrations');
@@ -287,7 +290,7 @@ Meteor.methods({
     return await fixMissingListsMigration.executeMigration(boardId);
   },
 
-  async 'fixMissingListsMigration.needsMigration'(boardId) {
+  async 'fixMissingListsMigration.needsMigration'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -304,3 +307,20 @@ Meteor.methods({
     return await fixMissingListsMigration.needsMigration(boardId);
   }
 });
+
+interface FixMissingListData {
+  title: string;
+  boardId: string;
+  swimlaneId: string;
+  sort: number;
+  archived: boolean;
+  createdAt: Date;
+  modifiedAt: Date;
+  type: string;
+  color?: string;
+  wipLimit?: number;
+  wipLimitEnabled?: boolean;
+  wipLimitSoft?: boolean;
+  starred?: boolean;
+  collapsed?: boolean;
+}
