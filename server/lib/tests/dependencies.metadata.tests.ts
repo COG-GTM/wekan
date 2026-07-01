@@ -39,7 +39,7 @@ describe('dependencies metadata', function () {
     });
 
     it('falls back to the default type for an unknown type', function () {
-      expect(normalizeDependency({ cardId: 'c1', type: 'bogus' }).type).to.equal(
+      expect(normalizeDependency({ cardId: 'c1', type: 'bogus' })!.type).to.equal(
         DEFAULT_DEPENDENCY_TYPE,
       );
     });
@@ -53,7 +53,9 @@ describe('dependencies metadata', function () {
 
   describe('normalizeDependencies', function () {
     it('normalizes a mixed legacy/object array and drops invalid entries', function () {
-      const out = normalizeDependencies(['a', { cardId: 'b', type: 'fixes' }, {}, null]);
+      const out = normalizeDependencies(
+        ['a', { cardId: 'b', type: 'fixes' }, {}, null] as Parameters<typeof normalizeDependencies>[0],
+      );
       expect(out).to.have.length(2);
       expect(out[0].cardId).to.equal('a');
       expect(out[1]).to.deep.include({ cardId: 'b', type: 'fixes' });
@@ -76,20 +78,23 @@ describe('dependencies metadata', function () {
     });
 
     it('related-to is undirected', function () {
-      expect(dependencyTypeMeta('related-to').directed).to.equal(false);
+      expect(dependencyTypeMeta('related-to')!.directed).to.equal(false);
     });
 
     it('an unknown type falls back to the default type meta', function () {
-      expect(dependencyTypeMeta('nope').id).to.equal(DEFAULT_DEPENDENCY_TYPE);
+      expect(dependencyTypeMeta('nope')!.id).to.equal(DEFAULT_DEPENDENCY_TYPE);
     });
   });
 
   describe('DEPENDENCY_TYPE_INVERSE', function () {
     it('maps every type to a valid inverse, and inverting twice is identity', function () {
+      // The inverse map is keyed by the fixed set of type ids; index it via a
+      // string-keyed view so the loop variables (plain strings) can look up.
+      const inverse: Record<string, string> = DEPENDENCY_TYPE_INVERSE;
       DEPENDENCY_TYPE_IDS.forEach(id => {
-        const inv = DEPENDENCY_TYPE_INVERSE[id];
+        const inv = inverse[id];
         expect(DEPENDENCY_TYPE_IDS).to.include(inv);
-        expect(DEPENDENCY_TYPE_INVERSE[inv]).to.equal(id);
+        expect(inverse[inv]).to.equal(id);
       });
     });
   });

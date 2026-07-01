@@ -28,10 +28,13 @@ export function isItemHidden({ isChecked, hideChecked }: ItemHiddenInput = {}) {
 }
 
 interface ChecklistHideDoc {
+  _id?: string;
   hideCheckedChecklistItems?: boolean;
 }
 
 interface ItemHiddenInput {
-  isChecked?: boolean;
-  hideChecked?: boolean;
+  // Both flags are coerced with `!!`, so any truthy/falsy runtime value is
+  // accepted (documents/DB values may arrive as numbers or strings).
+  isChecked?: boolean | number | string | null;
+  hideChecked?: boolean | number | string | null;
 }

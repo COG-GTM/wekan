@@ -58,7 +58,7 @@ describe('utils', function() {
       expect(allowIsAnyBoardMember(Random.id(), boardsExpectedTrue)).to.equal(false);
 
       const boardsExpectedFalse = [{
-        hasMember: (): boolean => false
+        hasMember: (_id: string): boolean => false
       }] as Parameters<typeof allowIsAnyBoardMember>[1];
 
       expect(allowIsAnyBoardMember(userId, boardsExpectedFalse)).to.equal(false);
@@ -71,9 +71,9 @@ describe('utils', function() {
       const userId = Random.id();
       const board = {
         hasMember: (id: string): boolean => id === userId,
-        hasReadOnly: (): boolean => false,
-        hasReadAssignedOnly: (): boolean => false,
-        hasNoComments: (): boolean => false,
+        hasReadOnly: (_id: string): boolean => false,
+        hasReadAssignedOnly: (_id: string): boolean => false,
+        hasNoComments: (_id: string): boolean => false,
       } as Parameters<typeof allowIsBoardMemberCommentOnly>[1];
 
       expect(allowIsBoardMemberCommentOnly(userId, board)).to.equal(true);

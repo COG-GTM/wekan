@@ -14,7 +14,7 @@ describe('webhookGuard.safeDeliver (bug #1402: outgoing webhook must be non-bloc
 
   it('resolves (does NOT reject) when a synchronous deliverFn throws', async function() {
     let rejected = false;
-    let result;
+    let result: Awaited<ReturnType<typeof safeDeliver>> | undefined;
     try {
       result = await safeDeliver(() => {
         throw new Error('boom-sync');
@@ -23,14 +23,14 @@ describe('webhookGuard.safeDeliver (bug #1402: outgoing webhook must be non-bloc
       rejected = true;
     }
     expect(rejected).to.equal(false);
-    expect(result.ok).to.equal(false);
-    expect(result.error).to.be.instanceOf(Error);
-    expect(result.error.message).to.equal('boom-sync');
+    expect(result!.ok).to.equal(false);
+    expect(result!.error).to.be.instanceOf(Error);
+    expect(result!.error!.message).to.equal('boom-sync');
   });
 
   it('resolves (does NOT reject) when an async deliverFn rejects', async function() {
     let rejected = false;
-    let result;
+    let result: Awaited<ReturnType<typeof safeDeliver>> | undefined;
     try {
       result = await safeDeliver(async () => {
         throw new Error('boom-async');
@@ -39,8 +39,8 @@ describe('webhookGuard.safeDeliver (bug #1402: outgoing webhook must be non-bloc
       rejected = true;
     }
     expect(rejected).to.equal(false);
-    expect(result.ok).to.equal(false);
-    expect(result.error.message).to.equal('boom-async');
+    expect(result!.ok).to.equal(false);
+    expect(result!.error!.message).to.equal('boom-async');
   });
 
   it('resolves { ok: true } when an async deliverFn resolves', async function() {

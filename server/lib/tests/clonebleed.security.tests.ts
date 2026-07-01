@@ -126,7 +126,7 @@ describe('CloneBleed authorization', function() {
 
   describe('updateListSort (server/models/lists.js)', function() {
     const handler = () => Meteor.server.method_handlers['updateListSort'];
-    const writeMember = (userId) => ({
+    const writeMember = (userId: string) => ({
       members: [{ userId, isActive: true, isNoComments: false, isCommentOnly: false, isWorker: false, isReadOnly: false, isReadAssignedOnly: false }],
     });
 
@@ -173,7 +173,7 @@ describe('CloneBleed authorization', function() {
       'userPositionHistory.getRecent',
       'userPositionHistory.getCheckpoints',
     ];
-    const argsFor = {
+    const argsFor: { [name: string]: (string | number)[] } = {
       'userPositionHistory.createCheckpoint': ['private-board', 'cp'],
       'userPositionHistory.getRecent': ['private-board', 10],
       'userPositionHistory.getCheckpoints': ['private-board'],

@@ -10,7 +10,7 @@ describe('boards security', function() {
     it('denies anonymous updates even if fieldNames include sort', function() {
       const userId = null;
       const board = {
-        hasMember: (): boolean => true,
+        hasMember: (_id: string): boolean => true,
       } as Parameters<typeof canUpdateBoardSort>[1];
       const fieldNames = ['sort'];
 

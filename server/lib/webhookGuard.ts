@@ -26,13 +26,14 @@
  *   be synchronous or return a Promise.
  * @returns {Promise<{ok: boolean, error?: Error}>}
  */
-export async function safeDeliver(deliverFn: DeliverFn) {
+export async function safeDeliver(deliverFn: DeliverFn | null | undefined) {
   try {
     if (typeof deliverFn !== 'function') {
       throw new TypeError('safeDeliver: deliverFn must be a function');
     }
     await deliverFn();
-    return { ok: true };
+    const success: SafeDeliverResult = { ok: true };
+    return success;
   } catch (error) {
     // Swallow + log: a failing webhook must never abort the caller.
     try {
@@ -41,10 +42,16 @@ export async function safeDeliver(deliverFn: DeliverFn) {
     } catch (_logErr) {
       // ignore logging failures
     }
-    return { ok: false, error };
+    const failure: SafeDeliverResult = { ok: false, error };
+    return failure;
   }
 }
 
 // `deliverFn` may be synchronous or return a Promise, and its resolved value is
 // ignored, so its return type is arbitrary (any is unavoidable here).
 type DeliverFn = () => any;
+
+interface SafeDeliverResult {
+  ok: boolean;
+  error?: Error;
+}

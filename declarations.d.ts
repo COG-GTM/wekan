@@ -13,7 +13,7 @@ declare module 'meteor/meteor' {
   namespace Meteor {
     const server: {
       method_handlers: {
-        [name: string]: (this: { userId?: string }, ...args: any[]) => any;
+        [name: string]: (this: { userId?: string | null }, ...args: any[]) => any;
       };
     };
   }

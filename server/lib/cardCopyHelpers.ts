@@ -19,8 +19,8 @@
  * @returns {Array<string>} ids of destination-board labels whose (non-empty) name matches a source label name
  */
 export function filterCopiedLabelIds(
-  destBoardLabels: BoardLabel[],
-  sourceLabelNames: string[],
+  destBoardLabels: BoardLabel[] | null | undefined,
+  sourceLabelNames: (string | null | undefined)[] | null | undefined,
 ) {
   const labels = Array.isArray(destBoardLabels) ? destBoardLabels : [];
   const names = Array.isArray(sourceLabelNames) ? sourceLabelNames : [];
@@ -60,8 +60,8 @@ export function resolveRealCardId(card: RealIdCard | null | undefined) {
  * @returns {string|undefined} the remapped coverId, or undefined when there is no cover / no match
  */
 export function remapCoverId(
-  oldCoverId: string | undefined,
-  oldToNewAttachmentId: { [oldId: string]: string },
+  oldCoverId: string | null | undefined,
+  oldToNewAttachmentId: { [oldId: string]: string } | null | undefined,
 ) {
   if (!oldCoverId) {
     return undefined;
