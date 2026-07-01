@@ -11,7 +11,7 @@ import {
 // sanitizeFilename now caps the name at 200 UTF-8 *bytes*, measured in bytes and
 // never splitting a multibyte codepoint, while preserving the file extension.
 describe('attachment filename truncation (#6412)', function() {
-  const isValidUtf8 = s => Buffer.from(s, 'utf8').toString('utf8') === s;
+  const isValidUtf8 = (s: string) => Buffer.from(s, 'utf8').toString('utf8') === s;
 
   describe('truncateFilenameToBytes', function() {
     it('leaves a short name unchanged', function() {

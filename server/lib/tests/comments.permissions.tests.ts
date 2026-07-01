@@ -2,6 +2,9 @@
 import { expect } from 'chai';
 import { canEditComment } from '/models/cardComments';
 
+// The options object accepted by canEditComment (its interface is not exported).
+type CanEditCommentOpts = Parameters<typeof canEditComment>[0];
+
 /**
  * Unit tests for the comment edit/delete permission decision (issue #5906).
  *
@@ -75,7 +78,9 @@ describe('comment edit/delete permissions (canEditComment)', function() {
   });
 
   it('treats missing/undefined flags as falsy (no accidental allow)', function() {
-    expect(canEditComment({})).to.equal(false);
-    expect(canEditComment({ isBoardAdmin: undefined })).to.equal(false);
+    // Deliberately omit/undefine flags to prove they are read as falsy; the
+    // casts bypass the required-field types since that is exactly what's tested.
+    expect(canEditComment({} as CanEditCommentOpts)).to.equal(false);
+    expect(canEditComment({ isBoardAdmin: undefined } as Partial<CanEditCommentOpts> as CanEditCommentOpts)).to.equal(false);
   });
 });

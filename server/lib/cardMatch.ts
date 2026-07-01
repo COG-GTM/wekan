@@ -20,7 +20,7 @@
  */
 export function cardMatchesQuery(
   card: CardMatchInput | null | undefined,
-  query: string,
+  query: string | null | undefined,
 ) {
   const c = card || {};
   const q = (query == null ? '' : String(query)).toLowerCase();
@@ -52,5 +52,7 @@ export function cardMatchesQuery(
 interface CardMatchInput {
   title?: string;
   description?: string;
-  commentTexts?: string[];
+  // Individual comment texts may be null/undefined/empty; the loop skips falsy
+  // entries, so the element type is intentionally nullable.
+  commentTexts?: (string | null | undefined)[];
 }

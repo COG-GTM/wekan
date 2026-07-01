@@ -115,5 +115,8 @@ export function validateCommentBody(body: CommentRequestBody | null | undefined)
 }
 
 interface CommentRequestBody {
-  comment?: string;
+  // The raw, untrusted REST request body: `comment` may be any type (or absent)
+  // and is validated with a `typeof === 'string'` guard. `any` because the value
+  // comes straight off the wire and the guard is what makes it safe.
+  comment?: any;
 }

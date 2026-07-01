@@ -1,3 +1,9 @@
+// Load the Mocha BDD globals (describe/it/before*/after*) from @types/mocha for
+// the server/lib test suites. These globals are provided by the meteortesting:mocha
+// driver at runtime; @types/mocha is global-only (never imported) so it is not
+// auto-included and must be referenced explicitly here.
+/// <reference types="mocha" />
+
 // Ambient module and global declarations for the wekan root application.
 //
 // These cover Meteor packages and app-wide globals that are NOT typed by

@@ -26,9 +26,9 @@
  *   missingNames: names of referenced source labels that have no match on dest
  */
 export function remapLabelIds(
-  sourceLabels: LabelLike[],
-  sourceLabelIds: string[],
-  destLabels: LabelLike[],
+  sourceLabels: LabelLike[] | null | undefined,
+  sourceLabelIds: string[] | null | undefined,
+  destLabels: LabelLike[] | null | undefined,
 ) {
   const src = Array.isArray(sourceLabels) ? sourceLabels : [];
   const ids = Array.isArray(sourceLabelIds) ? sourceLabelIds : [];

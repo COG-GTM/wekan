@@ -71,9 +71,11 @@ export function isSelectedSubtaskBoard(board: SubtaskBoard | null | undefined, b
 }
 
 interface SubtaskBoard {
-  subtasksDefaultBoardId?: string;
-  subtasksDefaultListId?: string;
-  subtasksDefaultSwimlaneId?: string;
+  // Fields may be null (an explicitly cleared setting) as well as absent; the
+  // `isConfigured` guard treats null/undefined/''/'null' as "not configured".
+  subtasksDefaultBoardId?: string | null;
+  subtasksDefaultListId?: string | null;
+  subtasksDefaultSwimlaneId?: string | null;
 }
 
 interface SubtaskLanding {

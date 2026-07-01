@@ -20,7 +20,10 @@ interface TitleDoc {
 }
 
 interface TitleModifier {
+  // A Mongo `$set` modifier that may carry any card fields; only `title` is
+  // relevant here. `any` values because the modifier shape is dynamic (Mongo).
   $set?: {
     title?: string;
+    [key: string]: any;
   };
 }

@@ -54,8 +54,10 @@ export default canAddUserToBoard;
 
 interface OrgTeamRestrictionOpts {
   restrictEnabled?: boolean;
-  adderOrgs?: string[];
-  adderTeams?: string[];
-  candidateOrgs?: string[];
-  candidateTeams?: string[];
+  // Org/Team id arrays may be null (no memberships) as well as absent;
+  // `hasIntersection` treats null/undefined as an empty array.
+  adderOrgs?: string[] | null;
+  adderTeams?: string[] | null;
+  candidateOrgs?: string[] | null;
+  candidateTeams?: string[] | null;
 }

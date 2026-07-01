@@ -20,10 +20,10 @@ describe('REST API response helpers (#5804)', function() {
   // back to its schema, which points back to its contexts. This is the exact
   // shape that previously crashed JSON.stringify and surfaced as HTTP 500.
   function makeCircularValidationError() {
-    const schema = { name: 'SimpleSchema' };
-    const context = { name: 'SimpleSchemaValidationContext', _simpleSchema: schema };
+    const schema: ValidationSchema = { name: 'SimpleSchema' };
+    const context: ValidationContext = { name: 'SimpleSchemaValidationContext', _simpleSchema: schema };
     schema._validationContexts = { default: context };
-    const error = new Error('failed validation');
+    const error: ValidationError = new Error('failed validation');
     error.reason = 'Text is required';
     error._validationContexts = { default: context };
     return error;
@@ -39,7 +39,7 @@ describe('REST API response helpers (#5804)', function() {
     });
 
     it('prefers reason over message', function() {
-      const e = new Error('low level');
+      const e: ValidationError = new Error('low level');
       e.reason = 'friendly';
       expect(extractErrorMessage(e)).to.equal('friendly');
     });
@@ -69,7 +69,7 @@ describe('REST API response helpers (#5804)', function() {
     });
 
     it('does NOT throw on a circular structure (regression for the HTTP 500)', function() {
-      const circular = {};
+      const circular: CircularRef = {};
       circular.self = circular;
       expect(() => safeJsonStringify(circular)).to.not.throw();
     });
@@ -127,3 +127,26 @@ describe('REST API response helpers (#5804)', function() {
     });
   });
 });
+
+// The circular SimpleSchema validation-error shape used by the tests above: a
+// schema points at its validation contexts, each of which points back at the
+// schema, forming the cycle that once crashed JSON.stringify (#5804).
+interface ValidationContext {
+  name: string;
+  _simpleSchema: ValidationSchema;
+}
+
+interface ValidationSchema {
+  name: string;
+  _validationContexts?: { [key: string]: ValidationContext };
+}
+
+interface ValidationError extends Error {
+  reason?: string;
+  _validationContexts?: { [key: string]: ValidationContext };
+}
+
+// A minimal self-referential object used to build a plain circular structure.
+interface CircularRef {
+  self?: CircularRef;
+}
