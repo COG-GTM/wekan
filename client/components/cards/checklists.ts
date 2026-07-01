@@ -1,3 +1,5 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
 import Cards from '/models/cards';
@@ -12,7 +14,7 @@ import autosize from 'autosize';
 // SubsManager removed for Meteor 3 migration
 const { calculateIndexData } = Utils;
 
-function initSorting(items) {
+function initSorting(items: JQuery) {
   items.sortable({
     tolerance: 'pointer',
     helper: 'clone',
@@ -23,24 +25,26 @@ function initSorting(items) {
     placeholder: 'checklist-item placeholder',
     scroll: true,
     start(evt, ui) {
-      ui.placeholder.height(ui.helper.height());
+      ui.placeholder.height(ui.helper.height() as number);
       EscapeActions.clickExecute(evt.target, 'inlinedForm');
     },
     stop(evt, ui) {
       const parent = ui.item.parents('.js-checklist-items');
-      const checklistId = Blaze.getData(parent.get(0)).checklist._id;
-      let prevItem = ui.item.prev('.js-checklist-item').get(0);
+      // Blaze.getData returns the dynamic checklist/checklist-item data context.
+      const checklistId = (Blaze.getData(parent.get(0)) as any).checklist._id;
+      // prevItem/nextItem start as DOM elements then become resolved data items.
+      let prevItem: any = ui.item.prev('.js-checklist-item').get(0);
       if (prevItem) {
-        prevItem = Blaze.getData(prevItem).item;
+        prevItem = (Blaze.getData(prevItem) as any).item;
       }
-      let nextItem = ui.item.next('.js-checklist-item').get(0);
+      let nextItem: any = ui.item.next('.js-checklist-item').get(0);
       if (nextItem) {
-        nextItem = Blaze.getData(nextItem).item;
+        nextItem = (Blaze.getData(nextItem) as any).item;
       }
       const nItems = 1;
       const sortIndex = calculateIndexData(prevItem, nextItem, nItems);
       const checklistDomElement = ui.item.get(0);
-      const checklistData = Blaze.getData(checklistDomElement);
+      const checklistData = Blaze.getData(checklistDomElement) as any;
       const checklistItem = checklistData.item;
 
       items.sortable('cancel');
@@ -50,11 +54,11 @@ function initSorting(items) {
   });
 }
 
-Template.checklistDetail.onRendered(function () {
+Template.checklistDetail.onRendered(function (this: ChecklistDetailInstance) {
   const tpl = this;
   tpl.itemsDom = this.$('.js-checklist-items');
   initSorting(tpl.itemsDom);
-  tpl.itemsDom.mousedown(function (evt) {
+  tpl.itemsDom.mousedown(function (evt: JQuery.TriggeredEvent) {
     evt.stopPropagation();
   });
 
@@ -78,14 +82,14 @@ Template.checklistDetail.onRendered(function () {
 
 Template.checklistDetail.helpers({
   /** returns the finished percent of the checklist */
-  finishedPercent() {
+  finishedPercent(this: any) {
     const ret = this.checklist.finishedPercent();
     return ret;
   },
 });
 
 Template.checklists.helpers({
-  checklists() {
+  checklists(this: any) {
     const card = ReactiveCache.getCard(this.cardId);
     if (!card || typeof card.checklists !== 'function') {
       return [];
@@ -97,9 +101,9 @@ Template.checklists.helpers({
 
 Template.checklists.events({
   'click .js-open-checklist-details-menu': Popup.open('checklistActions'),
-  'submit .js-add-checklist'(event, tpl) {
+  'submit .js-add-checklist'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     event.preventDefault();
-    const textarea = tpl.find('textarea.js-add-checklist-item');
+    const textarea = tpl.find('textarea.js-add-checklist-item') as HTMLTextAreaElement;
     const title = textarea.value.trim();
     let cardId = Template.currentData().cardId;
     const card = ReactiveCache.getCard(cardId);
@@ -131,33 +135,35 @@ Template.checklists.events({
       }, 100);
     }
   },
-  'submit .js-edit-checklist-title'(event, tpl) {
+  'submit .js-edit-checklist-title'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     event.preventDefault();
-    const textarea = tpl.find('textarea.js-edit-checklist-item');
+    const textarea = tpl.find('textarea.js-edit-checklist-item') as HTMLTextAreaElement;
     const title = textarea.value.trim();
-    const formData = Blaze.getData(event.currentTarget) || Blaze.getData(event.target);
+    // dynamic Blaze data context of the checklist form
+    const formData = (Blaze.getData(event.currentTarget) || Blaze.getData(event.target)) as any;
     const checklist = formData?.checklist;
     if (checklist) {
       checklist.setTitle(title);
     }
   },
-  'submit .js-add-checklist-item'(event, tpl) {
+  'submit .js-add-checklist-item'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     event.preventDefault();
-    const textarea = tpl.find('textarea.js-add-checklist-item');
+    const textarea = tpl.find('textarea.js-add-checklist-item') as HTMLTextAreaElement;
     if (!textarea) {
       return;
     }
-    const newlineBecomesNewChecklistItem = tpl.find('input#toggleNewlineBecomesNewChecklistItem');
-    const newlineBecomesNewChecklistItemOriginOrder = tpl.find('input#toggleNewlineBecomesNewChecklistItemOriginOrder');
+    const newlineBecomesNewChecklistItem = tpl.find('input#toggleNewlineBecomesNewChecklistItem') as HTMLInputElement;
+    const newlineBecomesNewChecklistItemOriginOrder = tpl.find('input#toggleNewlineBecomesNewChecklistItemOriginOrder') as HTMLInputElement;
     const title = textarea.value.trim();
     const currentData = Template.currentData() || {};
     let resolvedData = currentData;
     let checklist = currentData.checklist;
     if (!checklist) {
-      const form = event.currentTarget?.closest
-        ? event.currentTarget.closest('form')
+      const form = (event.currentTarget as HTMLElement)?.closest
+        ? (event.currentTarget as HTMLElement).closest('form')
         : $(event.target).closest('form').get(0);
-      const formData = form ? Blaze.getData(form) : null;
+      // dynamic Blaze data context of the resolved form
+      const formData = form ? Blaze.getData(form) as any : null;
       if (formData) {
         resolvedData = formData;
       }
@@ -170,7 +176,7 @@ Template.checklists.events({
     if (title) {
       let checklistItems = [title];
       if (newlineBecomesNewChecklistItem?.checked) {
-        checklistItems = title.split('\n').map(_value => _value.trim());
+        checklistItems = title.split('\n').map((_value: string) => _value.trim());
         if (resolvedData.position === 'top') {
           if (newlineBecomesNewChecklistItemOriginOrder?.checked === false) {
             checklistItems = checklistItems.reverse();
@@ -200,18 +206,19 @@ Template.checklists.events({
     textarea.value = '';
     textarea.focus();
   },
-  'submit .js-edit-checklist-item'(event, tpl) {
+  'submit .js-edit-checklist-item'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     event.preventDefault();
-    const textarea = tpl.find('textarea.js-edit-checklist-item');
+    const textarea = tpl.find('textarea.js-edit-checklist-item') as HTMLTextAreaElement;
     const title = textarea.value.trim();
-    const formData = Blaze.getData(event.currentTarget) || Blaze.getData(event.target);
+    // dynamic Blaze data context of the checklist item form
+    const formData = (Blaze.getData(event.currentTarget) || Blaze.getData(event.target)) as any;
     const item = formData?.item;
     if (item) {
       item.setTitle(title);
     }
   },
   'click .js-convert-checklist-item-to-card': Popup.open('convertChecklistItemToCard'),
-  'click .js-delete-checklist-item': Popup.afterConfirm('checklistItemDelete', function () {
+  'click .js-delete-checklist-item': Popup.afterConfirm('checklistItemDelete', function (this: any) {
     Popup.back();
     const item = this?.item || this;
     // #3252: guard against removing a doc already evicted from Minimongo (heavy
@@ -221,14 +228,14 @@ Template.checklists.events({
     }
   }),
   // add and delete checklist / checklist-item
-  'click .js-open-inlined-form'(event, tpl) {
+  'click .js-open-inlined-form'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     tpl.$('.js-close-inlined-form').click();
   },
-  'click #toggleHideFinishedChecklist'(event) {
+  'click #toggleHideFinishedChecklist'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     Template.currentData().card.toggleHideFinishedChecklist();
   },
-  'keydown textarea.js-add-checklist-item'(event) {
+  'keydown textarea.js-add-checklist-item'(event: JQuery.TriggeredEvent) {
     //If user press enter key inside a form, submit it
     //Unless the user is also holding down the 'shift' key
     if (event.keyCode === 13 && !event.shiftKey) {
@@ -242,14 +249,14 @@ Template.checklists.events({
 // NOTE: boardsSwimlanesAndLists template was removed from jade but JS was left behind.
 // This is dead code — the template no longer exists in any jade file.
 
-Template.addChecklistItemForm.onRendered(function () {
+Template.addChecklistItemForm.onRendered(function (this: Blaze.TemplateInstance) {
   autosize(this.$('textarea.js-add-checklist-item'));
 });
 
 Template.addChecklistItemForm.events({
-  'click a.fa.fa-copy'(event, tpl) {
+  'click a.fa.fa-copy'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const $editor = tpl.$('textarea');
-    const promise = Utils.copyTextToClipboard($editor[0].value);
+    const promise = Utils.copyTextToClipboard(($editor[0] as HTMLTextAreaElement).value);
 
     const $tooltip = tpl.$('.copied-tooltip');
     Utils.showCopied(promise, $tooltip);
@@ -257,7 +264,7 @@ Template.addChecklistItemForm.events({
 });
 
 Template.checklistActionsPopup.events({
-  'click .js-delete-checklist': Popup.afterConfirm('checklistDelete', function () {
+  'click .js-delete-checklist': Popup.afterConfirm('checklistDelete', function (this: any) {
     Popup.back(2);
     const checklist = this.checklist;
     // #3252: see js-delete-checklist-item — avoid "Removed nonexistent document".
@@ -267,31 +274,31 @@ Template.checklistActionsPopup.events({
   }),
   'click .js-move-checklist': Popup.open('moveChecklist'),
   'click .js-copy-checklist': Popup.open('copyChecklist'),
-  'click .js-hide-checked-checklist-items'(event) {
+  'click .js-hide-checked-checklist-items'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     Template.currentData().checklist.toggleHideCheckedChecklistItems();
     Popup.back();
   },
-  'click .js-hide-all-checklist-items'(event) {
+  'click .js-hide-all-checklist-items'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     Template.currentData().checklist.toggleHideAllChecklistItems();
     Popup.back();
   },
-  'click .js-show-checklist-at-minicard'(event) {
+  'click .js-show-checklist-at-minicard'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     Template.currentData().checklist.toggleShowChecklistAtMinicard();
     Popup.back();
   },
 });
 
-Template.editChecklistItemForm.onRendered(function () {
+Template.editChecklistItemForm.onRendered(function (this: Blaze.TemplateInstance) {
   autosize(this.$('textarea.js-edit-checklist-item'));
 });
 
 Template.editChecklistItemForm.events({
-  'click a.fa.fa-copy'(event, tpl) {
+  'click a.fa.fa-copy'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const $editor = tpl.$('textarea');
-    const promise = Utils.copyTextToClipboard($editor[0].value);
+    const promise = Utils.copyTextToClipboard(($editor[0] as HTMLTextAreaElement).value);
 
     const $tooltip = tpl.$('.copied-tooltip');
     Utils.showCopied(promise, $tooltip);
@@ -316,11 +323,11 @@ Template.checklistItemDetail.events({
  * copyAndMoveChecklist is included inside moveChecklistPopup / copyChecklistPopup,
  * so we traverse up the view hierarchy to find the parent template's dialog.
  */
-function getParentDialog(tpl) {
-  let view = tpl.view.parentView;
+function getParentDialog(tpl: Blaze.TemplateInstance) {
+  let view: Blaze.View | null = (tpl.view as Blaze.View).parentView;
   while (view) {
-    if (view.templateInstance && view.templateInstance() && view.templateInstance().dialog) {
-      return view.templateInstance().dialog;
+    if (view.templateInstance && view.templateInstance() && (view.templateInstance() as any).dialog) {
+      return (view.templateInstance() as any).dialog;
     }
     view = view.parentView;
   }
@@ -345,23 +352,23 @@ Template.copyAndMoveChecklist.helpers({
     const dialog = getParentDialog(Template.instance());
     return dialog ? dialog.cards() : [];
   },
-  isDialogOptionBoardId(boardId) {
+  isDialogOptionBoardId(boardId: string) {
     const dialog = getParentDialog(Template.instance());
     return dialog ? dialog.isDialogOptionBoardId(boardId) : false;
   },
-  isDialogOptionSwimlaneId(swimlaneId) {
+  isDialogOptionSwimlaneId(swimlaneId: string) {
     const dialog = getParentDialog(Template.instance());
     return dialog ? dialog.isDialogOptionSwimlaneId(swimlaneId) : false;
   },
-  isDialogOptionListId(listId) {
+  isDialogOptionListId(listId: string) {
     const dialog = getParentDialog(Template.instance());
     return dialog ? dialog.isDialogOptionListId(listId) : false;
   },
-  isDialogOptionCardId(cardId) {
+  isDialogOptionCardId(cardId: string) {
     const dialog = getParentDialog(Template.instance());
     return dialog ? dialog.isDialogOptionCardId(cardId) : false;
   },
-  isTitleDefault(title) {
+  isTitleDefault(title: string) {
     const dialog = getParentDialog(Template.instance());
     return dialog ? dialog.isTitleDefault(title) : title;
   },
@@ -371,20 +378,20 @@ Template.copyAndMoveChecklist.helpers({
  * Helper: register standard card dialog events on a checklist popup template.
  * Events bubble up from the copyAndMoveChecklist sub-template to the parent popup.
  */
-function registerChecklistDialogEvents(templateName) {
+function registerChecklistDialogEvents(templateName: string) {
   Template[templateName].events({
-    async 'click .js-done'(event, tpl) {
+    async 'click .js-done'(event: JQuery.TriggeredEvent, tpl: ChecklistDialogInstance) {
       const dialog = tpl.dialog;
-      const boardSelect = tpl.$('.js-select-boards')[0];
+      const boardSelect = tpl.$('.js-select-boards')[0] as HTMLSelectElement;
       const boardId = boardSelect.options[boardSelect.selectedIndex].value;
 
-      const listSelect = tpl.$('.js-select-lists')[0];
+      const listSelect = tpl.$('.js-select-lists')[0] as HTMLSelectElement;
       const listId = listSelect.options[listSelect.selectedIndex].value;
 
-      const swimlaneSelect = tpl.$('.js-select-swimlanes')[0];
+      const swimlaneSelect = tpl.$('.js-select-swimlanes')[0] as HTMLSelectElement;
       const swimlaneId = swimlaneSelect.options[swimlaneSelect.selectedIndex].value;
 
-      const cardSelect = tpl.$('.js-select-cards')[0];
+      const cardSelect = tpl.$('.js-select-cards')[0] as HTMLSelectElement;
       const cardId = cardSelect.options.length > 0
         ? cardSelect.options[cardSelect.selectedIndex].value
         : null;
@@ -397,30 +404,30 @@ function registerChecklistDialogEvents(templateName) {
       }
       Popup.back(2);
     },
-    'change .js-select-boards'(event, tpl) {
-      tpl.dialog.getBoardData($(event.currentTarget).val());
+    'change .js-select-boards'(event: JQuery.TriggeredEvent, tpl: ChecklistDialogInstance) {
+      tpl.dialog.getBoardData($(event.currentTarget).val() as string);
     },
-    'change .js-select-swimlanes'(event, tpl) {
-      tpl.dialog.selectedSwimlaneId.set($(event.currentTarget).val());
+    'change .js-select-swimlanes'(event: JQuery.TriggeredEvent, tpl: ChecklistDialogInstance) {
+      tpl.dialog.selectedSwimlaneId.set($(event.currentTarget).val() as string);
       tpl.dialog.setFirstListId();
     },
-    'change .js-select-lists'(event, tpl) {
-      tpl.dialog.selectedListId.set($(event.currentTarget).val());
+    'change .js-select-lists'(event: JQuery.TriggeredEvent, tpl: ChecklistDialogInstance) {
+      tpl.dialog.selectedListId.set($(event.currentTarget).val() as string);
       tpl.dialog.selectedCardId.set('');
     },
-    'change .js-select-cards'(event, tpl) {
-      tpl.dialog.selectedCardId.set($(event.currentTarget).val());
+    'change .js-select-cards'(event: JQuery.TriggeredEvent, tpl: ChecklistDialogInstance) {
+      tpl.dialog.selectedCardId.set($(event.currentTarget).val() as string);
     },
   });
 }
 
 /** Move Checklist Dialog */
-Template.moveChecklistPopup.onCreated(function () {
+Template.moveChecklistPopup.onCreated(function (this: ChecklistDialogInstance) {
   this.dialog = new BoardSwimlaneListCardDialog(this, {
     getDialogOptions() {
       return ReactiveCache.getCurrentUser().getMoveChecklistDialogOptions();
     },
-    async setDone(cardId, options) {
+    async setDone(this: any, cardId: string, options: any) {
       ReactiveCache.getCurrentUser().setMoveChecklistDialogOption(this.currentBoardId, options);
       await Template.currentData().checklist.move(cardId);
     },
@@ -429,15 +436,25 @@ Template.moveChecklistPopup.onCreated(function () {
 registerChecklistDialogEvents('moveChecklistPopup');
 
 /** Copy Checklist Dialog */
-Template.copyChecklistPopup.onCreated(function () {
+Template.copyChecklistPopup.onCreated(function (this: ChecklistDialogInstance) {
   this.dialog = new BoardSwimlaneListCardDialog(this, {
     getDialogOptions() {
       return ReactiveCache.getCurrentUser().getCopyChecklistDialogOptions();
     },
-    async setDone(cardId, options) {
+    async setDone(this: any, cardId: string, options: any) {
       ReactiveCache.getCurrentUser().setCopyChecklistDialogOption(this.currentBoardId, options);
       await Template.currentData().checklist.copy(cardId);
     },
   });
 });
 registerChecklistDialogEvents('copyChecklistPopup');
+
+// The checklistDetail instance caches the jQuery collection of item rows.
+interface ChecklistDetailInstance extends Blaze.TemplateInstance {
+  itemsDom: JQuery;
+}
+
+// Popups that host the board/swimlane/list/card selector dialog.
+interface ChecklistDialogInstance extends Blaze.TemplateInstance {
+  dialog: BoardSwimlaneListCardDialog;
+}

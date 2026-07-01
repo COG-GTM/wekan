@@ -366,6 +366,19 @@ interface WekanConnectRouter {
   options(path: string, ...handlers: WekanConnectHandler[]): WekanConnectRouter;
 }
 
+// autosize ships no bundled types and @types/autosize is not installed. It is
+// called on a jQuery collection or DOM element to auto-grow textareas; the
+// element argument is `any` to accept either form.
+declare module 'autosize' {
+  interface Autosize {
+    (element: any): any;
+    update(element: any): any;
+    destroy(element: any): any;
+  }
+  const autosize: Autosize;
+  export default autosize;
+}
+
 // papaparse ships no bundled types and @types/papaparse is not installed. Only
 // the two methods the rules import/export uses are declared: parse() to read a
 // CSV string into rows (header mode yields objects keyed by column) and
