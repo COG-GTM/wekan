@@ -43,6 +43,10 @@ type MeteorConnectFn = (url: string, options?: object) => any;
 declare module 'meteor/meteor' {
   namespace Meteor {
     let connect: MeteorConnectFn;
+    // Absolute filesystem path of the running bundle. Exposed by the Meteor
+    // server runtime but not modelled by @types/meteor; the custom head-assets
+    // route reads default public files relative to it.
+    const absolutePath: string;
     // The user's `profile` subdocument holds a large, evolving set of wekan
     // preferences (per-board list widths, collapse state, sort modes, dialog
     // options, …) that @types/meteor leaves intentionally empty, so they are
@@ -153,6 +157,9 @@ interface WekanFileObj {
   _id: string;
   name: string;
   type?: string;
+  size?: number;
+  isImage?: boolean;
+  uploadedAt?: Date;
   userId?: string;
   fileSize?: number;
   collectionName?: string;
@@ -791,6 +798,8 @@ declare const Filter: WekanDocumentField;
 interface WekanWebAppRequest {
   params: Record<string, string>;
   query: Record<string, string>;
+  // The incoming HTTP headers; a genuinely dynamic dictionary of header names.
+  headers: Record<string, any>;
   userId?: string;
   // connect middleware augments the request with additional runtime members.
   [prop: string]: WekanDocumentField;
@@ -828,6 +837,36 @@ declare module 'meteor/webapp' {
 
   namespace WebApp {
     const handlers: WekanWebAppHandlers;
+  }
+}
+
+// The community `accounts-express` package exposes connect-style middleware
+// that authenticates REST requests (populating `req.userId`). It ships no types,
+// so the single factory the attachment API mounts is declared here, returning a
+// handler compatible with the WebApp.handlers router.
+declare module 'meteor/accounts-express' {
+  function createAuthMiddleware(
+    options?: WekanDocumentField,
+  ): (
+    req: WekanWebAppRequest,
+    res: WekanWebAppResponse,
+    next: (error?: WekanDocumentField) => void,
+  ) => void;
+  export { createAuthMiddleware };
+}
+
+// @types/meteor's `meteor/ddp` models the public DDP surface but not the
+// internal `_CurrentMethodInvocation` environment variable. The Trello zip HTTP
+// route (which has no method invocation context) uses it to run the importer as
+// the uploading user, so the small surface it touches is declared here.
+declare module 'meteor/ddp' {
+  namespace DDP {
+    const _CurrentMethodInvocation: {
+      withValue<T>(
+        value: { userId: string; isSimulation: boolean },
+        fn: () => T,
+      ): T;
+    };
   }
 }
 

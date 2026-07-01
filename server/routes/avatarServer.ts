@@ -13,7 +13,7 @@ import { getOldAttachmentData, getOldAttachmentStream } from '/models/lib/attach
 // Serve a legacy CollectionFS avatar (cfs.avatars.filerecord + cfs_gridfs.avatars
 // bucket) in place, without migrating it. Returns true when it handled the
 // response, false when there is no such legacy avatar.
-async function serveLegacyAvatar(fileId, req, res) {
+async function serveLegacyAvatar(fileId: string, req: WekanWebAppRequest, res: WekanWebAppResponse) {
   const legacy = await getOldAttachmentData(fileId, 'avatars');
   if (!legacy) {
     return false;
@@ -33,8 +33,10 @@ async function serveLegacyAvatar(fileId, req, res) {
     return true;
   }
   res.writeHead(200);
-  stream.pipe(res);
-  stream.on('error', (error) => {
+  // At runtime res is a Node ServerResponse (a writable stream); the documented
+  // WekanWebAppResponse interop shape doesn't model that surface, so cast here.
+  stream.pipe(res as unknown as NodeJS.WritableStream);
+  stream.on('error', (error: Error) => {
     console.error('Legacy avatar stream error:', error);
     if (!res.headersSent) {
       res.writeHead(500);
@@ -91,7 +93,7 @@ WebApp.handlers.use('/cdn/storage/avatars/:fileName', async (req, res, next) => 
 
     // Get file strategy
     const strategy = fileStoreStrategyFactory.getFileStrategy(avatar, 'original');
-    const readStream = strategy.getReadStream();
+    const readStream = strategy!.getReadStream();
 
     if (!readStream) {
       res.writeHead(404);
@@ -115,9 +117,11 @@ WebApp.handlers.use('/cdn/storage/avatars/:fileName', async (req, res, next) => 
 
     // Stream the file
     res.writeHead(200);
-    readStream.pipe(res);
+    // res is a Node ServerResponse (writable stream) at runtime; cast past the
+    // documented WekanWebAppResponse interop shape.
+    readStream.pipe(res as unknown as NodeJS.WritableStream);
 
-    readStream.on('error', (error) => {
+    readStream.on('error', (error: Error) => {
       console.error('Avatar stream error:', error);
       if (!res.headersSent) {
         res.writeHead(500);

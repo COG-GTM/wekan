@@ -14,7 +14,7 @@ if (process.env.DEBUG === 'true') {
  * For non-ASCII filenames, uses RFC 5987 encoding to preserve the original filename.
  * This prevents ERR_INVALID_CHAR errors when filenames contain control characters.
  */
-function sanitizeFilenameForHeader(filename) {
+function sanitizeFilenameForHeader(filename: string) {
   if (!filename || typeof filename !== 'string') {
     return 'download';
   }
@@ -43,7 +43,7 @@ function sanitizeFilenameForHeader(filename) {
  * Helper function to build a complete Content-Disposition header value with RFC 5987 support
  * Handles the special format returned by sanitizeFilenameForHeader for non-ASCII filenames
  */
-function buildContentDispositionHeader(disposition, sanitizedFilename) {
+function buildContentDispositionHeader(disposition: string, sanitizedFilename: string) {
   if (sanitizedFilename.includes('|RFC5987:')) {
     const [fallback, encoded] = sanitizedFilename.split('|RFC5987:');
     return `${disposition}; filename="${fallback}"; filename*=UTF-8''${encoded}`;
@@ -113,7 +113,9 @@ if (Meteor.isServer) {
       const fileStream = await getOldAttachmentStream(attachmentId);
       if (fileStream) {
         res.writeHead(200);
-        fileStream.pipe(res);
+        // res is a Node ServerResponse (writable stream) at runtime; cast past
+        // the documented WekanWebAppResponse interop shape.
+        fileStream.pipe(res as unknown as NodeJS.WritableStream);
       } else {
         res.writeHead(404);
         res.end('File not found in GridFS');

@@ -19,8 +19,8 @@ import { getAttachmentWithBackwardCompatibility, getOldAttachmentStream } from '
 import fs from 'fs';
 import path from 'path';
 
-function parseNonNegativeInt(value, fallback = 0) {
-  const parsed = Number.parseInt(value, 10);
+function parseNonNegativeInt(value: string | undefined, fallback = 0) {
+  const parsed = Number.parseInt(value as string, 10);
   if (!Number.isFinite(parsed) || parsed < 0) {
     return fallback;
   }
@@ -72,7 +72,7 @@ if (Meteor.isServer) {
   /**
    * Helper function to set appropriate headers for file serving
    */
-  function setFileHeaders(res, fileObj, isAttachment = false) {
+  function setFileHeaders(res: WekanWebAppResponse, fileObj: WekanReactiveDocument, isAttachment = false) {
     // Decide safe serving strategy
     const nameLower = (fileObj.name || '').toLowerCase();
     const typeLower = (fileObj.type || '').toLowerCase();
@@ -167,7 +167,7 @@ if (Meteor.isServer) {
   /**
    * Helper function to handle conditional requests
    */
-  function handleConditionalRequest(req, res, fileObj) {
+  function handleConditionalRequest(req: WekanWebAppRequest, res: WekanWebAppResponse, fileObj: WekanReactiveDocument) {
     const ifNoneMatch = req.headers['if-none-match'];
     if (ifNoneMatch && ifNoneMatch === `"${fileObj._id}"`) {
       res.writeHead(304);
@@ -181,7 +181,7 @@ if (Meteor.isServer) {
    * Extract first path segment (file id) from request URL.
    * Works whether req.url is the full path or already trimmed by the mount path.
    */
-  function extractFirstIdFromUrl(req, mountPrefix) {
+  function extractFirstIdFromUrl(req: WekanWebAppRequest, mountPrefix: string) {
     // Strip query string
     let urlPath = (req.url || '').split('?')[0];
     // If url still contains the mount prefix, remove it
@@ -200,7 +200,7 @@ if (Meteor.isServer) {
    * Check if the request explicitly asks to download the file
    * Recognizes ?download=true or ?download=1 (case-insensitive for key)
    */
-  function isDownloadRequested(req) {
+  function isDownloadRequested(req: WekanWebAppRequest) {
     const q = (req.url || '').split('?')[1] || '';
     if (!q) return false;
     const pairs = q.split('&');
@@ -223,7 +223,7 @@ if (Meteor.isServer) {
    *  - Else if avatar's owner belongs to at least one public board -> allow
    *  - Otherwise -> deny
    */
-  async function isAuthorizedForAvatar(req, avatar) {
+  async function isAuthorizedForAvatar(req: WekanWebAppRequest, avatar: WekanReactiveDocument) {
     try {
       if (!avatar) return false;
 
@@ -266,9 +266,9 @@ if (Meteor.isServer) {
   /**
    * Parse cookies from request headers into an object map
    */
-  function parseCookies(req) {
+  function parseCookies(req: WekanWebAppRequest) {
     const header = req.headers && req.headers.cookie;
-    const out = {};
+    const out: Record<string, string> = {};
     if (!header) return out;
     const parts = header.split(';');
     for (const part of parts) {
@@ -284,8 +284,8 @@ if (Meteor.isServer) {
   /**
    * Get query parameters as a simple object
    */
-  function parseQuery(req) {
-    const out = {};
+  function parseQuery(req: WekanWebAppRequest) {
+    const out: Record<string, string> = {};
     const q = (req.url || '').split('?')[1] || '';
     if (!q) return out;
     const pairs = q.split('&');
@@ -307,7 +307,7 @@ if (Meteor.isServer) {
    * - authToken query parameter
    * - meteor_login_token or wekan_login_token cookie
    */
-  function extractLoginToken(req) {
+  function extractLoginToken(req: WekanWebAppRequest) {
     // Authorization: Bearer <token>
     const authz = req.headers && (req.headers.authorization || req.headers.Authorization);
     if (authz && typeof authz === 'string') {
@@ -334,7 +334,7 @@ if (Meteor.isServer) {
   /**
    * Resolve a user from a raw login token string
    */
-  async function getUserFromToken(rawToken) {
+  async function getUserFromToken(rawToken: string) {
     try {
       if (!rawToken || typeof rawToken !== 'string' || rawToken.length < 10) return null;
       const hashed = Accounts._hashLoginToken(rawToken);
@@ -356,7 +356,7 @@ if (Meteor.isServer) {
    * - Public boards: allow
    * - Private boards: require valid user who is a member
    */
-  async function isAuthorizedForBoard(req, board) {
+  async function isAuthorizedForBoard(req: WekanWebAppRequest, board: WekanReactiveDocument) {
     try {
       if (!board) return false;
       if (board.isPublic && board.isPublic()) return true;
@@ -382,7 +382,7 @@ if (Meteor.isServer) {
    * - Non-ASCII: sanitizeFilenameForHeader('現有檔案.odt') => 'file.odt'; filename*=UTF-8''%E7%8F%BE%E6%9C%89%E6%AA%94%E6%A1%88.odt
    * - Control chars: sanitizeFilenameForHeader('test\nfile.txt') => 'testfile.txt'
    */
-  function sanitizeFilenameForHeader(filename) {
+  function sanitizeFilenameForHeader(filename: string) {
     if (!filename || typeof filename !== 'string') {
       return 'download';
     }
@@ -411,7 +411,7 @@ if (Meteor.isServer) {
    * Helper function to build a complete Content-Disposition header value with RFC 5987 support
    * Handles the special format returned by sanitizeFilenameForHeader for non-ASCII filenames
    */
-  function buildContentDispositionHeader(disposition, sanitizedFilename) {
+  function buildContentDispositionHeader(disposition: string, sanitizedFilename: string) {
     if (sanitizedFilename.includes('|RFC5987:')) {
       const [fallback, encoded] = sanitizedFilename.split('|RFC5987:');
       return `${disposition}; filename="${fallback}"; filename*=UTF-8''${encoded}`;
@@ -422,8 +422,8 @@ if (Meteor.isServer) {
   /**
    * Helper function to stream file with error handling
    */
-  function streamFile(res, readStream, fileObj) {
-    readStream.on('error', (error) => {
+  function streamFile(res: WekanWebAppResponse, readStream: NodeJS.ReadableStream, fileObj: WekanReactiveDocument) {
+    readStream.on('error', (error: Error) => {
       console.error('File stream error:', error);
       if (!res.headersSent) {
         res.writeHead(500);
@@ -437,7 +437,7 @@ if (Meteor.isServer) {
       }
     });
 
-    readStream.pipe(res);
+    readStream.pipe(res as unknown as NodeJS.WritableStream);
   }
 
   // ============================================================================
@@ -512,12 +512,12 @@ if (Meteor.isServer) {
       // the storage backend it currently lives in is enabled.
       const storageSettings = await AttachmentStorageSettings.findOneAsync({});
       if (storageSettings) {
-        let storageName;
+        let storageName: string | null | undefined;
         if (attachment?.meta?.source === 'legacy') {
           // Legacy CollectionFS files live in MongoDB GridFS.
           storageName = STORAGE_NAME_GRIDFS;
         } else {
-          const probeStrategy = attachmentStoreFactory.getFileStrategy(attachment, 'original');
+          const probeStrategy = attachmentStoreFactory.getFileStrategy(attachment as unknown as WekanFileObj, 'original');
           storageName = probeStrategy && probeStrategy.getStorageName
             ? probeStrategy.getStorageName()
             : null;
@@ -530,13 +530,13 @@ if (Meteor.isServer) {
       }
 
       // Choose proper streaming based on source
-      let readStream;
+      let readStream: NodeJS.ReadableStream | null | undefined;
       if (attachment?.meta?.source === 'legacy') {
         // Legacy CollectionFS GridFS stream
         readStream = await getOldAttachmentStream(fileId);
       } else {
         // New Meteor-Files storage
-        const strategy = attachmentStoreFactory.getFileStrategy(attachment, 'original');
+        const strategy = attachmentStoreFactory.getFileStrategy(attachment as unknown as WekanFileObj, 'original')!;
         readStream = strategy.getReadStream();
       }
 
@@ -609,7 +609,7 @@ if (Meteor.isServer) {
       }
 
       // Get file strategy and stream
-  const strategy = avatarStoreFactory.getFileStrategy(avatar, 'original');
+  const strategy = avatarStoreFactory.getFileStrategy(avatar, 'original')!;
       const readStream = strategy.getReadStream();
 
       if (!readStream) {
@@ -754,7 +754,7 @@ if (Meteor.isServer) {
       }
 
       // Get file strategy and stream
-  const strategy = avatarStoreFactory.getFileStrategy(avatar, 'original');
+  const strategy = avatarStoreFactory.getFileStrategy(avatar, 'original')!;
       const readStream = strategy.getReadStream();
 
       if (!readStream) {
