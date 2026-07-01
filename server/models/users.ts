@@ -50,7 +50,7 @@ Meteor.methods({
       }
     }
 
-    const fakeUser = {
+    const fakeUser: WekanDocumentField = {
       extendAutoValueContext: {
         userId: this.userId,
       },
@@ -70,7 +70,7 @@ Meteor.methods({
         fakeUser,
       );
 
-      await Users.updateAsync(this.userId, {
+      await Users.updateAsync(this.userId!, {
         $set: { 'profile.templatesBoardId': boardId },
       });
 
@@ -86,7 +86,7 @@ Meteor.methods({
         },
         fakeUser,
       );
-      await Users.updateAsync(this.userId, {
+      await Users.updateAsync(this.userId!, {
         $set: { 'profile.cardTemplatesSwimlaneId': cardSwimlaneId },
       });
 
@@ -102,7 +102,7 @@ Meteor.methods({
         },
         fakeUser,
       );
-      await Users.updateAsync(this.userId, {
+      await Users.updateAsync(this.userId!, {
         $set: { 'profile.listTemplatesSwimlaneId': listSwimlaneId },
       });
 
@@ -118,7 +118,7 @@ Meteor.methods({
         },
         fakeUser,
       );
-      await Users.updateAsync(this.userId, {
+      await Users.updateAsync(this.userId!, {
         $set: { 'profile.boardTemplatesSwimlaneId': boardSwimlaneId },
       });
 
@@ -127,11 +127,11 @@ Meteor.methods({
 
     return createdId;
   },
-  async deleteWorkspace(workspaceId) {
+  async deleteWorkspace(workspaceId: string) {
     check(workspaceId, String);
     if (!this.userId) throw new Meteor.Error('not-logged-in');
 
-    const user =
+    const user: WekanDocumentField =
       (await Users.findOneAsync(this.userId, {
         fields: {
           'profile.boardWorkspacesTree': 1,
@@ -146,16 +146,16 @@ Meteor.methods({
     const assignments = {
       ...((user.profile && user.profile.boardWorkspaceAssignments) || {}),
     };
-    const removedWorkspaceIds = [];
+    const removedWorkspaceIds: WekanDocumentField[] = [];
 
-    const collectWorkspaceIds = node => {
+    const collectWorkspaceIds = (node: WekanDocumentField) => {
       removedWorkspaceIds.push(node.id);
       if (node.children && node.children.length) {
         node.children.forEach(collectWorkspaceIds);
       }
     };
 
-    const removeWorkspaceFromTree = nodes => {
+    const removeWorkspaceFromTree = (nodes: WekanDocumentField) => {
       for (let i = 0; i < nodes.length; i++) {
         if (nodes[i].id === workspaceId) {
           collectWorkspaceIds(nodes[i]);
@@ -189,7 +189,7 @@ Meteor.methods({
     return true;
   },
 
-  async removeUser(targetUserId) {
+  async removeUser(targetUserId: string) {
     check(targetUserId, String);
 
     const currentUserId = this.userId;
@@ -225,7 +225,7 @@ Meteor.methods({
     return { success: true, message: 'User deleted successfully' };
   },
 
-  async editUser(targetUserId, updateData) {
+  async editUser(targetUserId: string, updateData: WekanDocumentField) {
     check(targetUserId, String);
     check(updateData, Object);
 
@@ -244,28 +244,29 @@ Meteor.methods({
       throw new Meteor.Error('user-not-found', 'Target user not found');
     }
 
-    const updateObject = {};
-    if (updateData.fullname !== undefined) updateObject['profile.fullname'] = updateData.fullname;
-    if (updateData.initials !== undefined) updateObject['profile.initials'] = updateData.initials;
-    if (updateData.isAdmin !== undefined) updateObject.isAdmin = updateData.isAdmin;
-    if (updateData.loginDisabled !== undefined) updateObject.loginDisabled = updateData.loginDisabled;
-    if (updateData.authenticationMethod !== undefined) {
-      updateObject.authenticationMethod = updateData.authenticationMethod;
+    const updateObject: Record<string, WekanDocumentField> = {};
+    const data = updateData as WekanDocumentField;
+    if (data.fullname !== undefined) updateObject['profile.fullname'] = data.fullname;
+    if (data.initials !== undefined) updateObject['profile.initials'] = data.initials;
+    if (data.isAdmin !== undefined) updateObject.isAdmin = data.isAdmin;
+    if (data.loginDisabled !== undefined) updateObject.loginDisabled = data.loginDisabled;
+    if (data.authenticationMethod !== undefined) {
+      updateObject.authenticationMethod = data.authenticationMethod;
     }
-    if (updateData.importUsernames !== undefined) updateObject.importUsernames = updateData.importUsernames;
-    if (updateData.teams !== undefined) updateObject.teams = updateData.teams;
-    if (updateData.orgs !== undefined) updateObject.orgs = updateData.orgs;
+    if (data.importUsernames !== undefined) updateObject.importUsernames = data.importUsernames;
+    if (data.teams !== undefined) updateObject.teams = data.teams;
+    if (data.orgs !== undefined) updateObject.orgs = data.orgs;
 
     await Users.updateAsync(targetUserId, { $set: updateObject });
   },
 
-  async setListSortBy(value) {
+  async setListSortBy(value: string) {
     check(value, String);
     (await ReactiveCache.getCurrentUser()).setListSortBy(value);
   },
 
   // #5799: persist the All Boards page sort mode for the current user.
-  async setAllBoardsSortBy(value) {
+  async setAllBoardsSortBy(value: string) {
     check(value, String);
     if (!allowedAllBoardsSortValues.includes(value)) {
       throw new Meteor.Error('invalid-sort', 'Invalid All Boards sort value');
@@ -273,13 +274,13 @@ Meteor.methods({
     await (await ReactiveCache.getCurrentUser()).setAllBoardsSortBy(value);
   },
 
-  async setAvatarUrl(avatarUrl) {
+  async setAvatarUrl(avatarUrl: string) {
     check(avatarUrl, String);
     if (!this.userId) throw new Meteor.Error('not-logged-in', 'User must be logged in');
     await Users.updateAsync(this.userId, { $set: { 'profile.avatarUrl': avatarUrl } });
   },
 
-  async adminSetAvatarUrl(targetUserId, avatarUrl) {
+  async adminSetAvatarUrl(targetUserId: string, avatarUrl: string) {
     check(targetUserId, String);
     check(avatarUrl, String);
     if (!this.userId) throw new Meteor.Error('not-logged-in', 'User must be logged in');
@@ -292,7 +293,7 @@ Meteor.methods({
     await Users.updateAsync(targetUserId, { $set: { 'profile.avatarUrl': avatarUrl } });
   },
 
-  async toggleBoardStar(boardId) {
+  async toggleBoardStar(boardId: string) {
     check(boardId, String);
     if (!this.userId) throw new Meteor.Error('not-logged-in', 'User must be logged in');
     const user = await Users.findOneAsync(this.userId);
@@ -304,10 +305,10 @@ Meteor.methods({
       ? { $pull: { 'profile.starredBoards': boardId } }
       : { $addToSet: { 'profile.starredBoards': boardId } };
 
-    await Users.updateAsync(this.userId, updateObject);
+    await Users.updateAsync(this.userId, updateObject as WekanDocumentField);
   },
 
-  async toggleGreyIcons(value) {
+  async toggleGreyIcons(value: WekanDocumentField) {
     if (!this.userId) throw new Meteor.Error('not-logged-in', 'User must be logged in');
     if (value !== undefined) check(value, Boolean);
 
@@ -326,13 +327,13 @@ Meteor.methods({
     user.toggleDesktopHandles(user.hasShowDesktopDragHandles());
   },
 
-  async createWorkspace(params) {
+  async createWorkspace(params: WekanDocumentField) {
     check(params, Object);
-    const { parentId = null, name } = params;
+    const { parentId = null, name } = params as WekanDocumentField;
     check(parentId, Match.OneOf(String, null));
     check(name, String);
     if (!this.userId) throw new Meteor.Error('not-logged-in');
-    const user = (await Users.findOneAsync(this.userId)) || {};
+    const user: WekanDocumentField = (await Users.findOneAsync(this.userId)) || {};
     const tree =
       user.profile && user.profile.boardWorkspacesTree
         ? EJSON.clone(user.profile.boardWorkspacesTree)
@@ -343,7 +344,7 @@ Meteor.methods({
     if (!parentId) {
       tree.push(newNode);
     } else {
-      const insertInto = nodes => {
+      const insertInto = (nodes: WekanDocumentField) => {
         for (const n of nodes) {
           if (n.id === parentId) {
             n.children = n.children || [];
@@ -363,19 +364,19 @@ Meteor.methods({
     return newNode;
   },
 
-  async setWorkspacesTree(newTree) {
+  async setWorkspacesTree(newTree: WekanDocumentField) {
     check(newTree, Array);
     if (!this.userId) throw new Meteor.Error('not-logged-in');
     await Users.updateAsync(this.userId, { $set: { 'profile.boardWorkspacesTree': newTree } });
     return true;
   },
 
-  async assignBoardToWorkspace(boardId, spaceId) {
+  async assignBoardToWorkspace(boardId: string, spaceId: string) {
     check(boardId, String);
     check(spaceId, String);
     if (!this.userId) throw new Meteor.Error('not-logged-in');
 
-    const user = await Users.findOneAsync(this.userId, { fields: { 'profile.boardWorkspaceAssignments': 1 } });
+    const user: WekanDocumentField = await Users.findOneAsync(this.userId, { fields: { 'profile.boardWorkspaceAssignments': 1 } });
     const assignments = user.profile?.boardWorkspaceAssignments || {};
     assignments[boardId] = spaceId;
 
@@ -385,11 +386,11 @@ Meteor.methods({
     return true;
   },
 
-  async unassignBoardFromWorkspace(boardId) {
+  async unassignBoardFromWorkspace(boardId: string) {
     check(boardId, String);
     if (!this.userId) throw new Meteor.Error('not-logged-in');
 
-    const user = await Users.findOneAsync(this.userId, { fields: { 'profile.boardWorkspaceAssignments': 1 } });
+    const user: WekanDocumentField = await Users.findOneAsync(this.userId, { fields: { 'profile.boardWorkspaceAssignments': 1 } });
     const assignments = user.profile?.boardWorkspaceAssignments || {};
     delete assignments[boardId];
 
@@ -420,13 +421,13 @@ Meteor.methods({
     user.toggleCardMaximized(user.hasCardMaximized());
   },
 
-  async setCardCollapsed(value) {
+  async setCardCollapsed(value: boolean) {
     check(value, Boolean);
     if (!this.userId) throw new Meteor.Error('not-logged-in');
     await Users.updateAsync(this.userId, { $set: { 'profile.cardCollapsed': value } });
   },
 
-  async setMapProvider(provider) {
+  async setMapProvider(provider: string) {
     check(provider, String);
     if (!this.userId) throw new Meteor.Error('not-logged-in');
     if (
@@ -466,24 +467,24 @@ Meteor.methods({
     user.toggleRescueCardDescription(user.hasRescuedCardDescription());
   },
 
-  async changeLimitToShowCardsCount(limit) {
+  async changeLimitToShowCardsCount(limit: number) {
     check(limit, Number);
     (await ReactiveCache.getCurrentUser()).setShowCardsCountAt(limit);
   },
 
-  async changeStartDayOfWeek(startDay) {
+  async changeStartDayOfWeek(startDay: number) {
     check(startDay, Number);
     (await ReactiveCache.getCurrentUser()).setStartDayOfWeek(startDay);
   },
 
-  async changeDateFormat(dateFormat) {
+  async changeDateFormat(dateFormat: string) {
     check(dateFormat, String);
     const user = await ReactiveCache.getCurrentUser();
     if (!user) return;
     user.setDateFormat(dateFormat);
   },
 
-  async applyListWidth(boardId, listId, width, constraint) {
+  async applyListWidth(boardId: string, listId: string, width: number, constraint: number) {
     check(boardId, String);
     check(listId, String);
     check(width, Number);
@@ -513,7 +514,7 @@ Meteor.methods({
     }
   },
 
-  async setBoardAutoWidth(boardId, autoWidth) {
+  async setBoardAutoWidth(boardId: string, autoWidth: boolean) {
     check(boardId, String);
     check(autoWidth, Boolean);
     if (!this.userId) {
@@ -529,7 +530,7 @@ Meteor.methods({
     return true;
   },
 
-  async setListCollapsedState(boardId, listId, collapsed) {
+  async setListCollapsedState(boardId: string, listId: string, collapsed: boolean) {
     check(boardId, String);
     check(listId, String);
     check(collapsed, Boolean);
@@ -542,7 +543,7 @@ Meteor.methods({
     await Users.updateAsync(this.userId, { $set: { 'profile.collapsedLists': current } });
   },
 
-  async applySwimlaneHeight(boardId, swimlaneId, height) {
+  async applySwimlaneHeight(boardId: string, swimlaneId: string, height: number) {
     check(boardId, String);
     check(swimlaneId, String);
     check(height, Number);
@@ -550,7 +551,7 @@ Meteor.methods({
     user.setSwimlaneHeight(boardId, swimlaneId, height);
   },
 
-  async setSwimlaneCollapsedState(boardId, swimlaneId, collapsed) {
+  async setSwimlaneCollapsedState(boardId: string, swimlaneId: string, collapsed: boolean) {
     check(boardId, String);
     check(swimlaneId, String);
     check(collapsed, Boolean);
@@ -563,7 +564,7 @@ Meteor.methods({
     await Users.updateAsync(this.userId, { $set: { 'profile.collapsedSwimlanes': current } });
   },
 
-  async applySwimlaneHeightToStorage(boardId, swimlaneId, height) {
+  async applySwimlaneHeightToStorage(boardId: string, swimlaneId: string, height: number) {
     check(boardId, String);
     check(swimlaneId, String);
     check(height, Number);
@@ -573,7 +574,7 @@ Meteor.methods({
     }
   },
 
-  async applyListWidthToStorage(boardId, listId, width, constraint) {
+  async applyListWidthToStorage(boardId: string, listId: string, width: number, constraint: number) {
     check(boardId, String);
     check(listId, String);
     check(width, Number);
@@ -588,7 +589,7 @@ Meteor.methods({
   // #5729 Enable/disable the per-user "same width for all lists" mode for a
   // board. This is a personal viewer setting (like personal list widths), so any
   // logged-in user may toggle it for any board they can view.
-  async setFixedListWidthEnabled(boardId, enabled) {
+  async setFixedListWidthEnabled(boardId: string, enabled: boolean) {
     check(boardId, String);
     check(enabled, Boolean);
     if (!this.userId) {
@@ -601,7 +602,7 @@ Meteor.methods({
   },
 
   // #5729 Set the single width applied to every list when fixed width mode is on.
-  async setFixedListWidth(boardId, width) {
+  async setFixedListWidth(boardId: string, width: number) {
     check(boardId, String);
     check(width, Number);
     if (!this.userId) {
@@ -616,19 +617,19 @@ Meteor.methods({
     return true;
   },
 
-  async setZoomLevel(level) {
+  async setZoomLevel(level: number) {
     check(level, Number);
     const user = await ReactiveCache.getCurrentUser();
     user.setZoomLevel(level);
   },
 
-  async setMobileMode(enabled) {
+  async setMobileMode(enabled: boolean) {
     check(enabled, Boolean);
     const user = await ReactiveCache.getCurrentUser();
     user.setMobileMode(enabled);
   },
 
-  async setBoardView(view) {
+  async setBoardView(view: string) {
     check(view, String);
     const user = await ReactiveCache.getCurrentUser();
     if (!user) throw new Meteor.Error('not-authorized', 'Must be logged in');
@@ -636,16 +637,16 @@ Meteor.methods({
   },
 
   async setCreateUser(
-    fullname,
-    username,
-    initials,
-    password,
-    isAdmin,
-    isActive,
-    email,
-    importUsernames,
-    userOrgsArray,
-    userTeamsArray,
+    fullname: string,
+    username: string,
+    initials: string,
+    password: string,
+    isAdmin: string,
+    isActive: string,
+    email: string,
+    importUsernames: WekanDocumentField[],
+    userOrgsArray: WekanDocumentField[],
+    userTeamsArray: WekanDocumentField[],
   ) {
     check(fullname, String);
     check(username, String);
@@ -680,7 +681,7 @@ Meteor.methods({
           isActive,
           email: email.toLowerCase(),
           from: 'admin',
-        });
+        } as WekanDocumentField);
         const user =
           (await ReactiveCache.getUser(username)) ||
           (await ReactiveCache.getUser({ username }));
@@ -699,7 +700,7 @@ Meteor.methods({
     }
   },
 
-  async setUsername(username, userId) {
+  async setUsername(username: string, userId: string) {
     check(username, String);
     check(userId, String);
     if (username.includes('/') || userId.includes('/')) {
@@ -715,7 +716,7 @@ Meteor.methods({
     }
   },
 
-  async setEmail(email, userId) {
+  async setEmail(email: string, userId: string) {
     check(email, String);
     check(userId, String);
     if (userId.includes('/') || email.includes('/')) {
@@ -741,7 +742,7 @@ Meteor.methods({
     }
   },
 
-  async setUsernameAndEmail(username, email, userId) {
+  async setUsernameAndEmail(username: string, email: string, userId: string) {
     check(username, String);
     check(email, String);
     check(userId, String);
@@ -757,7 +758,7 @@ Meteor.methods({
     }
   },
 
-  async setPassword(newPassword, userId) {
+  async setPassword(newPassword: string, userId: string) {
     check(userId, String);
     check(newPassword, String);
     if (!this.userId) {
@@ -778,7 +779,7 @@ Meteor.methods({
     }
   },
 
-  async setEmailVerified(email, verified, userId) {
+  async setEmailVerified(email: string, verified: boolean, userId: string) {
     check(email, String);
     check(verified, Boolean);
     check(userId, String);
@@ -794,7 +795,7 @@ Meteor.methods({
     }
   },
 
-  async setInitials(initials, userId) {
+  async setInitials(initials: string, userId: string) {
     check(initials, String);
     check(userId, String);
     if (initials.includes('/') || userId.includes('/')) {
@@ -805,7 +806,7 @@ Meteor.methods({
     }
   },
 
-  async inviteUserToBoard(username, boardId) {
+  async inviteUserToBoard(username: string, boardId: string) {
     check(username, String);
     check(boardId, String);
     if (username.includes('/') || boardId.includes('/')) {
@@ -817,7 +818,7 @@ Meteor.methods({
     // Global site admins (Admin Panel users) always have all rights and bypass
     // both the board-membership and the configurable per-role check below.
     if (!inviter.isAdmin) {
-      const member = board.members.find(memberItem => memberItem.userId === inviter._id);
+      const member = board.members.find((memberItem: WekanDocumentField) => memberItem.userId === inviter._id);
       if (!member || !member.isActive) throw new Meteor.Error('error-board-notAMember');
       // Enforce the Admin Panel / People / Roles policy: only the configured
       // board roles are allowed to invite users to a board.
@@ -888,7 +889,7 @@ Meteor.methods({
       }
     }
 
-    const memberIndex = board.members.findIndex(m => m.userId === user._id);
+    const memberIndex = board.members.findIndex((m: WekanDocumentField) => m.userId === user._id);
     if (memberIndex >= 0) {
       await Boards.updateAsync(boardId, {
         $set: { [`members.${memberIndex}.isActive`]: true, modifiedAt: new Date() },
@@ -917,7 +918,7 @@ Meteor.methods({
     if (board.subtasksDefaultBoardId) {
       const subBoard = await ReactiveCache.getBoard(board.subtasksDefaultBoardId);
       if (subBoard) {
-        const subMemberIndex = subBoard.members.findIndex(m => m.userId === user._id);
+        const subMemberIndex = subBoard.members.findIndex((m: WekanDocumentField) => m.userId === user._id);
         if (subMemberIndex >= 0) {
           await Boards.updateAsync(board.subtasksDefaultBoardId, {
             $set: { [`members.${subMemberIndex}.isActive`]: true, modifiedAt: new Date() },
@@ -989,7 +990,7 @@ Meteor.methods({
     };
   },
 
-  async impersonate(userId) {
+  async impersonate(userId: string) {
     check(userId, String);
 
     if (!(await ReactiveCache.getUser(userId))) {
@@ -1007,12 +1008,12 @@ Meteor.methods({
     this.setUserId(userId);
   },
 
-  async isImpersonated(userId) {
+  async isImpersonated(userId: string) {
     check(userId, String);
     return await ReactiveCache.getImpersonatedUser({ userId });
   },
 
-  async setUsersTeamsTeamDisplayName(teamId, teamDisplayName) {
+  async setUsersTeamsTeamDisplayName(teamId: string, teamDisplayName: string) {
     check(teamId, String);
     check(teamDisplayName, String);
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
@@ -1027,7 +1028,7 @@ Meteor.methods({
     }
   },
 
-  async setUsersOrgsOrgDisplayName(orgId, orgDisplayName) {
+  async setUsersOrgsOrgDisplayName(orgId: string, orgDisplayName: string) {
     check(orgId, String);
     check(orgDisplayName, String);
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
@@ -1043,7 +1044,7 @@ Meteor.methods({
   },
 });
 
-Accounts.onCreateUser(async (options, user) => {
+Accounts.onCreateUser(async (options: WekanDocumentField, user: WekanDocumentField) => {
   const usersCursor = await ReactiveCache.getUsers({}, {}, true);
   const userCount = typeof usersCursor.countAsync === 'function' ? await usersCursor.countAsync() : usersCursor.count();
   user.isAdmin = userCount === 0;
@@ -1064,7 +1065,7 @@ Accounts.onCreateUser(async (options, user) => {
     const fullname = user.services.oidc.fullname || user.username;
     const initials = fullname
       .split(/\s+/)
-      .reduce((memo, word) => memo + word[0], '')
+      .reduce((memo: WekanDocumentField, word: WekanDocumentField) => memo + word[0], '')
       .toUpperCase();
     user.profile = {
       initials,
@@ -1089,13 +1090,13 @@ Accounts.onCreateUser(async (options, user) => {
         ? user.services.oidc.groups
         : [];
       const userGroupNames = oidcGroups
-        .map(group => {
+        .map((group: WekanDocumentField) => {
           if (typeof group === 'string') return group;
           if (group && typeof group === 'object') return group.displayName || group.name || '';
           return '';
         })
-        .filter(name => name.length > 0);
-      user.isAdmin = userGroupNames.some(name => oauth2AdminGroups.includes(name));
+        .filter((name: WekanDocumentField) => name.length > 0);
+      user.isAdmin = userGroupNames.some((name: WekanDocumentField) => oauth2AdminGroups.includes(name));
     }
 
     // SECURITY (GHSA-mp7g-hj5q-gxhq): Do not silently take over an existing
@@ -1130,7 +1131,7 @@ Accounts.onCreateUser(async (options, user) => {
     // keeps the previous behaviour (auto-create on first login).
     const autoRegistrationDisabled =
       process.env.OAUTH2_AUTO_REGISTRATION === 'false' ||
-      process.env.OAUTH2_AUTO_REGISTRATION === false;
+      (process.env.OAUTH2_AUTO_REGISTRATION as WekanDocumentField) === false;
     if (autoRegistrationDisabled && !existingUser) {
       throw new Meteor.Error(
         'oidc-registration-disabled',
@@ -1144,7 +1145,7 @@ Accounts.onCreateUser(async (options, user) => {
 
     const mergeExistingUsers =
       process.env.OAUTH2_MERGE_EXISTING_USERS === 'true' ||
-      process.env.OAUTH2_MERGE_EXISTING_USERS === true;
+      (process.env.OAUTH2_MERGE_EXISTING_USERS as WekanDocumentField) === true;
     const emailVerified = user.services.oidc.email_verified === true;
     if (!mergeExistingUsers || !emailVerified) {
       throw new Meteor.Error(
@@ -1207,13 +1208,13 @@ Accounts.onCreateUser(async (options, user) => {
   return user;
 });
 
-let notificationCleanupIntervalId = null;
+let notificationCleanupIntervalId: WekanDocumentField = null;
 
 const runNotificationCleanup = async function runNotificationCleanup() {
   const envRemoveAge =
     process.env.NOTIFICATION_TRAY_AFTER_READ_DAYS_BEFORE_REMOVE;
   const defaultRemoveAge = 2;
-  const removeAge = parseInt(envRemoveAge, 10) || defaultRemoveAge;
+  const removeAge = parseInt(envRemoveAge as string, 10) || defaultRemoveAge;
 
   for (const user of await ReactiveCache.getUsers()) {
     if (!user.profile || !user.profile.notifications) continue;
@@ -1311,7 +1312,7 @@ async function repairLegacyAvatarUrls() {
 
 Meteor.startup(async () => {
   for (const value of allowedSortValues) {
-    await ensureIndex(Lists, value);
+    await ensureIndex(Lists, value as WekanDocumentField);
   }
   await ensureIndex(Users, { modifiedAt: -1 });
   Meteor.defer(() => {
@@ -1322,10 +1323,10 @@ Meteor.startup(async () => {
   });
 });
 
-Users.after.update(function(userId, user, fieldNames) {
+Users.after.update(function(this: WekanDocumentField, userId, user, fieldNames) {
   if (!fieldNames.includes('profile')) return;
 
-  function getStarredBoardsIds(doc) {
+  function getStarredBoardsIds(doc: WekanDocumentField) {
     const starredBoards = doc.profile && doc.profile.starredBoards;
     return Array.isArray(starredBoards) ? starredBoards : [];
   }
@@ -1333,7 +1334,7 @@ Users.after.update(function(userId, user, fieldNames) {
   const oldIds = getStarredBoardsIds(this.previous);
   const newIds = getStarredBoardsIds(user);
 
-  function incrementBoards(boardsIds, inc) {
+  function incrementBoards(boardsIds: WekanDocumentField[], inc: number) {
     boardsIds.forEach(boardId => {
       Boards.updateAsync(boardId, { $inc: { stars: inc } }).catch(error => {
         console.error('Failed to update board stars:', error);
@@ -1345,7 +1346,7 @@ Users.after.update(function(userId, user, fieldNames) {
   incrementBoards(newIds.filter(x => !oldIds.includes(x)), +1);
 });
 
-const fakeUserId = new Meteor.EnvironmentVariable();
+const fakeUserId = new Meteor.EnvironmentVariable<string | null | undefined>();
 const getUserId = CollectionHooks.getUserId;
 CollectionHooks.getUserId = () => {
   return fakeUserId.get() || getUserId();
@@ -1357,7 +1358,7 @@ CollectionHooks.getUserId = () => {
 // through any authentication method (password, LDAP, OAuth2) start clean and
 // the container is only materialized when a template is actually saved/copied.
 
-Users.after.insert(async (userId, doc) => {
+Users.after.insert(async (userId: string, doc: WekanDocumentField) => {
   doc = await ReactiveCache.getUser(doc._id);
   if (doc.createdThroughApi) {
     await Users.updateAsync(doc._id, { $set: { createdThroughApi: '' } });
@@ -1383,7 +1384,7 @@ Users.after.insert(async (userId, doc) => {
     } else {
       for (const boardId of invitationCode.boardsToBeInvited) {
         const board = await ReactiveCache.getBoard(boardId);
-        const memberIndex = board.members.findIndex(m => m.userId === doc._id);
+        const memberIndex = board.members.findIndex((m: WekanDocumentField) => m.userId === doc._id);
         if (memberIndex >= 0) {
           await Boards.updateAsync(boardId, { $set: { [`members.${memberIndex}.isActive`]: true } });
         } else {
@@ -1425,8 +1426,8 @@ WebApp.handlers.get('/api/user', async function(req, res) {
       { type: 'board', 'members.userId': req.userId },
       { fields: { _id: 1, members: 1 } },
     );
-    boards = boards.map(b => {
-      const u = b.members.find(m => m.userId === req.userId);
+    boards = boards.map((b: WekanDocumentField) => {
+      const u = b.members.find((m: WekanDocumentField) => m.userId === req.userId);
       delete u.userId;
       u.boardId = b._id;
       return u;
@@ -1467,8 +1468,8 @@ WebApp.handlers.get('/api/users/:userId', async function(req, res) {
       { type: 'board', 'members.userId': id },
       { fields: { _id: 1, members: 1 } },
     );
-    boards = boards.map(b => {
-      const u = b.members.find(m => m.userId === id);
+    boards = boards.map((b: WekanDocumentField) => {
+      const u = b.members.find((m: WekanDocumentField) => m.userId === id);
       delete u.userId;
       u.boardId = b._id;
       return u;
@@ -1568,11 +1569,11 @@ WebApp.handlers.post('/api/boards/:boardId/members/:userId/add', async function(
       const boards = await ReactiveCache.getBoards({ _id: boardId });
       data = [];
       for (const board of boards) {
-        const hasMember = board.members.some(m => m.userId === userId && m.isActive);
+        const hasMember = board.members.some((m: WekanDocumentField) => m.userId === userId && m.isActive);
         if (!hasMember) {
           // Tolerate both real booleans (from a named `role`) and 'true'/'false'
           // strings (from individual flag params).
-          const isTrue = value => value === true || String(value).toLowerCase() === 'true';
+          const isTrue = (value: WekanDocumentField) => value === true || String(value).toLowerCase() === 'true';
           const memberFlags = {
             isAdmin: isTrue(isAdmin),
             isNoComments: isTrue(isNoComments),
@@ -1583,7 +1584,7 @@ WebApp.handlers.post('/api/boards/:boardId/members/:userId/add', async function(
             isReadOnly: isTrue(isReadOnly),
             isReadAssignedOnly: isTrue(isReadAssignedOnly),
           };
-          const memberIndex = board.members.findIndex(m => m.userId === userId);
+          const memberIndex = board.members.findIndex((m: WekanDocumentField) => m.userId === userId);
           if (memberIndex >= 0) {
             // Re-activate an existing (inactive) member and apply the new flags.
             const flagSet = { [`members.${memberIndex}.isActive`]: true };
@@ -1633,12 +1634,12 @@ WebApp.handlers.post('/api/boards/:boardId/members/:userId/remove', async functi
       const boards = await ReactiveCache.getBoards({ _id: boardId });
       data = [];
       for (const board of boards) {
-        const hasMember = board.members.some(m => m.userId === userId && m.isActive);
+        const hasMember = board.members.some((m: WekanDocumentField) => m.userId === userId && m.isActive);
         if (hasMember) {
-          const memberIndex = board.members.findIndex(m => m.userId === userId);
+          const memberIndex = board.members.findIndex((m: WekanDocumentField) => m.userId === userId);
           if (memberIndex >= 0) {
             const member = board.members[memberIndex];
-            const activeAdmins = board.members.filter(m => m.isActive && m.isAdmin);
+            const activeAdmins = board.members.filter((m: WekanDocumentField) => m.isActive && m.isAdmin);
             const allowRemove = !member.isAdmin || activeAdmins.length > 1;
             if (!allowRemove) {
               await Boards.updateAsync(boardId, { $set: { [`members.${memberIndex}.isActive`]: true } });
@@ -1669,7 +1670,7 @@ WebApp.handlers.post('/api/users/', async function(req, res) {
       email: req.body.email,
       password: req.body.password,
       from: 'admin',
-    });
+    } as WekanDocumentField);
     sendJsonResult(res, { code: 200, data: { _id: id } });
   } catch (error) {
     sendJsonResult(res, { code: 200, data: error });
@@ -1692,7 +1693,7 @@ WebApp.handlers.post('/api/createtoken/:userId', async function(req, res) {
     await Authentication.checkUserId(req.userId);
     const id = req.params.userId;
     const token = Accounts._generateStampedLoginToken();
-    Accounts._insertLoginToken(id, token);
+    (Accounts as WekanDocumentField)._insertLoginToken(id, token);
 
     sendJsonResult(res, {
       code: 200,
@@ -1716,7 +1717,7 @@ WebApp.handlers.post('/api/deletetoken', async function(req, res) {
     };
 
     if (token && userId) {
-      Accounts.destroyToken(userId, token);
+      (Accounts as WekanDocumentField).destroyToken(userId, token);
       data.message = `Delete token: [${token}] from user: ${userId}`;
     } else if (userId) {
       check(userId, String);
@@ -1733,7 +1734,7 @@ WebApp.handlers.post('/api/deletetoken', async function(req, res) {
   }
 });
 
-const sanitizeUserForSearch = userData => {
+const sanitizeUserForSearch = (userData: WekanDocumentField) => {
   const safeFields = {
     _id: 1,
     username: 1,
@@ -1749,7 +1750,7 @@ const sanitizeUserForSearch = userData => {
     orgs: 1,
   };
 
-  const sanitized = {};
+  const sanitized: Record<string, WekanDocumentField> = {};
   for (const field of Object.keys(safeFields)) {
     if (userData[field] !== undefined) {
       sanitized[field] = userData[field];
@@ -1772,12 +1773,12 @@ const sanitizeUserForSearch = userData => {
 };
 
 Meteor.methods({
-  sanitizeUserForSearch(userData) {
+  sanitizeUserForSearch(userData: WekanDocumentField) {
     check(userData, Object);
     return sanitizeUserForSearch(userData);
   },
 
-  async getUsersCollectionCount(query = {}) {
+  async getUsersCollectionCount(query: WekanDocumentField = {}) {
     check(query, Match.OneOf(Object, null, undefined));
 
     if (!this.userId) {
@@ -1814,7 +1815,7 @@ Meteor.methods({
     }
 
     const users = await Users.find({}, { fields: { emails: 1 } }).fetchAsync();
-    const counts = {};
+    const counts: Record<string, number> = {};
     for (const u of users) {
       const addr = (u.emails && u.emails[0] && u.emails[0].address) || '';
       const at = addr.lastIndexOf('@');
@@ -1876,7 +1877,7 @@ Meteor.methods({
 
       // Enumerate the user's shared template boards: linked-board cards in the
       // Board Templates swimlane of their Templates container board.
-      const cardQuery = {
+      const cardQuery: Record<string, WekanDocumentField> = {
         boardId: templatesBoardId,
         type: 'cardType-linkedBoard',
         archived: false,
@@ -1906,11 +1907,11 @@ Meteor.methods({
         });
       }
 
-      const emails = (user.emails || []).map(e => e.address).filter(Boolean);
+      const emails = (user.emails || []).map((e: WekanDocumentField) => e.address).filter(Boolean);
       const domains = [
         ...new Set(
           emails
-            .map(addr => (addr.indexOf('@') >= 0 ? addr.split('@')[1].toLowerCase() : ''))
+            .map((addr: WekanDocumentField) => (addr.indexOf('@') >= 0 ? addr.split('@')[1].toLowerCase() : ''))
             .filter(Boolean),
         ),
       ];
@@ -1919,11 +1920,11 @@ Meteor.methods({
         userId: user._id,
         username: user.username || '',
         fullname: (profile.fullname) || '',
-        orgs: (user.orgs || []).map(o => ({
+        orgs: (user.orgs || []).map((o: WekanDocumentField) => ({
           orgId: o.orgId,
           orgDisplayName: o.orgDisplayName,
         })),
-        teams: (user.teams || []).map(t => ({
+        teams: (user.teams || []).map((t: WekanDocumentField) => ({
           teamId: t.teamId,
           teamDisplayName: t.teamDisplayName,
         })),
@@ -1935,7 +1936,7 @@ Meteor.methods({
     return result;
   },
 
-  async searchUsers(query, boardId) {
+  async searchUsers(query: string, boardId: string) {
     check(query, String);
     check(boardId, String);
 
@@ -1948,7 +1949,7 @@ Meteor.methods({
     // Global site admins bypass the board-membership check, mirroring
     // inviteUserToBoard.
     if (!currentUser.isAdmin) {
-      const member = board.members.find(memberItem => memberItem.userId === currentUser._id);
+      const member = board.members.find((memberItem: WekanDocumentField) => memberItem.userId === currentUser._id);
       if (!member || !member.isActive) {
         throw new Meteor.Error('not-authorized', 'User is not a member of this board');
       }
@@ -1991,7 +1992,7 @@ Meteor.methods({
     if (!currentUser.isAdmin) {
       const setting = await ReactiveCache.getCurrentSetting();
       if (setting && setting.boardMembersFromSameOrgOrTeamOnly) {
-        const activeMemberUsers = [];
+        const activeMemberUsers: WekanDocumentField[] = [];
         for (const m of board.members) {
           if (!m.isActive) continue;
           const memberUser =
@@ -2000,7 +2001,7 @@ Meteor.methods({
               : await ReactiveCache.getUser(m.userId);
           if (memberUser) activeMemberUsers.push(memberUser);
         }
-        filteredUsers = users.filter(candidate =>
+        filteredUsers = users.filter((candidate: WekanDocumentField) =>
           activeMemberUsers.some(memberUser =>
             memberUser.sharesOrgOrTeamWith(candidate),
           ),
@@ -2008,7 +2009,7 @@ Meteor.methods({
       }
     }
 
-    return filteredUsers.map(user => sanitizeUserForSearch(user));
+    return filteredUsers.map((user: WekanDocumentField) => sanitizeUserForSearch(user));
   },
 });
 
@@ -2029,7 +2030,7 @@ WebApp.handlers.get('/api/admin/domains', async function(req, res) {
   try {
     await Authentication.checkUserId(req.userId);
     const users = await Users.find({}, { fields: { emails: 1 } }).fetchAsync();
-    const counts = {};
+    const counts: Record<string, number> = {};
     for (const u of users) {
       const addr = (u.emails && u.emails[0] && u.emails[0].address) || '';
       const at = addr.lastIndexOf('@');

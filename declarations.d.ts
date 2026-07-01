@@ -664,3 +664,15 @@ declare module 'meteor/webapp' {
     const handlers: WekanWebAppHandlers;
   }
 }
+
+// The matb33:collection-hooks package exposes a `CollectionHooks` object whose
+// `getUserId` resolver server code reads and overrides (to inject a fake user id
+// during system-initiated writes). @types/meteor doesn't model this package, so
+// declare the small surface used by server/models.
+declare module 'meteor/matb33:collection-hooks' {
+  interface WekanCollectionHooksStatic {
+    getUserId: () => string | null | undefined;
+  }
+  const CollectionHooks: WekanCollectionHooksStatic;
+  export { CollectionHooks };
+}
