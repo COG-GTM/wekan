@@ -95,6 +95,11 @@ interface JQuery {
   // the index signatures.
   sortable(options?: JQueryUiSortableOptions): JQuery;
   sortable(method: string, ...args: any[]): any;
+  // Vendored paste/drop image readers (client/lib/pasteImage.ts,
+  // client/lib/dropImage.ts). The handler receives a dynamic results object
+  // carrying the pasted/dropped image (dataURL + file).
+  pasteImageReader(handler: (results: any) => void): JQuery;
+  dropImageReader(handler: (results: any) => void): JQuery;
 }
 
 // The `ui` object passed to jQuery UI sortable start/stop callbacks.

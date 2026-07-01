@@ -1,3 +1,7 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { Meteor } from 'meteor/meteor';
+import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { ObjectId } from 'bson';
 import DOMPurify from 'dompurify';
@@ -15,18 +19,18 @@ import prettyMilliseconds from 'pretty-ms';
 // We store current card ID and the ID of currently opened attachment in a
 // global var. This is used so that we know what's the next attachment to open
 // when the user clicks on the prev/next button in the attachment viewer.
-let cardId = null;
-let openAttachmentId = null;
+let cardId: string | null | undefined = null;
+let openAttachmentId: string | null | undefined = null;
 
 // Used to store the start and end coordinates of a touch event for attachment swiping
-let touchStartCoords = null;
-let touchEndCoords = null;
+let touchStartCoords: TouchCoords | null = null;
+let touchEndCoords: TouchCoords | null = null;
 
 // Stores link to the attachment for which attachment actions popup was opened
-let attachmentActionsLink = null;
+let attachmentActionsLink: string | null = null;
 
 Template.attachmentGallery.events({
-  'click .open-preview'(event) {
+  'click .open-preview'(event: JQuery.TriggeredEvent) {
 
     openAttachmentId = $(event.currentTarget).attr("data-attachment-id");
     cardId = $(event.currentTarget).attr("data-card-id");
@@ -36,15 +40,15 @@ Template.attachmentGallery.events({
   'click .js-add-attachment': Popup.open('cardAttachments'),
   // If we let this event bubble, FlowRouter will handle it and empty the page
   // content, see #101.
-  'click .js-download'(event) {
+  'click .js-download'(event: JQuery.TriggeredEvent) {
     event.stopPropagation();
   },
   'click .js-open-attachment-menu': Popup.open('attachmentActions'),
-  'mouseover .js-open-attachment-menu'(event) { // For some reason I cannot combine handlers for "click .js-open-attachment-menu" and "mouseover .js-open-attachment-menu" events so this is a quick workaround.
+  'mouseover .js-open-attachment-menu'(event: JQuery.TriggeredEvent) { // For some reason I cannot combine handlers for "click .js-open-attachment-menu" and "mouseover .js-open-attachment-menu" events so this is a quick workaround.
     attachmentActionsLink = event.currentTarget.getAttribute("data-attachment-link");
   },
   'click .js-rename': Popup.open('attachmentRename'),
-  'click .js-confirm-delete': Popup.afterConfirm('attachmentDelete', async function() {
+  'click .js-confirm-delete': Popup.afterConfirm('attachmentDelete', async function(this: any) {
       const card = this.meta && this.meta.cardId ? ReactiveCache.getCard(this.meta.cardId) : null;
       if (card && card.coverId === this._id) {
         await card.unsetCover();
@@ -54,7 +58,7 @@ Template.attachmentGallery.events({
   }),
 });
 
-function getNextAttachmentId(currentAttachmentId, offset = 0) {
+function getNextAttachmentId(currentAttachmentId: any, offset = 0) {
     const attachments = ReactiveCache.getAttachments({'meta.cardId': cardId});
 
   let i = 0;
@@ -66,7 +70,7 @@ function getNextAttachmentId(currentAttachmentId, offset = 0) {
   return attachments[(i + offset + 1 + attachments.length) % attachments.length]._id;
 }
 
-function getPrevAttachmentId(currentAttachmentId, offset = 0) {
+function getPrevAttachmentId(currentAttachmentId: any, offset = 0) {
   const attachments = ReactiveCache.getAttachments({'meta.cardId': cardId});
 
   let i = 0;
@@ -78,7 +82,7 @@ function getPrevAttachmentId(currentAttachmentId, offset = 0) {
   return attachments[(i + offset - 1 + attachments.length) % attachments.length]._id;
 }
 
-function attachmentCanBeOpened(attachment) {
+function attachmentCanBeOpened(attachment: any) {
   return (
     attachment.isImage ||
     attachment.isPDF ||
@@ -89,11 +93,11 @@ function attachmentCanBeOpened(attachment) {
   );
 }
 
-function getAttachmentUrl(attachment) {
+function getAttachmentUrl(attachment: any) {
   return attachment && typeof attachment.link === 'function' ? attachment.link() : '';
 }
 
-function openAttachmentViewer(attachmentId) {
+function openAttachmentViewer(attachmentId: any) {
   const attachment = ReactiveCache.getAttachment(attachmentId);
 
   // Check if we can open the attachment (if we have a viewer for it) and exit if not
@@ -158,13 +162,13 @@ function closeAttachmentViewer() {
   $("#txt-viewer").attr("data", "");
   $("#txt-viewer").addClass("hidden");
 
-  $("#video-viewer").get(0).pause(); // Stop playback
-  $("#video-viewer").get(0).currentTime = 0;
+  ($("#video-viewer").get(0) as HTMLVideoElement).pause(); // Stop playback
+  ($("#video-viewer").get(0) as HTMLVideoElement).currentTime = 0;
   $("#video-viewer").empty();
   $("#video-viewer").addClass("hidden");
 
-  $("#audio-viewer").get(0).pause(); // Stop playback
-  $("#audio-viewer").get(0).currentTime = 0;
+  ($("#audio-viewer").get(0) as HTMLAudioElement).pause(); // Stop playback
+  ($("#audio-viewer").get(0) as HTMLAudioElement).currentTime = 0;
   $("#audio-viewer").empty();
   $("#audio-viewer").addClass("hidden");
 }
@@ -205,8 +209,8 @@ function openPrevAttachment() {
 
 function processTouch(){
 
-  xDist = touchEndCoords.x - touchStartCoords.x;
-  yDist = touchEndCoords.y - touchStartCoords.y;
+  const xDist = touchEndCoords!.x - touchStartCoords!.x;
+  const yDist = touchEndCoords!.y - touchStartCoords!.y;
 
   // Left swipe
   if (Math.abs(xDist) > Math.abs(yDist) && xDist < 0) {
@@ -226,20 +230,22 @@ function processTouch(){
 }
 
 Template.attachmentViewer.events({
-  'touchstart #viewer-container'(event) {
+  'touchstart #viewer-container'(event: JQuery.TriggeredEvent) {
+    const touches = (event.originalEvent as TouchEvent).changedTouches;
     touchStartCoords = {
-      x: event.changedTouches[0].screenX,
-      y: event.changedTouches[0].screenY
+      x: touches[0].screenX,
+      y: touches[0].screenY
     }
   },
-  'touchend #viewer-container'(event) {
+  'touchend #viewer-container'(event: JQuery.TriggeredEvent) {
+    const touches = (event.originalEvent as TouchEvent).changedTouches;
     touchEndCoords = {
-      x: event.changedTouches[0].screenX,
-      y: event.changedTouches[0].screenY
+      x: touches[0].screenX,
+      y: touches[0].screenY
     }
     processTouch();
   },
-  'click #viewer-container'(event) {
+  'click #viewer-container'(event: JQuery.TriggeredEvent) {
 
     // Make sure the click was on #viewer-container and not on any of its children
     if(event.target !== event.currentTarget) {
@@ -249,7 +255,7 @@ Template.attachmentViewer.events({
 
     closeAttachmentViewer();
   },
-  'click #viewer-content'(event) {
+  'click #viewer-content'(event: JQuery.TriggeredEvent) {
 
     // Make sure the click was on #viewer-content and not on any of its children
     if(event.target !== event.currentTarget) {
@@ -276,7 +282,8 @@ Template.attachmentGallery.helpers({
     if (!card) return [];
     const cardId = typeof card.getRealId === 'function' ? card.getRealId() : card._id;
     if (!cardId) return [];
-    const filesCursor = Attachments.find(
+    // ostrio:files find() returns a dynamic FilesCursor exposing .cursor/.each.
+    const filesCursor: any = Attachments.find(
       { 'meta.cardId': cardId },
       { sort: { uploadedAt: -1 } },
     );
@@ -292,14 +299,14 @@ Template.attachmentGallery.helpers({
   isBoardAdmin() {
     return ReactiveCache.getCurrentUser()?.isBoardAdmin();
   },
-  fileSize(size) {
+  fileSize(size: any) {
     const ret = filesize(size);
     return ret;
   },
-  sanitize(value) {
+  sanitize(value: any) {
     return sanitizeHTML(value);
   },
-  uploaderName() {
+  uploaderName(this: any) {
     const uploaderId = this.userId;
     if (!uploaderId) return '';
     const uploader = ReactiveCache.getUser(uploaderId);
@@ -308,7 +315,7 @@ Template.attachmentGallery.helpers({
       ? uploader.profile.fullname
       : uploader.username || '';
   },
-  uploadedAt() {
+  uploadedAt(this: any) {
     if (this.uploadedAtOstrio) {
       return formatDateTime(this.uploadedAtOstrio);
     }
@@ -321,39 +328,39 @@ Template.attachmentGallery.helpers({
   },
 });
 
-Template.cardAttachmentsPopup.onCreated(function() {
-  this.uploads = new ReactiveVar([]);
+Template.cardAttachmentsPopup.onCreated(function(this: CardAttachmentsPopupInstance) {
+  this.uploads = new ReactiveVar<any[]>([]);
 });
 
 Template.cardAttachmentsPopup.helpers({
-  getEstimateTime(upload) {
+  getEstimateTime(upload: any) {
     const ret = prettyMilliseconds(upload.estimateTime.get());
     return ret;
   },
-  getEstimateSpeed(upload) {
+  getEstimateSpeed(upload: any) {
     const ret = filesize(upload.estimateSpeed.get(), {round: 0}) + "/s";
     return ret;
   },
   uploads() {
-    return Template.instance().uploads.get();
+    return (Template.instance() as CardAttachmentsPopupInstance).uploads.get();
   }
 });
 
 Template.cardAttachmentsPopup.events({
-  async 'change .js-attach-file'(event, templateInstance) {
+  async 'change .js-attach-file'(this: any, event: JQuery.TriggeredEvent, templateInstance: CardAttachmentsPopupInstance) {
     event.stopPropagation();
     const card = this;
-    const files = event.currentTarget.files;
+    const files = (event.currentTarget as HTMLInputElement).files;
     if (files) {
-      let uploads = [];
+      let uploads: any[] = [];
       const uploaders = await handleFileUpload(card, files);
 
-      uploaders.forEach(uploader => {
-        uploader.on('start', function() {
+      uploaders.forEach((uploader: any) => {
+        uploader.on('start', function(this: any) {
           uploads.push(this);
           templateInstance.uploads.set(uploads);
         });
-        uploader.on('end', (error, fileRef) => {
+        uploader.on('end', (error: any, fileRef: any) => {
           uploads = uploads.filter(_upload => _upload.config.fileId != fileRef._id);
           templateInstance.uploads.set(uploads);
           if (uploads.length == 0 ) {
@@ -363,23 +370,26 @@ Template.cardAttachmentsPopup.events({
       });
     }
   },
-  'click .js-computer-upload'(event, templateInstance) {
+  'click .js-computer-upload'(event: JQuery.TriggeredEvent, templateInstance: Blaze.TemplateInstance) {
     // Prevent the click fired when the OS file-picker dialog closes from
     // triggering EscapeActions and closing the popup before the upload starts.
     // Same pattern as swimlanes.js after drag operations.
     EscapeActions.preventNextClick();
-    templateInstance.find('.js-attach-file').click();
+    (templateInstance.find('.js-attach-file') as HTMLElement).click();
     event.preventDefault();
   },
   'click .js-upload-clipboard-image': Popup.open('previewClipboardImage'),
 });
 
 const MAX_IMAGE_PIXEL = Utils.MAX_IMAGE_PIXEL;
-const COMPRESS_RATIO = Utils.IMAGE_COMPRESS_RATIO;
-let pastedResults = null;
+// Utils exposes COMPRESS_RATIO, not IMAGE_COMPRESS_RATIO; kept as-is to preserve
+// the original (undefined) runtime value.
+const COMPRESS_RATIO = (Utils as any).IMAGE_COMPRESS_RATIO;
+// Holds the most recent pasted/dropped clipboard image result (dynamic shape).
+let pastedResults: any = null;
 
 // Shared upload logic for drag-and-drop functionality
-export async function handleFileUpload(card, files) {
+export async function handleFileUpload(card: any, files: any) {
   if (!files || files.length === 0) {
     return [];
   }
@@ -401,7 +411,7 @@ export async function handleFileUpload(card, files) {
     return [];
   }
 
-  const uploads = [];
+  const uploads: any[] = [];
 
   for (const file of files) {
     // Basic file validation
@@ -426,7 +436,7 @@ export async function handleFileUpload(card, files) {
       }
     }
 
-    const config = {
+    const config: AttachmentUploadConfig = {
       file: file,
       fileId: fileId,
       fileName: fileName,
@@ -449,7 +459,7 @@ export async function handleFileUpload(card, files) {
       // Add to progress manager for tracking
       const uploadId = uploadProgressManager.addUpload(card._id, uploader, file);
 
-      uploader.on('uploaded', (error, fileRef) => {
+      uploader.on('uploaded', (error: any, fileRef: any) => {
         if (!error) {
           if (fileRef.isImage) {
             card.setCover(fileRef._id);
@@ -464,7 +474,7 @@ export async function handleFileUpload(card, files) {
         }
       });
 
-      uploader.on('error', (error) => {
+      uploader.on('error', (error: any) => {
         if (process.env.DEBUG === 'true') {
           console.error('Upload error:', error);
         }
@@ -484,9 +494,9 @@ export async function handleFileUpload(card, files) {
 
 Template.previewClipboardImagePopup.onRendered(() => {
   // we can paste image from clipboard
-  const handle = results => {
+  const handle = (results: any) => {
     if (results.dataURL.startsWith('data:image/')) {
-      const direct = results => {
+      const direct = (results: any) => {
         $('img.preview-clipboard-image').attr('src', results.dataURL);
         pastedResults = results;
       };
@@ -496,7 +506,7 @@ Template.previewClipboardImagePopup.onRendered(() => {
           dataurl: results.dataURL,
           maxSize: MAX_IMAGE_PIXEL,
           ratio: COMPRESS_RATIO,
-          callback(changed) {
+          callback(changed: any) {
             if (changed !== false && !!changed) {
               results.dataURL = changed;
             }
@@ -516,13 +526,14 @@ Template.previewClipboardImagePopup.onRendered(() => {
 });
 
 Template.previewClipboardImagePopup.events({
-  async 'click .js-upload-pasted-image'() {
+  async 'click .js-upload-pasted-image'(this: any) {
     const card = this;
     if (pastedResults && pastedResults.file) {
       const file = pastedResults.file;
-      window.oPasted = pastedResults;
+      // window.oPasted is an ad-hoc debug global not present on the Window type.
+      (window as any).oPasted = pastedResults;
       const fileId = new ObjectId().toString();
-      const config = {
+      const config: AttachmentUploadConfig = {
         file,
         fileId: fileId,
         meta: Utils.getCommonAttachmentMetaFrom(card),
@@ -535,14 +546,14 @@ Template.previewClipboardImagePopup.events({
         config,
         false,
       );
-      uploader.on('uploaded', (error, fileRef) => {
+      uploader.on('uploaded', (error: any, fileRef: any) => {
         if (!error) {
           if (fileRef.isImage) {
             card.setCover(fileRef._id);
           }
         }
       });
-      uploader.on('end', (error, fileRef) => {
+      uploader.on('end', (error: any, fileRef: any) => {
         pastedResults = null;
         $(document.body).pasteImageReader(() => {});
         Popup.back();
@@ -553,7 +564,7 @@ Template.previewClipboardImagePopup.events({
 });
 
 Template.attachmentActionsPopup.helpers({
-  isCover() {
+  isCover(this: any) {
     const ret = ReactiveCache.getCard(this.meta.cardId).coverId == this._id;
     return ret;
   },
@@ -565,22 +576,22 @@ Template.attachmentActionsPopup.helpers({
 });
 
 Template.attachmentActionsPopup.events({
-  'click .js-add-cover'() {
+  'click .js-add-cover'(this: any) {
     ReactiveCache.getCard(this.meta.cardId).setCover(this._id);
     Popup.back();
   },
-  'click .js-remove-cover'() {
+  'click .js-remove-cover'(this: any) {
     ReactiveCache.getCard(this.meta.cardId).unsetCover();
     Popup.back();
   },
-  'click .js-add-background-image'(event) {
+  'click .js-add-background-image'(event: JQuery.TriggeredEvent) {
     const currentBoard = Utils.getCurrentBoard();
-    currentBoard.setBackgroundImageURL(attachmentActionsLink);
-    Utils.setBackgroundImage(attachmentActionsLink);
+    currentBoard.setBackgroundImageURL(attachmentActionsLink as string);
+    Utils.setBackgroundImage(attachmentActionsLink as string);
     Popup.back();
     event.preventDefault();
   },
-  'click .js-remove-background-image'(event) {
+  'click .js-remove-background-image'(event: JQuery.TriggeredEvent) {
     const currentBoard = Utils.getCurrentBoard();
     currentBoard.setBackgroundImageURL("");
     Utils.setBackgroundImage("");
@@ -591,23 +602,23 @@ Template.attachmentActionsPopup.events({
 });
 
 Template.attachmentRenamePopup.helpers({
-  getNameWithoutExtension() {
+  getNameWithoutExtension(this: any) {
     const ret = this.name.replace(new RegExp("\\." + this.extension + "$"), "");
     return ret;
   },
 });
 
 Template.attachmentRenamePopup.events({
-  'keydown input.js-edit-attachment-name'(evt, tpl) {
+  'keydown input.js-edit-attachment-name'(evt: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     // enter = save
     if (evt.keyCode === 13) {
-      tpl.find('button[type=submit]').click();
+      (tpl.find('button[type=submit]') as HTMLElement).click();
     }
   },
-  'click button.js-submit-edit-attachment-name'(event, tpl) {
+  'click button.js-submit-edit-attachment-name'(this: any, event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     // save button pressed
     event.preventDefault();
-    const name = tpl.$('.js-edit-attachment-name')[0]
+    const name = (tpl.$('.js-edit-attachment-name')[0] as HTMLInputElement)
       .value
       .trim() + this.extensionWithDot;
     if (name === sanitizeText(name)) {
@@ -618,18 +629,43 @@ Template.attachmentRenamePopup.events({
 });
 
 // Template helpers for attachment migration status
-Template.registerHelper('attachmentMigrationStatus', function(attachmentId) {
+Template.registerHelper('attachmentMigrationStatus', function(attachmentId: any) {
   return attachmentMigrationManager.getAttachmentMigrationStatus(attachmentId);
 });
 
-Template.registerHelper('isAttachmentMigrating', function(attachmentId) {
+Template.registerHelper('isAttachmentMigrating', function(attachmentId: any) {
   return attachmentMigrationManager.isAttachmentBeingMigrated(attachmentId);
 });
 
 Template.registerHelper('attachmentMigrationProgress', function() {
-  return attachmentMigrationManager.attachmentMigrationProgress.get();
+  // attachmentMigration{Progress,Status} are module-level reactive vars, not
+  // members of the manager instance; accessed via the manager here to preserve
+  // the pre-existing runtime behavior.
+  return (attachmentMigrationManager as any).attachmentMigrationProgress.get();
 });
 
 Template.registerHelper('attachmentMigrationStatusText', function() {
-  return attachmentMigrationManager.attachmentMigrationStatus.get();
+  return (attachmentMigrationManager as any).attachmentMigrationStatus.get();
 });
+
+// Start/end coordinates of a touch used to detect attachment swipe gestures.
+interface TouchCoords {
+  x: number;
+  y: number;
+}
+
+// The card attachments popup tracks in-progress uploads in a reactive var.
+interface CardAttachmentsPopupInstance extends Blaze.TemplateInstance {
+  uploads: ReactiveVar<any[]>;
+}
+
+// ostrio:files upload config. `meta` is the dynamic per-file metadata built by
+// Utils.getCommonAttachmentMetaFrom (fileId is added after construction).
+interface AttachmentUploadConfig {
+  file: any;
+  fileId: string;
+  fileName: string;
+  meta: any;
+  chunkSize: string;
+  transport: string;
+}
