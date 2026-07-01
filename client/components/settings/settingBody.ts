@@ -1,3 +1,7 @@
+import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
 import { ALLOWED_WAIT_SPINNERS } from '/config/const';
@@ -28,9 +32,9 @@ import TableVisibilityModeSettings from '/models/tableVisibilityModeSettings';
 import { format } from '/imports/lib/dateUtils';
 
 // Helper functions shared across the template
-function checkField(selector) {
+function checkField(selector: any) {
   const value = $(selector).val();
-  if (!value || value.trim() === '') {
+  if (!value || (value as string).trim() === '') {
     $(selector).parents('li.smtp-form').addClass('has-error');
     throw Error('blank field');
   } else {
@@ -38,7 +42,7 @@ function checkField(selector) {
   }
 }
 
-function cleanAndValidateJSON(content) {
+function cleanAndValidateJSON(content: any) {
   if (!content || !content.trim()) {
     return { json: content };
   }
@@ -47,7 +51,7 @@ function cleanAndValidateJSON(content) {
     // Try to parse as-is
     const parsed = JSON.parse(content);
     return { json: JSON.stringify(parsed, null, 2) };
-  } catch (e) {
+  } catch (e: any) { // e: any — JSON.parse throws untyped errors.
     const errorMsg = e.message;
 
     // If error is "unexpected non-whitespace character after JSON data"
@@ -118,7 +122,7 @@ function cleanAndValidateJSON(content) {
   }
 }
 
-const LIMIT_UNIT_FACTORS = {
+const LIMIT_UNIT_FACTORS: Record<string, number> = {
   bytes: 1,
   mb: 1024 * 1024,
   gb: 1024 * 1024 * 1024,
@@ -131,7 +135,7 @@ const DEFAULT_LIMIT_SETTINGS = {
   apiDownloadMaxBytes: 20 * 1024 * 1024,
 };
 
-function toNonNegativeInteger(value, fallback = 0) {
+function toNonNegativeInteger(value: any, fallback = 0) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed < 0) {
     return fallback;
@@ -139,7 +143,7 @@ function toNonNegativeInteger(value, fallback = 0) {
   return parsed;
 }
 
-function normalizeLimitSettings(settingsDoc) {
+function normalizeLimitSettings(settingsDoc: any): Record<string, number> {
   const fromDoc = settingsDoc?.limitSettings || {};
   const legacyUpload = settingsDoc?.uploadSettings?.maxFileSize;
 
@@ -163,7 +167,7 @@ function normalizeLimitSettings(settingsDoc) {
   };
 }
 
-function pickUnitForBytes(bytes) {
+function pickUnitForBytes(bytes: any) {
   const safeBytes = toNonNegativeInteger(bytes, 0);
   if (safeBytes > 0 && safeBytes % LIMIT_UNIT_FACTORS.gb === 0) {
     return 'gb';
@@ -174,13 +178,13 @@ function pickUnitForBytes(bytes) {
   return 'bytes';
 }
 
-function toDisplayValue(bytes, unit) {
+function toDisplayValue(bytes: any, unit: any) {
   const safeBytes = toNonNegativeInteger(bytes, 0);
   const factor = LIMIT_UNIT_FACTORS[unit] || LIMIT_UNIT_FACTORS.bytes;
   return safeBytes / factor;
 }
 
-function toBytes(value, unit) {
+function toBytes(value: any, unit: any) {
   const numericValue = Number.parseFloat(value);
   if (!Number.isFinite(numericValue) || numericValue < 0) {
     return null;
@@ -189,7 +193,7 @@ function toBytes(value, unit) {
   return Math.round(numericValue * factor);
 }
 
-function refreshAttachmentStorageSettings(tpl, showLoading = false) {
+function refreshAttachmentStorageSettings(tpl: SettingInstance, showLoading = false) {
   if (!tpl) {
     return;
   }
@@ -198,7 +202,8 @@ function refreshAttachmentStorageSettings(tpl, showLoading = false) {
     tpl.loading.set(true);
   }
 
-  Meteor.call('getAttachmentStorageSettings', (error, settings) => {
+    // error/settings: any — untyped Meteor method callback.
+  Meteor.call('getAttachmentStorageSettings', (error: any, settings: any) => {
     if (showLoading) {
       tpl.loading.set(false);
     }
@@ -232,7 +237,7 @@ function refreshAttachmentStorageSettings(tpl, showLoading = false) {
   });
 }
 
-function getLimitUnitOptions(selectedUnit) {
+function getLimitUnitOptions(selectedUnit: any) {
   return [
     { value: 'gb', labelKey: 'attachment-limit-unit-gb', selected: selectedUnit === 'gb' },
     { value: 'mb', labelKey: 'attachment-limit-unit-mb', selected: selectedUnit === 'mb' },
@@ -240,7 +245,7 @@ function getLimitUnitOptions(selectedUnit) {
   ];
 }
 
-Template.setting.onCreated(function () {
+Template.setting.onCreated(function (this: SettingInstance) {
   this.error = new ReactiveVar('');
   this.loading = new ReactiveVar(false);
   this.forgotPasswordSetting = new ReactiveVar(false);
@@ -291,13 +296,13 @@ Template.setting.onCreated(function () {
   // }, 5000); // Poll every 5 seconds
 });
 
-Template.setting.onDestroyed(function () {
+Template.setting.onDestroyed(function (this: SettingInstance) {
   // if (this.errorPollInterval) {
   //   Meteor.clearInterval(this.errorPollInterval);
   // }
 });
 
-Template.setting.onRendered(function () {
+Template.setting.onRendered(function (this: SettingInstance) {
   this.previousAttachmentLimitEnabled = null;
 
   this.autorun(() => {
@@ -345,41 +350,41 @@ Template.setting.onRendered(function () {
 
 Template.setting.helpers({
   isGeneralSetting() {
-    const inst = Template.instance();
+    const inst = Template.instance() as SettingInstance;
     return inst.generalSetting && inst.generalSetting.get();
   },
   isEmailSetting() {
-    const inst = Template.instance();
+    const inst = Template.instance() as SettingInstance;
     return inst.emailSetting && inst.emailSetting.get();
   },
   isAccountSetting() {
-    const inst = Template.instance();
+    const inst = Template.instance() as SettingInstance;
     return inst.accountSetting && inst.accountSetting.get();
   },
   isTableVisibilityModeSetting() {
-    const inst = Template.instance();
+    const inst = Template.instance() as SettingInstance;
     return (
       inst.tableVisibilityModeSetting && inst.tableVisibilityModeSetting.get()
     );
   },
   isAnnouncementSetting() {
-    const inst = Template.instance();
+    const inst = Template.instance() as SettingInstance;
     return inst.announcementSetting && inst.announcementSetting.get();
   },
   isAccessibilitySetting() {
-    const inst = Template.instance();
+    const inst = Template.instance() as SettingInstance;
     return inst.accessibilitySetting && inst.accessibilitySetting.get();
   },
   isLayoutSetting() {
-    const inst = Template.instance();
+    const inst = Template.instance() as SettingInstance;
     return inst.layoutSetting && inst.layoutSetting.get();
   },
   isWebhookSetting() {
-    const inst = Template.instance();
+    const inst = Template.instance() as SettingInstance;
     return inst.webhookSetting && inst.webhookSetting.get();
   },
   isAttachmentSettings() {
-    const inst = Template.instance();
+    const inst = Template.instance() as SettingInstance;
     return inst.attachmentSettings && inst.attachmentSettings.get();
   },
   // isCronSettings() {
@@ -387,7 +392,7 @@ Template.setting.helpers({
   //   return inst.cronSettings && inst.cronSettings.get();
   // },
   isLoading() {
-    const inst = Template.instance();
+    const inst = Template.instance() as SettingInstance;
     return inst.loading && inst.loading.get();
   },
 
@@ -434,8 +439,8 @@ Template.setting.helpers({
     return process.env.S3_PORT || 443;
   },
 
-  attachmentTransferLimitValue(fieldName) {
-    const tpl = Template.instance();
+  attachmentTransferLimitValue(fieldName: any) {
+    const tpl = Template.instance() as SettingInstance;
     const settingsDoc = tpl.attachmentStorageSettings.get();
     const units = tpl.attachmentLimitUnits.get() || {};
     const limits = normalizeLimitSettings(settingsDoc);
@@ -443,15 +448,15 @@ Template.setting.helpers({
     return toDisplayValue(limits[fieldName], unit);
   },
 
-  attachmentTransferLimitUnitOptions(fieldName) {
-    const tpl = Template.instance();
+  attachmentTransferLimitUnitOptions(fieldName: any) {
+    const tpl = Template.instance() as SettingInstance;
     const units = tpl.attachmentLimitUnits.get() || {};
     const selectedUnit = units[fieldName] || 'bytes';
     return getLimitUnitOptions(selectedUnit);
   },
 
-  isAttachmentLimitEnabled(fieldName) {
-    const tpl = Template.instance();
+  isAttachmentLimitEnabled(fieldName: any) {
+    const tpl = Template.instance() as SettingInstance;
     const enabledMap = tpl.attachmentLimitEnabled.get() || {};
     return enabledMap[fieldName] === true;
   },
@@ -593,7 +598,7 @@ Template.setting.helpers({
 });
 
 Template.setting.events({
-  'click a.js-toggle-forgot-password'(event, tpl) {
+  'click a.js-toggle-forgot-password'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     tpl.loading.set(true);
     const forgotPasswordClosed =
       ReactiveCache.getCurrentSetting().disableForgotPassword;
@@ -602,7 +607,7 @@ Template.setting.events({
     });
     tpl.loading.set(false);
   },
-  'click a.js-toggle-registration'(event, tpl) {
+  'click a.js-toggle-registration'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     tpl.loading.set(true);
     const registrationClosed =
       ReactiveCache.getCurrentSetting().disableRegistration;
@@ -616,7 +621,7 @@ Template.setting.events({
       $('.invite-people').slideDown();
     }
   },
-  'click a.js-toggle-board-members-same-org-team'(event, tpl) {
+  'click a.js-toggle-board-members-same-org-team'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     // #6116: toggle the global "add board members from same Org/Team only" setting.
     tpl.loading.set(true);
     const current =
@@ -641,7 +646,7 @@ Template.setting.events({
   'click a.js-toggle-display-authentication-method'() {
     $('#display-authentication-method').toggleClass('is-checked');
   },
-  'click a.js-setting-menu'(event, tpl) {
+  'click a.js-setting-menu'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     const target = $(event.target);
     if (!target.hasClass('active')) {
       $('.side-menu li.active').removeClass('active');
@@ -689,7 +694,7 @@ Template.setting.events({
       // }
     }
   },
-  'click a.js-toggle-board-choose'(event) {
+  'click a.js-toggle-board-choose'(event: JQuery.TriggeredEvent) {
     let target = $(event.target);
     if (!target.hasClass('js-toggle-board-choose')) {
       target = target.parent();
@@ -698,19 +703,19 @@ Template.setting.events({
     $(`#${checkboxId} .materialCheckBox`).toggleClass('is-checked');
     $(`#${checkboxId}`).toggleClass('is-checked');
   },
-  'click button.js-email-invite'(event, tpl) {
-    const emails = $('#email-to-invite')
-      .val()
+  'click button.js-email-invite'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
+    const emails = ($('#email-to-invite').val() as string)
       .toLowerCase()
       .trim()
       .split('\n')
       .join(',')
       .split(',');
-    const boardsToInvite = [];
+    // boardsToInvite/validEmails: any[] — collected board ids and email strings.
+    const boardsToInvite: any[] = [];
     $('.js-toggle-board-choose .materialCheckBox.is-checked').each(function () {
       boardsToInvite.push($(this).data('id'));
     });
-    const validEmails = [];
+    const validEmails: any[] = [];
     emails.forEach((email) => {
       if (email && /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(email.trim())) {
         validEmails.push(email.trim());
@@ -726,15 +731,15 @@ Template.setting.events({
       });
     }
   },
-  'click button.js-save'(event, tpl) {
+  'click button.js-save'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     tpl.loading.set(true);
     $('li').removeClass('has-error');
 
     try {
       const host = checkField('#mail-server-host');
       const port = checkField('#mail-server-port');
-      const username = $('#mail-server-username').val().trim();
-      const password = $('#mail-server-password').val().trim();
+      const username = ($('#mail-server-username').val() as string).trim();
+      const password = ($('#mail-server-password').val() as string).trim();
       const from = checkField('#mail-server-from');
       const tls = $('#mail-server-tls.is-checked').length > 0;
       Settings.update(ReactiveCache.getCurrentSetting()._id, {
@@ -754,7 +759,8 @@ Template.setting.events({
     }
   },
   'click button.js-send-smtp-test-email'() {
-    Meteor.call('sendSMTPTestEmail', (err, ret) => {
+    // err/ret: any — untyped Meteor method callback.
+    Meteor.call('sendSMTPTestEmail', (err: any, ret: any) => {
       if (!err && ret) {
         const message = `${TAPi18n.__(ret.message)}: ${ret.email}`;
         alert(message);
@@ -765,37 +771,37 @@ Template.setting.events({
       }
     });
   },
-  'click button.js-save-layout'(event, tpl) {
+  'click button.js-save-layout'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     tpl.loading.set(true);
     $('li').removeClass('has-error');
 
-    const productName = ($('#product-name').val() || '').trim();
+    const productName = ($('#product-name').val() as string || '').trim();
     const customLoginLogoImageUrl = (
-      $('#custom-login-logo-image-url').val() || ''
+      $('#custom-login-logo-image-url').val() as string || ''
     ).trim();
     const customLoginLogoLinkUrl = (
-      $('#custom-login-logo-link-url').val() || ''
+      $('#custom-login-logo-link-url').val() as string || ''
     ).trim();
-    const customHelpLinkUrl = ($('#custom-help-link-url').val() || '').trim();
+    const customHelpLinkUrl = ($('#custom-help-link-url').val() as string || '').trim();
     const textBelowCustomLoginLogo = (
-      $('#text-below-custom-login-logo').val() || ''
+      $('#text-below-custom-login-logo').val() as string || ''
     ).trim();
     const automaticLinkedUrlSchemes = (
-      $('#automatic-linked-url-schemes').val() || ''
+      $('#automatic-linked-url-schemes').val() as string || ''
     ).trim();
     const customTopLeftCornerLogoImageUrl = (
-      $('#custom-top-left-corner-logo-image-url').val() || ''
+      $('#custom-top-left-corner-logo-image-url').val() as string || ''
     ).trim();
     const customTopLeftCornerLogoLinkUrl = (
-      $('#custom-top-left-corner-logo-link-url').val() || ''
+      $('#custom-top-left-corner-logo-link-url').val() as string || ''
     ).trim();
     const customTopLeftCornerLogoHeight = (
-      $('#custom-top-left-corner-logo-height').val() || ''
+      $('#custom-top-left-corner-logo-height').val() as string || ''
     ).trim();
 
-    const oidcBtnText = ($('#oidcBtnTextvalue').val() || '').trim();
-    const mailDomainName = ($('#mailDomainNamevalue').val() || '').trim();
-    const legalNotice = ($('#legalNoticevalue').val() || '').trim();
+    const oidcBtnText = ($('#oidcBtnTextvalue').val() as string || '').trim();
+    const mailDomainName = ($('#mailDomainNamevalue').val() as string || '').trim();
+    const legalNotice = ($('#legalNoticevalue').val() as string || '').trim();
     const hideLogoChange = $('input[name=hideLogo]:checked').val() === 'true';
     const hideCardCounterListChange =
       $('input[name=hideCardCounterList]:checked').val() === 'true';
@@ -804,7 +810,7 @@ Template.setting.events({
     const displayAuthenticationMethod =
       $('input[name=displayAuthenticationMethod]:checked').val() === 'true';
     const defaultAuthenticationMethod = $('#defaultAuthenticationMethod').val();
-    const spinnerName = ($('#spinnerName').val() || '').trim();
+    const spinnerName = ($('#spinnerName').val() as string || '').trim();
 
     try {
       Settings.update(ReactiveCache.getCurrentSetting()._id, {
@@ -837,7 +843,7 @@ Template.setting.events({
 
     document.title = productName;
   },
-  'click a.js-toggle-support'(event, tpl) {
+  'click a.js-toggle-support'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     tpl.loading.set(true);
     const supportPageEnabled = !$(
       '.js-toggle-support .materialCheckBox',
@@ -849,7 +855,7 @@ Template.setting.events({
     });
     tpl.loading.set(false);
   },
-  'click a.js-toggle-support-public'(event, tpl) {
+  'click a.js-toggle-support-public'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     tpl.loading.set(true);
     const supportPagePublic = !$(
       '.js-toggle-support-public .materialCheckBox',
@@ -860,10 +866,10 @@ Template.setting.events({
     });
     tpl.loading.set(false);
   },
-  'click button.js-support-save'(event, tpl) {
+  'click button.js-support-save'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     tpl.loading.set(true);
-    const supportTitle = ($('#support-title').val() || '').trim();
-    const supportPageText = ($('#support-page-text').val() || '').trim();
+    const supportTitle = ($('#support-title').val() as string || '').trim();
+    const supportPageText = ($('#support-page-text').val() as string || '').trim();
     try {
       Settings.update(Settings.findOne()._id, {
         $set: {
@@ -877,7 +883,7 @@ Template.setting.events({
       tpl.loading.set(false);
     }
   },
-  'click a.js-toggle-custom-head'(event, tpl) {
+  'click a.js-toggle-custom-head'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     tpl.loading.set(true);
     const customHeadEnabled = !$(
       '.js-toggle-custom-head .materialCheckBox',
@@ -889,7 +895,7 @@ Template.setting.events({
     });
     tpl.loading.set(false);
   },
-  'click a.js-toggle-custom-manifest'(event, tpl) {
+  'click a.js-toggle-custom-manifest'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     tpl.loading.set(true);
     const customManifestEnabled = !$(
       '.js-toggle-custom-manifest .materialCheckBox',
@@ -901,10 +907,10 @@ Template.setting.events({
     });
     tpl.loading.set(false);
   },
-  'click button.js-custom-head-save'(event, tpl) {
+  'click button.js-custom-head-save'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     tpl.loading.set(true);
-    const customHeadMetaTags = $('#custom-head-meta').val() || '';
-    let customManifestContent = $('#custom-manifest-content').val() || '';
+    const customHeadMetaTags = $('#custom-head-meta').val() as string || '';
+    let customManifestContent = $('#custom-manifest-content').val() as string || '';
 
     // Validate and clean JSON if present
     if (customManifestContent.trim()) {
@@ -919,7 +925,7 @@ Template.setting.events({
       $('#custom-manifest-content').val(customManifestContent);
     }
 
-    const customHeadLinkTags = $('#custom-head-links').val() || '';
+    const customHeadLinkTags = $('#custom-head-links').val() as string || '';
 
     try {
       Settings.update(ReactiveCache.getCurrentSetting()._id, {
@@ -935,7 +941,7 @@ Template.setting.events({
       tpl.loading.set(false);
     }
   },
-  'click a.js-toggle-custom-assetlinks'(event, tpl) {
+  'click a.js-toggle-custom-assetlinks'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     tpl.loading.set(true);
     const customAssetLinksEnabled = !$(
       '.js-toggle-custom-assetlinks .materialCheckBox',
@@ -949,9 +955,9 @@ Template.setting.events({
     });
     tpl.loading.set(false);
   },
-  'click button.js-custom-assetlinks-save'(event, tpl) {
+  'click button.js-custom-assetlinks-save'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     tpl.loading.set(true);
-    let customAssetLinksContent = $('#custom-assetlinks-content').val() || '';
+    let customAssetLinksContent = $('#custom-assetlinks-content').val() as string || '';
 
     // Validate and clean JSON if present
     if (customAssetLinksContent.trim()) {
@@ -980,7 +986,7 @@ Template.setting.events({
   },
 
   // Event handlers for attachment settings
-  'click button.js-test-s3-connection'(event) {
+  'click button.js-test-s3-connection'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const secretKey = $('#s3-secret-key').val();
     if (!secretKey) {
@@ -988,7 +994,8 @@ Template.setting.events({
       return;
     }
 
-    Meteor.call('testS3Connection', { secretKey }, (error, result) => {
+    // error/result: any — untyped Meteor method callback.
+    Meteor.call('testS3Connection', { secretKey }, (error: any, result: any) => {
       if (error) {
         alert(TAPi18n.__('s3-connection-failed') + ': ' + error.reason);
       } else {
@@ -997,7 +1004,7 @@ Template.setting.events({
     });
   },
 
-  'click button.js-save-s3-settings'(event) {
+  'click button.js-save-s3-settings'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const secretKey = $('#s3-secret-key').val();
     if (!secretKey) {
@@ -1005,7 +1012,8 @@ Template.setting.events({
       return;
     }
 
-    Meteor.call('saveS3Settings', { secretKey }, (error, result) => {
+    // error/result: any — untyped Meteor method callback.
+    Meteor.call('saveS3Settings', { secretKey }, (error: any, result: any) => {
       if (error) {
         alert(TAPi18n.__('s3-settings-save-failed') + ': ' + error.reason);
       } else {
@@ -1015,9 +1023,10 @@ Template.setting.events({
     });
   },
 
-  'change select.js-attachment-limit-unit'(event, tpl) {
-    const fieldName = event.currentTarget.dataset.field;
-    const selectedUnit = event.currentTarget.value;
+  'change select.js-attachment-limit-unit'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
+    const currentTarget = event.currentTarget as HTMLSelectElement;
+    const fieldName = currentTarget.dataset.field;
+    const selectedUnit = currentTarget.value;
     if (!fieldName || !selectedUnit) {
       return;
     }
@@ -1029,9 +1038,9 @@ Template.setting.events({
     });
   },
 
-  'click a.js-toggle-attachment-limit'(event, tpl) {
+  'click a.js-toggle-attachment-limit'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     event.preventDefault();
-    const fieldName = event.currentTarget.dataset.field;
+    const fieldName = (event.currentTarget as HTMLElement).dataset.field;
     if (!fieldName) {
       return;
     }
@@ -1043,7 +1052,7 @@ Template.setting.events({
     });
   },
 
-  'click button.js-save-attachment-transfer-limits'(event, tpl) {
+  'click button.js-save-attachment-transfer-limits'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     event.preventDefault();
 
     const currentSettings = tpl.attachmentStorageSettings.get();
@@ -1061,7 +1070,8 @@ Template.setting.events({
       { fieldName: 'apiDownloadMaxBytes', inputId: '#api-download-limit-value' },
     ];
 
-    const nextLimitSettings = {};
+    // nextLimitSettings: Record<string, number> — per-field byte limits.
+    const nextLimitSettings: Record<string, number> = {};
     for (const field of fieldConfig) {
       if (!enabledMap[field.fieldName]) {
         nextLimitSettings[field.fieldName] = 0;
@@ -1091,7 +1101,8 @@ Template.setting.events({
       },
     };
 
-    Meteor.call('updateAttachmentStorageSettings', nextSettings, (error) => {
+    // error: any — untyped Meteor method callback.
+    Meteor.call('updateAttachmentStorageSettings', nextSettings, (error: any) => {
       if (error) {
         alert(`${TAPi18n.__('attachment-transfer-limits-save-failed')}: ${error.reason || error.message}`);
         return;
@@ -1103,7 +1114,7 @@ Template.setting.events({
   },
 
   // Event handlers for cron settings
-  // 'click button.js-start-migration'(event, tpl) {
+  // 'click button.js-start-migration'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
   //   event.preventDefault();
   //   tpl.loading.set(true);
   //   cronIsMigrating.set(true);
@@ -1145,7 +1156,7 @@ Template.setting.events({
   //   }
   // },
   //
-  // 'click button.js-start-all-migrations'(event, tpl) {
+  // 'click button.js-start-all-migrations'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
   //   event.preventDefault();
   //   tpl.loading.set(true);
   //   Meteor.call('cron.startAllMigrations', (error) => {
@@ -1158,7 +1169,7 @@ Template.setting.events({
   //   });
   // },
   //
-  // 'click button.js-pause-all-migrations'(event, tpl) {
+  // 'click button.js-pause-all-migrations'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
   //   event.preventDefault();
   //   tpl.loading.set(true);
   //   Meteor.call('cron.pauseAllMigrations', (error) => {
@@ -1171,7 +1182,7 @@ Template.setting.events({
   //   });
   // },
   //
-  // 'click button.js-stop-all-migrations'(event, tpl) {
+  // 'click button.js-stop-all-migrations'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
   //   event.preventDefault();
   //   if (confirm(TAPi18n.__('migration-stop-confirm'))) {
   //     tpl.loading.set(true);
@@ -1186,7 +1197,7 @@ Template.setting.events({
   //   }
   // },
   //
-  // 'click button.js-pause-migration'(event, tpl) {
+  // 'click button.js-pause-migration'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
   //   event.preventDefault();
   //   tpl.loading.set(true);
   //   cronIsMigrating.set(false);
@@ -1201,7 +1212,7 @@ Template.setting.events({
   //   });
   // },
   //
-  // 'click button.js-stop-migration'(event, tpl) {
+  // 'click button.js-stop-migration'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
   //   event.preventDefault();
   //   if (confirm(TAPi18n.__('migration-stop-confirm'))) {
   //     tpl.loading.set(true);
@@ -1222,7 +1233,7 @@ Template.setting.events({
   //   }
   // },
   //
-  // 'click button.js-start-job'(event, tpl) {
+  // 'click button.js-start-job'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
   //   event.preventDefault();
   //   const jobName = $(event.target).data('job-name');
   //   tpl.loading.set(true);
@@ -1236,7 +1247,7 @@ Template.setting.events({
   //   });
   // },
   //
-  // 'click button.js-pause-job'(event, tpl) {
+  // 'click button.js-pause-job'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
   //   event.preventDefault();
   //   const jobName = $(event.target).data('job-name');
   //   tpl.loading.set(true);
@@ -1250,7 +1261,7 @@ Template.setting.events({
   //   });
   // },
   //
-  // 'click button.js-resume-job'(event, tpl) {
+  // 'click button.js-resume-job'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
   //   event.preventDefault();
   //   const jobName = $(event.target).data('job-name');
   //   tpl.loading.set(true);
@@ -1264,7 +1275,7 @@ Template.setting.events({
   //   });
   // },
   //
-  // 'click button.js-delete-job'(event, tpl) {
+  // 'click button.js-delete-job'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
   //   event.preventDefault();
   //   const jobName = $(event.target).data('job-name');
   //   if (confirm(TAPi18n.__('cron-job-delete-confirm'))) {
@@ -1280,7 +1291,7 @@ Template.setting.events({
   //   }
   // },
   //
-  // 'click button.js-add-cron-job'(event) {
+  // 'click button.js-add-cron-job'(event: JQuery.TriggeredEvent) {
   //   event.preventDefault();
   //   // Placeholder for adding a new cron job (e.g., open a modal)
   //   alert(TAPi18n.__('add-cron-job-placeholder'));
@@ -1328,7 +1339,8 @@ Template.accountSettings.events({
     });
   },
   'click button.js-all-boards-hide-activities'() {
-    Meteor.call('setAllBoardsHideActivities', (err, ret) => {
+    // err/ret: any — untyped Meteor method callback.
+    Meteor.call('setAllBoardsHideActivities', (err: any, ret: any) => {
       if (!err && ret) {
         if (ret === true) {
           const message = `${TAPi18n.__(
@@ -1349,7 +1361,7 @@ Template.tableVisibilityModeSettings.helpers({
   allowPrivateOnly() {
     return TableVisibilityModeSettings.findOne(
       'tableVisibilityMode-allowPrivateOnly',
-    ).booleanValue;
+    )!.booleanValue;
   },
 });
 
@@ -1362,7 +1374,8 @@ Template.tableVisibilityModeSettings.events({
     });
   },
   'click button.js-all-boards-hide-activities'() {
-    Meteor.call('setAllBoardsHideActivities', (err, ret) => {
+    // err/ret: any — untyped Meteor method callback.
+    Meteor.call('setAllBoardsHideActivities', (err: any, ret: any) => {
       if (!err && ret) {
         if (ret === true) {
           const message = `${TAPi18n.__(
@@ -1379,7 +1392,7 @@ Template.tableVisibilityModeSettings.events({
   },
 });
 
-Template.announcementSettings.onCreated(function () {
+Template.announcementSettings.onCreated(function (this: LoadingInstance) {
   this.loading = new ReactiveVar(false);
 });
 
@@ -1390,7 +1403,7 @@ Template.announcementSettings.helpers({
 });
 
 Template.announcementSettings.events({
-  async 'click a.js-toggle-activemessage'(event, tpl) {
+  async 'click a.js-toggle-activemessage'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     event.preventDefault();
     tpl.loading.set(true);
     const announcements = Announcements.findOne();
@@ -1408,15 +1421,15 @@ Template.announcementSettings.events({
       } else {
         $('.admin-announcement').slideDown();
       }
-    } catch (error) {
+    } catch (error: any) { // error: any — untyped async error.
       alert(error?.reason || error?.message || 'Failed to update announcement setting');
     } finally {
       tpl.loading.set(false);
     }
   },
-  async 'click button.js-announcement-save'(event) {
+  async 'click button.js-announcement-save'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
-    const message = $('#admin-announcement').val().trim();
+    const message = ($('#admin-announcement').val() as string).trim();
     const announcement = Announcements.findOne();
     if (!announcement) {
       return;
@@ -1425,13 +1438,13 @@ Template.announcementSettings.events({
       await Announcements.updateAsync(announcement._id, {
         $set: { body: message },
       });
-    } catch (error) {
+    } catch (error: any) { // error: any — untyped async error.
       alert(error?.reason || error?.message || 'Failed to save announcement');
     }
   },
 });
 
-Template.accessibilitySettings.onCreated(function () {
+Template.accessibilitySettings.onCreated(function (this: LoadingInstance) {
   this.loading = new ReactiveVar(false);
 });
 
@@ -1442,9 +1455,9 @@ Template.accessibilitySettings.helpers({
 });
 
 Template.accessibilitySettings.events({
-  'click a.js-toggle-accessibility'(event, tpl) {
+  'click a.js-toggle-accessibility'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     tpl.loading.set(true);
-    const accessibilitySetting = AccessibilitySettings.findOne();
+    const accessibilitySetting = AccessibilitySettings.findOne()!;
     const isActive = accessibilitySetting.enabled;
     AccessibilitySettings.update(accessibilitySetting._id, {
       $set: { enabled: !isActive },
@@ -1456,13 +1469,13 @@ Template.accessibilitySettings.events({
       $('.accessibility-content').slideDown();
     }
   },
-  'click button.js-accessibility-save'(event, tpl) {
+  'click button.js-accessibility-save'(event: JQuery.TriggeredEvent, tpl: SettingInstance) {
     tpl.loading.set(true);
-    const title = $('#admin-accessibility-title').val().trim();
-    const content = $('#admin-accessibility-content').val().trim();
+    const title = ($('#admin-accessibility-title').val() as string).trim();
+    const content = ($('#admin-accessibility-content').val() as string).trim();
 
     try {
-      AccessibilitySettings.update(AccessibilitySettings.findOne()._id, {
+      AccessibilitySettings.update(AccessibilitySettings.findOne()!._id, {
         $set: {
           title: title,
           body: content,
@@ -1477,10 +1490,11 @@ Template.accessibilitySettings.events({
   },
 });
 
-Template.selectAuthenticationMethod.onCreated(function () {
+Template.selectAuthenticationMethod.onCreated(function (this: SelectAuthInstance) {
   this.authenticationMethods = new ReactiveVar([]);
 
-  Meteor.call('getAuthenticationsEnabled', (_, result) => {
+  // _/result: any — untyped Meteor method callback.
+  Meteor.call('getAuthenticationsEnabled', (_: any, result: any) => {
     if (result) {
       // TODO : add a management of different languages
       // (ex {value: ldap, text: TAPi18n.__('ldap', {}, T9n.getLanguage() || 'en')})
@@ -1497,10 +1511,11 @@ Template.selectAuthenticationMethod.onCreated(function () {
 
 Template.selectAuthenticationMethod.helpers({
   authentications() {
-    return Template.instance().authenticationMethods.get();
+    return (Template.instance() as SelectAuthInstance).authenticationMethods.get();
   },
-  isSelected(match) {
-    return Template.instance().data.authenticationMethod === match;
+  isSelected(match: any) {
+    // data: any — the template data context carries authenticationMethod.
+    return (Template.instance().data as any).authenticationMethod === match;
   },
 });
 
@@ -1508,7 +1523,39 @@ Template.selectSpinnerName.helpers({
   spinners() {
     return ALLOWED_WAIT_SPINNERS;
   },
-  isSelected(match) {
-    return Template.instance().data.spinnerName === match;
+  isSelected(match: any) {
+    // data: any — the template data context carries spinnerName.
+    return (Template.instance().data as any).spinnerName === match;
   },
 });
+
+// setting instance: all settings-panel visibility flags plus attachment state.
+interface SettingInstance extends Blaze.TemplateInstance {
+  error: ReactiveVar<any>;
+  loading: ReactiveVar<any>;
+  forgotPasswordSetting: ReactiveVar<any>;
+  generalSetting: ReactiveVar<any>;
+  emailSetting: ReactiveVar<any>;
+  accountSetting: ReactiveVar<any>;
+  tableVisibilityModeSetting: ReactiveVar<any>;
+  announcementSetting: ReactiveVar<any>;
+  accessibilitySetting: ReactiveVar<any>;
+  layoutSetting: ReactiveVar<any>;
+  webhookSetting: ReactiveVar<any>;
+  attachmentSettings: ReactiveVar<any>;
+  attachmentStorageSettings: ReactiveVar<any>;
+  attachmentLimitUnits: ReactiveVar<any>;
+  attachmentLimitEnabled: ReactiveVar<any>;
+  // previousAttachmentLimitEnabled: any — last-seen enabled map (or null).
+  previousAttachmentLimitEnabled: any;
+}
+
+// Popups/panels that only track a loading spinner.
+interface LoadingInstance extends Blaze.TemplateInstance {
+  loading: ReactiveVar<any>;
+}
+
+// selectAuthenticationMethod instance: available auth methods.
+interface SelectAuthInstance extends Blaze.TemplateInstance {
+  authenticationMethods: ReactiveVar<any>;
+}
