@@ -1,6 +1,7 @@
 import { ReactiveCache } from '/imports/reactiveCache';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 import DOMPurify from 'dompurify';
 import { sanitizeHTML, sanitizeText } from '/imports/lib/secureDOMPurify';
 import { TAPi18n } from '/imports/i18n';
@@ -9,7 +10,7 @@ import { getSidebarInstance } from '/client/features/sidebar/service';
 
 const activitiesPerPage = 500;
 
-Template.activities.onCreated(function () {
+Template.activities.onCreated(function (this: ActivitiesInstance) {
   // Register with sidebar so it can call loadNextPage on us
   const Sidebar = getSidebarInstance();
   if (Sidebar) {
@@ -68,7 +69,7 @@ Template.activities.onCreated(function () {
   });
 });
 
-function _showActivities(data) {
+function _showActivities(data: any) {
   let ret = false;
   let mode = data?.mode;
   if (mode) {
@@ -92,7 +93,7 @@ Template.activities.helpers({
     return _showActivities(data);
   },
 
-  activities() {
+  activities(this: any) {
     const activities = this.card?.activities?.();
     return activities || [];
   },
@@ -116,13 +117,13 @@ Template.cardActivities.helpers({
 });
 
 Template.activity.helpers({
-  checkItem() {
+  checkItem(this: any) {
     const checkItemId = this.activity.checklistItemId;
     const checkItem = ReactiveCache.getChecklistItem(checkItemId);
     return checkItem && checkItem.title;
   },
 
-  boardLabelLink() {
+  boardLabelLink(this: any) {
     const currentBoardId = Session.get('currentBoard');
     if (this.mode !== 'board') {
       return createBoardLink(this.activity.board(), this.activity.listName ? this.activity.listName : null);
@@ -133,7 +134,7 @@ Template.activity.helpers({
     return TAPi18n.__('this-board');
   },
 
-  cardLabelLink() {
+  cardLabelLink(this: any) {
     const currentBoardId = Session.get('currentBoard');
     if (this.mode == 'card') {
       return TAPi18n.__('this-card');
@@ -147,7 +148,7 @@ Template.activity.helpers({
     return createCardLink(this.activity.card(), null);
   },
 
-  cardLink() {
+  cardLink(this: any) {
     const currentBoardId = Session.get('currentBoard');
     if (this.mode !== 'board') {
       return createCardLink(this.activity.card(), null);
@@ -158,31 +159,31 @@ Template.activity.helpers({
     return createCardLink(this.activity.card(), null);
   },
 
-  receivedDate() {
+  receivedDate(this: any) {
     const card = this.activity.card();
     if (!card) return null;
     return card.receivedAt;
   },
 
-  startDate() {
+  startDate(this: any) {
     const card = this.activity.card();
     if (!card) return null;
     return card.startAt;
   },
 
-  dueDate() {
+  dueDate(this: any) {
     const card = this.activity.card();
     if (!card) return null;
     return card.dueAt;
   },
 
-  endDate() {
+  endDate(this: any) {
     const card = this.activity.card();
     if (!card) return null;
     return card.endAt;
   },
 
-  lastLabel() {
+  lastLabel(this: any) {
     const lastLabelId = this.activity.labelId;
     if (!lastLabelId) return null;
     const lastLabel = ReactiveCache.getBoard(
@@ -197,7 +198,7 @@ Template.activity.helpers({
     }
   },
 
-  lastCustomField() {
+  lastCustomField(this: any) {
     const lastCustomField = ReactiveCache.getCustomField(
       this.activity.customFieldId,
     );
@@ -205,7 +206,7 @@ Template.activity.helpers({
     return lastCustomField.name;
   },
 
-  lastCustomFieldValue() {
+  lastCustomFieldValue(this: any) {
     const lastCustomField = ReactiveCache.getCustomField(
       this.activity.customFieldId,
     );
@@ -216,7 +217,7 @@ Template.activity.helpers({
       lastCustomField.settings.dropdownItems.length > 0
     ) {
       const dropDownValue = lastCustomField.settings.dropdownItems.find(
-        item => {
+        (item: any) => {
           return item._id === value;
         },
       );
@@ -225,13 +226,13 @@ Template.activity.helpers({
     return value;
   },
 
-  listLabel() {
+  listLabel(this: any) {
     const activity = this.activity;
     const list = activity.list();
     return (list && list.title) || activity.title;
   },
 
-  sourceLink() {
+  sourceLink(this: any) {
     const source = this.activity.source;
     if (source) {
       if (source.url) {
@@ -250,13 +251,13 @@ Template.activity.helpers({
     return null;
   },
 
-  memberLink() {
+  memberLink(this: any) {
     return Blaze.toHTMLWithData(Template.memberName, {
       user: this.activity.member(),
     });
   },
 
-  attachmentLink() {
+  attachmentLink(this: any) {
     const attachment = this.activity.attachment();
     const attachmentUrl = attachment && typeof attachment.link === 'function'
       ? attachment.link()
@@ -279,7 +280,7 @@ Template.activity.helpers({
     );
   },
 
-  customField() {
+  customField(this: any) {
     const customField = this.activity.customField();
     if (!customField) return null;
     return customField.name;
@@ -287,16 +288,16 @@ Template.activity.helpers({
 });
 
 Template.activity.helpers({
-  sanitize(value) {
+  sanitize(value: string) {
     return sanitizeHTML(value);
   },
 });
 
 Template.commentReactions.events({
-  'click .reaction'(event) {
+  'click .reaction'(event: JQuery.TriggeredEvent) {
     const user = ReactiveCache.getCurrentUser();
     if (user && user.isBoardMember()) {
-      const codepoint = event.currentTarget.dataset['codepoint'];
+      const codepoint = (event.currentTarget as HTMLElement).dataset['codepoint'];
       const commentId = Template.instance().data.commentId;
       const cardComment = ReactiveCache.getCardComment(commentId);
       cardComment.toggleReaction(codepoint);
@@ -306,10 +307,10 @@ Template.commentReactions.events({
 })
 
 Template.addReactionPopup.events({
-  'click .add-comment-reaction'(event) {
+  'click .add-comment-reaction'(event: JQuery.TriggeredEvent) {
     const user = ReactiveCache.getCurrentUser();
     if (user && user.isBoardMember()) {
-      const codepoint = event.currentTarget.dataset['codepoint'];
+      const codepoint = (event.currentTarget as HTMLElement).dataset['codepoint'];
       const commentId = Template.instance().data.commentId;
       const cardComment = ReactiveCache.getCardComment(commentId);
       cardComment.toggleReaction(codepoint);
@@ -338,18 +339,18 @@ Template.addReactionPopup.helpers({
 })
 
 Template.commentReactions.helpers({
-  isSelected(userIds) {
-    return Meteor.userId() && userIds.includes(Meteor.userId());
+  isSelected(userIds: string[]) {
+    return Meteor.userId() && userIds.includes(Meteor.userId()!);
   },
-  userNames(userIds) {
+  userNames(userIds: string[]) {
     const ret = ReactiveCache.getUsers({_id: {$in: userIds}})
-      .map(user => user.profile.fullname)
+      .map((user: any) => user.profile.fullname)
       .join(', ');
     return ret;
   }
 })
 
-function createCardLink(card, board) {
+function createCardLink(card: any, board: string | null) {
   if (!card) return '';
   let text = card.title;
   if (board) text = `${board} > ` + text;
@@ -367,7 +368,7 @@ function createCardLink(card, board) {
   );
 }
 
-function createBoardLink(board, list) {
+function createBoardLink(board: any, list: string | null) {
   let text = board.title;
   if (list) text += `: ${list}`;
   return (
@@ -382,4 +383,10 @@ function createBoardLink(board, list) {
       ),
     )
   );
+}
+
+interface ActivitiesInstance extends Blaze.TemplateInstance {
+  page: ReactiveVar<number>;
+  loadNextPageLocked: boolean;
+  loadNextPage: () => void;
 }
