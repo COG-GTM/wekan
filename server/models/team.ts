@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor';
+import { check, Match } from 'meteor/check';
 import { WebApp } from 'meteor/webapp';
 import { ReactiveCache } from '/imports/reactiveCache';
 import Team from '/models/team';
@@ -8,7 +9,7 @@ import { sendJsonResult } from '/server/apiMiddleware';
 
 // #5850: reliable admin check from a method's this.userId (Meteor.user() can
 // return null inside an async method after an await).
-async function callerIsAdmin(userId) {
+async function callerIsAdmin(userId: string | null | undefined) {
   if (!userId) return false;
   const u = await ReactiveCache.getUser({ _id: userId }, { fields: { isAdmin: 1 } });
   return !!(u && u.isAdmin);
@@ -85,7 +86,7 @@ Meteor.methods({
 
   async setTeamDisplayName(team, teamDisplayName) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
-      check(team, Object);
+      check(team as object, Object);
       check(teamDisplayName, String);
       await Team.updateAsync(team, {
         $set: { teamDisplayName },
@@ -96,7 +97,7 @@ Meteor.methods({
 
   async setTeamDesc(team, teamDesc) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
-      check(team, Object);
+      check(team as object, Object);
       check(teamDesc, String);
       await Team.updateAsync(team, {
         $set: { teamDesc },
@@ -106,7 +107,7 @@ Meteor.methods({
 
   async setTeamShortName(team, teamShortName) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
-      check(team, Object);
+      check(team as object, Object);
       check(teamShortName, String);
       await Team.updateAsync(team, {
         $set: { teamShortName },
@@ -116,7 +117,7 @@ Meteor.methods({
 
   async setTeamIsActive(team, teamIsActive) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
-      check(team, Object);
+      check(team as object, Object);
       check(teamIsActive, Boolean);
       await Team.updateAsync(team, {
         $set: { teamIsActive },
@@ -127,7 +128,7 @@ Meteor.methods({
   // #4737/#5850: per-team feature toggles shown as columns in Admin Panel >
   // People > Teams. All default off.
   async setTeamSharedTemplates(team, value) {
-    check(team, Object);
+    check(team as object, Object);
     check(value, Boolean);
     if (await callerIsAdmin(this.userId)) {
       await Team.updateAsync(team, { $set: { teamSharedTemplates: value } });
@@ -135,7 +136,7 @@ Meteor.methods({
   },
 
   async setTeamPropagateMembersToBoards(team, value) {
-    check(team, Object);
+    check(team as object, Object);
     check(value, Boolean);
     if (await callerIsAdmin(this.userId)) {
       await Team.updateAsync(team, { $set: { teamPropagateMembersToBoards: value } });
@@ -143,7 +144,7 @@ Meteor.methods({
   },
 
   async setTeamSyncMembersFromAuth(team, value) {
-    check(team, Object);
+    check(team as object, Object);
     check(value, Boolean);
     if (await callerIsAdmin(this.userId)) {
       await Team.updateAsync(team, { $set: { teamSyncMembersFromAuth: value } });
@@ -183,7 +184,7 @@ Meteor.methods({
     if (this.connection !== null) {
       throw new Meteor.Error('not-authorized');
     }
-    check(team, Object);
+    check(team as object, Object);
     check(teamDisplayName, String);
     check(teamDesc, String);
     check(teamShortName, String);
@@ -210,7 +211,7 @@ Meteor.methods({
     teamIsActive,
   ) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
-      check(team, Object);
+      check(team as object, Object);
       check(teamDisplayName, String);
       check(teamDesc, String);
       check(teamShortName, String);
@@ -311,7 +312,7 @@ WebApp.handlers.put('/api/admin/teams/:teamId/features', async function(req, res
     await Authentication.checkUserId(req.userId);
     const teamId = req.params.teamId;
     const body = req.body || {};
-    const $set = {};
+    const $set: { [key: string]: boolean } = {};
     TEAM_FEATURE_FIELDS.forEach(field => {
       if (body[field] !== undefined) {
         $set[field] = !!body[field];

@@ -90,7 +90,7 @@ Meteor.startup(async () => {
     { _id: 'unknown-failuresBeforeLockout' },
     {
       $setOnInsert: {
-        value: (correctVar || typoVar) ? parseInt(correctVar || typoVar, 10) : 3,
+        value: (correctVar || typoVar) ? parseInt((correctVar || typoVar) as string, 10) : 3,
         category: 'unknown',
         sort: 0,
       },

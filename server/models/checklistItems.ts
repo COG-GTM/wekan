@@ -184,7 +184,8 @@ WebApp.handlers.put(
       return;
     }
 
-    function isTrue(data) {
+    // `data` is a value pulled from the untyped request body, hence `any`.
+    function isTrue(data: any) {
       try {
         return data.toLowerCase() === 'true';
       } catch (error) {

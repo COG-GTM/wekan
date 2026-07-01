@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor';
+import { check } from 'meteor/check';
 import { WebApp } from 'meteor/webapp';
 import { Authentication } from '/server/authentication';
 import { sendJsonResult } from '/server/apiMiddleware';
@@ -173,7 +174,7 @@ WebApp.handlers.get(
     }
 
     const checklists = (await ReactiveCache.getChecklists({ cardId: paramCardId })).map(function(
-      doc,
+      doc: any,
     ) {
       return {
         _id: doc._id,
@@ -220,7 +221,7 @@ WebApp.handlers.get(
     if (checklist) {
       checklist.items = (await ReactiveCache.getChecklistItems({
         checklistId: checklist._id,
-      })).map(function(doc) {
+      })).map(function(doc: any) {
         return {
           _id: doc._id,
           title: doc.title,

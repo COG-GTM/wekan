@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor';
+import { check, Match } from 'meteor/check';
 import { WebApp } from 'meteor/webapp';
 import { ReactiveCache } from '/imports/reactiveCache';
 import Org from '/models/org';
@@ -10,7 +11,7 @@ import { sendJsonResult } from '/server/apiMiddleware';
 // getCurrentUser() can return null inside an async method after an await
 // (the DDP invocation context is not always preserved), so we look the caller
 // up directly by id.
-async function callerIsAdmin(userId) {
+async function callerIsAdmin(userId: string | null | undefined) {
   if (!userId) return false;
   const u = await ReactiveCache.getUser({ _id: userId }, { fields: { isAdmin: 1 } });
   return !!(u && u.isAdmin);
@@ -93,7 +94,7 @@ Meteor.methods({
 
   async setOrgDisplayName(org, orgDisplayName) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
-      check(org, Object);
+      check(org as object, Object);
       check(orgDisplayName, String);
       await Org.updateAsync(org, {
         $set: { orgDisplayName },
@@ -104,7 +105,7 @@ Meteor.methods({
 
   async setOrgDesc(org, orgDesc) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
-      check(org, Object);
+      check(org as object, Object);
       check(orgDesc, String);
       await Org.updateAsync(org, {
         $set: { orgDesc },
@@ -114,7 +115,7 @@ Meteor.methods({
 
   async setOrgShortName(org, orgShortName) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
-      check(org, Object);
+      check(org as object, Object);
       check(orgShortName, String);
       await Org.updateAsync(org, {
         $set: { orgShortName },
@@ -124,7 +125,7 @@ Meteor.methods({
 
   async setAutoAddUsersWithDomainName(org, orgAutoAddUsersWithDomainName) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
-      check(org, Object);
+      check(org as object, Object);
       check(orgAutoAddUsersWithDomainName, String);
       await Org.updateAsync(org, {
         $set: { orgAutoAddUsersWithDomainName },
@@ -134,7 +135,7 @@ Meteor.methods({
 
   async setOrgIsActive(org, orgIsActive) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
-      check(org, Object);
+      check(org as object, Object);
       check(orgIsActive, Boolean);
       await Org.updateAsync(org, {
         $set: { orgIsActive },
@@ -148,7 +149,7 @@ Meteor.methods({
   // method's this.userId (Meteor.user()/getCurrentUser() can lose the DDP
   // invocation context across awaits in async methods and return null).
   async setOrgSharedTemplates(org, value) {
-    check(org, Object);
+    check(org as object, Object);
     check(value, Boolean);
     if (await callerIsAdmin(this.userId)) {
       await Org.updateAsync(org, { $set: { orgSharedTemplates: value } });
@@ -156,7 +157,7 @@ Meteor.methods({
   },
 
   async setOrgPropagateMembersToBoards(org, value) {
-    check(org, Object);
+    check(org as object, Object);
     check(value, Boolean);
     if (await callerIsAdmin(this.userId)) {
       await Org.updateAsync(org, { $set: { orgPropagateMembersToBoards: value } });
@@ -164,7 +165,7 @@ Meteor.methods({
   },
 
   async setOrgSyncMembersFromAuth(org, value) {
-    check(org, Object);
+    check(org as object, Object);
     check(value, Boolean);
     if (await callerIsAdmin(this.userId)) {
       await Org.updateAsync(org, { $set: { orgSyncMembersFromAuth: value } });
@@ -205,7 +206,7 @@ Meteor.methods({
     if (this.connection !== null) {
       throw new Meteor.Error('not-authorized');
     }
-    check(org, Object);
+    check(org as object, Object);
     check(orgDisplayName, String);
     check(orgDesc, String);
     check(orgShortName, String);
@@ -235,7 +236,7 @@ Meteor.methods({
     orgIsActive,
   ) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
-      check(org, Object);
+      check(org as object, Object);
       check(orgDisplayName, String);
       check(orgDesc, String);
       check(orgShortName, String);
@@ -338,7 +339,7 @@ WebApp.handlers.put('/api/admin/orgs/:orgId/features', async function(req, res) 
     await Authentication.checkUserId(req.userId);
     const orgId = req.params.orgId;
     const body = req.body || {};
-    const $set = {};
+    const $set: { [key: string]: boolean } = {};
     ORG_FEATURE_FIELDS.forEach(field => {
       if (body[field] !== undefined) {
         $set[field] = !!body[field];

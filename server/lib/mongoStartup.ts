@@ -1,4 +1,4 @@
-import { MongoInternals } from 'meteor/mongo';
+import { Mongo, MongoInternals } from 'meteor/mongo';
 
 // ============================================================================
 // WeKan MongoDB startup helpers
@@ -141,11 +141,16 @@ export async function waitForMongoReady() {
  * @returns {Promise<boolean>} true if an index was created, false if skipped
  */
 export async function ensureIndex(
-  collection: RawCollectionSource | null | undefined,
+  // Accepts either a Meteor Mongo.Collection (the common case from model files;
+  // its document type varies per collection, hence `any`) or a raw-collection
+  // bearing wrapper. Both expose rawCollection() and are unwrapped below.
+  collection: Mongo.Collection<any> | RawCollectionSource | null | undefined,
   keys: object,
   options: object = {},
 ) {
-  const raw = getRawCollection(collection);
+  // A Meteor Mongo.Collection exposes rawCollection() at runtime exactly like the
+  // RawCollectionSource wrappers, so unwrap it through the same helper.
+  const raw = getRawCollection(collection as RawCollectionSource | null | undefined);
   if (!raw) {
     console.error('WeKan ensureIndex: could not resolve rawCollection, skipping', keys);
     return false;

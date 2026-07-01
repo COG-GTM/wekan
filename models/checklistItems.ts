@@ -164,7 +164,9 @@ export async function publishCheckActivity(userId: string, doc: any) {
   await Activities.insertAsync(act);
 }
 
-export async function publishChekListCompleted(userId: string, doc: any) {
+// `fieldNames` is accepted (and ignored) so the collection-hook callers can pass
+// the mutated field list through without an arity mismatch.
+export async function publishChekListCompleted(userId: string, doc: any, fieldNames?: string[]) {
   const card = await ReactiveCache.getCard(doc.cardId);
   if (!card) {
     console.warn('[publishChekListCompleted] Card not found for cardId:', doc.cardId, '— skipping activity insert.');
@@ -195,7 +197,9 @@ export async function publishChekListCompleted(userId: string, doc: any) {
   }
 }
 
-export async function publishChekListUncompleted(userId: string, doc: any) {
+// `fieldNames` is accepted (and ignored) so the collection-hook callers can pass
+// the mutated field list through without an arity mismatch.
+export async function publishChekListUncompleted(userId: string, doc: any, fieldNames?: string[]) {
   const card = await ReactiveCache.getCard(doc.cardId);
   if (!card) {
     console.warn('[publishChekListUncompleted] Card not found for cardId:', doc.cardId, '— skipping activity insert.');

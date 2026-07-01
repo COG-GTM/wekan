@@ -9,7 +9,7 @@ import Boards from '/models/boards';
 import Cards from '/models/cards';
 import Lists from '/models/lists';
 import { ensureIndex } from '/server/lib/mongoStartup';
-import { computeSortForIndex } from '/server/lib/utils';
+import { computeSortForIndex, allowIsBoardMemberWithWriteAccess } from '/server/lib/utils';
 
 const hasBoardWriteAccess = (userId, board) => {
   if (!userId || !board) {

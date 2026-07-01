@@ -23,15 +23,18 @@ import Actions from '/models/actions';
 
 const STRIP = ['_id', 'boardId', 'createdAt', 'modifiedAt', 'updatedAt'];
 
-function strip(doc) {
-  const out = {};
+// `doc` is a raw rule Mongo document (dynamic shape) and `out` collects its
+// non-stripped fields, so both values are `any`.
+function strip(doc: any) {
+  const out: { [key: string]: any } = {};
   Object.keys(doc || {}).forEach(k => {
     if (!STRIP.includes(k)) out[k] = doc[k];
   });
   return out;
 }
 
-async function serializeRule(rule) {
+// `rule` is a raw rule Mongo document (dynamic shape), hence `any`.
+async function serializeRule(rule: any) {
   const trigger = await ReactiveCache.getTrigger(rule.triggerId);
   const action = await ReactiveCache.getAction(rule.actionId);
   return {

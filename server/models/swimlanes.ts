@@ -130,7 +130,7 @@ WebApp.handlers.get('/api/boards/:boardId/swimlanes', async function(req, res) {
     const swimlanes = await ReactiveCache.getSwimlanes({ boardId: paramBoardId, archived: false });
     sendJsonResult(res, {
       code: 200,
-      data: swimlanes.map(function(doc) {
+      data: swimlanes.map(function(doc: any) {
         return {
           _id: doc._id,
           title: doc.title,
@@ -245,7 +245,7 @@ WebApp.handlers.delete('/api/boards/:boardId/swimlanes/:swimlaneId', async funct
 
 // Reposition a freshly copied/moved swimlane at a 0-based `position` counted
 // from the top of the destination board, by setting its sort between siblings.
-async function repositionSwimlane(swimlaneId, toBoardId, position) {
+async function repositionSwimlane(swimlaneId: string, toBoardId: string, position: number | null | undefined) {
   if (position === undefined || position === null) {
     return;
   }

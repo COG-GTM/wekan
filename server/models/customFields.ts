@@ -9,7 +9,8 @@ import Cards from '/models/cards';
 import CustomFields from '/models/customFields';
 import { ensureIndex } from '/server/lib/mongoStartup';
 
-async function customFieldCreation(userId, doc) {
+// `doc` is the raw customField Mongo document (dynamic shape), hence `any`.
+async function customFieldCreation(userId: string, doc: any) {
   await Activities.insertAsync({
     userId,
     activityType: 'createCustomField',
@@ -18,7 +19,8 @@ async function customFieldCreation(userId, doc) {
   });
 }
 
-async function customFieldDeletion(userId, doc) {
+// `doc` is the raw customField Mongo document (dynamic shape), hence `any`.
+async function customFieldDeletion(userId: string, doc: any) {
   await Activities.insertAsync({
     userId,
     activityType: 'deleteCustomField',
@@ -27,7 +29,8 @@ async function customFieldDeletion(userId, doc) {
   });
 }
 
-async function customFieldEdit(userId, doc) {
+// `doc` is the raw customField Mongo document (dynamic shape), hence `any`.
+async function customFieldEdit(userId: string, doc: any) {
   // #5390: deleting a custom field from a board ($pull boardIds) calls this; an
   // activity may not exist (e.g. the field never had a value set), so guard the
   // lookup instead of dereferencing `.value` on undefined, which threw and
@@ -54,7 +57,9 @@ CustomFields.after.insert(async (userId, doc) => {
   await customFieldCreation(userId, doc);
 
   if (doc.alwaysOnCard) {
-    CustomFields.addToAllCards(doc);
+    // `addToAllCards` is a custom static attached to the CustomFields collection
+    // (not part of Mongo.Collection), hence the `any` cast.
+    (CustomFields as any).addToAllCards(doc);
   }
 });
 
@@ -84,7 +89,9 @@ CustomFields.before.update(async (userId, doc, fieldNames, modifier) => {
 
 CustomFields.after.update((userId, doc) => {
   if (doc.alwaysOnCard) {
-    CustomFields.addToAllCards(doc);
+    // `addToAllCards` is a custom static attached to the CustomFields collection
+    // (not part of Mongo.Collection), hence the `any` cast.
+    (CustomFields as any).addToAllCards(doc);
   }
 });
 
@@ -106,7 +113,7 @@ WebApp.handlers.get('/api/boards/:boardId/custom-fields', async function(req, re
   await Authentication.checkBoardAccess(req.userId, paramBoardId);
   sendJsonResult(res, {
     code: 200,
-    data: (await ReactiveCache.getCustomFields({ boardIds: { $in: [paramBoardId] } })).map(cf => ({
+    data: (await ReactiveCache.getCustomFields({ boardIds: { $in: [paramBoardId] } })).map((cf: any) => ({
       _id: cf._id,
       name: cf.name,
       type: cf.type,

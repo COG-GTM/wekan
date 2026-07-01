@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor';
+import { check } from 'meteor/check';
 import Translation from '/models/translation';
 import { ensureIndex } from '/server/lib/mongoStartup';
 
