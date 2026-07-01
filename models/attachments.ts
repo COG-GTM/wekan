@@ -7,7 +7,8 @@ import { generateUniversalAttachmentUrl } from '/models/lib/universalUrlGenerato
 // Mirrors the shape used for the 'deleteAttachment' activity, so card
 // history rendering and member/subscriber notifications behave identically.
 // see #5905
-export function buildAttachmentAddedActivity(fileObj) {
+// `fileObj` is an ostrio:files upload document (dynamic), hence `any`.
+export function buildAttachmentAddedActivity(fileObj: any) {
   const meta = (fileObj && fileObj.meta) || {};
   return {
     userId: fileObj && fileObj.userId,
@@ -48,7 +49,8 @@ const Attachments = new FilesCollection({
   collectionName: 'attachments',
   allowClientCode: true,
   storagePath: storagePath,
-  namingFunction(opts) {
+  // `opts` is an ostrio:files naming callback payload (dynamic), hence `any`.
+  namingFunction(opts: any) {
     let filenameWithoutExtension = ""
     let fileId = "";
     if (opts?.name) {
@@ -80,11 +82,12 @@ const Attachments = new FilesCollection({
     // remove fileId from meta, it was only stored there to have this information here in the namingFunction function
     return ret;
   },
-  sanitize(str, max, replacement) {
+  sanitize(str: string, max?: number, replacement?: string) {
     // keep the original filename
     return str;
   },
-  onBeforeUpload(file) {
+  // `file` is an ostrio:files upload document (dynamic), hence `any`.
+  onBeforeUpload(file: any) {
     // SECURITY: Sanitize filename to prevent path traversal attacks
     if (file.name && typeof file.name === 'string') {
       // Strip directory components (client-safe alternative to path.basename)
@@ -127,7 +130,8 @@ const Attachments = new FilesCollection({
   },
 });
 
-function normalizeRemovedFiles(filesInput) {
+// `filesInput` may be an array, cursor, doc, id string or selector, hence `any`.
+function normalizeRemovedFiles(filesInput: any) {
   if (!filesInput) {
     return [];
   }
@@ -171,7 +175,8 @@ Attachments.getAttachmentsWithBackwardCompatibility = async () => [];
 // a collection-helpers class instance (not a plain object).
 // Uses short URL format handled by universalFileServer.js.
 if (Meteor.isClient) {
-  Attachments.link = function () {
+  // `this` is the attachment document when called as an instance method.
+  Attachments.link = function (this: any) {
     let fileRef;
     if (this && this._id) {
       // Called as instance method: doc.link(version)
@@ -195,7 +200,7 @@ if (Meteor.isClient) {
 // then notifies card members + watchers, deduplicated, exactly as it does for
 // every other card activity.
 if (Meteor.isServer) {
-  Attachments.collection.after.insert((userId, doc) => {
+  Attachments.collection.after.insert((userId: string, doc: any) => {
     // Skip attachments created during a board/card import: those are not
     // user-driven uploads and should not generate notifications.
     if (doc.meta && doc.meta.source === 'import') {
@@ -203,7 +208,7 @@ if (Meteor.isServer) {
     }
     // Lazy import to keep this out of the client bundle.
     const Activities = require('/models/activities').default;
-    Activities.insertAsync(buildAttachmentAddedActivity(doc)).catch(error => {
+    Activities.insertAsync(buildAttachmentAddedActivity(doc)).catch((error: any) => {
       console.error('Failed to insert addAttachment activity:', error);
     });
   });

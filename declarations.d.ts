@@ -16,6 +16,19 @@ type MongoQuery = { [key: string]: any };
 // Untyped Meteor / npm packages imported by app code
 // ---------------------------------------------------------------------------
 
+// meteor/ostrio:files — file upload/storage package exposing FilesCollection.
+// It ships no TypeScript types and its API is large and dynamic, so the class
+// is modelled with an index signature (mirroring WekanFilesCollection) and its
+// constructor config is `any`.
+declare module 'meteor/ostrio:files' {
+  // Instances are modelled by the global WekanFilesCollection shape (index
+  // signature + the enumerated methods), so `new FilesCollection(config)`
+  // produces a value the rest of the model/lib code can consume.
+  export const FilesCollection: {
+    new (config?: any): WekanFilesCollection;
+  };
+}
+
 // meteor/ostrio:flow-router-extra — client-side router used across config/.
 declare module 'meteor/ostrio:flow-router-extra' {
   // The `this` context available inside a route `action`.

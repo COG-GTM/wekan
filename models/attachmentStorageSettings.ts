@@ -1,5 +1,5 @@
 import { Mongo } from 'meteor/mongo';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 import {
   STORAGE_NAME_FILESYSTEM,
   STORAGE_NAME_GRIDFS,
@@ -292,7 +292,7 @@ AttachmentStorageSettings.helpers({
   },
 
   // Check if storage backend is enabled
-  isStorageEnabled(storageName) {
+  isStorageEnabled(storageName: string) {
     if (!this.storageConfig) return false;
 
     switch (storageName) {
@@ -313,19 +313,19 @@ AttachmentStorageSettings.helpers({
 
   // Check if reading from a storage backend is allowed by the admin.
   // Defaults to true when unset so existing files stay readable.
-  isStorageReadEnabled(storageName) {
+  isStorageReadEnabled(storageName: string) {
     const config = this.getStorageConfig(storageName);
     return !config || config.read !== false;
   },
 
   // Check if writing to a storage backend is allowed by the admin.
-  isStorageWriteEnabled(storageName) {
+  isStorageWriteEnabled(storageName: string) {
     const config = this.getStorageConfig(storageName);
     return !config || config.write !== false;
   },
 
   // Get storage configuration
-  getStorageConfig(storageName) {
+  getStorageConfig(storageName: string) {
     if (!this.storageConfig) return null;
 
     switch (storageName) {

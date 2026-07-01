@@ -21,11 +21,11 @@ import { ensureIndex } from '/server/lib/mongoStartup';
 // Server-only configuration
 // ---------------------------------------------------------------------------
 
-let attachmentUploadExternalProgram;
-let attachmentUploadMimeTypes = [];
+let attachmentUploadExternalProgram: string | undefined;
+let attachmentUploadMimeTypes: string[] = [];
 let attachmentUploadSize = 0;
 
-function parseNonNegativeInt(value, fallback = 0) {
+function parseNonNegativeInt(value: string, fallback = 0) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed < 0) {
     return fallback;
@@ -68,7 +68,7 @@ const storagePath = endsWithFiles
 
 if (process.env.ATTACHMENTS_UPLOAD_MIME_TYPES) {
   attachmentUploadMimeTypes = process.env.ATTACHMENTS_UPLOAD_MIME_TYPES.split(',');
-  attachmentUploadMimeTypes = attachmentUploadMimeTypes.map(value => value.trim());
+  attachmentUploadMimeTypes = attachmentUploadMimeTypes.map((value: string) => value.trim());
 }
 
 if (process.env.ATTACHMENTS_UPLOAD_MAX_SIZE) {
@@ -102,7 +102,8 @@ Attachments.storagePath = function () {
   return fileStoreStrategyFactory.storagePath;
 };
 
-Attachments.onAfterUpload = async function (fileObj) {
+// `fileObj` is an ostrio:files upload document (dynamic), hence `any`.
+Attachments.onAfterUpload = async function (this: any, fileObj: any) {
   // Sanitize SVG uploads in place before they are validated or moved to any
   // storage backend. This strips scripts, event handlers, javascript: URIs and
   // XML DOCTYPE/ENTITY (XML loop) constructs, so SVG images can be uploaded
@@ -110,7 +111,7 @@ Attachments.onAfterUpload = async function (fileObj) {
   // configured storage backend.
   if (isSvgFile(fileObj.type, fileObj.name)) {
     let svgSanitized = false;
-    Object.keys(fileObj.versions).forEach(versionName => {
+    Object.keys(fileObj.versions).forEach((versionName: string) => {
       const version = fileObj.versions[versionName];
       const newSize = sanitizeSvgFileSync(version && version.path);
       if (newSize !== null) {
@@ -142,7 +143,7 @@ Attachments.onAfterUpload = async function (fileObj) {
   }
 
   // Set initial storage to filesystem (temporary)
-  Object.keys(fileObj.versions).forEach(versionName => {
+  Object.keys(fileObj.versions).forEach((versionName: string) => {
     fileObj.versions[versionName].storage = STORAGE_NAME_FILESYSTEM;
   });
 
@@ -181,20 +182,22 @@ Attachments.onAfterUpload = async function (fileObj) {
   }
 };
 
-Attachments.interceptDownload = function (http, fileObj, versionName) {
+// ostrio:files download interception callback; args are dynamic, hence `any`.
+Attachments.interceptDownload = function (this: any, http: any, fileObj: any, versionName: string) {
   const ret = fileStoreStrategyFactory.getFileStrategy(fileObj, versionName).interceptDownload(http, this.cacheControl);
   return ret;
 };
 
-Attachments.onAfterRemove = function (filesInput) {
+// `filesInput` may be an array, cursor, doc, id or selector, hence `any`.
+Attachments.onAfterRemove = function (filesInput: any) {
   const files = normalizeRemovedFiles(filesInput);
 
-  files.forEach(fileObj => {
+  files.forEach((fileObj: any) => {
     if (!fileObj || !fileObj.versions) {
       return;
     }
 
-    Object.keys(fileObj.versions).forEach(versionName => {
+    Object.keys(fileObj.versions).forEach((versionName: string) => {
       fileStoreStrategyFactory.getFileStrategy(fileObj, versionName).onAfterRemove();
     });
   });
@@ -205,7 +208,9 @@ Attachments.onAfterRemove = function (filesInput) {
 // - if the board is private, only board members can download it
 // Note: ostrio:files v3.x uses `await this.protected.call(...)` in _checkAccess,
 // so this function can be async and use findOneAsync for Meteor 3.x compatibility.
-Attachments.protected = async function (fileObj) {
+// `fileObj` is an ostrio:files document (dynamic); `this` is the ostrio access
+// context carrying userId, hence both `any`.
+Attachments.protected = async function (this: any, fileObj: any) {
   // file may have been deleted already again after upload validation failed
   if (!fileObj) {
     return false;

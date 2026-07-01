@@ -13,13 +13,13 @@ import Avatars, { normalizeRemovedFiles, setAvatarsUploadSize } from './avatars'
 // Server-only configuration
 // ---------------------------------------------------------------------------
 
-let avatarsUploadExternalProgram;
-let avatarsUploadMimeTypes = [];
+let avatarsUploadExternalProgram: string | undefined;
+let avatarsUploadMimeTypes: string[] = [];
 let avatarsUploadSize = 72000;
 
 if (process.env.AVATARS_UPLOAD_MIME_TYPES) {
   avatarsUploadMimeTypes = process.env.AVATARS_UPLOAD_MIME_TYPES.split(',');
-  avatarsUploadMimeTypes = avatarsUploadMimeTypes.map(value => value.trim());
+  avatarsUploadMimeTypes = avatarsUploadMimeTypes.map((value: string) => value.trim());
 }
 
 if (process.env.AVATARS_UPLOAD_MAX_SIZE) {
@@ -70,9 +70,10 @@ Avatars.storagePath = function () {
   return fileStoreStrategyFactory.storagePath;
 };
 
-Avatars.onAfterUpload = async function (fileObj) {
+// `fileObj` is an ostrio:files upload document (dynamic), hence `any`.
+Avatars.onAfterUpload = async function (fileObj: any) {
   // current storage is the filesystem, update object and database
-  Object.keys(fileObj.versions).forEach(versionName => {
+  Object.keys(fileObj.versions).forEach((versionName: string) => {
     fileObj.versions[versionName].storage = STORAGE_NAME_FILESYSTEM;
   });
 
@@ -80,7 +81,7 @@ Avatars.onAfterUpload = async function (fileObj) {
   // URIs and XML DOCTYPE/ENTITY constructs) before validation so safe SVGs are
   // accepted instead of rejected.
   if (isSvgFile(fileObj.type, fileObj.name)) {
-    Object.keys(fileObj.versions).forEach(versionName => {
+    Object.keys(fileObj.versions).forEach((versionName: string) => {
       const version = fileObj.versions[versionName];
       const newSize = sanitizeSvgFileSync(version && version.path);
       if (newSize !== null) {
@@ -102,7 +103,8 @@ Avatars.onAfterUpload = async function (fileObj) {
     if (fileObj.meta && fileObj.meta.adminUploadForUserId) {
       // Verify the uploader is an admin
       const uploader = await Meteor.users.findOneAsync(fileObj.userId);
-      if (uploader && uploader.isAdmin) {
+      // `isAdmin` is a wekan-specific field not present in @types/meteor's User.
+      if (uploader && (uploader as any).isAdmin) {
         targetUserId = fileObj.meta.adminUploadForUserId;
         // Update the file to belong to the target user
         await Avatars.updateAsync({ _id: fileObj._id }, { $set: { userId: targetUserId } });
@@ -116,12 +118,14 @@ Avatars.onAfterUpload = async function (fileObj) {
   }
 };
 
-Avatars.interceptDownload = function (http, fileObj, versionName) {
+// ostrio:files download interception callback; args are dynamic, hence `any`.
+Avatars.interceptDownload = function (http: any, fileObj: any, versionName: string) {
   const ret = fileStoreStrategyFactory.getFileStrategy(fileObj, versionName).interceptDownload(http, this.cacheControl);
   return ret;
 };
 
-Avatars.onBeforeRemove = async function (filesInput) {
+// `filesInput` may be an array, cursor, doc, id or selector, hence `any`.
+Avatars.onBeforeRemove = async function (filesInput: any) {
   let files;
   try {
     files = normalizeRemovedFiles(filesInput);
@@ -153,7 +157,8 @@ Avatars.onBeforeRemove = async function (filesInput) {
   return true;
 };
 
-Avatars.onAfterRemove = async function (filesInput) {
+// `filesInput` may be an array, cursor, doc, id or selector, hence `any`.
+Avatars.onAfterRemove = async function (filesInput: any) {
   let files;
   try {
     files = normalizeRemovedFiles(filesInput);
@@ -173,12 +178,12 @@ Avatars.onAfterRemove = async function (filesInput) {
     files = [];
   }
 
-  files.forEach(fileObj => {
+  files.forEach((fileObj: any) => {
     if (!fileObj || !fileObj.versions) {
       return;
     }
 
-    Object.keys(fileObj.versions).forEach(versionName => {
+    Object.keys(fileObj.versions).forEach((versionName: string) => {
       fileStoreStrategyFactory.getFileStrategy(fileObj, versionName).onAfterRemove();
     });
   });

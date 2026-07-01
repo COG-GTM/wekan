@@ -29,7 +29,8 @@ const Avatars = new FilesCollection({
   collectionName: 'avatars',
   allowClientCode: true,
   storagePath: storagePath,
-  namingFunction(opts) {
+  // `opts` is an ostrio:files naming callback payload (dynamic), hence `any`.
+  namingFunction(opts: any) {
     let filenameWithoutExtension = ""
     let fileId = "";
     if (opts?.name) {
@@ -60,11 +61,12 @@ const Avatars = new FilesCollection({
     const ret = fileId + "-original-" + safeName;
     return ret;
   },
-  sanitize(str, max, replacement) {
+  sanitize(str: string, max?: number, replacement?: string) {
     // Strip characters that are dangerous in shell contexts and filesystem paths.
     return str.replace(/[^a-zA-Z0-9_.\-]/g, '_');
   },
-  onBeforeUpload(file) {
+  // `file` is an ostrio:files upload document (dynamic), hence `any`.
+  onBeforeUpload(file: any) {
     // Block SVG files for avatars to prevent XSS attacks
     if (file.name && file.name.toLowerCase().endsWith('.svg')) {
       if (process.env.DEBUG === 'true') {
@@ -87,7 +89,8 @@ const Avatars = new FilesCollection({
   },
 });
 
-function normalizeRemovedFiles(filesInput) {
+// `filesInput` may be an array, cursor, doc, id string or selector, hence `any`.
+function normalizeRemovedFiles(filesInput: any) {
   if (!filesInput) {
     return [];
   }
@@ -122,7 +125,7 @@ function normalizeRemovedFiles(filesInput) {
 // Export normalizeRemovedFiles and avatarsUploadSize setter for use in server file
 export { normalizeRemovedFiles };
 
-export function setAvatarsUploadSize(size) {
+export function setAvatarsUploadSize(size: number) {
   avatarsUploadSize = size;
 }
 
