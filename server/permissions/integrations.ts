@@ -3,10 +3,10 @@ import Integrations from '/models/integrations';
 import { allowIsBoardAdmin } from '/server/lib/utils';
 
 const permissionHelper = {
-  async allow(userId, doc) {
+  async allow(userId: string, doc: WekanBoardScopedDoc) {
     const user = await Meteor.users.findOneAsync(userId);
     const isAdmin = user && user.isAdmin;
-    return isAdmin || allowIsBoardAdmin(userId, await Boards.findOneAsync(doc.boardId));
+    return isAdmin || allowIsBoardAdmin(userId, (await Boards.findOneAsync(doc.boardId)) as WekanPolicyBoard | undefined);
   },
 };
 Integrations.allow({

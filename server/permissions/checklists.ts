@@ -5,15 +5,15 @@ import { allowIsBoardMemberWithWriteAccessByCard, denyCrossBoardMoveByCard } fro
 Checklists.allow({
   async insert(userId, doc) {
     // ReadOnly users cannot create checklists
-    return await allowIsBoardMemberWithWriteAccessByCard(userId, await Cards.findOneAsync(doc.cardId));
+    return await allowIsBoardMemberWithWriteAccessByCard(userId, (await Cards.findOneAsync(doc.cardId)) as WekanPolicyCard | undefined);
   },
   async update(userId, doc) {
     // ReadOnly users cannot edit checklists
-    return await allowIsBoardMemberWithWriteAccessByCard(userId, await Cards.findOneAsync(doc.cardId));
+    return await allowIsBoardMemberWithWriteAccessByCard(userId, (await Cards.findOneAsync(doc.cardId)) as WekanPolicyCard | undefined);
   },
   async remove(userId, doc) {
     // ReadOnly users cannot delete checklists
-    return await allowIsBoardMemberWithWriteAccessByCard(userId, await Cards.findOneAsync(doc.cardId));
+    return await allowIsBoardMemberWithWriteAccessByCard(userId, (await Cards.findOneAsync(doc.cardId)) as WekanPolicyCard | undefined);
   },
   fetch: ['userId', 'cardId'],
 });

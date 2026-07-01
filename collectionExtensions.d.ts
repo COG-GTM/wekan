@@ -32,6 +32,12 @@ declare module 'meteor/mongo' {
       // without firing the before/after hooks). It mirrors the collection's own
       // surface.
       direct: Mongo.Collection<T, U>;
+      // @types/meteor's allow/deny only accept synchronous, strictly-boolean
+      // rules. Wekan's server/permissions rules are async and rely on Meteor's
+      // truthiness coercion of the result, so add overloads accepting that form.
+      // (See WekanAllowDenyOptions / WekanAllowDenyResult in declarations.d.ts.)
+      allow(options: WekanAllowDenyOptions<T>): boolean;
+      deny(options: WekanAllowDenyOptions<T>): boolean;
       // Wekan attaches model-specific "static" helpers directly onto collection
       // instances (e.g. Boards.userBoardIds, CardComments.textSearch). Those are
       // declared per-model where practical; this documented index signature

@@ -66,6 +66,17 @@ declare module 'meteor/meteor' {
   }
 }
 
+// Wekan flags site administrators directly on the user document. @types/meteor
+// exposes the `Meteor` namespace both as the `meteor/meteor` module (augmented
+// above) AND as an ambient global; the server/permissions rules read
+// `Meteor.users.findOneAsync(...)` through the global, so mirror the admin flag
+// onto the global User shape as well.
+declare namespace Meteor {
+  interface User {
+    isAdmin?: boolean;
+  }
+}
+
 declare module 'meteor/accounts-base' {
   namespace Accounts {
     // Server-only low-level user provisioning helper used by the header-login
@@ -586,7 +597,76 @@ interface WekanCollectionHookOptions {
 // The `meteor/mongo` module augmentation that adds these community-package
 // methods to `Mongo.Collection` lives in `collectionExtensions.d.ts` (a
 // module-scoped file, so it merges with @types/meteor instead of shadowing the
-// rest of the 'meteor/mongo' surface such as MongoInternals).
+// rest of the 'meteor/mongo' surface such as MongoInternals). That file also
+// adds the async/truthiness-friendly allow/deny overloads modelled below.
+
+// ---------------------------------------------------------------------------
+// allow/deny (server/permissions) policy shapes.
+//
+// @types/meteor only models synchronous, strictly-boolean allow/deny rules,
+// whereas Wekan's server/permissions rules are async (they await the owning
+// board/card before deciding) and rely on Meteor coercing the returned value to
+// a boolean via truthiness (so a rule may return e.g. `board && board.hasAdmin(…)`
+// which is `boolean | null | undefined`, or `userId && …` which is
+// `string | boolean`). These types back the extra Mongo.Collection allow/deny
+// overloads declared in collectionExtensions.d.ts.
+// ---------------------------------------------------------------------------
+type WekanAllowDenyResult =
+  | boolean
+  | string
+  | null
+  | undefined
+  | Promise<boolean | string | null | undefined>;
+
+interface WekanAllowDenyOptions<T> {
+  insert?: (userId: string, doc: T) => WekanAllowDenyResult;
+  update?: (
+    userId: string,
+    doc: T,
+    fieldNames: string[],
+    modifier: WekanMongoModifier,
+  ) => WekanAllowDenyResult;
+  remove?: (userId: string, doc: T) => WekanAllowDenyResult;
+  fetch?: string[];
+  transform?: (doc: T) => T;
+}
+
+// A board fetched inside an allow/deny rule exposes the dburles:collection-helpers
+// membership predicates at runtime, but the model `BoardDocument` surfaces them
+// only through its index signature (so it is not assignable to the narrow
+// BoardAdminAccess / BoardMemberAccess / BoardCommentAccess parameter shapes the
+// server/lib/utils helpers declare). Policy call sites view the fetched board
+// through this documented interop shape, which carries the helper predicates as
+// named members.
+interface WekanPolicyBoard {
+  // Shared named member with the model BoardDocument so a non-nullable board
+  // value (e.g. an allow/deny `doc`) can be viewed through this shape.
+  _id?: string;
+  hasAdmin(userId: string): boolean;
+  hasMember(userId: string): boolean;
+  hasReadOnly(userId: string): boolean;
+  hasReadAssignedOnly(userId: string): boolean;
+  hasNoComments(userId: string): boolean;
+  members?: WekanDocumentField;
+  [field: string]: WekanDocumentField;
+}
+
+// A card fetched inside an allow/deny rule, viewed only for the board it belongs
+// to (the write-access-by-card helpers need `boardId`). The model `CardDocument`
+// exposes `boardId` through its index signature, which does not satisfy the weak
+// `CardBoardRef` parameter shape, so call sites view it through this shape.
+interface WekanPolicyCard {
+  boardId?: string;
+  [field: string]: WekanDocumentField;
+}
+
+// A board-scoped document handled by an allow/deny rule that reads `doc.boardId`.
+// A few model document types (e.g. ActionDocument) do not declare `boardId` or an
+// index signature, so those rules annotate their `doc` parameter with this shape.
+interface WekanBoardScopedDoc {
+  boardId?: string;
+  [field: string]: WekanDocumentField;
+}
 
 /** Wekan's global modal helper. */
 interface WekanModalStatic {

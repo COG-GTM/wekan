@@ -4,7 +4,7 @@ import { allowIsBoardMemberWithWriteAccess, denyCrossBoardMove } from '/server/l
 
 // Centralized update policy for Cards
 // Security: deny any direct client updates to 'vote' fields; require write access otherwise
-export const canUpdateCard = async function(userId, doc, fields) {
+export const canUpdateCard = async function(userId: string | null | undefined, doc: WekanPolicyCard, fields?: string[]) {
   if (!userId) return false;
   const fieldNames = fields || [];
   // Block direct updates to voting fields; voting must go through Meteor method 'cards.vote'

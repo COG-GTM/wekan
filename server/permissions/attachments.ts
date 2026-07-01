@@ -3,7 +3,7 @@ import Boards from '/models/boards';
 import AttachmentStorageSettings from '/models/attachmentStorageSettings';
 import { allowIsBoardMemberWithWriteAccess } from '/server/lib/utils';
 
-function hasUnsafeClientVersionFields(fileObj) {
+function hasUnsafeClientVersionFields(fileObj: WekanFileObj) {
   const versions = fileObj?.versions;
   if (!versions || typeof versions !== 'object') {
     return false;
@@ -21,7 +21,7 @@ function hasUnsafeClientVersionFields(fileObj) {
 }
 
 Attachments.allow({
-  async insert(userId, fileObj) {
+  async insert(userId: string, fileObj: WekanFileObj) {
     // Block attempts to inject server-managed storage metadata.
     if (hasUnsafeClientVersionFields(fileObj)) {
       if (process.env.DEBUG === 'true') {
@@ -45,7 +45,7 @@ Attachments.allow({
     // ReadOnly users cannot upload attachments
     return allowIsBoardMemberWithWriteAccess(userId, await Boards.findOneAsync(fileObj.meta?.boardId));
   },
-  async update(userId, fileObj, fields) {
+  async update(userId: string, fileObj: WekanFileObj, fields: string[]) {
     // SECURITY: The 'name' field is sanitized in onBeforeUpload and server-side methods,
     // but we block direct client-side $set operations on 'versions.*.path' to prevent
     // path traversal attacks via storage migration exploits.
@@ -77,7 +77,7 @@ Attachments.allow({
     // ReadOnly users cannot update attachments
     return allowIsBoardMemberWithWriteAccess(userId, await Boards.findOneAsync(fileObj.meta?.boardId));
   },
-  async remove(userId, fileObj) {
+  async remove(userId: string, fileObj: WekanFileObj) {
     // Additional security check: ensure the file belongs to the board the user has access to
     if (!fileObj || !fileObj.meta?.boardId) {
       if (process.env.DEBUG === 'true') {

@@ -16,15 +16,19 @@ Boards.allow({
 
     return true;
   },
-  update: allowIsBoardAdmin,
-  remove: allowIsBoardAdmin,
+  update(userId, doc) {
+    return allowIsBoardAdmin(userId, doc as WekanPolicyBoard);
+  },
+  remove(userId, doc) {
+    return allowIsBoardAdmin(userId, doc as WekanPolicyBoard);
+  },
   fetch: ['members'],
 });
 
 // All logged in users are allowed to reorder boards by dragging at All Boards page and Public Boards page.
 Boards.allow({
   update(userId, board, fieldNames) {
-    return canUpdateBoardSort(userId, board, fieldNames);
+    return canUpdateBoardSort(userId, board as WekanPolicyBoard, fieldNames);
   },
   // Need members to verify membership in policy
   fetch: ['members'],

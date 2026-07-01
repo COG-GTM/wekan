@@ -1,7 +1,7 @@
 import Avatars from '/models/avatars';
 import AttachmentStorageSettings from '/models/attachmentStorageSettings';
 
-function isOwner(userId, doc) {
+function isOwner(userId: string, doc: WekanFileObj) {
   return userId && userId === doc.userId;
 }
 
@@ -22,7 +22,7 @@ async function avatarUploadsBlocked() {
 }
 
 Avatars.allow({
-  async insert(userId, doc) {
+  async insert(userId: string, doc: WekanFileObj) {
     if (await avatarUploadsBlocked()) {
       return false;
     }

@@ -1,6 +1,10 @@
 import UnsavedEditCollection from '/models/unsavedEdits';
 
-function isAuthor(userId, doc, fieldNames = []) {
+function isAuthor(
+  userId: string,
+  doc: { userId?: string; [field: string]: WekanDocumentField },
+  fieldNames: string[] = [],
+) {
   return userId === doc.userId && fieldNames.indexOf('userId') === -1;
 }
 

@@ -9,13 +9,13 @@ import { allowIsBoardMemberCommentOnly } from '/server/lib/utils';
 // hides from them (read-only-write privilege escalation class).
 CardCommentReactions.allow({
   async insert(userId, doc) {
-    return allowIsBoardMemberCommentOnly(userId, await Boards.findOneAsync(doc.boardId));
+    return allowIsBoardMemberCommentOnly(userId, (await Boards.findOneAsync(doc.boardId)) as WekanPolicyBoard | undefined);
   },
   async update(userId, doc) {
-    return allowIsBoardMemberCommentOnly(userId, await Boards.findOneAsync(doc.boardId));
+    return allowIsBoardMemberCommentOnly(userId, (await Boards.findOneAsync(doc.boardId)) as WekanPolicyBoard | undefined);
   },
   async remove(userId, doc) {
-    return allowIsBoardMemberCommentOnly(userId, await Boards.findOneAsync(doc.boardId));
+    return allowIsBoardMemberCommentOnly(userId, (await Boards.findOneAsync(doc.boardId)) as WekanPolicyBoard | undefined);
   },
   fetch: ['boardId'],
 });
