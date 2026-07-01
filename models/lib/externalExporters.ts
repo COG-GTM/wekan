@@ -4,16 +4,16 @@ import { ReactiveCache } from '/imports/reactiveCache';
 // per-format formatter emits the target platform's JSON shape. This mirrors the
 // generalized import (externalParsers.js): one collector + a map of formatters.
 
-async function collect(boardId) {
-  const board = await ReactiveCache.getBoard(boardId);
-  const lists = await ReactiveCache.getLists({ boardId, archived: false }, { sort: { sort: 1 } });
-  const swimlanes = await ReactiveCache.getSwimlanes({ boardId, archived: false }, { sort: { sort: 1 } });
-  const cards = await ReactiveCache.getCards({ boardId, archived: false }, { sort: { sort: 1 } });
-  const listById = {};
+async function collect(boardId: string) {
+  const board: ExportBoard = await ReactiveCache.getBoard(boardId);
+  const lists: ExportList[] = await ReactiveCache.getLists({ boardId, archived: false }, { sort: { sort: 1 } });
+  const swimlanes: ExportSwimlane[] = await ReactiveCache.getSwimlanes({ boardId, archived: false }, { sort: { sort: 1 } });
+  const cards: any[] = await ReactiveCache.getCards({ boardId, archived: false }, { sort: { sort: 1 } });
+  const listById: { [id: string]: string } = {};
   lists.forEach(l => { listById[l._id] = l.title; });
-  const swById = {};
+  const swById: { [id: string]: string } = {};
   swimlanes.forEach(s => { swById[s._id] = s.title; });
-  const labelById = {};
+  const labelById: { [id: string]: string } = {};
   (board.labels || []).forEach(l => { labelById[l._id] = l.name; });
   const items = cards.map(c => ({
     cardId: c._id,
@@ -24,17 +24,17 @@ async function collect(boardId) {
     swimlaneTitle: swById[c.swimlaneId] || 'Default',
     dueAt: c.dueAt ? new Date(c.dueAt).toISOString() : undefined,
     labelIds: c.labelIds || [],
-    labels: (c.labelIds || []).map(id => labelById[id]).filter(Boolean),
+    labels: (c.labelIds || []).map((id: string) => labelById[id]).filter(Boolean),
   }));
   return { board, lists, swimlanes, items };
 }
 
 // A WeKan list maps to a "closed" issue state when its name looks terminal.
-function isClosed(listTitle) {
+function isClosed(listTitle?: string) {
   return /done|closed|complete|archiv|finished/i.test(listTitle || '');
 }
 
-const githubLike = ({ items }) =>
+const githubLike = ({ items }: ExportCollection) =>
   items.map(i => ({
     title: i.title,
     body: i.description,
@@ -43,7 +43,7 @@ const githubLike = ({ items }) =>
     due_date: i.dueAt,
   }));
 
-const formatters = {
+const formatters: { [format: string]: ExternalExportFormatter } = {
   // NextCloud Deck: board with stacks, each stack carrying its cards.
   deck: ({ board, lists, items }) => ({
     title: board.title,
@@ -144,8 +144,54 @@ const formatters = {
 
 export const EXTERNAL_EXPORT_FORMATS = Object.keys(formatters);
 
-export async function buildExternalExport(boardId, format) {
+export async function buildExternalExport(boardId: string, format: string) {
   const formatter = formatters[format];
   if (!formatter) return null;
   return formatter(await collect(boardId));
 }
+
+// A board label as stored on the board document.
+interface ExportLabel {
+  _id: string;
+  name: string;
+  color?: string;
+}
+
+// Loosely-typed board/list/swimlane docs as returned by ReactiveCache; only the
+// fields the exporters read are declared here.
+interface ExportBoard {
+  title: string;
+  labels?: ExportLabel[];
+}
+
+interface ExportList {
+  _id: string;
+  title: string;
+}
+
+interface ExportSwimlane {
+  _id: string;
+  title: string;
+}
+
+// Neutral intermediate a formatter turns into a target platform's JSON shape.
+interface ExportItem {
+  cardId: string;
+  listId: string;
+  title: string;
+  description: string;
+  listTitle: string;
+  swimlaneTitle: string;
+  dueAt?: string;
+  labelIds: string[];
+  labels: string[];
+}
+
+interface ExportCollection {
+  board: ExportBoard;
+  lists: ExportList[];
+  swimlanes: ExportSwimlane[];
+  items: ExportItem[];
+}
+
+type ExternalExportFormatter = (data: ExportCollection) => object;
