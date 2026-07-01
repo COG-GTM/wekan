@@ -15,7 +15,7 @@
 // document. Returns a strict boolean; a missing/undefined field means "off".
 // `checklist` is expected to be that specific checklist's document, so the
 // state is always scoped to the checklist passed in.
-export function checklistHideState(checklist) {
+export function checklistHideState(checklist: ChecklistHideDoc | null | undefined) {
   return !!(checklist && checklist.hideCheckedChecklistItems === true);
 }
 
@@ -23,6 +23,15 @@ export function checklistHideState(checklist) {
 // An item is hidden only when it is checked (`isChecked`) AND its owning
 // checklist's toggle is on (`hideChecked`). Checked items with the toggle off,
 // and unchecked items, are always visible.
-export function isItemHidden({ isChecked, hideChecked } = {}) {
+export function isItemHidden({ isChecked, hideChecked }: ItemHiddenInput = {}) {
   return !!isChecked && !!hideChecked;
+}
+
+interface ChecklistHideDoc {
+  hideCheckedChecklistItems?: boolean;
+}
+
+interface ItemHiddenInput {
+  isChecked?: boolean;
+  hideChecked?: boolean;
 }

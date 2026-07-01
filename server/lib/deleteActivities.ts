@@ -17,8 +17,8 @@ export function buildDeleteCardActivity({
   swimlaneId,
   userId,
   cardTitle,
-} = {}) {
-  const activity = {
+}: DeleteCardActivityInput = {}) {
+  const activity: DeleteCardActivity = {
     userId,
     activityType: 'deleteCard',
     boardId,
@@ -32,7 +32,7 @@ export function buildDeleteCardActivity({
   return activity;
 }
 
-export function buildDeleteBoardActivity({ boardId, userId } = {}) {
+export function buildDeleteBoardActivity({ boardId, userId }: DeleteBoardActivityInput = {}) {
   return {
     userId,
     type: 'board',
@@ -40,4 +40,28 @@ export function buildDeleteBoardActivity({ boardId, userId } = {}) {
     activityTypeId: boardId,
     boardId,
   };
+}
+
+interface DeleteCardActivityInput {
+  cardId?: string;
+  boardId?: string;
+  listId?: string;
+  swimlaneId?: string;
+  userId?: string;
+  cardTitle?: string;
+}
+
+interface DeleteCardActivity {
+  userId?: string;
+  activityType: string;
+  boardId?: string;
+  listId?: string;
+  cardId?: string;
+  swimlaneId?: string;
+  cardTitle?: string;
+}
+
+interface DeleteBoardActivityInput {
+  boardId?: string;
+  userId?: string;
 }

@@ -18,7 +18,10 @@
  * @param {Array<string>} sourceLabelNames - names of the labels on the source card
  * @returns {Array<string>} ids of destination-board labels whose (non-empty) name matches a source label name
  */
-export function filterCopiedLabelIds(destBoardLabels, sourceLabelNames) {
+export function filterCopiedLabelIds(
+  destBoardLabels: BoardLabel[],
+  sourceLabelNames: string[],
+) {
   const labels = Array.isArray(destBoardLabels) ? destBoardLabels : [];
   const names = Array.isArray(sourceLabelNames) ? sourceLabelNames : [];
   return labels
@@ -37,7 +40,7 @@ export function filterCopiedLabelIds(destBoardLabels, sourceLabelNames) {
  * @param {{_id?:string, linkedId?:string, type?:string}} card
  * @returns {string|undefined} the real card id to update
  */
-export function resolveRealCardId(card) {
+export function resolveRealCardId(card: RealIdCard | null | undefined) {
   const c = card || {};
   if (c.type === 'cardType-linkedCard') {
     return c.linkedId;
@@ -56,10 +59,24 @@ export function resolveRealCardId(card) {
  * @param {Object<string,string>} oldToNewAttachmentId - map old attachment id -> new attachment id
  * @returns {string|undefined} the remapped coverId, or undefined when there is no cover / no match
  */
-export function remapCoverId(oldCoverId, oldToNewAttachmentId) {
+export function remapCoverId(
+  oldCoverId: string | undefined,
+  oldToNewAttachmentId: { [oldId: string]: string },
+) {
   if (!oldCoverId) {
     return undefined;
   }
   const map = oldToNewAttachmentId || {};
   return map[oldCoverId];
+}
+
+interface BoardLabel {
+  _id: string;
+  name?: string;
+}
+
+interface RealIdCard {
+  _id?: string;
+  linkedId?: string;
+  type?: string;
 }

@@ -1,9 +1,10 @@
+import { Meteor } from 'meteor/meteor';
 import { WebApp } from 'meteor/webapp';
 import { WebAppInternals } from 'meteor/webapp';
 import Settings from '/models/settings';
 
 // Cache the setting since the boilerplate callback is synchronous
-let cachedSetting = null;
+let cachedSetting: CustomHeadSetting | null = null;
 
 Meteor.startup(async () => {
   // Load initial setting
@@ -11,13 +12,13 @@ Meteor.startup(async () => {
 
   // Keep cache updated reactively
   Settings.find().observeChanges({
-    added() { Settings.findOneAsync().then(s => { cachedSetting = s; }); },
-    changed() { Settings.findOneAsync().then(s => { cachedSetting = s; }); },
-    removed() { Settings.findOneAsync().then(s => { cachedSetting = s; }); },
+    added() { Settings.findOneAsync().then((s: CustomHeadSetting | null) => { cachedSetting = s; }); },
+    changed() { Settings.findOneAsync().then((s: CustomHeadSetting | null) => { cachedSetting = s; }); },
+    removed() { Settings.findOneAsync().then((s: CustomHeadSetting | null) => { cachedSetting = s; }); },
   });
 
   // Use Meteor's official API to modify the HTML boilerplate
-  WebAppInternals.registerBoilerplateDataCallback('wekan-custom-head', (request, data) => {
+  WebAppInternals.registerBoilerplateDataCallback('wekan-custom-head', (request: BoilerplateRequest, data: BoilerplateData) => {
     try {
       const setting = cachedSetting;
 
@@ -76,3 +77,19 @@ Meteor.startup(async () => {
     }
   });
 });
+
+interface CustomHeadSetting {
+  productName?: string;
+  customHeadEnabled?: boolean;
+  customHeadLinkTags?: string;
+  customManifestEnabled?: boolean;
+}
+
+interface BoilerplateData {
+  head?: string;
+}
+
+interface BoilerplateRequest {
+  url?: string;
+  headers?: { [key: string]: string | string[] | undefined };
+}

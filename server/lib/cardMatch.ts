@@ -18,7 +18,10 @@
  * @param {string} query - free-text query
  * @returns {boolean} true if the query matches title, description or any comment
  */
-export function cardMatchesQuery(card, query) {
+export function cardMatchesQuery(
+  card: CardMatchInput | null | undefined,
+  query: string,
+) {
   const c = card || {};
   const q = (query == null ? '' : String(query)).toLowerCase();
 
@@ -27,7 +30,7 @@ export function cardMatchesQuery(card, query) {
     return true;
   }
 
-  const haystacks = [];
+  const haystacks: string[] = [];
 
   if (c.title) {
     haystacks.push(String(c.title));
@@ -44,4 +47,10 @@ export function cardMatchesQuery(card, query) {
   }
 
   return haystacks.some(h => h.toLowerCase().includes(q));
+}
+
+interface CardMatchInput {
+  title?: string;
+  description?: string;
+  commentTexts?: string[];
 }

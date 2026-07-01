@@ -16,8 +16,8 @@ import Cards from '/models/cards';
 // per-card update a no-op after the first run.
 // ============================================================================
 export async function backfillBoardIdFromCard(
-  collection,
-  { cardField = 'cardId', boardField = 'boardId', label = 'collection' } = {},
+  collection: BackfillCollection,
+  { cardField = 'cardId', boardField = 'boardId', label = 'collection' }: BackfillOptions = {},
 ) {
   try {
     const anyMissing = await collection.findOneAsync(
@@ -41,4 +41,17 @@ export async function backfillBoardIdFromCard(
   } catch (e) {
     console.error(`[${label}] Failed to backfill ${boardField}:`, e);
   }
+}
+
+interface BackfillOptions {
+  cardField?: string;
+  boardField?: string;
+  label?: string;
+}
+
+interface BackfillCollection {
+  findOneAsync(selector: MongoQuery, options?: MongoQuery): Promise<{ _id: string } | undefined>;
+  direct: {
+    updateAsync(selector: MongoQuery, modifier: MongoQuery, options?: MongoQuery): Promise<number>;
+  };
 }
