@@ -7,9 +7,13 @@ import { Filter } from '/client/lib/filter';
 import { EscapeActions } from '/client/lib/escapeActions';
 import { Utils } from '/client/lib/utils';
 import { defaultSwimlaneIdForBoard } from '/client/components/lists/listAddHelpers';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 const { calculateIndex } = Utils;
 
-function saveSorting(ui) {
+// ui: any — the jQuery UI sortable callback "ui" object (item/helper/placeholder jQuery refs).
+function saveSorting(ui: any) {
   // #5462 (defense in depth): a logged-in user without write access must never
   // persist a list reorder, even if a sortable was left enabled. Anonymous
   // users on public boards fall through to the localStorage path below.
@@ -35,7 +39,8 @@ function saveSorting(ui) {
     return;
   }
 
-  let list;
+  // list: any — Blaze.getData returns Object; this is the dynamic List model doc.
+  let list: any;
   try {
     list = Blaze.getData(listDomElement);
   } catch (error) {
@@ -67,7 +72,7 @@ function saveSorting(ui) {
   const originalSwimlaneId = list.getEffectiveSwimlaneId ? list.getEffectiveSwimlaneId() : (list.swimlaneId || null);
 
   // Prepare update object
-  const updateData = {
+  const updateData: MongoQuery = {
     sort: sortIndex.base,
   };
 
@@ -84,7 +89,7 @@ function saveSorting(ui) {
       archived: false
     });
 
-    cardsInList.forEach(card => {
+    cardsInList.forEach((card: any) => {
       card.move(list.boardId, targetSwimlaneId, list._id);
     });
 
@@ -105,7 +110,7 @@ function saveSorting(ui) {
       let listOrder = JSON.parse(localStorage.getItem(listOrderKey) || '{}');
       if (!listOrder.lists) listOrder.lists = [];
 
-      const listIndex = listOrder.lists.findIndex(l => l.id === listId);
+      const listIndex = listOrder.lists.findIndex((l: any) => l.id === listId);
       if (listIndex >= 0) {
         listOrder.lists[listIndex].sort = sortIndex.base;
         listOrder.lists[listIndex].swimlaneId = updateData.swimlaneId;
@@ -124,7 +129,8 @@ function saveSorting(ui) {
   }
 
   // Persist to server
-  Meteor.call('updateListSort', list._id, list.boardId, updateData, function (error) {
+  // error: any — Meteor.call rejection is an untyped Meteor.Error.
+  Meteor.call('updateListSort', list._id, list.boardId, updateData, function (error: any) {
     if (error) {
       Meteor.subscribe('board', list.boardId, false);
     }
@@ -134,7 +140,9 @@ function saveSorting(ui) {
   try {
     const boardBodyEl = ui.item[0]?.closest?.('.board-body') || document.querySelector('.board-body');
     const boardView = boardBodyEl && Blaze.getView(boardBodyEl, 'Template.boardBody');
-    const boardComponent = boardView?.templateInstance?.();
+    // boardComponent: any — the boardBody Blaze instance exposes custom imperative
+    // methods (setIsDragging/scrollLeft) not present on Blaze.TemplateInstance.
+    const boardComponent: any = boardView?.templateInstance?.();
     if (boardComponent && boardComponent.setIsDragging) {
       if (boardComponent) boardComponent.setIsDragging(false);
     }
@@ -155,7 +163,7 @@ function saveSorting(ui) {
   });
 }
 
-function currentListIsInThisSwimlane(swimlaneId) {
+function currentListIsInThisSwimlane(swimlaneId: string) {
   const currentList = Utils.getCurrentList();
   if (!currentList) return false;
   // Match the list's own swimlane, or shared/orphaned lists (empty/null
@@ -172,11 +180,11 @@ function currentListIsInThisSwimlane(swimlaneId) {
     { sort: ['sort'] },
   );
   if (!allSwimlanes.length || allSwimlanes[0]._id !== swimlaneId) return false;
-  const validIds = new Set(allSwimlanes.map(s => s._id));
+  const validIds = new Set(allSwimlanes.map((s: any) => s._id));
   return !validIds.has(currentList.swimlaneId);
 }
 
-function currentCardIsInThisList(listId, swimlaneId) {
+function currentCardIsInThisList(listId: string, swimlaneId: string) {
   const currentCard = Utils.getCurrentCard();
   if (!currentCard) return false;
   // On desktop a clicked card is shown as a draggable popup via the openCards
@@ -225,7 +233,7 @@ function currentCardIsInThisList(listId, swimlaneId) {
   //          without using currentuser above, because currentuser is null.
 }
 
-function syncListOrderFromStorage(boardId) {
+function syncListOrderFromStorage(boardId: string) {
   if (Meteor.userId()) {
     // Logged-in users: don't use localStorage, trust server
     return;
@@ -241,7 +249,7 @@ function syncListOrderFromStorage(boardId) {
     if (!listOrder.lists || listOrder.lists.length === 0) return;
 
     // Compare each list's order in localStorage with database
-    listOrder.lists.forEach(storedList => {
+    listOrder.lists.forEach((storedList: any) => {
       const dbList = Lists.findOne(storedList.id);
       if (dbList) {
         // Check if localStorage has newer data (compare timestamps)
@@ -267,7 +275,8 @@ function syncListOrderFromStorage(boardId) {
   }
 };
 
-function initSortable(boardComponent, $listsDom) {
+// boardComponent: any — boardBody Blaze instance with custom imperative methods.
+function initSortable(boardComponent: any, $listsDom: JQuery) {
   // Safety check: ensure we have valid DOM elements
   if (!$listsDom || $listsDom.length === 0) {
     console.error('initSortable: No valid DOM elements provided');
@@ -281,17 +290,17 @@ function initSortable(boardComponent, $listsDom) {
 
   // We want to animate the card details window closing. We rely on CSS
   // transition for the actual animation.
-  $listsDom._uihooks = {
-    removeElement(node) {
+  ($listsDom as any)._uihooks = {
+    removeElement(node: HTMLElement) {
       const removeNode = once(() => {
-        node.parentNode.removeChild(node);
+        node.parentNode!.removeChild(node);
       });
       if ($(node).hasClass('js-card-details')) {
         $(node).css({
           flexBasis: 0,
           padding: 0,
         });
-        $listsDom.one(CSSEvents.transitionend, removeNode);
+        $listsDom.one(CSSEvents.transitionend!, removeNode);
       } else {
         removeNode();
       }
@@ -343,8 +352,8 @@ function initSortable(boardComponent, $listsDom) {
       disabled: !Utils.canModifyBoard(),
       start(evt, ui) {
         ui.helper.css('z-index', 1000);
-        ui.placeholder.height(ui.helper.height());
-        ui.placeholder.width(ui.helper.width());
+        ui.placeholder.height(ui.helper.height()!);
+        ui.placeholder.width(ui.helper.width()!);
         EscapeActions.executeUpTo('popup-close');
         if (boardComponent) boardComponent.setIsDragging(true);
 
@@ -362,7 +371,7 @@ function initSortable(boardComponent, $listsDom) {
           $(this).removeClass('dragscroll');
         });
       },
-      beforeStop(evt, ui) {
+      beforeStop(evt: any, ui: JQueryUiSortableUi) {
         // Clean up visual feedback
         ui.item.removeClass('ui-sortable-helper');
       },
@@ -385,17 +394,18 @@ function initSortable(boardComponent, $listsDom) {
   // Skip the complex autorun and options for now
 }
 
-Template.swimlane.onCreated(function () {
+Template.swimlane.onCreated(function (this: SwimlaneInstance) {
   this.draggingActive = new ReactiveVar(false);
   this._isDragging = false;
   this._lastDragPositionX = 0;
 });
 
-Template.swimlane.onRendered(function () {
+Template.swimlane.onRendered(function (this: SwimlaneInstance) {
   const tpl = this;
-  const boardBodyEl = tpl.firstNode?.parentElement?.closest?.('.board-body') || document.querySelector('.board-body');
-  const boardView = boardBodyEl && Blaze.getView(boardBodyEl, 'Template.boardBody');
-  const boardComponent = boardView?.templateInstance?.();
+  const boardBodyEl = (tpl.firstNode as HTMLElement | null)?.parentElement?.closest?.('.board-body') || document.querySelector('.board-body');
+  const boardView = boardBodyEl && Blaze.getView(boardBodyEl as HTMLElement, 'Template.boardBody');
+  // boardComponent: any — boardBody Blaze instance with custom imperative methods.
+  const boardComponent: any = boardView?.templateInstance?.();
   const $listsDom = tpl.$('.js-lists');
   // Sync list order from localStorage on board load
   const boardId = Session.get('currentBoard');
@@ -444,8 +454,8 @@ Template.swimlane.onRendered(function () {
         dropOnEmpty: true,
         start(evt, ui) {
           ui.helper.css('z-index', 1000);
-          ui.placeholder.height(ui.helper.height());
-          ui.placeholder.width(ui.helper.width());
+          ui.placeholder.height(ui.helper.height()!);
+          ui.placeholder.width(ui.helper.width()!);
           EscapeActions.executeUpTo('popup-close');
           if (boardComponent) boardComponent.setIsDragging(true);
         },
@@ -469,7 +479,9 @@ Template.swimlane.onRendered(function () {
   }, 100);
 });
 
-function initializeSwimlaneResize(tpl, retryCount = 0) {
+// tpl: any — the swimlane Blaze template instance; this helper reads runtime-only
+// fields (isDestroyed, data) and may run outside a current Blaze view context.
+function initializeSwimlaneResize(tpl: any, retryCount = 0) {
   // Avoid accessing Template.currentData() here: this function can run in setTimeout
   // callbacks outside a current Blaze view context.
   if (!tpl || tpl.isDestroyed) {
@@ -511,14 +523,17 @@ function initializeSwimlaneResize(tpl, retryCount = 0) {
   // Read the vertical page coordinate from either a jQuery mouse event or a
   // native touch event (touchstart/move expose `touches`, touchend exposes
   // `changedTouches`).
-  const getEventPageY = (e) => {
+  // e: any — handler is bound to both jQuery mouse events and native touch
+  // events, whose overlapping fields (originalEvent/touches/pageY) differ.
+  const getEventPageY = (e: any) => {
     const oe = e.originalEvent || e;
     if (oe.touches && oe.touches.length) return oe.touches[0].pageY;
     if (oe.changedTouches && oe.changedTouches.length) return oe.changedTouches[0].pageY;
     return e.pageY;
   };
 
-  const startResize = (e) => {
+  // e: any — bound to both jQuery mouse and native touch events (see getEventPageY).
+  const startResize = (e: any) => {
     isResizing = true;
     startY = getEventPageY(e);
     startHeight = parseInt($swimlane.css('height')) || 300;
@@ -531,7 +546,8 @@ function initializeSwimlaneResize(tpl, retryCount = 0) {
     e.stopPropagation();
   };
 
-  const doResize = (e) => {
+  // e: any — bound to both jQuery mouse and native touch events (see getEventPageY).
+  const doResize = (e: any) => {
     if (!isResizing) {
       return;
     }
@@ -554,7 +570,8 @@ function initializeSwimlaneResize(tpl, retryCount = 0) {
     e.stopPropagation();
   };
 
-  const stopResize = (e) => {
+  // e: any — bound to both jQuery mouse and native touch events (see getEventPageY).
+  const stopResize = (e: any) => {
     if (!isResizing) return;
 
     isResizing = false;
@@ -589,7 +606,8 @@ function initializeSwimlaneResize(tpl, retryCount = 0) {
     const currentUser = ReactiveCache.getCurrentUser();
     if (currentUser) {
       // For logged-in users, use server method
-      Meteor.call('applySwimlaneHeightToStorage', boardId, swimlaneId, finalHeight, (error, result) => {
+      // error/result: any — untyped Meteor method callback (Meteor.Error / method return).
+      Meteor.call('applySwimlaneHeightToStorage', boardId, swimlaneId, finalHeight, (error: any, result: any) => {
         if (error) {
           console.error('Error saving swimlane height:', error);
         } else {
@@ -645,7 +663,7 @@ Template.swimlane.helpers({
   canSeeAddList() {
     return ReactiveCache.getCurrentUser()?.isBoardAdmin();
   },
-  lists() {
+  lists(this: any) {
     const swimlane = this;
     // myLists() already covers:
     //   • lists owned by this swimlane (swimlaneId === this._id)
@@ -664,12 +682,12 @@ Template.swimlane.helpers({
     if (!allSwimlanes.length || allSwimlanes[0]._id !== swimlane._id) {
       return regularLists;
     }
-    const validIds = allSwimlanes.map(s => s._id);
+    const validIds = allSwimlanes.map((s: any) => s._id);
     const orphaned = swimlane.orphanedSwimlaneLists(validIds);
     if (!orphaned.length) return regularLists;
 
     // Merge, deduplicating by _id (regularLists may already contain some).
-    const seen = new Set(regularLists.map(l => l._id));
+    const seen = new Set(regularLists.map((l: any) => l._id));
     const combined = [...regularLists];
     for (const l of orphaned) {
       if (!seen.has(l._id)) {
@@ -679,21 +697,23 @@ Template.swimlane.helpers({
     }
     return combined;
   },
-  collapseSwimlane() {
+  collapseSwimlane(this: any) {
     return Utils.getSwimlaneCollapseState(this);
   },
-  id() {
+  id(this: any) {
     return this._id;
   },
-  currentCardIsInThisList(listId, swimlaneId) {
+  currentCardIsInThisList(listId: string, swimlaneId: string) {
     return currentCardIsInThisList(listId, swimlaneId);
   },
-  currentListIsInThisSwimlane(swimlaneId) {
+  currentListIsInThisSwimlane(swimlaneId: string) {
     return currentListIsInThisSwimlane(swimlaneId);
   },
-  visible(list) {
+  visible(this: any, list: any) {
     if (list.archived) {
-      if (!Filter.archive.isSelected()) {
+      // SetFilter.isSelected(val) is typed to require a value; the app calls it
+      // with none to test the "empty/undefined" selection — preserve that.
+      if (!(Filter.archive as any).isSelected()) {
         return false;
       }
     }
@@ -702,7 +722,7 @@ Template.swimlane.helpers({
         return false;
       }
     }
-    if (Filter.hideEmpty.isSelected()) {
+    if ((Filter.hideEmpty as any).isSelected()) {
       // Pass the current swimlane ID so we only count cards belonging to
       // this swimlane (not cards in other swimlanes that happen to match).
       const cards = list.cards(this._id);
@@ -744,7 +764,7 @@ Template.swimlane.helpers({
 
 Template.swimlane.events({
   // Click-and-drag action
-  'mousedown .board-canvas'(evt, tpl) {
+  'mousedown .board-canvas'(evt: JQuery.TriggeredEvent, tpl: SwimlaneInstance) {
     const noDragInside = ['a', 'input', 'textarea', 'p'].concat(
       Utils.isTouchScreenOrShowDesktopDragHandles()
         ? ['.js-list-handle', '.js-swimlane-header-handle']
@@ -763,22 +783,22 @@ Template.swimlane.events({
 
     if (
       !isInNoDragArea &&
-      tpl.$('.swimlane').prop('clientHeight') > evt.offsetY
+      tpl.$('.swimlane').prop('clientHeight') > (evt as JQuery.MouseDownEvent).offsetY
     ) {
       tpl._isDragging = true;
-      tpl._lastDragPositionX = evt.clientX;
+      tpl._lastDragPositionX = (evt as JQuery.MouseDownEvent).clientX;
     }
   },
-  mouseup(evt, tpl) {
+  mouseup(evt: JQuery.TriggeredEvent, tpl: SwimlaneInstance) {
     if (tpl._isDragging) {
       tpl._isDragging = false;
     }
   },
-  mousemove(evt, tpl) {
+  mousemove(evt: JQuery.TriggeredEvent, tpl: SwimlaneInstance) {
     if (tpl._isDragging) {
       // Update the canvas position
-      tpl.listsDom.scrollLeft -= evt.clientX - tpl._lastDragPositionX;
-      tpl._lastDragPositionX = evt.clientX;
+      tpl.listsDom.scrollLeft -= (evt as JQuery.MouseMoveEvent).clientX - tpl._lastDragPositionX;
+      tpl._lastDragPositionX = (evt as JQuery.MouseMoveEvent).clientX;
       // Disable browser text selection while dragging
       evt.stopPropagation();
       evt.preventDefault();
@@ -791,7 +811,7 @@ Template.swimlane.events({
 });
 
 
-Template.addListForm.onCreated(function () {
+Template.addListForm.onCreated(function (this: AddListFormInstance) {
   this.currentBoard = Utils.getCurrentBoard();
   this.isListTemplatesSwimlane =
     this.currentBoard.isTemplatesBoard() &&
@@ -801,7 +821,7 @@ Template.addListForm.onCreated(function () {
 
 Template.addListForm.helpers({
   swimlaneLists() {
-    const swimlane = Template.instance().currentSwimlane;
+    const swimlane = (Template.instance() as AddListFormInstance).currentSwimlane;
     if (!swimlane?._id) return [];
     return ReactiveCache.getLists(
       { swimlaneId: swimlane._id, archived: false },
@@ -811,15 +831,15 @@ Template.addListForm.helpers({
 });
 
 Template.addListForm.events({
-  async submit(evt, tpl) {
+  async submit(evt: JQuery.TriggeredEvent, tpl: AddListFormInstance) {
     evt.preventDefault();
 
-    const titleInput = tpl.find('.list-name-input');
+    const titleInput = tpl.find('.list-name-input') as HTMLInputElement;
     const title = titleInput?.value.trim();
 
     if (!title) return;
 
-    const positionInput = tpl.find('.list-position-input');
+    const positionInput = tpl.find('.list-position-input') as HTMLSelectElement;
     const afterListId =
       positionInput && positionInput.value ? positionInput.value.trim() : null;
     const nextListId =
@@ -859,12 +879,14 @@ Template.listsGroup.helpers({
     if (!swimlaneId) return null;
     return ReactiveCache.getSwimlane({ _id: swimlaneId });
   },
-  currentCardIsInThisList(listId, swimlaneId) {
+  currentCardIsInThisList(listId: string, swimlaneId: string) {
     return currentCardIsInThisList(listId, swimlaneId);
   },
-  visible(list) {
+  visible(list: any) {
     if (list.archived) {
-      if (!Filter.archive.isSelected()) {
+      // SetFilter.isSelected(val) is typed to require a value; the app calls it
+      // with none to test the "empty/undefined" selection — preserve that.
+      if (!(Filter.archive as any).isSelected()) {
         return false;
       }
     }
@@ -873,7 +895,7 @@ Template.listsGroup.helpers({
         return false;
       }
     }
-    if (Filter.hideEmpty.isSelected()) {
+    if ((Filter.hideEmpty as any).isSelected()) {
       const cards = list.cards();
       if (cards.length === 0) {
         return false;
@@ -883,11 +905,12 @@ Template.listsGroup.helpers({
   },
 });
 
-Template.listsGroup.onRendered(function () {
+Template.listsGroup.onRendered(function (this: Blaze.TemplateInstance) {
   const tpl = this;
-  const boardBodyEl2 = tpl.firstNode?.parentElement?.closest?.('.board-body') || document.querySelector('.board-body');
-  const boardView2 = boardBodyEl2 && Blaze.getView(boardBodyEl2, 'Template.boardBody');
-  const boardComponent = boardView2?.templateInstance?.();
+  const boardBodyEl2 = (tpl.firstNode as HTMLElement | null)?.parentElement?.closest?.('.board-body') || document.querySelector('.board-body');
+  const boardView2 = boardBodyEl2 && Blaze.getView(boardBodyEl2 as HTMLElement, 'Template.boardBody');
+  // boardComponent: any — boardBody Blaze instance with custom imperative methods.
+  const boardComponent: any = boardView2?.templateInstance?.();
   const $listsDom = tpl.$('.js-lists');
 
   if (!Utils.getCurrentCardId() && boardComponent) {
@@ -931,8 +954,8 @@ Template.listsGroup.onRendered(function () {
         dropOnEmpty: true,
         start(evt, ui) {
           ui.helper.css('z-index', 1000);
-          ui.placeholder.height(ui.helper.height());
-          ui.placeholder.width(ui.helper.width());
+          ui.placeholder.height(ui.helper.height()!);
+          ui.placeholder.width(ui.helper.width()!);
           EscapeActions.executeUpTo('popup-close');
           if (boardComponent) boardComponent.setIsDragging(true);
         },
@@ -957,8 +980,8 @@ Template.listsGroup.onRendered(function () {
 });
 
 
-function swimlaneBoardsSelector(excludeCurrentBoard) {
-  const selector = {
+function swimlaneBoardsSelector(excludeCurrentBoard: boolean) {
+  const selector: MongoQuery = {
     archived: false,
     'members.userId': Meteor.userId(),
     type: 'board',
@@ -969,14 +992,14 @@ function swimlaneBoardsSelector(excludeCurrentBoard) {
   return selector;
 }
 
-function swimlaneToBoards(excludeCurrentBoard) {
+function swimlaneToBoards(excludeCurrentBoard: boolean) {
   return ReactiveCache.getBoards(
     swimlaneBoardsSelector(excludeCurrentBoard),
     { sort: { title: 1 } },
   );
 }
 
-function getSwimlanesForBoard(boardId) {
+function getSwimlanesForBoard(boardId: string) {
   if (!boardId) {
     return [];
   }
@@ -986,15 +1009,15 @@ function getSwimlanesForBoard(boardId) {
   );
 }
 
-function setFirstSelectedSwimlane(tpl) {
+function setFirstSelectedSwimlane(tpl: SwimlanePopupInstance) {
   const swimlanes = getSwimlanesForBoard(tpl.selectedBoardId.get());
   const firstSwimlaneId = swimlanes[0]?._id || '';
   tpl.selectedSwimlaneId.set(firstSwimlaneId);
 }
 
-function swimlaneDoneEvent(serverMethod, tpl) {
-  const bSelect = tpl.$('.js-select-boards')[0];
-  const sSelect = tpl.$('.js-select-swimlanes')[0];
+function swimlaneDoneEvent(serverMethod: string, tpl: SwimlanePopupInstance) {
+  const bSelect = tpl.$('.js-select-boards')[0] as HTMLSelectElement;
+  const sSelect = tpl.$('.js-select-swimlanes')[0] as HTMLSelectElement;
   if (!bSelect) {
     Popup.back();
     return;
@@ -1004,7 +1027,7 @@ function swimlaneDoneEvent(serverMethod, tpl) {
   const swimlaneId = sSelect?.options[sSelect.selectedIndex]?.value || null;
   const position = tpl.$('input[name="swimlane-position"]:checked').val() || 'below';
   const titleInputId = serverMethod === 'copySwimlane' ? '#copy-swimlane-title' : '#move-swimlane-title';
-  const title = tpl.$(titleInputId).val().trim();
+  const title = (tpl.$(titleInputId).val() as string).trim();
   Meteor.call(
     serverMethod,
     tpl.currentSwimlane._id,
@@ -1012,7 +1035,8 @@ function swimlaneDoneEvent(serverMethod, tpl) {
     swimlaneId,
     position,
     title,
-    err => {
+    // err: any — untyped Meteor.call rejection (Meteor.Error).
+    (err: any) => {
       if (err) {
         console.error(`${serverMethod} failed`, err);
         return;
@@ -1022,7 +1046,7 @@ function swimlaneDoneEvent(serverMethod, tpl) {
   );
 }
 
-Template.moveSwimlanePopup.onCreated(function () {
+Template.moveSwimlanePopup.onCreated(function (this: SwimlanePopupInstance) {
   this.currentSwimlane = Template.currentData();
   this.selectedBoardId = new ReactiveVar(Utils.getCurrentBoard()._id);
   this.selectedSwimlaneId = new ReactiveVar('');
@@ -1037,30 +1061,30 @@ Template.moveSwimlanePopup.helpers({
     return swimlaneToBoards(false);
   },
   toSwimlanes() {
-    return getSwimlanesForBoard(Template.instance().selectedBoardId.get());
+    return getSwimlanesForBoard((Template.instance() as SwimlanePopupInstance).selectedBoardId.get());
   },
-  isSelectedBoard(boardId) {
-    return Template.instance().selectedBoardId.get() === boardId;
+  isSelectedBoard(boardId: string) {
+    return (Template.instance() as SwimlanePopupInstance).selectedBoardId.get() === boardId;
   },
-  isSelectedSwimlane(swimlaneId) {
-    return Template.instance().selectedSwimlaneId.get() === swimlaneId;
+  isSelectedSwimlane(swimlaneId: string) {
+    return (Template.instance() as SwimlanePopupInstance).selectedSwimlaneId.get() === swimlaneId;
   },
 });
 
 Template.moveSwimlanePopup.events({
-  'click .js-done'(event, tpl) {
+  'click .js-done'(event: JQuery.TriggeredEvent, tpl: SwimlanePopupInstance) {
     swimlaneDoneEvent('moveSwimlane', tpl);
   },
-  'change .js-select-boards'(event, tpl) {
-    tpl.selectedBoardId.set($(event.currentTarget).val());
+  'change .js-select-boards'(event: JQuery.TriggeredEvent, tpl: SwimlanePopupInstance) {
+    tpl.selectedBoardId.set($(event.currentTarget).val() as string);
     setFirstSelectedSwimlane(tpl);
   },
-  'change .js-select-swimlanes'(event, tpl) {
-    tpl.selectedSwimlaneId.set($(event.currentTarget).val());
+  'change .js-select-swimlanes'(event: JQuery.TriggeredEvent, tpl: SwimlanePopupInstance) {
+    tpl.selectedSwimlaneId.set($(event.currentTarget).val() as string);
   },
 });
 
-Template.copySwimlanePopup.onCreated(function () {
+Template.copySwimlanePopup.onCreated(function (this: SwimlanePopupInstance) {
   this.currentSwimlane = Template.currentData();
   this.selectedBoardId = new ReactiveVar(Utils.getCurrentBoard()._id);
   this.selectedSwimlaneId = new ReactiveVar('');
@@ -1075,25 +1099,46 @@ Template.copySwimlanePopup.helpers({
     return swimlaneToBoards(false);
   },
   toSwimlanes() {
-    return getSwimlanesForBoard(Template.instance().selectedBoardId.get());
+    return getSwimlanesForBoard((Template.instance() as SwimlanePopupInstance).selectedBoardId.get());
   },
-  isSelectedBoard(boardId) {
-    return Template.instance().selectedBoardId.get() === boardId;
+  isSelectedBoard(boardId: string) {
+    return (Template.instance() as SwimlanePopupInstance).selectedBoardId.get() === boardId;
   },
-  isSelectedSwimlane(swimlaneId) {
-    return Template.instance().selectedSwimlaneId.get() === swimlaneId;
+  isSelectedSwimlane(swimlaneId: string) {
+    return (Template.instance() as SwimlanePopupInstance).selectedSwimlaneId.get() === swimlaneId;
   },
 });
 
 Template.copySwimlanePopup.events({
-  'click .js-done'(event, tpl) {
+  'click .js-done'(event: JQuery.TriggeredEvent, tpl: SwimlanePopupInstance) {
     swimlaneDoneEvent('copySwimlane', tpl);
   },
-  'change .js-select-boards'(event, tpl) {
-    tpl.selectedBoardId.set($(event.currentTarget).val());
+  'change .js-select-boards'(event: JQuery.TriggeredEvent, tpl: SwimlanePopupInstance) {
+    tpl.selectedBoardId.set($(event.currentTarget).val() as string);
     setFirstSelectedSwimlane(tpl);
   },
-  'change .js-select-swimlanes'(event, tpl) {
-    tpl.selectedSwimlaneId.set($(event.currentTarget).val());
+  'change .js-select-swimlanes'(event: JQuery.TriggeredEvent, tpl: SwimlanePopupInstance) {
+    tpl.selectedSwimlaneId.set($(event.currentTarget).val() as string);
   },
 });
+
+// currentSwimlane/currentBoard are dynamic Swimlane/Board model docs, hence
+// `any`; the reactive vars hold the popup's selected board/swimlane ids.
+interface SwimlaneInstance extends Blaze.TemplateInstance {
+  draggingActive: ReactiveVar<boolean>;
+  _isDragging: boolean;
+  _lastDragPositionX: number;
+  listsDom: HTMLElement;
+}
+
+interface AddListFormInstance extends Blaze.TemplateInstance {
+  currentBoard: any;
+  isListTemplatesSwimlane: boolean;
+  currentSwimlane: any;
+}
+
+interface SwimlanePopupInstance extends Blaze.TemplateInstance {
+  currentSwimlane: any;
+  selectedBoardId: ReactiveVar<string>;
+  selectedSwimlaneId: ReactiveVar<string>;
+}

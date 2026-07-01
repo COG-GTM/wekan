@@ -732,6 +732,10 @@ declare module 'meteor/blaze' {
     interface TemplateInstance {
       $(selector: Element | JQuery): JQuery;
     }
+    // Wekan's Blaze runtime accepts an optional template-name filter as a
+    // second argument to getView (returns the nearest view rendered by that
+    // template); @types/meteor only declares the single-element form.
+    function getView(element: HTMLElement, templateName: string): Blaze.View;
   }
 }
 
