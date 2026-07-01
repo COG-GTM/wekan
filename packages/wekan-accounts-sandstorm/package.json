@@ -1,0 +1,10 @@
+{
+  "name": "wekan-accounts-sandstorm",
+  "private": true,
+  "description": "Package-local dev dependencies for type-checking the wekan-accounts-sandstorm Meteor package with `tsc --noEmit`. Meteor itself builds this package from package.js.",
+  "devDependencies": {
+    "@types/meteor": "^2.9.11",
+    "@types/node": "^26.1.0",
+    "typescript": "^6.0.3"
+  }
+}
