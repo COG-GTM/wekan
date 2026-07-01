@@ -50,7 +50,9 @@ Meteor.methods({
       }
     }
 
-    const fakeUser = {
+    // collection2's `extendAutoValueContext` insert option is not part of the
+    // base Mongo.Collection.insertAsync signature, so this options bag is `any`.
+    const fakeUser: any = {
       extendAutoValueContext: {
         userId: this.userId,
       },
@@ -70,7 +72,7 @@ Meteor.methods({
         fakeUser,
       );
 
-      await Users.updateAsync(this.userId, {
+      await Users.updateAsync(this.userId as string, {
         $set: { 'profile.templatesBoardId': boardId },
       });
 
@@ -86,7 +88,7 @@ Meteor.methods({
         },
         fakeUser,
       );
-      await Users.updateAsync(this.userId, {
+      await Users.updateAsync(this.userId as string, {
         $set: { 'profile.cardTemplatesSwimlaneId': cardSwimlaneId },
       });
 
@@ -102,7 +104,7 @@ Meteor.methods({
         },
         fakeUser,
       );
-      await Users.updateAsync(this.userId, {
+      await Users.updateAsync(this.userId as string, {
         $set: { 'profile.listTemplatesSwimlaneId': listSwimlaneId },
       });
 
@@ -118,7 +120,7 @@ Meteor.methods({
         },
         fakeUser,
       );
-      await Users.updateAsync(this.userId, {
+      await Users.updateAsync(this.userId as string, {
         $set: { 'profile.boardTemplatesSwimlaneId': boardSwimlaneId },
       });
 
@@ -137,7 +139,7 @@ Meteor.methods({
           'profile.boardWorkspacesTree': 1,
           'profile.boardWorkspaceAssignments': 1,
         },
-      })) || {};
+      })) || ({} as Meteor.User);
 
     const tree =
       user.profile && user.profile.boardWorkspacesTree
@@ -146,16 +148,18 @@ Meteor.methods({
     const assignments = {
       ...((user.profile && user.profile.boardWorkspaceAssignments) || {}),
     };
-    const removedWorkspaceIds = [];
+    // Collected workspace id strings from the dynamic tree nodes, hence `any[]`.
+    const removedWorkspaceIds: any[] = [];
 
-    const collectWorkspaceIds = node => {
+    // `node` is a dynamic workspace-tree node ({ id, name, children }), hence `any`.
+    const collectWorkspaceIds = (node: any) => {
       removedWorkspaceIds.push(node.id);
       if (node.children && node.children.length) {
         node.children.forEach(collectWorkspaceIds);
       }
     };
 
-    const removeWorkspaceFromTree = nodes => {
+    const removeWorkspaceFromTree = (nodes: any[]) => {
       for (let i = 0; i < nodes.length; i++) {
         if (nodes[i].id === workspaceId) {
           collectWorkspaceIds(nodes[i]);
@@ -227,7 +231,7 @@ Meteor.methods({
 
   async editUser(targetUserId, updateData) {
     check(targetUserId, String);
-    check(updateData, Object);
+    check(updateData as object, Object);
 
     const currentUserId = this.userId;
     if (!currentUserId) {
@@ -244,7 +248,8 @@ Meteor.methods({
       throw new Meteor.Error('user-not-found', 'Target user not found');
     }
 
-    const updateObject = {};
+    // Dynamic $set map: dotted profile paths and top-level fields keyed by name.
+    const updateObject: { [key: string]: any } = {};
     if (updateData.fullname !== undefined) updateObject['profile.fullname'] = updateData.fullname;
     if (updateData.initials !== undefined) updateObject['profile.initials'] = updateData.initials;
     if (updateData.isAdmin !== undefined) updateObject.isAdmin = updateData.isAdmin;
@@ -327,12 +332,12 @@ Meteor.methods({
   },
 
   async createWorkspace(params) {
-    check(params, Object);
+    check(params as object, Object);
     const { parentId = null, name } = params;
     check(parentId, Match.OneOf(String, null));
     check(name, String);
     if (!this.userId) throw new Meteor.Error('not-logged-in');
-    const user = (await Users.findOneAsync(this.userId)) || {};
+    const user = (await Users.findOneAsync(this.userId)) || ({} as Meteor.User);
     const tree =
       user.profile && user.profile.boardWorkspacesTree
         ? EJSON.clone(user.profile.boardWorkspacesTree)
@@ -343,7 +348,7 @@ Meteor.methods({
     if (!parentId) {
       tree.push(newNode);
     } else {
-      const insertInto = nodes => {
+      const insertInto = (nodes: any[]) => {
         for (const n of nodes) {
           if (n.id === parentId) {
             n.children = n.children || [];
@@ -376,7 +381,7 @@ Meteor.methods({
     if (!this.userId) throw new Meteor.Error('not-logged-in');
 
     const user = await Users.findOneAsync(this.userId, { fields: { 'profile.boardWorkspaceAssignments': 1 } });
-    const assignments = user.profile?.boardWorkspaceAssignments || {};
+    const assignments = user!.profile?.boardWorkspaceAssignments || {};
     assignments[boardId] = spaceId;
 
     await Users.updateAsync(this.userId, {
@@ -390,7 +395,7 @@ Meteor.methods({
     if (!this.userId) throw new Meteor.Error('not-logged-in');
 
     const user = await Users.findOneAsync(this.userId, { fields: { 'profile.boardWorkspaceAssignments': 1 } });
-    const assignments = user.profile?.boardWorkspaceAssignments || {};
+    const assignments = user!.profile?.boardWorkspaceAssignments || {};
     delete assignments[boardId];
 
     await Users.updateAsync(this.userId, {
@@ -673,6 +678,8 @@ Meteor.methods({
       } else if (nUsersWithEmail > 0) {
         throw new Meteor.Error('email-already-taken');
       } else {
+        // wekan's Accounts.onCreateUser reads extra fields (isAdmin/isActive/from)
+        // that are not part of the base Accounts.createUser options, hence `any`.
         Accounts.createUser({
           username,
           password,
@@ -680,7 +687,7 @@ Meteor.methods({
           isActive,
           email: email.toLowerCase(),
           from: 'admin',
-        });
+        } as any);
         const user =
           (await ReactiveCache.getUser(username)) ||
           (await ReactiveCache.getUser({ username }));
@@ -817,11 +824,13 @@ Meteor.methods({
     // Global site admins (Admin Panel users) always have all rights and bypass
     // both the board-membership and the configurable per-role check below.
     if (!inviter.isAdmin) {
-      const member = board.members.find(memberItem => memberItem.userId === inviter._id);
+      const member = board.members.find((memberItem: any) => memberItem.userId === inviter._id);
       if (!member || !member.isActive) throw new Meteor.Error('error-board-notAMember');
       // Enforce the Admin Panel / People / Roles policy: only the configured
       // board roles are allowed to invite users to a board.
-      const allowedRoles = await InviteToBoardRolesSettings.allowedRoles();
+      // `allowedRoles` is a custom static on the InviteToBoardRolesSettings
+      // collection (not part of Mongo.Collection), hence the `any` cast.
+      const allowedRoles = await (InviteToBoardRolesSettings as any).allowedRoles();
       if (!allowedRoles.includes(board.memberRole(inviter._id))) {
         throw new Meteor.Error('error-notAllowed');
       }
@@ -888,7 +897,7 @@ Meteor.methods({
       }
     }
 
-    const memberIndex = board.members.findIndex(m => m.userId === user._id);
+    const memberIndex = board.members.findIndex((m: any) => m.userId === user._id);
     if (memberIndex >= 0) {
       await Boards.updateAsync(boardId, {
         $set: { [`members.${memberIndex}.isActive`]: true, modifiedAt: new Date() },
@@ -917,7 +926,7 @@ Meteor.methods({
     if (board.subtasksDefaultBoardId) {
       const subBoard = await ReactiveCache.getBoard(board.subtasksDefaultBoardId);
       if (subBoard) {
-        const subMemberIndex = subBoard.members.findIndex(m => m.userId === user._id);
+        const subMemberIndex = subBoard.members.findIndex((m: any) => m.userId === user._id);
         if (subMemberIndex >= 0) {
           await Boards.updateAsync(board.subtasksDefaultBoardId, {
             $set: { [`members.${subMemberIndex}.isActive`]: true, modifiedAt: new Date() },
@@ -1043,7 +1052,12 @@ Meteor.methods({
   },
 });
 
-Accounts.onCreateUser(async (options, user) => {
+// The onCreateUser callback receives the provider options bag (carrying dynamic,
+// provider-specific fields like `ldap`/`from`/`profile.invitationcode`) and the
+// user document under construction (freely mutated with wekan-specific fields:
+// oidc services, authenticationMethod, createdThroughApi, ...). Both shapes are
+// inherently dynamic at this boundary, hence `any`.
+Accounts.onCreateUser(async (options: any, user: any) => {
   const usersCursor = await ReactiveCache.getUsers({}, {}, true);
   const userCount = typeof usersCursor.countAsync === 'function' ? await usersCursor.countAsync() : usersCursor.count();
   user.isAdmin = userCount === 0;
@@ -1064,7 +1078,7 @@ Accounts.onCreateUser(async (options, user) => {
     const fullname = user.services.oidc.fullname || user.username;
     const initials = fullname
       .split(/\s+/)
-      .reduce((memo, word) => memo + word[0], '')
+      .reduce((memo: any, word: any) => memo + word[0], '')
       .toUpperCase();
     user.profile = {
       initials,
@@ -1089,13 +1103,13 @@ Accounts.onCreateUser(async (options, user) => {
         ? user.services.oidc.groups
         : [];
       const userGroupNames = oidcGroups
-        .map(group => {
+        .map((group: any) => {
           if (typeof group === 'string') return group;
           if (group && typeof group === 'object') return group.displayName || group.name || '';
           return '';
         })
-        .filter(name => name.length > 0);
-      user.isAdmin = userGroupNames.some(name => oauth2AdminGroups.includes(name));
+        .filter((name: any) => name.length > 0);
+      user.isAdmin = userGroupNames.some((name: any) => oauth2AdminGroups.includes(name));
     }
 
     // SECURITY (GHSA-mp7g-hj5q-gxhq): Do not silently take over an existing
@@ -1130,7 +1144,9 @@ Accounts.onCreateUser(async (options, user) => {
     // keeps the previous behaviour (auto-create on first login).
     const autoRegistrationDisabled =
       process.env.OAUTH2_AUTO_REGISTRATION === 'false' ||
-      process.env.OAUTH2_AUTO_REGISTRATION === false;
+      // Pre-existing dead comparison (env var is a string, never boolean `false`);
+      // the `as any` cast preserves it without a runtime change.
+      (process.env.OAUTH2_AUTO_REGISTRATION as any) === false;
     if (autoRegistrationDisabled && !existingUser) {
       throw new Meteor.Error(
         'oidc-registration-disabled',
@@ -1144,7 +1160,9 @@ Accounts.onCreateUser(async (options, user) => {
 
     const mergeExistingUsers =
       process.env.OAUTH2_MERGE_EXISTING_USERS === 'true' ||
-      process.env.OAUTH2_MERGE_EXISTING_USERS === true;
+      // Pre-existing dead comparison (env var is a string, never boolean `true`);
+      // the `as any` cast preserves it without a runtime change.
+      (process.env.OAUTH2_MERGE_EXISTING_USERS as any) === true;
     const emailVerified = user.services.oidc.email_verified === true;
     if (!mergeExistingUsers || !emailVerified) {
       throw new Meteor.Error(
@@ -1207,13 +1225,14 @@ Accounts.onCreateUser(async (options, user) => {
   return user;
 });
 
-let notificationCleanupIntervalId = null;
+// Holds the Meteor.setInterval handle (opaque timer id), hence `any`.
+let notificationCleanupIntervalId: any = null;
 
 const runNotificationCleanup = async function runNotificationCleanup() {
   const envRemoveAge =
     process.env.NOTIFICATION_TRAY_AFTER_READ_DAYS_BEFORE_REMOVE;
   const defaultRemoveAge = 2;
-  const removeAge = parseInt(envRemoveAge, 10) || defaultRemoveAge;
+  const removeAge = parseInt(envRemoveAge as string, 10) || defaultRemoveAge;
 
   for (const user of await ReactiveCache.getUsers()) {
     if (!user.profile || !user.profile.notifications) continue;
@@ -1322,10 +1341,12 @@ Meteor.startup(async () => {
   });
 });
 
-Users.after.update(function(userId, user, fieldNames) {
+// `this` is the collection-hooks after-update context (carries `.previous`), hence `any`.
+Users.after.update(function(this: any, userId, user, fieldNames) {
   if (!fieldNames.includes('profile')) return;
 
-  function getStarredBoardsIds(doc) {
+  // `doc` is a raw user Mongo document (dynamic shape), hence `any`.
+  function getStarredBoardsIds(doc: any) {
     const starredBoards = doc.profile && doc.profile.starredBoards;
     return Array.isArray(starredBoards) ? starredBoards : [];
   }
@@ -1333,8 +1354,8 @@ Users.after.update(function(userId, user, fieldNames) {
   const oldIds = getStarredBoardsIds(this.previous);
   const newIds = getStarredBoardsIds(user);
 
-  function incrementBoards(boardsIds, inc) {
-    boardsIds.forEach(boardId => {
+  function incrementBoards(boardsIds: any[], inc: number) {
+    boardsIds.forEach((boardId: any) => {
       Boards.updateAsync(boardId, { $inc: { stars: inc } }).catch(error => {
         console.error('Failed to update board stars:', error);
       });
@@ -1345,7 +1366,7 @@ Users.after.update(function(userId, user, fieldNames) {
   incrementBoards(newIds.filter(x => !oldIds.includes(x)), +1);
 });
 
-const fakeUserId = new Meteor.EnvironmentVariable();
+const fakeUserId = new Meteor.EnvironmentVariable<string | null>();
 const getUserId = CollectionHooks.getUserId;
 CollectionHooks.getUserId = () => {
   return fakeUserId.get() || getUserId();
@@ -1383,7 +1404,7 @@ Users.after.insert(async (userId, doc) => {
     } else {
       for (const boardId of invitationCode.boardsToBeInvited) {
         const board = await ReactiveCache.getBoard(boardId);
-        const memberIndex = board.members.findIndex(m => m.userId === doc._id);
+        const memberIndex = board.members.findIndex((m: any) => m.userId === doc._id);
         if (memberIndex >= 0) {
           await Boards.updateAsync(boardId, { $set: { [`members.${memberIndex}.isActive`]: true } });
         } else {
@@ -1425,8 +1446,8 @@ WebApp.handlers.get('/api/user', async function(req, res) {
       { type: 'board', 'members.userId': req.userId },
       { fields: { _id: 1, members: 1 } },
     );
-    boards = boards.map(b => {
-      const u = b.members.find(m => m.userId === req.userId);
+    boards = boards.map((b: any) => {
+      const u = b.members.find((m: any) => m.userId === req.userId);
       delete u.userId;
       u.boardId = b._id;
       return u;
@@ -1467,8 +1488,8 @@ WebApp.handlers.get('/api/users/:userId', async function(req, res) {
       { type: 'board', 'members.userId': id },
       { fields: { _id: 1, members: 1 } },
     );
-    boards = boards.map(b => {
-      const u = b.members.find(m => m.userId === id);
+    boards = boards.map((b: any) => {
+      const u = b.members.find((m: any) => m.userId === id);
       delete u.userId;
       u.boardId = b._id;
       return u;
@@ -1568,11 +1589,11 @@ WebApp.handlers.post('/api/boards/:boardId/members/:userId/add', async function(
       const boards = await ReactiveCache.getBoards({ _id: boardId });
       data = [];
       for (const board of boards) {
-        const hasMember = board.members.some(m => m.userId === userId && m.isActive);
+        const hasMember = board.members.some((m: any) => m.userId === userId && m.isActive);
         if (!hasMember) {
           // Tolerate both real booleans (from a named `role`) and 'true'/'false'
           // strings (from individual flag params).
-          const isTrue = value => value === true || String(value).toLowerCase() === 'true';
+          const isTrue = (value: any) => value === true || String(value).toLowerCase() === 'true';
           const memberFlags = {
             isAdmin: isTrue(isAdmin),
             isNoComments: isTrue(isNoComments),
@@ -1583,7 +1604,7 @@ WebApp.handlers.post('/api/boards/:boardId/members/:userId/add', async function(
             isReadOnly: isTrue(isReadOnly),
             isReadAssignedOnly: isTrue(isReadAssignedOnly),
           };
-          const memberIndex = board.members.findIndex(m => m.userId === userId);
+          const memberIndex = board.members.findIndex((m: any) => m.userId === userId);
           if (memberIndex >= 0) {
             // Re-activate an existing (inactive) member and apply the new flags.
             const flagSet = { [`members.${memberIndex}.isActive`]: true };
@@ -1633,12 +1654,12 @@ WebApp.handlers.post('/api/boards/:boardId/members/:userId/remove', async functi
       const boards = await ReactiveCache.getBoards({ _id: boardId });
       data = [];
       for (const board of boards) {
-        const hasMember = board.members.some(m => m.userId === userId && m.isActive);
+        const hasMember = board.members.some((m: any) => m.userId === userId && m.isActive);
         if (hasMember) {
-          const memberIndex = board.members.findIndex(m => m.userId === userId);
+          const memberIndex = board.members.findIndex((m: any) => m.userId === userId);
           if (memberIndex >= 0) {
             const member = board.members[memberIndex];
-            const activeAdmins = board.members.filter(m => m.isActive && m.isAdmin);
+            const activeAdmins = board.members.filter((m: any) => m.isActive && m.isAdmin);
             const allowRemove = !member.isAdmin || activeAdmins.length > 1;
             if (!allowRemove) {
               await Boards.updateAsync(boardId, { $set: { [`members.${memberIndex}.isActive`]: true } });
@@ -1664,12 +1685,14 @@ WebApp.handlers.post('/api/boards/:boardId/members/:userId/remove', async functi
 WebApp.handlers.post('/api/users/', async function(req, res) {
   try {
     await Authentication.checkUserId(req.userId);
+    // wekan's Accounts.onCreateUser reads the extra `from` field, which is not
+    // part of the base Accounts.createUser options, hence `any`.
     const id = Accounts.createUser({
       username: req.body.username,
       email: req.body.email,
       password: req.body.password,
       from: 'admin',
-    });
+    } as any);
     sendJsonResult(res, { code: 200, data: { _id: id } });
   } catch (error) {
     sendJsonResult(res, { code: 200, data: error });
@@ -1733,7 +1756,8 @@ WebApp.handlers.post('/api/deletetoken', async function(req, res) {
   }
 });
 
-const sanitizeUserForSearch = userData => {
+// `userData` is a raw user Mongo document (dynamic shape), hence `any`.
+const sanitizeUserForSearch = (userData: any) => {
   const safeFields = {
     _id: 1,
     username: 1,
@@ -1749,7 +1773,8 @@ const sanitizeUserForSearch = userData => {
     orgs: 1,
   };
 
-  const sanitized = {};
+  // Whitelisted user fields copied by name, keyed dynamically.
+  const sanitized: { [key: string]: any } = {};
   for (const field of Object.keys(safeFields)) {
     if (userData[field] !== undefined) {
       sanitized[field] = userData[field];
@@ -1814,7 +1839,8 @@ Meteor.methods({
     }
 
     const users = await Users.find({}, { fields: { emails: 1 } }).fetchAsync();
-    const counts = {};
+    // Per-domain user counts, keyed by email domain.
+    const counts: { [key: string]: number } = {};
     for (const u of users) {
       const addr = (u.emails && u.emails[0] && u.emails[0].address) || '';
       const at = addr.lastIndexOf('@');
@@ -1876,7 +1902,8 @@ Meteor.methods({
 
       // Enumerate the user's shared template boards: linked-board cards in the
       // Board Templates swimlane of their Templates container board.
-      const cardQuery = {
+      // Card selector: `swimlaneId` is added conditionally below, keyed dynamically.
+      const cardQuery: { [key: string]: any } = {
         boardId: templatesBoardId,
         type: 'cardType-linkedBoard',
         archived: false,
@@ -1906,11 +1933,11 @@ Meteor.methods({
         });
       }
 
-      const emails = (user.emails || []).map(e => e.address).filter(Boolean);
+      const emails = (user.emails || []).map((e: any) => e.address).filter(Boolean);
       const domains = [
         ...new Set(
           emails
-            .map(addr => (addr.indexOf('@') >= 0 ? addr.split('@')[1].toLowerCase() : ''))
+            .map((addr: any) => (addr.indexOf('@') >= 0 ? addr.split('@')[1].toLowerCase() : ''))
             .filter(Boolean),
         ),
       ];
@@ -1919,11 +1946,11 @@ Meteor.methods({
         userId: user._id,
         username: user.username || '',
         fullname: (profile.fullname) || '',
-        orgs: (user.orgs || []).map(o => ({
+        orgs: (user.orgs || []).map((o: any) => ({
           orgId: o.orgId,
           orgDisplayName: o.orgDisplayName,
         })),
-        teams: (user.teams || []).map(t => ({
+        teams: (user.teams || []).map((t: any) => ({
           teamId: t.teamId,
           teamDisplayName: t.teamDisplayName,
         })),
@@ -1948,7 +1975,7 @@ Meteor.methods({
     // Global site admins bypass the board-membership check, mirroring
     // inviteUserToBoard.
     if (!currentUser.isAdmin) {
-      const member = board.members.find(memberItem => memberItem.userId === currentUser._id);
+      const member = board.members.find((memberItem: any) => memberItem.userId === currentUser._id);
       if (!member || !member.isActive) {
         throw new Meteor.Error('not-authorized', 'User is not a member of this board');
       }
@@ -1991,7 +2018,8 @@ Meteor.methods({
     if (!currentUser.isAdmin) {
       const setting = await ReactiveCache.getCurrentSetting();
       if (setting && setting.boardMembersFromSameOrgOrTeamOnly) {
-        const activeMemberUsers = [];
+        // Active board-member user docs (dynamic shapes), hence `any[]`.
+        const activeMemberUsers: any[] = [];
         for (const m of board.members) {
           if (!m.isActive) continue;
           const memberUser =
@@ -2000,15 +2028,15 @@ Meteor.methods({
               : await ReactiveCache.getUser(m.userId);
           if (memberUser) activeMemberUsers.push(memberUser);
         }
-        filteredUsers = users.filter(candidate =>
-          activeMemberUsers.some(memberUser =>
+        filteredUsers = users.filter((candidate: any) =>
+          activeMemberUsers.some((memberUser: any) =>
             memberUser.sharesOrgOrTeamWith(candidate),
           ),
         );
       }
     }
 
-    return filteredUsers.map(user => sanitizeUserForSearch(user));
+    return filteredUsers.map((user: any) => sanitizeUserForSearch(user));
   },
 });
 
@@ -2029,7 +2057,8 @@ WebApp.handlers.get('/api/admin/domains', async function(req, res) {
   try {
     await Authentication.checkUserId(req.userId);
     const users = await Users.find({}, { fields: { emails: 1 } }).fetchAsync();
-    const counts = {};
+    // Per-domain user counts, keyed by email domain.
+    const counts: { [key: string]: number } = {};
     for (const u of users) {
       const addr = (u.emails && u.emails[0] && u.emails[0].address) || '';
       const at = addr.lastIndexOf('@');

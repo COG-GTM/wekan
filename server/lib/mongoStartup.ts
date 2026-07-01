@@ -145,7 +145,9 @@ export async function ensureIndex(
   // its document type varies per collection, hence `any`) or a raw-collection
   // bearing wrapper. Both expose rawCollection() and are unwrapped below.
   collection: Mongo.Collection<any> | RawCollectionSource | null | undefined,
-  keys: object,
+  // Either an index-spec object ({ field: 1 }) or a single field name string;
+  // both are valid MongoDB index specifications passed straight to createIndex.
+  keys: object | string,
   options: object = {},
 ) {
   // A Meteor Mongo.Collection exposes rawCollection() at runtime exactly like the
@@ -186,7 +188,7 @@ interface RawIndex {
 
 interface RawCollection {
   indexes(): Promise<RawIndex[]>;
-  createIndex(keys: object, options?: object): Promise<string>;
+  createIndex(keys: object | string, options?: object): Promise<string>;
   collectionName: string;
 }
 

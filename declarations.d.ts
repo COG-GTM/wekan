@@ -21,6 +21,22 @@ declare module 'meteor/meteor' {
     // permissions/methods off `user.isAdmin`.
     interface User {
       isAdmin?: boolean;
+      // wekan records how a user authenticated (password, ldap, oauth2, ...) on
+      // the user document; not part of @types/meteor's `User`.
+      authenticationMethod?: string;
+    }
+    // @types/meteor leaves UserProfile intentionally empty because, by Meteor's
+    // default configuration, users write directly to their `profile` field. wekan
+    // stores a large, evolving set of per-user preferences there (starred boards,
+    // collapsed lists/swimlanes, template pointers, avatar/initials, workspace
+    // assignments, ...), so the shape is inherently dynamic; keyed by field name.
+    interface UserProfile {
+      [key: string]: any;
+    }
+    // OIDC/OAuth service data attached by the accounts login flow; its shape is
+    // defined by the external identity provider, hence `any`.
+    interface UserServices {
+      oidc?: any;
     }
   }
 }
@@ -334,7 +350,21 @@ declare const Accounts: AccountsStatic;
 declare module 'meteor/accounts-base' {
   namespace Accounts {
     function insertUserDoc(options: object, user: object): string;
+    // Server-internal login-token helpers (accounts-base) used by the REST
+    // create/delete-token endpoints in server/models/users.ts. Not part of
+    // @types/meteor's public surface.
+    function _insertLoginToken(userId: string, stampedToken: { token: string; when: Date }): void;
+    function destroyToken(userId: string, loginToken: string): void;
   }
+}
+
+// meteor/matb33:collection-hooks also exports a mutable `getUserId` resolver that
+// wekan overrides (server/models/users.ts) to inject a fake user id while running
+// hook-triggered operations. The package ships no TypeScript types.
+declare module 'meteor/matb33:collection-hooks' {
+  export const CollectionHooks: {
+    getUserId: () => string | null;
+  };
 }
 
 // Meteor's server-side global `Email` (meteor/email), used by
