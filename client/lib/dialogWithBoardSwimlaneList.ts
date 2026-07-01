@@ -1,4 +1,5 @@
 import { ReactiveVar } from 'meteor/reactive-var';
+import { Blaze } from 'meteor/blaze';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
 import { Utils } from '/client/lib/utils';
@@ -8,6 +9,14 @@ import { Utils } from '/client/lib/utils';
  * Not a BlazeComponent — instantiated by each Template's onCreated callback.
  */
 export class BoardSwimlaneListDialog {
+  tpl: Blaze.TemplateInstance;
+  _getDialogOptions: () => Record<string, DialogOption> | undefined;
+  _setDone: (...args: any[]) => any;
+  currentBoardId: string;
+  selectedBoardId: ReactiveVar<string>;
+  selectedSwimlaneId: ReactiveVar<string>;
+  selectedListId: ReactiveVar<string>;
+  cardOption!: DialogOption;
   /**
    * @param {Blaze.TemplateInstance} tpl - the template instance
    * @param {Object} callbacks
@@ -15,7 +24,7 @@ export class BoardSwimlaneListDialog {
    * @param {Function} callbacks.setDone - performs the action (boardId, swimlaneId, listId, options)
    * @param {Function} [callbacks.getDefaultOption] - override default option shape
    */
-  constructor(tpl, callbacks = {}) {
+  constructor(tpl: Blaze.TemplateInstance, callbacks: BoardSwimlaneListDialogCallbacks = {}) {
     this.tpl = tpl;
     this._getDialogOptions = callbacks.getDialogOptions || (() => undefined);
     this._setDone = callbacks.setDone || (() => {});
@@ -47,14 +56,15 @@ export class BoardSwimlaneListDialog {
   }
 
   /** performs the done action (delegates to callback) */
-  async setDone(...args) {
+  // `args` are forwarded verbatim to the caller-supplied setDone callback.
+  async setDone(...args: any[]) {
     return this._setDone(...args);
   }
 
   /** set the last confirmed dialog field values
    * @param boardId the current board id
    */
-  setOption(boardId) {
+  setOption(boardId: string) {
     this.cardOption = this.getDefaultOption();
 
     const currentOptions = this.getDialogOptions();
@@ -112,12 +122,16 @@ export class BoardSwimlaneListDialog {
   }
 
   /** get lists filtered by board and swimlane */
-  getListsForBoardSwimlane(boardId, swimlaneId) {
+  getListsForBoardSwimlane(boardId: string, swimlaneId: string) {
     if (!boardId) return [];
     const board = ReactiveCache.getBoard(boardId);
     if (!board) return [];
 
-    const selector = {
+    const selector: {
+      boardId: string;
+      archived: boolean;
+      swimlaneId?: string | { $in: (string | null)[] };
+    } = {
       boardId,
       archived: false,
     };
@@ -136,17 +150,17 @@ export class BoardSwimlaneListDialog {
   }
 
   /** returns if the board id was the last confirmed one */
-  isDialogOptionBoardId(boardId) {
+  isDialogOptionBoardId(boardId: string) {
     return this.cardOption.boardId == boardId;
   }
 
   /** returns if the swimlane id was the last confirmed one */
-  isDialogOptionSwimlaneId(swimlaneId) {
+  isDialogOptionSwimlaneId(swimlaneId: string) {
     return this.cardOption.swimlaneId == swimlaneId;
   }
 
   /** returns if the list id was the last confirmed one */
-  isDialogOptionListId(listId) {
+  isDialogOptionListId(listId: string) {
     return this.cardOption.listId == listId;
   }
 
@@ -157,7 +171,7 @@ export class BoardSwimlaneListDialog {
    * board <select> leaves no option selected, the DOM selectedIndex falls back to
    * -1, and the move/copy reads an undefined boardId — making card.move fail with
    * a 403 "may only update documents by ID" validation error. */
-  isSelectedBoardId(boardId) {
+  isSelectedBoardId(boardId: string) {
     return this.selectedBoardId.get() == boardId;
   }
 
@@ -165,7 +179,7 @@ export class BoardSwimlaneListDialog {
    * Used to bind the <option selected> attribute to the live selection rather
    * than the last-confirmed option, so a Blaze re-render of the swimlane <select>
    * cannot silently revert the user's in-progress choice. */
-  isSelectedSwimlaneId(swimlaneId) {
+  isSelectedSwimlaneId(swimlaneId: string) {
     return this.selectedSwimlaneId.get() == swimlaneId;
   }
 
@@ -173,7 +187,7 @@ export class BoardSwimlaneListDialog {
    * See isSelectedSwimlaneId — binding the <option selected> attribute to the
    * live selectedListId keeps the DOM <select> in sync with the user's choice
    * across reactive re-renders (e.g. when the board subscription data arrives). */
-  isSelectedListId(listId) {
+  isSelectedListId(listId: string) {
     return this.selectedListId.get() == listId;
   }
 
@@ -206,7 +220,7 @@ export class BoardSwimlaneListDialog {
   }
 
   /** Fix swimlane title translation issue for "Default" swimlane */
-  isTitleDefault(title) {
+  isTitleDefault(title: string) {
     if (
       title.startsWith("key 'default") &&
       title.endsWith('returned an object instead of string.')
@@ -229,7 +243,7 @@ export class BoardSwimlaneListDialog {
   }
 
   /** get the board data from the server */
-  getBoardData(boardId) {
+  getBoardData(boardId: string) {
     const self = this;
     Meteor.subscribe('board', boardId, false, {
       onReady() {
@@ -244,4 +258,19 @@ export class BoardSwimlaneListDialog {
     });
   }
 
+}
+
+// The last-confirmed selection for a board/swimlane/list (and card in the
+// card subclass) dialog.
+export interface DialogOption {
+  boardId: string;
+  swimlaneId: string;
+  listId: string;
+  cardId?: string;
+}
+// Caller-supplied hooks controlling the dialog's saved options and done action.
+export interface BoardSwimlaneListDialogCallbacks {
+  getDialogOptions?: () => Record<string, DialogOption> | undefined;
+  setDone?: (...args: any[]) => any;
+  getDefaultOption?: () => DialogOption;
 }

@@ -5,18 +5,19 @@ import { EscapeActions } from '/client/lib/escapeActions';
 import { Utils } from '/client/lib/utils';
 
 // Late-bind Sidebar to avoid circular dependency (sidebar.js needs its template first)
-let _Sidebar;
+// The sidebar service is loaded lazily via require() and is untyped, hence `any`.
+let _Sidebar: (() => any) | undefined;
 function getSidebar() {
   if (!_Sidebar) _Sidebar = require('/client/features/sidebar/service').getSidebarInstance;
-  return _Sidebar();
+  return _Sidebar!();
 }
 
-function getCardsBetween(idA, idB) {
-  function pluckId(doc) {
+function getCardsBetween(idA: string, idB: string) {
+  function pluckId(doc: { _id: string }) {
     return doc._id;
   }
 
-  function getListsStrictlyBetween(id1, id2) {
+  function getListsStrictlyBetween(id1: string, id2: string) {
     return ReactiveCache.getLists({
       $and: [
         { sort: { $gt: ReactiveCache.getList(id1).sort } },
@@ -65,7 +66,7 @@ function getCardsBetween(idA, idB) {
 export const MultiSelection = {
   sidebarView: 'multiselection',
 
-  _selectedCards: new ReactiveVar([]),
+  _selectedCards: new ReactiveVar<string[]>([]),
 
   _isActive: new ReactiveVar(false),
 
@@ -95,7 +96,8 @@ export const MultiSelection = {
     return this.count() === 0;
   },
   getSelectedCardIds(){
-    return this._selectedCards.curValue;
+    // Non-reactive read of the ReactiveVar's current value (internal `curValue`).
+    return (this._selectedCards as ReactiveVar<string[]> & { curValue: string[] }).curValue;
   },
 
   activate() {
@@ -126,15 +128,15 @@ export const MultiSelection = {
     }
   },
 
-  add(cardIds) {
+  add(cardIds: string | string[]) {
     return this.toggle(cardIds, { add: true, remove: false });
   },
 
-  remove(cardIds) {
+  remove(cardIds: string | string[]) {
     return this.toggle(cardIds, { add: false, remove: true });
   },
 
-  toggleRange(cardId) {
+  toggleRange(cardId: string) {
     const selectedCards = this._selectedCards.get();
     this.reset();
     if (!this.isActive() || selectedCards.length === 0) {
@@ -145,7 +147,7 @@ export const MultiSelection = {
     }
   },
 
-  toggle(cardIds, options = {}) {
+  toggle(cardIds: string | string[], options: MultiSelectionToggleOptions = {}) {
     cardIds = typeof cardIds === 'string' ? [cardIds] : cardIds;
     options = {
       add: true,
@@ -171,10 +173,16 @@ export const MultiSelection = {
     this._selectedCards.set(selectedCards);
   },
 
-  isSelected(cardId) {
+  isSelected(cardId: string) {
     return this._selectedCards.get().indexOf(cardId) > -1;
   },
 };
+
+// Options controlling whether toggle() adds and/or removes the given card ids.
+interface MultiSelectionToggleOptions {
+  add?: boolean;
+  remove?: boolean;
+}
 
 Blaze.registerHelper('MultiSelection', MultiSelection);
 

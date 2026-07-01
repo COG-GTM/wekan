@@ -1,14 +1,19 @@
 import { Meteor } from 'meteor/meteor';
 import { ReactiveVar } from 'meteor/reactive-var';
+import { Blaze } from 'meteor/blaze';
 import { ReactiveCache } from '/imports/reactiveCache';
-import { BoardSwimlaneListDialog } from '/client/lib/dialogWithBoardSwimlaneList';
+import {
+  BoardSwimlaneListDialog,
+  BoardSwimlaneListDialogCallbacks,
+} from '/client/lib/dialogWithBoardSwimlaneList';
 
 /**
  * Extension of BoardSwimlaneListDialog that adds card selection.
  * Used by popup templates that need board + swimlane + list + card selectors.
  */
 export class BoardSwimlaneListCardDialog extends BoardSwimlaneListDialog {
-  constructor(tpl, callbacks = {}) {
+  selectedCardId: ReactiveVar<string>;
+  constructor(tpl: Blaze.TemplateInstance, callbacks: BoardSwimlaneListDialogCallbacks = {}) {
     super(tpl, callbacks);
     this.selectedCardId = new ReactiveVar('');
   }
@@ -23,7 +28,7 @@ export class BoardSwimlaneListCardDialog extends BoardSwimlaneListDialog {
   }
 
   /** Override to also set cardId if available */
-  setOption(boardId) {
+  setOption(boardId: string) {
     super.setOption(boardId);
     if (this.cardOption && this.cardOption.cardId && this.selectedCardId) {
       this.selectedCardId.set(this.cardOption.cardId);
@@ -38,19 +43,19 @@ export class BoardSwimlaneListCardDialog extends BoardSwimlaneListDialog {
     });
     const swimlaneId = this.selectedSwimlaneId.get();
     if (list && swimlaneId) {
-      return list.cards(swimlaneId).sort((a, b) => a.sort - b.sort);
+      return list.cards(swimlaneId).sort((a: { sort: number }, b: { sort: number }) => a.sort - b.sort);
     } else {
       return [];
     }
   }
 
   /** returns if the card id was the last confirmed one */
-  isDialogOptionCardId(cardId) {
+  isDialogOptionCardId(cardId: string) {
     return this.cardOption.cardId == cardId;
   }
 
   /** Override to also reset card id on board change */
-  getBoardData(boardId) {
+  getBoardData(boardId: string) {
     const self = this;
     Meteor.subscribe('board', boardId, false, {
       onReady() {

@@ -7,11 +7,11 @@ import { Template } from 'meteor/templating';
 /**
  * Add original position tracking to swimlane templates
  */
-export function addOriginalPositionToSwimlane(swimlaneId) {
+export function addOriginalPositionToSwimlane(swimlaneId: string) {
   if (!swimlaneId) return;
   
   // Track original position when swimlane is created or first accessed
-  Meteor.call('positionHistory.trackSwimlane', swimlaneId, (error) => {
+  Meteor.call('positionHistory.trackSwimlane', swimlaneId, (error?: Meteor.Error | Error) => {
     if (error) {
       console.warn('Failed to track original position for swimlane:', error);
     }
@@ -21,11 +21,11 @@ export function addOriginalPositionToSwimlane(swimlaneId) {
 /**
  * Add original position tracking to list templates
  */
-export function addOriginalPositionToList(listId) {
+export function addOriginalPositionToList(listId: string) {
   if (!listId) return;
   
   // Track original position when list is created or first accessed
-  Meteor.call('positionHistory.trackList', listId, (error) => {
+  Meteor.call('positionHistory.trackList', listId, (error?: Meteor.Error | Error) => {
     if (error) {
       console.warn('Failed to track original position for list:', error);
     }
@@ -35,11 +35,11 @@ export function addOriginalPositionToList(listId) {
 /**
  * Add original position tracking to card templates
  */
-export function addOriginalPositionToCard(cardId) {
+export function addOriginalPositionToCard(cardId: string) {
   if (!cardId) return;
   
   // Track original position when card is created or first accessed
-  Meteor.call('positionHistory.trackCard', cardId, (error) => {
+  Meteor.call('positionHistory.trackCard', cardId, (error?: Meteor.Error | Error) => {
     if (error) {
       console.warn('Failed to track original position for card:', error);
     }
@@ -49,11 +49,12 @@ export function addOriginalPositionToCard(cardId) {
 /**
  * Get original position description for display in templates
  */
-export function getOriginalPositionDescription(entityId, entityType) {
+export function getOriginalPositionDescription(entityId: string, entityType: string) {
   return new Promise((resolve, reject) => {
     const methodName = `positionHistory.get${entityType.charAt(0).toUpperCase() + entityType.slice(1)}Description`;
     
-    Meteor.call(methodName, entityId, (error, result) => {
+    // `result` is an untyped Meteor method return value, hence `any`.
+    Meteor.call(methodName, entityId, (error?: Meteor.Error | Error, result?: any) => {
       if (error) {
         reject(error);
       } else {
@@ -66,11 +67,12 @@ export function getOriginalPositionDescription(entityId, entityType) {
 /**
  * Check if an entity has moved from its original position
  */
-export function hasEntityMoved(entityId, entityType) {
+export function hasEntityMoved(entityId: string, entityType: string) {
   return new Promise((resolve, reject) => {
     const methodName = `positionHistory.has${entityType.charAt(0).toUpperCase() + entityType.slice(1)}Moved`;
     
-    Meteor.call(methodName, entityId, (error, result) => {
+    // `result` is an untyped Meteor method return value, hence `any`.
+    Meteor.call(methodName, entityId, (error?: Meteor.Error | Error, result?: any) => {
       if (error) {
         reject(error);
       } else {
@@ -83,7 +85,7 @@ export function hasEntityMoved(entityId, entityType) {
 /**
  * Template helper for displaying original position info
  */
-Template.registerHelper('originalPositionInfo', function(entityId, entityType) {
+Template.registerHelper('originalPositionInfo', function(entityId: string, entityType: string) {
   if (!entityId || !entityType) return null;
   
   const description = getOriginalPositionDescription(entityId, entityType);
@@ -100,7 +102,7 @@ Template.registerHelper('originalPositionInfo', function(entityId, entityType) {
 /**
  * Template helper for checking if entity has moved
  */
-Template.registerHelper('hasEntityMoved', function(entityId, entityType) {
+Template.registerHelper('hasEntityMoved', function(entityId: string, entityType: string) {
   if (!entityId || !entityType) return false;
   
   return hasEntityMoved(entityId, entityType);
@@ -109,7 +111,7 @@ Template.registerHelper('hasEntityMoved', function(entityId, entityType) {
 /**
  * Template helper for getting original position description
  */
-Template.registerHelper('getOriginalPositionDescription', function(entityId, entityType) {
+Template.registerHelper('getOriginalPositionDescription', function(entityId: string, entityType: string) {
   if (!entityId || !entityType) return 'No original position data';
   
   return getOriginalPositionDescription(entityId, entityType);

@@ -4,6 +4,7 @@
  * with UI feedback and spinners for unconverted attachments
  */
 
+import { Meteor } from 'meteor/meteor';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Tracker } from 'meteor/tracker';
 import { ReactiveCache } from '/imports/reactiveCache';
@@ -13,12 +14,15 @@ import AttachmentMigrationStatus from '/models/attachmentMigrationStatus';
 export const attachmentMigrationProgress = new ReactiveVar(0);
 export const attachmentMigrationStatus = new ReactiveVar('');
 export const isMigratingAttachments = new ReactiveVar(false);
-export const unconvertedAttachments = new ReactiveVar([]);
+// Holds unconverted attachment documents (dynamic shape), hence `any[]`.
+export const unconvertedAttachments = new ReactiveVar<any[]>([]);
 
 // Global tracking of migrated boards (persistent across component reinitializations)
-const globalMigratedBoards = new Set();
+const globalMigratedBoards = new Set<string>();
 
 class AttachmentMigrationManager {
+  migrationCache: Map<string, boolean>;
+  migratedBoards: Set<string>;
   constructor() {
     this.migrationCache = new Map(); // Cache migrated attachment IDs
     this.migratedBoards = new Set(); // Track boards that have been migrated
@@ -29,7 +33,7 @@ class AttachmentMigrationManager {
    * @param {string} attachmentId - The attachment ID to check
    * @returns {boolean} - True if attachment needs migration
    */
-  needsMigration(attachmentId) {
+  needsMigration(attachmentId: string) {
     if (this.migrationCache.has(attachmentId)) {
       return false; // Already migrated
     }
@@ -54,7 +58,7 @@ class AttachmentMigrationManager {
    * @param {string} boardId - The board ID
    * @returns {boolean} - True if board has been migrated
    */
-  isBoardMigrated(boardId) {
+  isBoardMigrated(boardId: string) {
     return globalMigratedBoards.has(boardId);
   }
 
@@ -63,9 +67,10 @@ class AttachmentMigrationManager {
    * @param {string} boardId - The board ID
    * @returns {Promise<boolean>} - True if board has been migrated
    */
-  async isBoardMigratedServer(boardId) {
+  async isBoardMigratedServer(boardId: string) {
     return new Promise((resolve) => {
-      Meteor.call('attachmentMigration.isBoardMigrated', boardId, (error, result) => {
+      // `result` is an untyped Meteor method return value, hence `any`.
+      Meteor.call('attachmentMigration.isBoardMigrated', boardId, (error?: Meteor.Error | Error, result?: any) => {
         if (error) {
           console.error('Error checking board migration status:', error);
           resolve(false);
@@ -81,13 +86,13 @@ class AttachmentMigrationManager {
    * @param {string} boardId - The board ID
    * @returns {Array} - Array of unconverted attachments
    */
-  getUnconvertedAttachments(boardId) {
+  getUnconvertedAttachments(boardId: string) {
     try {
       const attachments = ReactiveCache.getAttachments({
         'meta.boardId': boardId
       });
 
-      return attachments.filter(attachment => this.needsMigration(attachment._id));
+      return attachments.filter((attachment: { _id: string }) => this.needsMigration(attachment._id));
     } catch (error) {
       console.error('Error getting unconverted attachments:', error);
       return [];
@@ -98,7 +103,7 @@ class AttachmentMigrationManager {
    * Start migration for attachments in a board
    * @param {string} boardId - The board ID
    */
-  async startAttachmentMigration(boardId) {
+  async startAttachmentMigration(boardId: string) {
     if (isMigratingAttachments.get()) {
       return; // Already migrating
     }
@@ -141,7 +146,8 @@ class AttachmentMigrationManager {
       }
 
       // Start server-side migration
-      Meteor.call('attachmentMigration.migrateBoardAttachments', boardId, (error, result) => {
+      // `result` is an untyped Meteor method return value, hence `any`.
+      Meteor.call('attachmentMigration.migrateBoardAttachments', boardId, (error?: Meteor.Error, result?: any) => {
         if (error) {
           console.error('Failed to start attachment migration:', error);
           const errorMessage = error.message || error.reason || error.toString();
@@ -166,9 +172,10 @@ class AttachmentMigrationManager {
    * Poll for attachment migration progress
    * @param {string} boardId - The board ID
    */
-  pollAttachmentMigrationProgress(boardId) {
+  pollAttachmentMigrationProgress(boardId: string) {
     const pollInterval = setInterval(() => {
-      Meteor.call('attachmentMigration.getProgress', boardId, (error, result) => {
+      // `result` is an untyped Meteor method return value, hence `any`.
+      Meteor.call('attachmentMigration.getProgress', boardId, (error?: Meteor.Error | Error, result?: any) => {
         if (error) {
           console.error('Error getting migration progress:', error);
           clearInterval(pollInterval);
@@ -201,7 +208,7 @@ class AttachmentMigrationManager {
    * @param {string} attachmentId - The attachment ID
    * @returns {boolean} - True if attachment is being migrated
    */
-  isAttachmentBeingMigrated(attachmentId) {
+  isAttachmentBeingMigrated(attachmentId: string) {
     const unconverted = unconvertedAttachments.get();
     return unconverted.some(attachment => attachment._id === attachmentId);
   }
@@ -211,7 +218,7 @@ class AttachmentMigrationManager {
    * @param {string} attachmentId - The attachment ID
    * @returns {string} - Migration status ('migrated', 'migrating', 'unmigrated')
    */
-  getAttachmentMigrationStatus(attachmentId) {
+  getAttachmentMigrationStatus(attachmentId: string) {
     if (this.migrationCache.has(attachmentId)) {
       return 'migrated';
     }

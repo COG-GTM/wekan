@@ -6,12 +6,14 @@ import { Tracker } from 'meteor/tracker';
  * Tracks upload progress across all cards and provides reactive data
  */
 class UploadProgressManager {
+  cardUploads: ReactiveVar<Map<string, Upload[]>>;
+  uploadMap: ReactiveVar<Map<string, Upload>>;
   constructor() {
     // Map of cardId -> array of upload objects
-    this.cardUploads = new ReactiveVar(new Map());
+    this.cardUploads = new ReactiveVar(new Map<string, Upload[]>());
 
     // Map of uploadId -> upload object for easy lookup
-    this.uploadMap = new ReactiveVar(new Map());
+    this.uploadMap = new ReactiveVar(new Map<string, Upload>());
   }
 
   /**
@@ -21,17 +23,18 @@ class UploadProgressManager {
    * @param {File} file - The file being uploaded
    * @returns {string} uploadId - Unique identifier for this upload
    */
-  addUpload(cardId, uploader, file) {
+  // `uploader` is a Meteor-Files uploader instance which is untyped, hence `any`.
+  addUpload(cardId: string, uploader: any, file: File) {
     const uploadId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    const upload = {
+    const upload: Upload = {
       id: uploadId,
       cardId: cardId,
       file: file,
       uploader: uploader,
       progress: new ReactiveVar(0),
       status: new ReactiveVar('uploading'), // 'uploading', 'completed', 'error'
-      error: new ReactiveVar(null),
+      error: new ReactiveVar<any>(null),
       startTime: Date.now(),
       endTime: null
     };
@@ -49,11 +52,12 @@ class UploadProgressManager {
     this.uploadMap.set(currentUploadMap);
 
     // Set up uploader event listeners
-    uploader.on('progress', (progress) => {
+    uploader.on('progress', (progress: number) => {
       upload.progress.set(progress);
     });
 
-    uploader.on('uploaded', (error, fileRef) => {
+    // `error`/`fileRef` come from the untyped Meteor-Files uploader, hence `any`.
+    uploader.on('uploaded', (error: any, fileRef: any) => {
       upload.status.set(error ? 'error' : 'completed');
       upload.endTime = Date.now();
       upload.error.set(error);
@@ -68,7 +72,8 @@ class UploadProgressManager {
       }, 2000);
     });
 
-    uploader.on('error', (error) => {
+    // `error` comes from the untyped Meteor-Files uploader, hence `any`.
+    uploader.on('error', (error: any) => {
       upload.status.set('error');
       upload.endTime = Date.now();
       upload.error.set(error);
@@ -94,7 +99,7 @@ class UploadProgressManager {
    * Remove an upload from tracking
    * @param {string} uploadId - The upload ID to remove
    */
-  removeUpload(uploadId) {
+  removeUpload(uploadId: string) {
     const upload = this.uploadMap.get().get(uploadId);
     if (!upload) return;
 
@@ -127,7 +132,7 @@ class UploadProgressManager {
    * @param {string} cardId - The card ID
    * @returns {Array} Array of upload objects
    */
-  getUploadsForCard(cardId) {
+  getUploadsForCard(cardId: string) {
     return this.cardUploads.get().get(cardId) || [];
   }
 
@@ -136,7 +141,7 @@ class UploadProgressManager {
    * @param {string} cardId - The card ID
    * @returns {number} Number of active uploads
    */
-  getUploadCountForCard(cardId) {
+  getUploadCountForCard(cardId: string) {
     return this.getUploadsForCard(cardId).length;
   }
 
@@ -145,7 +150,7 @@ class UploadProgressManager {
    * @param {string} cardId - The card ID
    * @returns {boolean} True if card has active uploads
    */
-  hasActiveUploads(cardId) {
+  hasActiveUploads(cardId: string) {
     return this.getUploadCountForCard(cardId) > 0;
   }
 
@@ -154,7 +159,7 @@ class UploadProgressManager {
    * @returns {Array} Array of all upload objects
    */
   getAllUploads() {
-    const allUploads = [];
+    const allUploads: Upload[] = [];
     this.cardUploads.get().forEach(cardUploads => {
       allUploads.push(...cardUploads);
     });
@@ -168,6 +173,21 @@ class UploadProgressManager {
     this.cardUploads.set(new Map());
     this.uploadMap.set(new Map());
   }
+}
+
+// A single tracked drag-and-drop file upload.
+interface Upload {
+  id: string;
+  cardId: string;
+  file: File;
+  // Meteor-Files uploader instance, untyped, hence `any`.
+  uploader: any;
+  progress: ReactiveVar<number>;
+  status: ReactiveVar<string>;
+  // Upload error object from the uploader, untyped, hence `any`.
+  error: ReactiveVar<any>;
+  startTime: number;
+  endTime: number | null;
 }
 
 // Create global instance

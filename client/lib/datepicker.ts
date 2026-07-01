@@ -1,16 +1,17 @@
 import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
+import { Blaze } from 'meteor/blaze';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { getCurrentCardFromContext } from '/client/lib/currentCard';
 import { normalizeDigits } from '/imports/lib/dateUtils';
 
 // Helper to check if a date is valid
-function isValidDate(date) {
-  return date instanceof Date && !isNaN(date);
+function isValidDate(date: Date) {
+  return date instanceof Date && !isNaN(date.getTime());
 }
 
 // Format date as YYYY-MM-DD
-function formatDate(date) {
+function formatDate(date: Date) {
   if (!isValidDate(date)) return '';
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -19,7 +20,7 @@ function formatDate(date) {
 }
 
 // Format time as HH:mm
-function formatTime(date) {
+function formatTime(date: Date) {
   if (!isValidDate(date)) return '';
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
@@ -35,7 +36,10 @@ function formatTime(date) {
  * @param {string} [options.defaultTime='1970-01-01 08:00:00'] - Default time string
  * @param {Date} [options.initialDate] - Initial date to set (if valid)
  */
-export function setupDatePicker(tpl, { defaultTime = '1970-01-01 08:00:00', initialDate } = {}) {
+export function setupDatePicker(
+  tpl: DatePickerInstance,
+  { defaultTime = '1970-01-01 08:00:00', initialDate }: SetupDatePickerOptions = {},
+) {
   const card = getCurrentCardFromContext() || Template.currentData();
   tpl.datePicker = {
     error: new ReactiveVar(''),
@@ -51,11 +55,11 @@ export function setupDatePicker(tpl, { defaultTime = '1970-01-01 08:00:00', init
  *
  * @param {TemplateInstance} tpl - The Blaze template instance
  */
-export function datePickerRendered(tpl) {
+export function datePickerRendered(tpl: DatePickerInstance) {
   const dp = tpl.datePicker;
   if (isValidDate(dp.date.get())) {
-    const dateInput = tpl.find('#date');
-    const timeInput = tpl.find('#time');
+    const dateInput = tpl.find('#date') as HTMLInputElement | null;
+    const timeInput = tpl.find('#time') as HTMLInputElement | null;
 
     if (dateInput) {
       dateInput.value = formatDate(dp.date.get());
@@ -76,15 +80,15 @@ export function datePickerRendered(tpl) {
 export function datePickerHelpers() {
   return {
     error() {
-      return Template.instance().datePicker.error;
+      return (Template.instance() as DatePickerInstance).datePicker.error;
     },
     showDate() {
-      const dp = Template.instance().datePicker;
+      const dp = (Template.instance() as DatePickerInstance).datePicker;
       if (isValidDate(dp.date.get())) return formatDate(dp.date.get());
       return '';
     },
     showTime() {
-      const dp = Template.instance().datePicker;
+      const dp = (Template.instance() as DatePickerInstance).datePicker;
       if (isValidDate(dp.date.get())) return formatTime(dp.date.get());
       return '';
     },
@@ -112,12 +116,12 @@ export function datePickerHelpers() {
  * @param {Function} callbacks.storeDate - Called with (date) when form is submitted
  * @param {Function} callbacks.deleteDate - Called when delete button is clicked
  */
-export function datePickerEvents({ storeDate, deleteDate }) {
+export function datePickerEvents({ storeDate, deleteDate }: DatePickerCallbacks) {
   return {
-    'change .js-date-field'(evt, tpl) {
+    'change .js-date-field'(evt: JQuery.TriggeredEvent, tpl: DatePickerInstance) {
       // Native HTML date input validation. Normalize any non-Latin digits
       // (e.g. Persian/Arabic-Indic) so parsing works in those locales (#5752).
-      const dateValue = normalizeDigits(tpl.find('#date').value);
+      const dateValue = normalizeDigits((tpl.find('#date') as HTMLInputElement).value);
       if (dateValue) {
         // HTML date input format is always YYYY-MM-DD
         const dateObj = new Date(dateValue + 'T12:00:00');
@@ -128,10 +132,10 @@ export function datePickerEvents({ storeDate, deleteDate }) {
         }
       }
     },
-    'change .js-time-field'(evt, tpl) {
+    'change .js-time-field'(evt: JQuery.TriggeredEvent, tpl: DatePickerInstance) {
       // Native HTML time input validation. Normalize any non-Latin digits
       // (e.g. Persian/Arabic-Indic) so parsing works in those locales (#5752).
-      const timeValue = normalizeDigits(tpl.find('#time').value);
+      const timeValue = normalizeDigits((tpl.find('#time') as HTMLInputElement).value);
       if (timeValue) {
         // HTML time input format is always HH:mm
         const timeObj = new Date(`1970-01-01T${timeValue}:00`);
@@ -142,17 +146,22 @@ export function datePickerEvents({ storeDate, deleteDate }) {
         }
       }
     },
-    'submit .edit-date'(evt, tpl) {
+    'submit .edit-date'(evt: JQuery.TriggeredEvent, tpl: DatePickerInstance) {
       evt.preventDefault();
 
+      // The submitted form exposes its date/time inputs as named controls.
+      const form = evt.target as HTMLFormElement & {
+        date: HTMLInputElement;
+        time: HTMLInputElement;
+      };
       // Normalize any non-Latin digits (e.g. Persian/Arabic-Indic) before
       // parsing so due/start/end dates work in those locales (#5752).
-      const dateValue = normalizeDigits(evt.target.date.value);
-      const timeValue = normalizeDigits(evt.target.time.value) || '12:00'; // Default to 12:00 if no time given
+      const dateValue = normalizeDigits(form.date.value);
+      const timeValue = normalizeDigits(form.time.value) || '12:00'; // Default to 12:00 if no time given
 
       if (!dateValue) {
         tpl.datePicker.error.set('invalid-date');
-        evt.target.date.focus();
+        form.date.focus();
         return;
       }
 
@@ -168,10 +177,30 @@ export function datePickerEvents({ storeDate, deleteDate }) {
       storeDate.call(tpl, newCompleteDate);
       Popup.back();
     },
-    'click .js-delete-date'(evt, tpl) {
+    'click .js-delete-date'(evt: JQuery.TriggeredEvent, tpl: DatePickerInstance) {
       evt.preventDefault();
       deleteDate.call(tpl);
       Popup.back();
     },
   };
+}
+
+// Reactive datepicker state stored on the Blaze template instance.
+interface DatePickerState {
+  error: ReactiveVar<string>;
+  // Current card (Blaze data context); dynamic shape, hence `any`.
+  card: any;
+  date: ReactiveVar<Date>;
+  defaultTime: string;
+}
+interface DatePickerInstance extends Blaze.TemplateInstance {
+  datePicker: DatePickerState;
+}
+interface SetupDatePickerOptions {
+  defaultTime?: string;
+  initialDate?: Date;
+}
+interface DatePickerCallbacks {
+  storeDate: (date: Date) => void;
+  deleteDate: () => void;
 }
