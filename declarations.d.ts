@@ -89,6 +89,12 @@ type MongoQuery = { [key: string]: any };
 // build time; for the type-checker they carry no exported bindings.
 declare module '*.css';
 
+// Side-effect Blaze template imports (client/features/* eagerly load each
+// component's compiled `.jade` template). The Meteor blaze-html-templates /
+// rspack pipeline compiles these into template registrations at build time; for
+// the type-checker they carry no exported bindings.
+declare module '*.jade';
+
 // @wekanteam/dragscroll — mouse drag-to-scroll library (no bundled types).
 // client/lib/pageDragscroll.ts only calls `reset()` to re-scan/re-bind after
 // toggling the `dragscroll` class on the page scroll containers.
