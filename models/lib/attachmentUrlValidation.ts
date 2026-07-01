@@ -1,7 +1,8 @@
 import { Meteor } from 'meteor/meteor';
+import type { LookupAddress } from 'dns';
 
-let dnsPromises;
-let netModule;
+let dnsPromises: typeof import('dns').promises | undefined;
+let netModule: typeof import('net') | undefined;
 
 if (Meteor.isServer) {
   dnsPromises = require('dns').promises;
@@ -33,11 +34,13 @@ const IPV4_RANGES = [
   ['224.0.0.0', '239.255.255.255'],
   ['240.0.0.0', '255.255.255.255'],
 ].map(([start, end]) => ({
-  start: ipv4ToInt(start),
-  end: ipv4ToInt(end),
+  // The range bounds are constant, valid dotted-quad IPs, so ipv4ToInt never
+  // returns null here; assert non-null so the bounds are plain numbers.
+  start: ipv4ToInt(start)!,
+  end: ipv4ToInt(end)!,
 }));
 
-function ipv4ToInt(ip) {
+function ipv4ToInt(ip: string) {
   const parts = ip.split('.').map(part => parseInt(part, 10));
   if (parts.length !== 4 || parts.some(part => Number.isNaN(part))) {
     return null;
@@ -45,7 +48,7 @@ function ipv4ToInt(ip) {
   return parts.reduce((acc, part) => (acc << 8) + part, 0) >>> 0;
 }
 
-function isIpv4Blocked(ip) {
+function isIpv4Blocked(ip: string) {
   const value = ipv4ToInt(ip);
   if (value === null) {
     return true;
@@ -53,7 +56,7 @@ function isIpv4Blocked(ip) {
   return IPV4_RANGES.some(range => value >= range.start && value <= range.end);
 }
 
-function isIpv6Blocked(ip) {
+function isIpv6Blocked(ip: string) {
   const normalized = ip.split('%')[0].toLowerCase();
   if (normalized === '::' || normalized === '::1' || /^0(:0){1,7}$/.test(normalized)) {
     return true;
@@ -83,7 +86,7 @@ function isIpv6Blocked(ip) {
   return false;
 }
 
-function isIpBlocked(ip) {
+function isIpBlocked(ip: string) {
   if (!netModule) {
     return false;
   }
@@ -97,7 +100,7 @@ function isIpBlocked(ip) {
   return true;
 }
 
-async function resolveHostname(hostname) {
+async function resolveHostname(hostname: string) {
   if (!dnsPromises) {
     return [];
   }
@@ -106,8 +109,11 @@ async function resolveHostname(hostname) {
     if (Array.isArray(results)) {
       return results.map(result => result.address);
     }
-    if (results && results.address) {
-      return [results.address];
+    // Defensive: some DNS shims resolve to a single address object rather than
+    // an array even with { all: true }; narrow the (typed-as-array) result.
+    const single = results as LookupAddress;
+    if (single && single.address) {
+      return [single.address];
     }
     return [];
   } catch (error) {
@@ -115,7 +121,9 @@ async function resolveHostname(hostname) {
   }
 }
 
-export async function validateAttachmentUrl(urlString) {
+export async function validateAttachmentUrl(
+  urlString: string | null | undefined,
+) {
   if (!urlString || typeof urlString !== 'string') {
     return { valid: false, reason: 'Empty URL' };
   }
