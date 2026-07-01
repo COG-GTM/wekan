@@ -255,9 +255,11 @@ export async function syncUserData(user: Partial<Meteor.User>, ldapUser: LdapUse
     const username = slug(getLdapUsername(ldapUser));
     if (user && user._id && username !== user.username) {
       log_info('Syncing user username', user.username, '->', username);
-      // Preserved as-is: the original passes a Mongo modifier as findOneAsync's
-      // options argument, which does not match the typed options shape, so the
-      // argument is asserted to bypass the mismatch without altering behaviour.
+      // Pre-existing bug preserved as-is by this JS->TS migration: findOneAsync's
+      // second argument is projection/options, not a Mongo modifier, so this
+      // `$set` is ignored and the username is never persisted (this likely should
+      // be updateAsync). The `as any` only silences the resulting type mismatch;
+      // fixing the bug is intentionally left out of the behaviour-preserving migration.
       await Meteor.users.findOneAsync({ _id: user._id }, { $set: { username }} as any);
     }
   }
