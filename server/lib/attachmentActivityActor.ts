@@ -11,6 +11,9 @@
  * @param {string|null|undefined} uploaderUserId the original uploader
  * @returns {string|null|undefined} actingUserId if present, otherwise uploaderUserId
  */
-export function deleteActivityUserId(actingUserId, uploaderUserId) {
+export function deleteActivityUserId(
+  actingUserId: string | null | undefined,
+  uploaderUserId: string | null | undefined,
+) {
   return actingUserId || uploaderUserId;
 }

@@ -27,7 +27,12 @@
  *   - getFirstListId(boardId) => Promise<string|undefined>
  * @return {Promise<object>} the patch applied to modifier.$set (empty if none)
  */
-async function applyCardBoardConsistency(doc, fieldNames, modifier, deps) {
+async function applyCardBoardConsistency(
+  doc: CardConsistencyDoc,
+  fieldNames: string[],
+  modifier: CardConsistencyModifier,
+  deps: CardConsistencyDeps,
+) {
   if (!doc || !modifier || !modifier.$set) return {};
   if (!Array.isArray(fieldNames) || !fieldNames.includes('boardId')) return {};
 
@@ -43,7 +48,7 @@ async function applyCardBoardConsistency(doc, fieldNames, modifier, deps) {
     !!newSwimlaneId && !!(await deps.swimlaneBelongs(newSwimlaneId, newBoardId));
   const listOk = !!newListId && !!(await deps.listBelongs(newListId, newBoardId));
 
-  const patch = {};
+  const patch: CardConsistencyPatch = {};
   if (swimlaneOk && listOk) return patch;
 
   if (!swimlaneOk) {
@@ -59,4 +64,30 @@ async function applyCardBoardConsistency(doc, fieldNames, modifier, deps) {
   return patch;
 }
 
-module.exports = { applyCardBoardConsistency };
+export { applyCardBoardConsistency };
+
+interface CardConsistencyDoc {
+  boardId?: string;
+  swimlaneId?: string;
+  listId?: string;
+}
+
+interface CardConsistencyModifier {
+  $set?: {
+    boardId?: string;
+    swimlaneId?: string;
+    listId?: string;
+  };
+}
+
+interface CardConsistencyPatch {
+  swimlaneId?: string;
+  listId?: string;
+}
+
+interface CardConsistencyDeps {
+  swimlaneBelongs(swimlaneId: string, boardId: string): Promise<boolean>;
+  listBelongs(listId: string, boardId: string): Promise<boolean>;
+  getDefaultSwimlaneId(boardId: string): Promise<string | undefined>;
+  getFirstListId(boardId: string): Promise<string | undefined>;
+}

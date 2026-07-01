@@ -25,7 +25,9 @@
  * @param {*} value
  * @returns {string}
  */
-export function extractErrorMessage(value) {
+// `value` is an arbitrary thrown value (Error, Meteor.Error, SimpleSchema
+// context, string, null, ...), so `any` is unavoidable here.
+export function extractErrorMessage(value: any) {
   if (value === null || value === undefined) {
     return String(value);
   }
@@ -54,8 +56,12 @@ export function extractErrorMessage(value) {
  * @param {(number|null)} [spacer] indentation passed through to JSON.stringify
  * @returns {string}
  */
-export function safeJsonStringify(data, spacer) {
-  const space = spacer === undefined ? null : spacer;
+// `data` is an arbitrary response payload of unknown shape, so `any` is
+// unavoidable here.
+export function safeJsonStringify(data: any, spacer?: number | null) {
+  // `null` and `undefined` are equivalent for JSON.stringify's `space` argument
+  // (both mean "no indentation"); normalise to `undefined` so the type matches.
+  const space = spacer == null ? undefined : spacer;
   try {
     return JSON.stringify(data, null, space);
   } catch (err) {
@@ -72,7 +78,8 @@ export function safeJsonStringify(data, spacer) {
  * @param {*} error
  * @returns {number}
  */
-export function httpStatusForError(error) {
+// `error` is an arbitrary thrown value, so `any` is unavoidable here.
+export function httpStatusForError(error: any) {
   if (error && typeof error.statusCode === 'number') {
     return error.statusCode;
   }
@@ -98,11 +105,15 @@ export function httpStatusForError(error) {
  * @param {object} body the request body
  * @returns {{ valid: boolean, comment?: string, error?: string }}
  */
-export function validateCommentBody(body) {
+export function validateCommentBody(body: CommentRequestBody | null | undefined) {
   const comment =
     body && typeof body.comment === 'string' ? body.comment.trim() : '';
   if (comment === '') {
     return { valid: false, error: 'Missing required parameter: comment' };
   }
   return { valid: true, comment };
+}
+
+interface CommentRequestBody {
+  comment?: string;
 }

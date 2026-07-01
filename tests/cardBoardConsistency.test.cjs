@@ -11,7 +11,7 @@
 // destination board.
 
 const assert = require('assert');
-const { applyCardBoardConsistency } = require('../server/lib/cardBoardConsistency');
+const { applyCardBoardConsistency } = require('../server/lib/cardBoardConsistency.ts');
 
 let passed = 0;
 function test(name, fn) {

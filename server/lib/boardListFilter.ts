@@ -12,13 +12,15 @@
 // server REST endpoints.
 
 // True when the title is wrapped in carets, e.g. `^Subtasks^`.
-export function isCaretWrappedTitle(title) {
+// `title` is arbitrary untrusted input (it may not be a string), so `any` is
+// unavoidable for this boundary validation helper.
+export function isCaretWrappedTitle(title: any) {
   return typeof title === 'string' && /^\^.*\^$/.test(title.trim());
 }
 
 // A board is visible to users only when it is a real `'board'` and its title is
 // not caret-wrapped.
-export function isUserVisibleBoard(board) {
+export function isUserVisibleBoard(board: BoardLike | null | undefined) {
   if (!board || typeof board !== 'object') {
     return false;
   }
@@ -32,9 +34,14 @@ export function isUserVisibleBoard(board) {
 }
 
 // Filter an array of boards down to the user-visible ones.
-export function filterUserBoards(boards) {
+export function filterUserBoards(boards: Array<BoardLike | null | undefined>) {
   if (!Array.isArray(boards)) {
     return [];
   }
   return boards.filter(isUserVisibleBoard);
+}
+
+interface BoardLike {
+  type?: string;
+  title?: string;
 }
