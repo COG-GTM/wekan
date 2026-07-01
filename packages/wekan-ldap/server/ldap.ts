@@ -1,8 +1,12 @@
-import { Client } from 'ldapts';
+import { Client, ClientOptions, SearchOptions, Entry } from 'ldapts';
+import { ConnectionOptions } from 'tls';
 import { Log } from 'meteor/logging';
+import { LdapUser } from '../types';
 
 // copied from https://github.com/ldapjs/node-ldapjs/blob/a113953e0d91211eb945d2a3952c84b7af6de41c/lib/filters/index.js#L167
-function escapedToHex (str) {
+function escapedToHex (str: string): string;
+function escapedToHex (str: undefined): undefined;
+function escapedToHex (str: string | undefined): string | undefined {
   if (str !== undefined) {
     return str.replace(/\\([0-9a-f][^0-9a-f]|[0-9a-f]$|[^0-9a-f]|$)/gi, function (match, p1) {
       if (!p1) {
@@ -20,8 +24,8 @@ function escapedToHex (str) {
 
 // Convert hex string to LDAP escaped binary filter value
 // e.g. "0102ff" -> "\\01\\02\\ff"
-function hexToLdapEscaped(hex) {
-  return hex.match(/.{2}/g).map(h => '\\' + h).join('');
+function hexToLdapEscaped(hex: string) {
+  return hex.match(/.{2}/g)!.map(h => '\\' + h).join('');
 }
 
 // #5236: RFC 4515 escaping for an LDAP filter assertion value, so a value taken
@@ -30,7 +34,7 @@ function hexToLdapEscaped(hex) {
 // backslash is escaped first; output uses single-backslash hex escapes (\28,
 // \29, …), matching escapedToHex so the existing filter post-processing treats
 // it the same way as the escaped username.
-function escapeLdapFilterValue(value) {
+function escapeLdapFilterValue(value: string | null | undefined) {
   if (value === undefined || value === null) {
     return value;
   }
@@ -43,6 +47,14 @@ function escapeLdapFilterValue(value) {
 }
 
 export default class LDAP {
+  declare ['constructor']: typeof LDAP;
+  connected: boolean;
+  // Configuration built from environment settings; every value is produced by
+  // settings_get(), whose type depends on the specific setting being read.
+  options: Record<string, any>;
+  client!: Client;
+  domainBinded?: boolean;
+
   constructor() {
     this.connected = false;
 
@@ -81,8 +93,11 @@ export default class LDAP {
     };
   }
 
-  static settings_get(name, ...args) {
-    let value = process.env[name];
+  // `...args` is unused but kept to preserve the original signature. The return
+  // value is a dynamically-typed setting (string/number/boolean/undefined).
+  static settings_get(name: string, ...args: any[]) {
+    // `value` holds a setting whose runtime type varies, so it is typed `any`.
+    let value: any = process.env[name];
     if (value !== undefined) {
       if (value === 'true' || value === 'false') {
         value = JSON.parse(value);
@@ -98,16 +113,16 @@ export default class LDAP {
   async connect() {
     Log.info('Init setup');
 
-    const tlsOptions = {
+    const tlsOptions: ConnectionOptions = {
       rejectUnauthorized: this.options.reject_unauthorized,
     };
 
     if (this.options.ca_cert && this.options.ca_cert !== '') {
       // Split CA cert into array of strings
       const chainLines = this.constructor.settings_get('LDAP_CA_CERT').replace(/\\n/g,'\n').split('\n');
-      let cert         = [];
-      const ca         = [];
-      chainLines.forEach((line) => {
+      let cert: string[]  = [];
+      const ca: string[]  = [];
+      chainLines.forEach((line: string) => {
         cert.push(line);
         if (line.match(/-END CERTIFICATE-/)) {
           ca.push(cert.join('\n'));
@@ -117,7 +132,7 @@ export default class LDAP {
       tlsOptions.ca = ca;
     }
 
-    let url;
+    let url: string;
     if (this.options.encryption === 'ssl') {
       url = `ldaps://${this.options.host}:${this.options.port}`;
     } else {
@@ -126,7 +141,7 @@ export default class LDAP {
 
     Log.info(`Connecting ${url}`);
 
-    const clientOptions = {
+    const clientOptions: ClientOptions = {
       url,
       timeout       : this.options.timeout,
       connectTimeout: this.options.connect_timeout,
@@ -156,12 +171,12 @@ export default class LDAP {
     this.connected = true;
   }
 
-  async bind(dn, password) {
+  async bind(dn: string, password: string) {
     await this.client.bind(dn, password);
   }
 
   getBufferAttributes() {
-    const fields = [];
+    const fields: string[] = [];
     let uidField = this.constructor.settings_get('LDAP_UNIQUE_IDENTIFIER_FIELD');
     if (uidField && uidField !== '') {
       fields.push(...uidField.replace(/\s/g, '').split(','));
@@ -173,8 +188,8 @@ export default class LDAP {
     return fields;
   }
 
-  async searchAll(BaseDN, options) {
-    const searchOptions = {
+  async searchAll(BaseDN: string, options: SearchAllOptions) {
+    const searchOptions: SearchOptions = {
       filter: options.filter,
       scope : options.scope || 'sub',
     };
@@ -206,8 +221,8 @@ export default class LDAP {
     return searchEntries.map((entry) => this.extractLdapEntryData(entry));
   }
 
-  extractLdapEntryData(entry) {
-    const values = {
+  extractLdapEntryData(entry: Entry) {
+    const values: LdapUser = {
       _raw: {},
     };
 
@@ -227,8 +242,8 @@ export default class LDAP {
     return values;
   }
 
-  getUserFilter(username) {
-    const filter = [];
+  getUserFilter(username: string) {
+    const filter: string[] = [];
 
     if (this.options.User_Search_Filter !== '') {
       if (this.options.User_Search_Filter[0] === '(') {
@@ -240,7 +255,7 @@ export default class LDAP {
 
     // Escape the username to prevent LDAP injection
     const escapedUsername = escapedToHex(username);
-    const usernameFilter = this.options.User_Search_Field.split(',').map((item) => `(${item}=${escapedUsername})`);
+    const usernameFilter = this.options.User_Search_Field.split(',').map((item: string) => `(${item}=${escapedUsername})`);
 
     if (usernameFilter.length === 0) {
       Log.error('LDAP_LDAP_User_Search_Field not defined');
@@ -253,7 +268,7 @@ export default class LDAP {
     return `(&${filter.join('')})`;
   }
 
-  async bindUserIfNecessary(username, password) {
+  async bindUserIfNecessary(username: string, password: string) {
 
     if (this.domainBinded === true) {
       return;
@@ -296,9 +311,9 @@ export default class LDAP {
     this.domainBinded = true;
   }
 
-  async searchUsers(username) {
+  async searchUsers(username: string) {
     await this.bindIfNecessary();
-    const searchOptions = {
+    const searchOptions: SearchAllOptions = {
       filter   : this.getUserFilter(username),
       scope    : this.options.User_Search_Scope || 'sub',
       sizeLimit: this.options.Search_Size_Limit,
@@ -319,7 +334,7 @@ export default class LDAP {
     return await this.searchAll(this.options.BaseDN, searchOptions);
   }
 
-  async getUserById(id, attribute) {
+  async getUserById(id: string, attribute?: string) {
     await this.bindIfNecessary();
 
     const Unique_Identifier_Field = this.constructor.settings_get('LDAP_UNIQUE_IDENTIFIER_FIELD').split(',');
@@ -330,11 +345,11 @@ export default class LDAP {
     if (attribute) {
       filter = `(${attribute}=${escapedValue})`;
     } else {
-      const filters = Unique_Identifier_Field.map((item) => `(${item}=${escapedValue})`);
+      const filters = Unique_Identifier_Field.map((item: string) => `(${item}=${escapedValue})`);
       filter = `(|${filters.join('')})`;
     }
 
-    const searchOptions = {
+    const searchOptions: SearchAllOptions = {
       filter,
       scope: 'sub',
     };
@@ -356,10 +371,10 @@ export default class LDAP {
     return result[0];
   }
 
-  async getUserByUsername(username) {
+  async getUserByUsername(username: string) {
     await this.bindIfNecessary();
 
-    const searchOptions = {
+    const searchOptions: SearchAllOptions = {
       filter: this.getUserFilter(username),
       scope : this.options.User_Search_Scope || 'sub',
     };
@@ -381,7 +396,7 @@ export default class LDAP {
     return result[0];
   }
 
-  async getUserGroups(username, ldapUser) {
+  async getUserGroups(username: string, ldapUser: LdapUser) {
     // The LDAP group search is needed by three independent features:
     //   - the login restriction filter (LDAP_GROUP_FILTER_ENABLE, via isUserInGroup)
     //   - admin status sync (LDAP_SYNC_ADMIN_STATUS / LDAP_SYNC_ADMIN_GROUPS)
@@ -419,7 +434,7 @@ export default class LDAP {
 
     // Escape the username to prevent LDAP injection
     const escapedUsername = escapedToHex(username);
-    const searchOptions = {
+    const searchOptions: SearchAllOptions = {
       filter: filter.join('').replace(/#{username}/g, escapedUsername).replace(/\\/g, "\\\\"),
       scope : 'sub',
     };
@@ -433,7 +448,7 @@ export default class LDAP {
     }
 
     const grp_identifier = this.options.group_filter_group_id_attribute || 'cn';
-    const groups         = [];
+    const groups: string[] = [];
     result.map((item) => {
       groups.push(item[grp_identifier]);
     });
@@ -442,7 +457,7 @@ export default class LDAP {
 
   }
 
-  async isUserInGroup(username, ldapUser) {
+  async isUserInGroup(username: string, ldapUser: LdapUser) {
     if (!this.options.group_filter_enabled) {
       return true;
     }
@@ -469,7 +484,7 @@ export default class LDAP {
 
     // Escape the username to prevent LDAP injection
     const escapedUsername = escapedToHex(username);
-    const searchOptions = {
+    const searchOptions: SearchAllOptions = {
       filter: filter.join('').replace(/#{username}/g, escapedUsername).replace(/\\/g, "\\\\"),
       scope : 'sub',
     };
@@ -484,7 +499,7 @@ export default class LDAP {
     return true;
   }
 
-  async auth(dn, password) {
+  async auth(dn: string, password: string) {
     Log.info(`Authenticating ${dn}`);
 
     try {
@@ -511,4 +526,15 @@ export default class LDAP {
       Log.debug('Error during disconnect', error);
     }
   }
+}
+
+// Options accepted by searchAll(); a narrowed subset of ldapts' SearchOptions
+// that reflects how the higher-level LDAP methods call it (paged is always an
+// object here, never the boolean that ldapts also permits).
+interface SearchAllOptions {
+  filter: string;
+  scope?: 'base' | 'children' | 'one' | 'sub';
+  attributes?: string[];
+  sizeLimit?: number;
+  paged?: { pageSize?: number };
 }

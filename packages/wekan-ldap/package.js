@@ -13,16 +13,16 @@ Package.describe({
 
 Package.onUse(function(api) {
 	api.versionsFrom(['2.16', '3.0']);
-	api.use('ecmascript');
+	api.use('typescript');
 	api.use('sha');
 	api.use('templating', 'client');
 
 	api.use('accounts-base', 'server');
 	api.use('accounts-password', 'server');
 	api.use('quave:synced-cron', 'server');
-	api.addFiles('client/loginHelper.js', 'client');
+	api.addFiles('client/loginHelper.ts', 'client');
 
-	api.mainModule('server/index.js', 'server');
+	api.mainModule('server/index.ts', 'server');
 });
 
 Npm.depends({
