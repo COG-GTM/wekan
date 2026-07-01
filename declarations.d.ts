@@ -148,6 +148,12 @@ declare const Attachments: WekanFilesCollection;
 declare const ReactiveCache: WekanReactiveCache;
 declare const Random: { id(n?: number): string };
 
+// Meteor's `check` package registers `check` and `Match` as globals when loaded.
+// @types/meteor only models them as exports of the 'meteor/check' module, so
+// re-expose them globally with those same types.
+declare const check: typeof import('meteor/check').check;
+declare const Match: typeof import('meteor/check').Match;
+
 // Meteor exposes every loaded package at runtime on the global `Package` object
 // (e.g. `Package.meteor.Meteor`, `Package.mongo.Mongo`). @types/meteor already
 // declares a global `namespace Package` for the build-time package API, so the

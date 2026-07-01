@@ -45,7 +45,28 @@ const DateString = Match.Where(function(dateAsString) {
 });
 
 export class WekanCreator {
-  constructor(data) {
+  _nowDate: Date;
+  createdAt: WekanCreatorCreatedAt;
+  createdBy: WekanCreatorCreatedBy;
+  labels: Record<string, string>;
+  swimlanes: Record<string, string>;
+  lists: Record<string, string>;
+  cards: Record<string, string>;
+  customFields: Record<string, string>;
+  commentIds: Record<string, string>;
+  attachmentIds: Record<string, string>;
+  checklists: Record<string, string>;
+  checklistItems: Record<string, string>;
+  comments: Record<string, WekanDocumentField[]>;
+  rules: Record<string, string>;
+  members: Record<string, string>;
+  triggers: Record<string, string>;
+  actions: Record<string, string>;
+  attachments: Record<string, WekanDocumentField[]>;
+  _defaultSwimlaneId: string | null;
+  _defaultListId: string | null;
+
+  constructor(data: WekanDocumentField) {
     // we log current date, to use the same timestamp for all our actions.
     // this helps to retrieve all elements performed by the same import.
     this._nowDate = new Date();
@@ -105,9 +126,9 @@ export class WekanCreator {
 
     // Normalize possible exported id fields: some exports may use `id` instead of `_id`.
     // Ensure every item we rely on has an `_id` so mappings work consistently.
-    const normalizeIds = arr => {
+    const normalizeIds = (arr: WekanDocumentField) => {
       if (!arr) return;
-      arr.forEach(item => {
+      arr.forEach((item: WekanDocumentField) => {
         if (item && item.id && !item._id) {
           item._id = item.id;
         }
@@ -137,7 +158,7 @@ export class WekanCreator {
    *
    * @param {String} dateString a properly formatted Date
    */
-  _now(dateString) {
+  _now(dateString?: string) {
     if (dateString) {
       return new Date(dateString);
     }
@@ -154,14 +175,14 @@ export class WekanCreator {
    * @param wekanUserId
    * @private
    */
-  _user(wekanUserId) {
+  _user(wekanUserId?: string) {
     if (wekanUserId && this.members[wekanUserId]) {
       return this.members[wekanUserId];
     }
     return Meteor.userId();
   }
 
-  checkActivities(wekanActivities) {
+  checkActivities(wekanActivities: WekanDocumentField) {
     check(wekanActivities, [
       Match.ObjectIncluding({
         activityType: String,
@@ -171,7 +192,7 @@ export class WekanCreator {
     // XXX we could perform more thorough checks based on action type
   }
 
-  checkBoard(wekanBoard) {
+  checkBoard(wekanBoard: WekanDocumentField) {
     check(
       wekanBoard,
       Match.ObjectIncluding({
@@ -187,7 +208,7 @@ export class WekanCreator {
     );
   }
 
-  checkCards(wekanCards) {
+  checkCards(wekanCards: WekanDocumentField) {
     check(wekanCards, [
       Match.ObjectIncluding({
         archived: Boolean,
@@ -199,7 +220,7 @@ export class WekanCreator {
     ]);
   }
 
-  checkLabels(wekanLabels) {
+  checkLabels(wekanLabels: WekanDocumentField) {
     check(wekanLabels, [
       Match.ObjectIncluding({
         // XXX refine control by validating 'color' against a list of allowed
@@ -209,7 +230,7 @@ export class WekanCreator {
     ]);
   }
 
-  checkLists(wekanLists) {
+  checkLists(wekanLists: WekanDocumentField) {
     check(wekanLists, [
       Match.ObjectIncluding({
         archived: Boolean,
@@ -218,7 +239,7 @@ export class WekanCreator {
     ]);
   }
 
-  checkSwimlanes(wekanSwimlanes) {
+  checkSwimlanes(wekanSwimlanes: WekanDocumentField) {
     check(wekanSwimlanes, [
       Match.ObjectIncluding({
         archived: Boolean,
@@ -227,7 +248,7 @@ export class WekanCreator {
     ]);
   }
 
-  checkChecklists(wekanChecklists) {
+  checkChecklists(wekanChecklists: WekanDocumentField) {
     check(wekanChecklists, [
       Match.ObjectIncluding({
         cardId: String,
@@ -236,7 +257,7 @@ export class WekanCreator {
     ]);
   }
 
-  checkChecklistItems(wekanChecklistItems) {
+  checkChecklistItems(wekanChecklistItems: WekanDocumentField) {
     check(wekanChecklistItems, [
       Match.ObjectIncluding({
         cardId: String,
@@ -245,7 +266,7 @@ export class WekanCreator {
     ]);
   }
 
-  checkRules(wekanRules) {
+  checkRules(wekanRules: WekanDocumentField) {
     check(wekanRules, [
       Match.ObjectIncluding({
         triggerId: String,
@@ -255,7 +276,7 @@ export class WekanCreator {
     ]);
   }
 
-  checkTriggers(wekanTriggers) {
+  checkTriggers(wekanTriggers: WekanDocumentField) {
     // XXX More check based on trigger type
     check(wekanTriggers, [
       Match.ObjectIncluding({
@@ -265,18 +286,18 @@ export class WekanCreator {
     ]);
   }
 
-  async getMembersToMap(data) {
+  async getMembersToMap(data: WekanDocumentField) {
     // we will work on the list itself (an ordered array of objects) when a
     // mapping is done, we add a 'wekan' field to the object representing the
     // imported member
     const membersToMap = data.members || [];
     const users = data.users || [];
     // auto-map based on username
-    const mappable = [];
+    const mappable: WekanDocumentField[] = [];
     for (const importedMember of membersToMap) {
       importedMember.id = importedMember.userId;
       delete importedMember.userId;
-      const user = users.filter(user => {
+      const user = users.filter((user: WekanDocumentField) => {
         return user._id === importedMember.id;
       })[0];
       // Skip dangling user references (e.g. a board member whose account was
@@ -298,7 +319,7 @@ export class WekanCreator {
     return mappable;
   }
 
-  checkActions(wekanActions) {
+  checkActions(wekanActions: WekanDocumentField) {
     // XXX More check based on action type
     check(wekanActions, [
       Match.ObjectIncluding({
@@ -309,8 +330,8 @@ export class WekanCreator {
   }
 
   // You must call parseActions before calling this one.
-  async createBoardAndLabels(boardToImport) {
-    const boardToCreate = {
+  async createBoardAndLabels(boardToImport: WekanDocumentField) {
+    const boardToCreate: WekanImportDocument = {
       archived: boardToImport.archived,
       // Imported exports may carry a non-WeKan/legacy color (e.g. Trello's
       // 'bgnone'); fall back to the default so collection2 validation does not
@@ -355,12 +376,12 @@ export class WekanCreator {
     }
     // now add other members
     if (boardToImport.members) {
-      boardToImport.members.forEach(wekanMember => {
+      boardToImport.members.forEach((wekanMember: WekanDocumentField) => {
         // is it defined and do we already have it in our list?
         if (
           wekanMember.wekanId &&
           !boardToCreate.members.some(
-            member => member.wekanId === wekanMember.wekanId,
+            (member: WekanDocumentField) => member.wekanId === wekanMember.wekanId,
           )
         )
           boardToCreate.members.push({
@@ -371,7 +392,7 @@ export class WekanCreator {
     }
 
     if (boardToImport.labels) {
-      boardToImport.labels.forEach(label => {
+      boardToImport.labels.forEach((label: WekanDocumentField) => {
         const labelToCreate = {
           _id: Random.id(6),
           color: label.color,
@@ -413,8 +434,8 @@ export class WekanCreator {
    * @param boardId
    * @returns {Array}
    */
-  async createCards(wekanCards, boardId) {
-    const result = [];
+  async createCards(wekanCards: WekanDocumentField, boardId: string) {
+    const result: string[] = [];
     // .direct.insertAsync below bypasses the before.insert hook that normally
     // assigns cardNumber, so we must handle the number ourselves: preserve the
     // number from the export when present, otherwise allocate a fresh one.
@@ -428,7 +449,7 @@ export class WekanCreator {
       if (!listId) {
         listId = await this._createDefaultList(boardId);
       }
-      const cardToCreate = {
+      const cardToCreate: WekanImportDocument = {
         archived: card.archived,
         boardId,
         cardNumber: card.cardNumber || (await boardObj.getNextCardNumber()),
@@ -449,15 +470,15 @@ export class WekanCreator {
       };
       // add labels
       if (card.labelIds) {
-        cardToCreate.labelIds = card.labelIds.map(wekanId => {
+        cardToCreate.labelIds = card.labelIds.map((wekanId: WekanDocumentField) => {
           return this.labels[wekanId];
         });
       }
       // add members {
       if (card.members) {
-        const wekanMembers = [];
+        const wekanMembers: string[] = [];
         // we can't just map, as some members may not have been mapped
-        card.members.forEach(sourceMemberId => {
+        card.members.forEach((sourceMemberId: WekanDocumentField) => {
           if (this.members[sourceMemberId]) {
             const wekanId = this.members[sourceMemberId];
             // we may map multiple Wekan members to the same wekan user
@@ -474,9 +495,9 @@ export class WekanCreator {
       }
       // add assignees
       if (card.assignees) {
-        const wekanAssignees = [];
+        const wekanAssignees: string[] = [];
         // we can't just map, as some members may not have been mapped
-        card.assignees.forEach(sourceMemberId => {
+        card.assignees.forEach((sourceMemberId: WekanDocumentField) => {
           if (this.members[sourceMemberId]) {
             const wekanId = this.members[sourceMemberId];
             // we may map multiple Wekan members to the same wekan user
@@ -499,7 +520,7 @@ export class WekanCreator {
 
       // add custom fields
       if (card.customFields) {
-        cardToCreate.customFields = card.customFields.map(field => {
+        cardToCreate.customFields = card.customFields.map((field: WekanDocumentField) => {
           return {
             _id: this.customFields[field._id],
             value: field.value,
@@ -559,7 +580,7 @@ export class WekanCreator {
       if (attachments && Meteor.isServer) {
         for (const att of attachments) {
           const meta = { boardId, cardId, source: 'import' };
-          const setCover = async newId => {
+          const setCover = async (newId?: string) => {
             if (!newId) return;
             this.attachmentIds[att._id] = newId;
             if (wekanCoverId === att._id) {
@@ -626,7 +647,7 @@ export class WekanCreator {
    * @param wekanCustomFields
    * @param boardId
    */
-  async createCustomFields(wekanCustomFields, boardId) {
+  async createCustomFields(wekanCustomFields: WekanDocumentField, boardId: string) {
     for (const field of wekanCustomFields) {
       const fieldToCreate = {
         boardIds: [boardId],
@@ -655,8 +676,8 @@ export class WekanCreator {
   }
 
   // Create labels if they do not exist and load this.labels.
-  createLabels(wekanLabels, board) {
-    wekanLabels.forEach(label => {
+  createLabels(wekanLabels: WekanDocumentField, board: WekanDocumentField) {
+    wekanLabels.forEach((label: WekanDocumentField) => {
       const color = label.color;
       const name = label.name;
       const existingLabel = board.getLabel(name, color);
@@ -671,7 +692,7 @@ export class WekanCreator {
 
   // Create a single fallback list for cards that have no valid list to live
   // in (export contained no lists, or only dangling listId references).
-  async _createDefaultList(boardId) {
+  async _createDefaultList(boardId: string) {
     const listId = await Lists.direct.insertAsync({
       archived: false,
       boardId,
@@ -686,9 +707,9 @@ export class WekanCreator {
     return listId;
   }
 
-  async createLists(wekanLists, boardId) {
+  async createLists(wekanLists: WekanDocumentField, boardId: string) {
     for (const [listIndex, list] of wekanLists.entries()) {
-      const listToCreate = {
+      const listToCreate: WekanImportDocument = {
         archived: list.archived,
         boardId,
         // We are being defensing here by providing a default date (now) if the
@@ -736,7 +757,7 @@ export class WekanCreator {
     }
   }
 
-  async createSwimlanes(wekanSwimlanes, boardId) {
+  async createSwimlanes(wekanSwimlanes: WekanDocumentField, boardId: string) {
     // If no swimlanes provided, create a default so cards still render
     if (!wekanSwimlanes || wekanSwimlanes.length === 0) {
       const swimlaneToCreate = {
@@ -757,7 +778,7 @@ export class WekanCreator {
     }
 
     for (const [swimlaneIndex, swimlane] of wekanSwimlanes.entries()) {
-      const swimlaneToCreate = {
+      const swimlaneToCreate: WekanImportDocument = {
         archived: swimlane.archived,
         boardId,
         // We are being defensing here by providing a default date (now) if the
@@ -786,7 +807,7 @@ export class WekanCreator {
     }
   }
 
-  async createSubtasks(wekanCards) {
+  async createSubtasks(wekanCards: WekanDocumentField) {
     for (const card of wekanCards) {
       // get new id of card (in created / new board)
       const cardIdInNewBoard = this.cards[card._id];
@@ -818,7 +839,7 @@ export class WekanCreator {
   // #3392: PI Program Board "Red Strings". Remap each card's cardDependencies
   // from the source card ids to the newly-created card ids, dropping any whose
   // target card was not part of the imported board.
-  async createCardDependencies(wekanCards) {
+  async createCardDependencies(wekanCards: WekanDocumentField) {
     for (const card of wekanCards) {
       if (!card.cardDependencies || card.cardDependencies.length === 0) {
         continue;
@@ -828,7 +849,7 @@ export class WekanCreator {
         continue;
       }
       const remapped = card.cardDependencies
-        .map(dep => {
+        .map((dep: WekanDocumentField) => {
           // Tolerate legacy bare-string entries as well as { cardId, ... }.
           const oldDepId = typeof dep === 'string' ? dep : dep.cardId;
           const newDepId = this.cards[oldDepId];
@@ -846,8 +867,8 @@ export class WekanCreator {
     }
   }
 
-  async createChecklists(wekanChecklists, boardId) {
-    const result = [];
+  async createChecklists(wekanChecklists: WekanDocumentField, boardId: string) {
+    const result: string[] = [];
     for (const [checklistIndex, checklist] of wekanChecklists.entries()) {
       // Skip orphaned checklists whose card is missing from the export.
       // Otherwise the checklist would be created with an undefined cardId and
@@ -872,7 +893,7 @@ export class WekanCreator {
     return result;
   }
 
-  async createTriggers(wekanTriggers, boardId) {
+  async createTriggers(wekanTriggers: WekanDocumentField, boardId: string) {
     for (const trigger of wekanTriggers) {
       if (trigger.hasOwnProperty('labelId')) {
         trigger.labelId = this.labels[trigger.labelId];
@@ -887,7 +908,7 @@ export class WekanCreator {
     }
   }
 
-  async createActions(wekanActions, boardId) {
+  async createActions(wekanActions: WekanDocumentField, boardId: string) {
     for (const action of wekanActions) {
       if (action.hasOwnProperty('labelId')) {
         action.labelId = this.labels[action.labelId];
@@ -902,7 +923,7 @@ export class WekanCreator {
     }
   }
 
-  async createRules(wekanRules, boardId) {
+  async createRules(wekanRules: WekanDocumentField, boardId: string) {
     for (const rule of wekanRules) {
       // Create the rule
       rule.boardId = boardId;
@@ -913,7 +934,7 @@ export class WekanCreator {
     }
   }
 
-  async createChecklistItems(wekanChecklistItems, boardId) {
+  async createChecklistItems(wekanChecklistItems: WekanDocumentField, boardId: string) {
     for (const [checklistitemIndex, checklistitem] of wekanChecklistItems.entries()) {
       //Check if the checklist for this item (still) exists
       //If a checklist was deleted, but items remain, the import would error out here
@@ -937,14 +958,14 @@ export class WekanCreator {
     }
   }
 
-  parseActivities(wekanBoard) {
-    wekanBoard.activities.forEach(activity => {
+  parseActivities(wekanBoard: WekanDocumentField) {
+    wekanBoard.activities.forEach((activity: WekanDocumentField) => {
       switch (activity.activityType) {
         case 'addAttachment': {
           // We have to be cautious, because the attachment could have been removed later.
           // In that case Wekan still reports its addition, but removes its 'url' field.
           // So we test for that
-          const wekanAttachment = wekanBoard.attachments.filter(attachment => {
+          const wekanAttachment = wekanBoard.attachments.filter((attachment: WekanDocumentField) => {
             return attachment._id === activity.attachmentId;
           })[0];
 
@@ -962,7 +983,7 @@ export class WekanCreator {
           break;
         }
         case 'addComment': {
-          const wekanComment = wekanBoard.comments.filter(comment => {
+          const wekanComment = wekanBoard.comments.filter((comment: WekanDocumentField) => {
             return comment._id === activity.commentId;
           })[0];
           const id = activity.cardId;
@@ -1001,7 +1022,7 @@ export class WekanCreator {
     });
   }
 
-  async importActivities(activities, boardId) {
+  async importActivities(activities: WekanDocumentField, boardId: string) {
     for (const activity of activities) {
       switch (activity.activityType) {
         // Board related activities
@@ -1133,7 +1154,7 @@ export class WekanCreator {
     // }
   }
 
-  async create(board, currentBoardId) {
+  async create(board: WekanDocumentField, currentBoardId?: string) {
     // TODO : Make isSandstorm variable global
     const isSandstorm =
       Meteor.settings &&
@@ -1167,13 +1188,13 @@ export class WekanCreator {
   // attachments (meta.source === 'board-background', no cardId), as new
   // board-level Attachments for the imported board, and re-point the active
   // background (backgroundImageId) to the new attachment id.
-  async recreateBackgrounds(board, boardId) {
+  async recreateBackgrounds(board: WekanDocumentField, boardId: string) {
     if (!Meteor.isServer) return;
     const backgrounds = (board.attachments || []).filter(
-      att => att && att.source === 'board-background' && att.file && !att.cardId,
+      (att: WekanDocumentField) => att && att.source === 'board-background' && att.file && !att.cardId,
     );
     if (!backgrounds.length) return;
-    const idMap = {};
+    const idMap: Record<string, string> = {};
     for (const bg of backgrounds) {
       try {
         const buffer = Buffer.from(bg.file, 'base64');
@@ -1213,13 +1234,13 @@ export class WekanCreator {
   // user's importUsernames (so future imports auto-map); unmapped members'
   // usernames are stored on the board's importUsernames for an admin to assign
   // to real users later via the People panel.
-  async recordImportedUsernames(board, boardId) {
+  async recordImportedUsernames(board: WekanDocumentField, boardId: string) {
     if (!Meteor.isServer) return;
-    const usersById = {};
-    (board.users || []).forEach(user => {
+    const usersById: Record<string, WekanDocumentField> = {};
+    (board.users || []).forEach((user: WekanDocumentField) => {
       usersById[user._id] = user;
     });
-    const unmapped = [];
+    const unmapped: string[] = [];
     for (const member of board.members || []) {
       // the client member mapper renames userId -> id before import
       const sourceId = member.id || member.userId;
@@ -1246,4 +1267,26 @@ export class WekanCreator {
       });
     }
   }
+}
+
+// Creation dates parsed from the Wekan activity log, indexed by Wekan id.
+interface WekanCreatorCreatedAt {
+  board: WekanDocumentField;
+  cards: Record<string, WekanDocumentField>;
+  lists: Record<string, WekanDocumentField>;
+  swimlanes: Record<string, WekanDocumentField>;
+  customFields: Record<string, WekanDocumentField>;
+}
+
+// Wekan creator ids for objects that expose one (only cards), indexed by
+// Wekan id.
+interface WekanCreatorCreatedBy {
+  cards: Record<string, WekanDocumentField>;
+}
+
+// Insert payloads are assembled field-by-field from untyped exported Wekan JSON
+// and mutated with optional properties along the way, so they are modelled as an
+// open document shape at this legacy interop boundary.
+interface WekanImportDocument {
+  [field: string]: WekanDocumentField;
 }
