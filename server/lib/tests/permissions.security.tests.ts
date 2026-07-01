@@ -12,8 +12,18 @@ describe('server-side permission enforcement', function() {
     sinon.restore();
   });
 
+  // The per-member role flags a test may override on the built board member.
+  interface BoardMemberFlags {
+    isActive?: boolean;
+    isNoComments?: boolean;
+    isCommentOnly?: boolean;
+    isWorker?: boolean;
+    isReadOnly?: boolean;
+    isReadAssignedOnly?: boolean;
+  }
+
   // Helper: build a board whose single member has the given role flags.
-  const boardWithMember = (userId, flags = {}) => ({
+  const boardWithMember = (userId: string, flags: BoardMemberFlags = {}) => ({
     members: [Object.assign(
       { userId, isActive: true, isNoComments: false, isCommentOnly: false, isWorker: false, isReadOnly: false, isReadAssignedOnly: false },
       flags,
@@ -51,20 +61,20 @@ describe('server-side permission enforcement', function() {
       const archiveStub = sinon.stub().resolves();
       sinon.stub(ReactiveCache, 'getBoard').resolves({ hasAdmin: () => false, archive: archiveStub });
       sinon.stub(ReactiveCache, 'getUser').resolves({ isAdmin: false });
-      let thrown;
+      let thrown: Meteor.Error | undefined;
       try {
         await handler().apply({ userId: 'member' }, ['board-1']);
       } catch (error) {
         thrown = error;
       }
       expect(thrown).to.exist;
-      expect(thrown.error).to.equal('error-board-notAdmin');
+      expect(thrown!.error).to.equal('error-board-notAdmin');
       expect(archiveStub.called).to.equal(false);
     });
 
     it('allows a board admin', async function() {
       const archiveStub = sinon.stub().resolves();
-      sinon.stub(ReactiveCache, 'getBoard').resolves({ hasAdmin: (id) => id === 'admin', archive: archiveStub });
+      sinon.stub(ReactiveCache, 'getBoard').resolves({ hasAdmin: (id: string) => id === 'admin', archive: archiveStub });
       sinon.stub(ReactiveCache, 'getUser').resolves({ isAdmin: false });
       const result = await handler().apply({ userId: 'admin' }, ['board-1']);
       expect(result).to.equal(true);
@@ -90,14 +100,14 @@ describe('server-side permission enforcement', function() {
         emails: [{ address: 'user@example.com' }],
         getLanguage: () => 'en',
       });
-      let thrown;
+      let thrown: Meteor.Error | undefined;
       try {
         await handler().apply({ userId: 'user-1', unblock: () => {} }, []);
       } catch (error) {
         thrown = error;
       }
       expect(thrown).to.exist;
-      expect(thrown.error).to.equal('error-notAuthorized');
+      expect(thrown!.error).to.equal('error-notAuthorized');
     });
   });
 });

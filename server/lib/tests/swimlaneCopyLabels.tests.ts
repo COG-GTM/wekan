@@ -89,7 +89,7 @@ describe('labelRemap.remapLabelIds (#5158)', function() {
   });
 
   it('tolerates non-array inputs', function() {
-    const { mappedIds, missingNames } = remapLabelIds(null, null, null);
+    const { mappedIds, missingNames } = remapLabelIds(null as never, null as never, null as never);
     expect(mappedIds).to.deep.equal([]);
     expect(missingNames).to.deep.equal([]);
   });

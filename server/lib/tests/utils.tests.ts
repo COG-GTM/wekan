@@ -21,7 +21,7 @@ describe('utils', function() {
     it('returns if a board has an admin', function() {
       const userId = Random.id();
       const board = {
-        hasAdmin: id => {
+        hasAdmin: (id: string) => {
           return id === userId;
         }
       };
@@ -35,7 +35,7 @@ describe('utils', function() {
     it('returns if a board has a member', function() {
       const userId = Random.id();
       const board = {
-        hasMember: id => {
+        hasMember: (id: string) => {
           return id === userId;
         }
       };
@@ -49,7 +49,7 @@ describe('utils', function() {
     it('returns if any board has a member', function() {
       const userId = Random.id();
       const boardsExpectedTrue = [{
-        hasMember: id => {
+        hasMember: (id: string) => {
           return id === userId;
         }
       }];
@@ -70,7 +70,7 @@ describe('utils', function() {
     it('returns if a board has a member that can post comments', function() {
       const userId = Random.id();
       const board = {
-        hasMember: id => id === userId,
+        hasMember: (id: string) => id === userId,
         hasReadOnly: () => false,
         hasReadAssignedOnly: () => false,
         hasNoComments: () => false,
@@ -85,10 +85,10 @@ describe('utils', function() {
     it('returns if a board has a member that has comment any comments', function() {
       const userId = Random.id();
       const board = {
-        hasMember: id => {
+        hasMember: (id: string) => {
           return id === userId;
         },
-        hasNoComments: id => {
+        hasNoComments: (id: string) => {
           return id !== userId;
         }
       };
@@ -102,10 +102,12 @@ describe('utils', function() {
     it('returns if the board for a given card has a member', async function() {
       const userId = Random.id();
       const board = {
-        hasMember: id => id === userId,
+        hasMember: (id: string) => id === userId,
       };
       const card = { boardId: 'board1' };
-      sinon.stub(Boards, 'findOneAsync').resolves(board);
+      // Minimal board stub: only hasMember is exercised, so it is asserted onto
+      // the findOneAsync result type which the fake intentionally does not fill.
+      sinon.stub(Boards, 'findOneAsync').resolves(board as never);
 
       expect(await allowIsBoardMemberByCard(userId, card)).to.equal(true);
       expect(await allowIsBoardMemberByCard(Random.id(), card)).to.equal(false);

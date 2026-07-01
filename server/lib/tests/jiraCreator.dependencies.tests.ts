@@ -10,7 +10,7 @@ import { JiraCreator } from '/models/jiraCreator';
 // Links to issues not in the import (or self-links) are skipped.
 
 describe('JiraCreator dependency mapping (#3392)', function () {
-  let updateStub;
+  let updateStub: sinon.SinonStub;
 
   beforeEach(function () {
     updateStub = sinon.stub(Cards.direct, 'updateAsync').resolves(1);
@@ -20,11 +20,20 @@ describe('JiraCreator dependency mapping (#3392)', function () {
     updateStub.restore();
   });
 
-  function runWith(issuelinks, key = 'PROJ-1') {
+  function runWith(issuelinks: JiraIssueLink[], key = 'PROJ-1') {
     const creator = new JiraCreator({});
-    creator.cardsByKey = { 'PROJ-1': 'idA', 'PROJ-2': 'idB', 'PROJ-3': 'idC' };
+    // cardsByKey is private on JiraCreator; Object.assign seeds it directly to
+    // map the imported issue keys onto the card ids createDependencies links.
+    Object.assign(creator, { cardsByKey: { 'PROJ-1': 'idA', 'PROJ-2': 'idB', 'PROJ-3': 'idC' } });
     const data = { issues: [{ key, fields: { issuelinks } }] };
     return creator.createDependencies(data).then(() => creator);
+  }
+
+  // A single Jira issue link as returned in an issue's `fields.issuelinks`.
+  interface JiraIssueLink {
+    type?: { name?: string };
+    inwardIssue?: { key?: string };
+    outwardIssue?: { key?: string };
   }
 
   it('maps an outward "Blocks" link to type blocks', async function () {

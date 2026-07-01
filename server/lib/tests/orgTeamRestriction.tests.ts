@@ -93,9 +93,9 @@ describe('orgTeamRestriction (#6116)', function() {
         canAddUserToBoard({
           restrictEnabled: true,
           adderOrgs: undefined,
-          adderTeams: null,
+          adderTeams: null as never,
           candidateOrgs: undefined,
-          candidateTeams: null,
+          candidateTeams: null as never,
         }),
       ).to.equal(false);
     });

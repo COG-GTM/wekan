@@ -26,7 +26,7 @@ describe('ProxyBleed header-login allowlist (GHSA-jggc-qvfc-jr6x)', function () 
     'HEADER_LOGIN_TRUSTED_IPS',
     'HEADER_LOGIN_TRUSTED_PROXIES',
   ];
-  const envBackup = {};
+  const envBackup: Record<string, string | undefined> = {};
 
   beforeEach(function () {
     envKeys.forEach(key => {
@@ -104,14 +104,14 @@ describe('ProxyBleed header-login allowlist (GHSA-jggc-qvfc-jr6x)', function () 
       socket: { remoteAddress: '172.17.0.5' },
     };
 
-    let thrown;
+    let thrown: Meteor.Error | undefined;
     try {
       await findOrCreateHeaderLoginUser(req);
     } catch (error) {
       thrown = error;
     }
     expect(thrown).to.exist;
-    expect(thrown.error).to.equal('unauthorized');
+    expect(thrown!.error).to.equal('unauthorized');
     // The named identity is never even looked up — rejected at the gate.
     expect(findOneStub.called).to.equal(false);
   });

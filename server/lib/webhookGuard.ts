@@ -26,7 +26,7 @@
  *   be synchronous or return a Promise.
  * @returns {Promise<{ok: boolean, error?: Error}>}
  */
-export async function safeDeliver(deliverFn) {
+export async function safeDeliver(deliverFn?: () => WekanDocumentField) {
   try {
     if (typeof deliverFn !== 'function') {
       throw new TypeError('safeDeliver: deliverFn must be a function');

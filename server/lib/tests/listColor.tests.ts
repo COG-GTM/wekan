@@ -45,8 +45,8 @@ describe('list/swimlane color normalization (#5382)', function() {
 
   it('normalizes empty / null / non-string input to "" (None)', function() {
     expect(normalizeListColor('')).to.equal('');
-    expect(normalizeListColor(null)).to.equal('');
-    expect(normalizeListColor(undefined)).to.equal('');
-    expect(normalizeListColor(123)).to.equal('');
+    expect(normalizeListColor(null as never)).to.equal('');
+    expect(normalizeListColor(undefined as never)).to.equal('');
+    expect(normalizeListColor(123 as never)).to.equal('');
   });
 });

@@ -22,8 +22,8 @@ describe('header login auth helpers', function () {
     HEADER_LOGIN_TRUSTED_PROXIES: process.env.HEADER_LOGIN_TRUSTED_PROXIES,
   };
 
-  let usersFindOneAsyncStub;
-  let insertUserDocStub;
+  let usersFindOneAsyncStub: sinon.SinonStub | null;
+  let insertUserDocStub: sinon.SinonStub | null;
 
   afterEach(function () {
     if (usersFindOneAsyncStub) {

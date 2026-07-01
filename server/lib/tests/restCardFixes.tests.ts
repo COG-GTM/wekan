@@ -29,14 +29,14 @@ describe('REST card fixes helpers', function() {
     });
 
     it('ignores non-numeric / NaN sort values', function() {
-      expect(computeTopSort([2, undefined, null, NaN, 'x', 1])).to.equal(0);
-      expect(computeTopSort([undefined, null])).to.equal(0);
+      expect(computeTopSort([2, undefined, null, NaN, 'x', 1] as never)).to.equal(0);
+      expect(computeTopSort([undefined, null] as never)).to.equal(0);
     });
 
     it('is input-type safe (null / undefined / non-array)', function() {
-      expect(computeTopSort(null)).to.equal(0);
-      expect(computeTopSort(undefined)).to.equal(0);
-      expect(computeTopSort('nope')).to.equal(0);
+      expect(computeTopSort(null as never)).to.equal(0);
+      expect(computeTopSort(undefined as never)).to.equal(0);
+      expect(computeTopSort('nope' as never)).to.equal(0);
     });
 
     it('places strictly above the existing top (regression for random sorting)', function() {
@@ -98,13 +98,13 @@ describe('REST card fixes helpers', function() {
     it('parses an ISO 8601 string into a Date', function() {
       const d = parseCardDate('2026-06-20T12:00:00.000Z');
       expect(d).to.be.an.instanceof(Date);
-      expect(d.toISOString()).to.equal('2026-06-20T12:00:00.000Z');
+      expect(d!.toISOString()).to.equal('2026-06-20T12:00:00.000Z');
     });
 
     it('parses a date-only ISO string', function() {
       const d = parseCardDate('2026-06-20');
       expect(d).to.be.an.instanceof(Date);
-      expect(Number.isNaN(d.getTime())).to.equal(false);
+      expect(Number.isNaN(d!.getTime())).to.equal(false);
     });
 
     it('returns a Date unchanged', function() {
@@ -114,8 +114,8 @@ describe('REST card fixes helpers', function() {
 
     it('parses a numeric epoch (number and numeric string)', function() {
       const ms = Date.UTC(2026, 0, 1);
-      expect(parseCardDate(ms).getTime()).to.equal(ms);
-      expect(parseCardDate(String(ms)).getTime()).to.equal(ms);
+      expect(parseCardDate(ms)!.getTime()).to.equal(ms);
+      expect(parseCardDate(String(ms))!.getTime()).to.equal(ms);
     });
 
     it('returns null for empty / clear-style values', function() {
