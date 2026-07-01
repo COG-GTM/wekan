@@ -11,12 +11,12 @@ import Activities from '/models/activities';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BOARD_LEVEL_ACTIONS = ['createCard', 'addSwimlane', 'moveAllCardsInList'];
 
-function pad(n) {
+function pad(n: number) {
   return String(n).padStart(2, '0');
 }
 
 // Has this calendar-scheduled trigger reached its day/date condition right now?
-function calendarDue(trigger, now) {
+function calendarDue(trigger: WekanReactiveDocument, now: Date) {
   const dow = now.getDay(); // 0 = Sunday … 6 = Saturday
   const dom = now.getDate();
   switch (trigger.scheduleType) {
@@ -39,7 +39,7 @@ function calendarDue(trigger, now) {
 
 // Days a card has spent in its current list, from the most recent move/create
 // activity for that card (falls back to the card creation date).
-async function daysInList(card) {
+async function daysInList(card: WekanReactiveDocument) {
   const acts = await ReactiveCache.getActivities(
     { cardId: card._id, activityType: { $in: ['moveCard', 'createCard'] } },
     { sort: { createdAt: -1 }, limit: 1 },
@@ -50,8 +50,12 @@ async function daysInList(card) {
 }
 
 // Resolve which cards a scheduled trigger should act on.
-async function selectCards(trigger) {
-  const selector = { boardId: trigger.boardId, archived: false };
+async function selectCards(trigger: WekanReactiveDocument) {
+  const selector: {
+    boardId: WekanDocumentField;
+    archived: boolean;
+    listId?: string;
+  } = { boardId: trigger.boardId, archived: false };
   if (trigger.listName && trigger.listName !== '*') {
     const list = await ReactiveCache.getList({
       title: trigger.listName,
@@ -65,7 +69,7 @@ async function selectCards(trigger) {
   if (trigger.scheduleKind === 'due') {
     const now = Date.now();
     const window = (Number(trigger.days) || 0) * DAY_MS;
-    cards = cards.filter(c => {
+    cards = cards.filter((c: WekanReactiveDocument) => {
       if (!c.dueAt) return false;
       const due = new Date(c.dueAt).getTime();
       if (trigger.dueCondition === 'set') return true;
@@ -86,7 +90,11 @@ async function selectCards(trigger) {
   return cards;
 }
 
-async function runDueTrigger(trigger, slotKey, now) {
+async function runDueTrigger(
+  trigger: WekanReactiveDocument,
+  slotKey: string,
+  now: Date,
+) {
   const rule = await ReactiveCache.getRule({ triggerId: trigger._id });
   if (!rule) return;
   const action = await ReactiveCache.getAction(rule.actionId);
@@ -115,7 +123,7 @@ async function runDueTrigger(trigger, slotKey, now) {
       );
     }
   }
-  await Triggers.updateAsync(trigger._id, {
+  await Triggers.updateAsync(trigger._id!, {
     $set: { lastRunKey: slotKey, lastRunAt: now },
   });
 }
@@ -149,9 +157,11 @@ export async function scanScheduledRules(now = new Date()) {
 
 Meteor.startup(() => {
   try {
-    SyncedCron.add({
+    // SyncedCron is a runtime Proxy typed as {} by the cron module; narrow it to
+    // the `add` surface this job needs (parser is the later-parser instance).
+    (SyncedCron as SchedulableCron).add({
       name: 'wekan-scheduled-rules',
-      schedule(parser) {
+      schedule(parser: WekanReactiveDocument) {
         return parser.text('every 1 minute');
       },
       job() {
@@ -163,3 +173,13 @@ Meteor.startup(() => {
     console.error('scheduledRules: failed to register cron job', e);
   }
 });
+
+// The `SyncedCron.add` surface used to register this job. The parser passed to
+// `schedule` is the community package's later-parser instance (interop alias).
+interface SchedulableCron {
+  add(config: {
+    name: string;
+    schedule(parser: WekanReactiveDocument): WekanDocumentField;
+    job(): Promise<void>;
+  }): void;
+}

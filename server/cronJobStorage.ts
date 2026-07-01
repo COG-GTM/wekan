@@ -19,7 +19,7 @@ export const CronJobErrors = new Mongo.Collection('cronJobErrors');
 // Allow server-side operations (when userId is undefined) but deny all client operations
 if (Meteor.isServer) {
   // Helper function to check if operation is server-only
-  const isServerOperation = (userId) => !userId;
+  const isServerOperation = (userId: string | undefined) => !userId;
 
   CronJobStatus.allow({
     insert: isServerOperation,
@@ -74,6 +74,10 @@ if (Meteor.isServer) {
 }
 
 class CronJobStorage {
+  maxConcurrentJobs: number;
+  cpuThreshold: number;
+  memoryThreshold: number;
+
   constructor() {
     this.maxConcurrentJobs = this.getMaxConcurrentJobs();
     this.cpuThreshold = 80; // CPU usage threshold percentage
@@ -99,7 +103,7 @@ class CronJobStorage {
   /**
    * Save job status to persistent storage
    */
-  async saveJobStatus(jobId, jobData) {
+  async saveJobStatus(jobId: string, jobData: WekanDocumentField) {
     const now = new Date();
     const existingJob = await CronJobStatus.findOneAsync({ jobId });
 
@@ -126,7 +130,7 @@ class CronJobStorage {
   /**
    * Get job status from persistent storage
    */
-  async getJobStatus(jobId) {
+  async getJobStatus(jobId: string) {
     return await CronJobStatus.findOneAsync({ jobId });
   }
 
@@ -142,7 +146,11 @@ class CronJobStorage {
   /**
    * Save job step status
    */
-  async saveJobStep(jobId, stepIndex, stepData) {
+  async saveJobStep(
+    jobId: string,
+    stepIndex: number,
+    stepData: WekanDocumentField,
+  ) {
     const now = new Date();
     const existingStep = await CronJobSteps.findOneAsync({ jobId, stepIndex });
 
@@ -170,7 +178,7 @@ class CronJobStorage {
   /**
    * Get job steps
    */
-  async getJobSteps(jobId) {
+  async getJobSteps(jobId: string) {
     return await CronJobSteps.find(
       { jobId },
       { sort: { stepIndex: 1 } }
@@ -180,7 +188,7 @@ class CronJobStorage {
   /**
    * Get incomplete steps for a job
    */
-  async getIncompleteSteps(jobId) {
+  async getIncompleteSteps(jobId: string) {
     return await CronJobSteps.find({
       jobId,
       status: { $in: ['pending', 'running'] }
@@ -190,7 +198,7 @@ class CronJobStorage {
   /**
    * Save job error to persistent storage
    */
-  async saveJobError(jobId, errorData) {
+  async saveJobError(jobId: string, errorData: JobErrorData) {
     const now = new Date();
     const { stepId, stepIndex, error, severity = 'error', context = {} } = errorData;
 
@@ -209,10 +217,13 @@ class CronJobStorage {
   /**
    * Get job errors from persistent storage
    */
-  async getJobErrors(jobId, options = {}) {
+  async getJobErrors(
+    jobId: string,
+    options: { limit?: number; severity?: string | null } = {},
+  ) {
     const { limit = 100, severity = null } = options;
 
-    const query = { jobId };
+    const query: { jobId: string; severity?: string } = { jobId };
     if (severity) {
       query.severity = severity;
     }
@@ -236,14 +247,19 @@ class CronJobStorage {
   /**
    * Clear errors for a specific job
    */
-  async clearJobErrors(jobId) {
+  async clearJobErrors(jobId: string) {
     return await CronJobErrors.removeAsync({ jobId });
   }
 
   /**
    * Add job to queue
    */
-  async addToQueue(jobId, jobType, priority = 5, jobData = {}) {
+  async addToQueue(
+    jobId: string,
+    jobType: string,
+    priority = 5,
+    jobData: WekanDocumentField = {},
+  ) {
     const now = new Date();
 
     // Check if job already exists in queue
@@ -277,7 +293,11 @@ class CronJobStorage {
   /**
    * Update job queue status
    */
-  async updateQueueStatus(jobId, status, additionalData = {}) {
+  async updateQueueStatus(
+    jobId: string,
+    status: string,
+    additionalData: WekanDocumentField = {},
+  ) {
     const now = new Date();
     await CronJobQueue.updateAsync(
       { jobId },
@@ -294,7 +314,7 @@ class CronJobStorage {
   /**
    * Remove job from queue
    */
-  async removeFromQueue(jobId) {
+  async removeFromQueue(jobId: string) {
     await CronJobQueue.removeAsync({ jobId });
   }
 
@@ -309,7 +329,7 @@ class CronJobStorage {
     let totalIdle = 0;
     let totalTick = 0;
 
-    cpus.forEach(cpu => {
+    cpus.forEach((cpu: WekanReactiveDocument) => {
       for (const type in cpu.times) {
         totalTick += cpu.times[type];
       }
@@ -439,7 +459,7 @@ class CronJobStorage {
   /**
    * Get job progress percentage
    */
-  async getJobProgress(jobId) {
+  async getJobProgress(jobId: string) {
     const steps = await this.getJobSteps(jobId);
     if (steps.length === 0) return 0;
 
@@ -450,7 +470,7 @@ class CronJobStorage {
   /**
    * Get detailed job information
    */
-  async getJobDetails(jobId) {
+  async getJobDetails(jobId: string) {
     const jobStatus = await this.getJobStatus(jobId);
     const jobSteps = await this.getJobSteps(jobId);
     const progress = await this.getJobProgress(jobId);
@@ -501,3 +521,14 @@ Meteor.startup(async () => {
     // Cleaned up old cron jobs
   }
 });
+
+// Payload passed to saveJobError. `error` may be a string or an Error-like
+// object (its `message`/`stack` are read), so it comes in through the dynamic
+// interop alias.
+interface JobErrorData {
+  stepId?: WekanDocumentField;
+  stepIndex?: number;
+  error: WekanDocumentField;
+  severity?: string;
+  context?: WekanDocumentField;
+}

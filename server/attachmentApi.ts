@@ -16,12 +16,15 @@ const HARD_MAX_API_FILE_BYTES = 64 * 1024 * 1024;
 // no-comments, worker, or assigned-only — or a global site admin. Mirrors
 // Authentication.checkBoardWriteAccess. Read operations keep using
 // board.hasMember().
-async function userHasBoardWriteAccess(board, userId) {
+async function userHasBoardWriteAccess(
+  board: WekanReactiveDocument | undefined,
+  userId: string | undefined,
+) {
   if (!board || !userId || !Array.isArray(board.members)) {
     return false;
   }
   const writeAccess = board.members.some(
-    m =>
+    (m: WekanReactiveDocument) =>
       m.userId === userId &&
       m.isActive &&
       !m.isNoComments &&
@@ -37,14 +40,19 @@ async function userHasBoardWriteAccess(board, userId) {
   return admin !== undefined;
 }
 
-function normalizeConfiguredLimit(configuredValue, fallbackValue = 0) {
+// The configured limit comes from loosely-typed storage settings and may be a
+// number, null, or undefined, so it enters through the dynamic interop alias.
+function normalizeConfiguredLimit(
+  configuredValue: WekanDocumentField,
+  fallbackValue = 0,
+) {
   if (Number.isFinite(configuredValue) && configuredValue >= 0) {
     return configuredValue;
   }
   return Number.isFinite(fallbackValue) && fallbackValue >= 0 ? fallbackValue : 0;
 }
 
-function getEffectiveApiFileLimit(maxBytes) {
+function getEffectiveApiFileLimit(maxBytes: number) {
   if (Number.isFinite(maxBytes) && maxBytes > 0) {
     return Math.min(maxBytes, HARD_MAX_API_FILE_BYTES);
   }
@@ -52,13 +60,13 @@ function getEffectiveApiFileLimit(maxBytes) {
   return HARD_MAX_API_FILE_BYTES;
 }
 
-function maxBase64LengthForBytes(maxBytes) {
+function maxBase64LengthForBytes(maxBytes: number) {
   const safeBytes = Number.isFinite(maxBytes) && maxBytes > 0 ? maxBytes : HARD_MAX_API_FILE_BYTES;
   return Math.ceil((safeBytes * 4) / 3) + 4;
 }
 
-function parseNonNegativeInt(value, fallback = 0) {
-  const parsed = Number.parseInt(value, 10);
+function parseNonNegativeInt(value: string | undefined, fallback = 0) {
+  const parsed = Number.parseInt(value as string, 10);
   if (!Number.isFinite(parsed) || parsed < 0) {
     return fallback;
   }
@@ -272,7 +280,7 @@ Meteor.methods({
         }
 
         // Get file strategy
-        const strategy = fileStoreStrategyFactory.getFileStrategy(attachment, 'original');
+        const strategy = fileStoreStrategyFactory.getFileStrategy(attachment, 'original')!;
         const readStream = strategy.getReadStream();
 
         if (!readStream) {
@@ -280,12 +288,12 @@ Meteor.methods({
         }
 
         // Read file data
-        const chunks = [];
+        const chunks: Buffer[] = [];
         return new Promise((resolve, reject) => {
           let settled = false;
           let totalBytes = 0;
 
-          const fail = (error) => {
+          const fail = (error: Error) => {
             if (settled) {
               return;
             }
@@ -466,17 +474,17 @@ Meteor.methods({
           throw new Meteor.Error('file-too-large', 'Background exceeds API download limit');
         }
 
-        const strategy = fileStoreStrategyFactory.getFileStrategy(attachment, 'original');
+        const strategy = fileStoreStrategyFactory.getFileStrategy(attachment, 'original')!;
         const readStream = strategy.getReadStream();
         if (!readStream) {
           throw new Meteor.Error('file-not-found', 'File not found in storage');
         }
 
-        const chunks = [];
+        const chunks: Buffer[] = [];
         return new Promise((resolve, reject) => {
           let settled = false;
           let totalBytes = 0;
-          const fail = (error) => {
+          const fail = (error: Error) => {
             if (settled) return;
             settled = true;
             try { readStream.destroy(); } catch (e) { /* ignore */ }
@@ -528,7 +536,7 @@ Meteor.methods({
       }
 
       try {
-        let query = { 'meta.boardId': boardId };
+        const query: Record<string, WekanDocumentField> = { 'meta.boardId': boardId };
 
         if (swimlaneId) {
           query['meta.swimlaneId'] = swimlaneId;
@@ -544,8 +552,8 @@ Meteor.methods({
 
         const attachments = await ReactiveCache.getAttachments(query);
         
-        const attachmentList = attachments.map(attachment => {
-          const strategy = fileStoreStrategyFactory.getFileStrategy(attachment, 'original');
+        const attachmentList = attachments.map((attachment: WekanFileObj) => {
+          const strategy = fileStoreStrategyFactory.getFileStrategy(attachment, 'original')!;
           return {
             attachmentId: attachment._id,
             fileName: attachment.name,
@@ -612,7 +620,7 @@ Meteor.methods({
 
       try {
         // Get source file strategy
-        const sourceStrategy = fileStoreStrategyFactory.getFileStrategy(sourceAttachment, 'original');
+        const sourceStrategy = fileStoreStrategyFactory.getFileStrategy(sourceAttachment, 'original')!;
         const readStream = sourceStrategy.getReadStream();
 
         if (!readStream) {
@@ -620,7 +628,7 @@ Meteor.methods({
         }
 
         // Read source file data
-        const chunks = [];
+        const chunks: Buffer[] = [];
         return new Promise((resolve, reject) => {
           readStream.on('data', (chunk) => {
             chunks.push(chunk);
@@ -795,7 +803,7 @@ Meteor.methods({
       }
 
       try {
-        const strategy = fileStoreStrategyFactory.getFileStrategy(attachment, 'original');
+        const strategy = fileStoreStrategyFactory.getFileStrategy(attachment, 'original')!;
 
         return {
           success: true,

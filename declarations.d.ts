@@ -933,7 +933,7 @@ declare module 'meteor/ddp' {
   namespace DDP {
     const _CurrentMethodInvocation: {
       withValue<T>(
-        value: { userId: string; isSimulation: boolean },
+        value: { userId: string; isSimulation?: boolean },
         fn: () => T,
       ): T;
     };

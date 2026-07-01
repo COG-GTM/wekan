@@ -10,11 +10,16 @@ import { cronJobStorage } from './cronJobStorage';
 import Boards from '/models/boards';
 
 // Reactive variables for board migration tracking
-export const unmigratedBoards = new ReactiveVar([]);
+export const unmigratedBoards = new ReactiveVar<WekanReactiveDocument[]>([]);
 export const migrationScanInProgress = new ReactiveVar(false);
-export const lastMigrationScan = new ReactiveVar(null);
+export const lastMigrationScan = new ReactiveVar<Date | null>(null);
 
 class BoardMigrationDetector {
+  scanInterval: number | null;
+  fullScanInterval: number | null = null;
+  isScanning: boolean;
+  migrationCheckInterval: number;
+
   constructor() {
     this.scanInterval = null;
     this.isScanning = false;
@@ -167,7 +172,7 @@ class BoardMigrationDetector {
   /**
    * Check if a board needs migration
    */
-  async needsMigration(board) {
+  async needsMigration(board: WekanReactiveDocument) {
     try {
       // Check if board has been migrated by looking for migration markers
       const migrationMarkers = await this.getMigrationMarkers(board._id);
@@ -188,10 +193,10 @@ class BoardMigrationDetector {
   /**
    * Get migration markers for a board
    */
-  async getMigrationMarkers(boardId) {
+  async getMigrationMarkers(boardId: string | undefined) {
     try {
       // Check if board has migration metadata
-      const board = await Boards.findOneAsync(boardId, { fields: { migrationMarkers: 1 } });
+      const board = await Boards.findOneAsync(boardId!, { fields: { migrationMarkers: 1 } });
 
       if (!board || !board.migrationMarkers) {
         return {
@@ -215,9 +220,9 @@ class BoardMigrationDetector {
   /**
    * Start migration for a specific board
    */
-  async startBoardMigration(boardId) {
+  async startBoardMigration(boardId: string | WekanReactiveDocument) {
     try {
-      const board = await Boards.findOneAsync(boardId);
+      const board = await Boards.findOneAsync(boardId as string);
       if (!board) {
         throw new Error(`Board ${boardId} not found`);
       }
@@ -289,7 +294,7 @@ class BoardMigrationDetector {
   /**
    * Get detailed migration status for a specific board
    */
-  async getBoardMigrationStatus(boardId) {
+  async getBoardMigrationStatus(boardId: string) {
     const unmigrated = unmigratedBoards.get();
     const isUnmigrated = unmigrated.some(b => b._id === boardId);
 
@@ -312,10 +317,10 @@ class BoardMigrationDetector {
   /**
    * Mark a board as migrated
    */
-  async markBoardAsMigrated(boardId, migrationType) {
+  async markBoardAsMigrated(boardId: string, migrationType: string) {
     try {
       // Update migration markers and version
-      const updateQuery = {};
+      const updateQuery: Record<string, WekanDocumentField> = {};
       updateQuery[`migrationMarkers.${migrationType}Migrated`] = true;
       updateQuery['migrationMarkers.lastMigration'] = new Date();
       updateQuery['migrationVersion'] = 1;  // Set migration version to prevent re-migration
@@ -364,7 +369,7 @@ Meteor.methods({
     return boardMigrationDetector.forceScan();
   },
 
-  async 'boardMigration.getBoardStatus'(boardId) {
+  async 'boardMigration.getBoardStatus'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -374,7 +379,7 @@ Meteor.methods({
     return await boardMigrationDetector.getBoardMigrationStatus(boardId);
   },
 
-  async 'boardMigration.markAsMigrated'(boardId, migrationType) {
+  async 'boardMigration.markAsMigrated'(boardId: string, migrationType: string) {
     check(boardId, String);
     check(migrationType, String);
 
@@ -385,7 +390,7 @@ Meteor.methods({
     return await boardMigrationDetector.markBoardAsMigrated(boardId, migrationType);
   },
 
-  'boardMigration.startBoardMigration'(boardId) {
+  'boardMigration.startBoardMigration'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {

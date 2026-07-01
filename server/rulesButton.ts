@@ -9,7 +9,7 @@ import Actions from '/models/actions';
 // Button rules are manual: a user clicks a card/board button and we run the
 // rule's action immediately. This method runs one button rule on demand.
 Meteor.methods({
-  async 'rules.runButton'(ruleId, cardId) {
+  async 'rules.runButton'(ruleId: string, cardId?: string) {
     check(ruleId, String);
     check(cardId, Match.Optional(String));
 
@@ -49,7 +49,12 @@ Meteor.methods({
   // board-button's trigger never re-published to the board view (the button only
   // appeared after a full page reload). Inserting on the server avoids the
   // optimistic-ghost reconciliation problem entirely.
-  async 'rules.createRule'(boardId, title, trigger, action) {
+  async 'rules.createRule'(
+    boardId: string,
+    title: string | undefined,
+    trigger: WekanReactiveDocument,
+    action: WekanReactiveDocument,
+  ) {
     check(boardId, String);
     check(title, Match.Optional(String));
     check(trigger, Object);
@@ -61,14 +66,24 @@ Meteor.methods({
       throw new Meteor.Error('not-authorized', 'Must be a board admin');
     }
 
-    const clean = doc => {
+    const clean = (doc: WekanReactiveDocument) => {
       const { _id, ...rest } = doc || {};
       return rest;
     };
 
     const triggerId = await Triggers.insertAsync({ ...clean(trigger), boardId });
-    const actionId = await Actions.insertAsync({ ...clean(action), boardId });
-    const ruleDoc = {
+    // The action document is user-supplied and schemaless beyond the modelled
+    // fields, so it goes in through the dynamic interop alias.
+    const actionDoc: WekanDocumentField = { ...clean(action), boardId };
+    const actionId = await Actions.insertAsync(actionDoc);
+    const ruleDoc: {
+      title: string;
+      triggerId: string;
+      actionId: string;
+      boardId: string;
+      buttonType?: string;
+      buttonLabel?: string;
+    } = {
       title: title || 'Rule',
       triggerId,
       actionId,

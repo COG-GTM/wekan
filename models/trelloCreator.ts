@@ -1025,7 +1025,7 @@ export class TrelloCreator {
     }
   }
 
-  async create(board: WekanDocumentField, currentBoardId?: string) {
+  async create(board: WekanDocumentField, currentBoardId?: string | null) {
     // TODO : Make isSandstorm variable global
     const isSandstorm =
       Meteor.settings &&
