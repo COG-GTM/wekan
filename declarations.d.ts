@@ -73,6 +73,25 @@ declare module 'meteor/aldeed:simple-schema' {
   export default _default;
 }
 
+// wekan's collections use three Meteor packages that extend Mongo.Collection but
+// ship no TypeScript types: aldeed:collection2 (attachSchema/simpleSchema),
+// dburles:collection-helpers (helpers) and matb33:collection-hooks
+// (before/after/hookOptions). Their APIs are dynamic (schema defs, helper maps
+// keyed on the document, hook callbacks), so the added members use `any` with
+// the collection-helper `this` widened to `any` so helper bodies type-check.
+declare module 'meteor/mongo' {
+  namespace Mongo {
+    interface Collection<T extends import('mongodb').Document, U = T> {
+      attachSchema(schema: any, options?: any): void;
+      simpleSchema(): any;
+      helpers(helpers: { [name: string]: (this: any, ...args: any[]) => any }): void;
+      before: any;
+      after: any;
+      hookOptions: any;
+    }
+  }
+}
+
 // i18next-sprintf-postprocessor — sprintf() post-processor plugin for i18next.
 // Shaped as an i18next PostProcessorModule so it type-checks when passed to
 // `i18next.use()`.

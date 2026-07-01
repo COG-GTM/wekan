@@ -1,6 +1,6 @@
 import { Mongo } from 'meteor/mongo';
 import { ReactiveCache } from '/imports/reactiveCache';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
 const LockoutSettings = new Mongo.Collection('lockoutSettings');
 
@@ -53,7 +53,7 @@ LockoutSettings.helpers({
       _id: { $in: ['known-failuresBeforeLockout', 'known-lockoutPeriod', 'known-failureWindow'] }
     }, { fields: { _id: 1, value: 1 } }).fetch();
 
-    const settingsMap = {};
+    const settingsMap: { [key: string]: any } = {};
     settings.forEach(s => { settingsMap[s._id] = s.value; });
 
     return {
@@ -68,7 +68,7 @@ LockoutSettings.helpers({
       _id: { $in: ['unknown-failuresBeforeLockout', 'unknown-lockoutPeriod', 'unknown-failureWindow'] }
     }, { fields: { _id: 1, value: 1 } }).fetch();
 
-    const settingsMap = {};
+    const settingsMap: { [key: string]: any } = {};
     settings.forEach(s => { settingsMap[s._id] = s.value; });
 
     return {
