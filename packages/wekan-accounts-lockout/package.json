@@ -1,4 +1,9 @@
 {
   "name": "wekan-accounts-lockout",
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "@types/meteor": "^2.9.11",
+    "@types/node": "^26.1.0",
+    "typescript": "^6.0.3"
+  }
 }
