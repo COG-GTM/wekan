@@ -1,6 +1,6 @@
 import { Mongo } from 'meteor/mongo';
 import { ReactiveCache } from '/imports/reactiveCache';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
 /**
  * PositionHistory collection to track original positions of swimlanes, lists, and cards

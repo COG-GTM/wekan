@@ -1,6 +1,6 @@
 import { Mongo } from 'meteor/mongo';
 import Cards from '/models/cards';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
 const CustomFields = new Mongo.Collection('customFields');
 
@@ -143,7 +143,10 @@ CustomFields.attachSchema(
   }),
 );
 
-CustomFields.addToAllCards = async cf => {
+// Custom static method attached to the collection instance; not part of the
+// Mongo.Collection type, so the assignment goes through `any`. `cf` is a custom
+// field document (dynamic shape).
+(CustomFields as any).addToAllCards = async (cf: any) => {
   await Cards.updateAsync(
     {
       boardId: { $in: cf.boardIds },
@@ -157,7 +160,7 @@ CustomFields.addToAllCards = async cf => {
 };
 
 CustomFields.helpers({
-  async addBoard(boardId) {
+  async addBoard(boardId: string) {
     if (boardId) {
       return await CustomFields.updateAsync(this._id, {
         $push: { boardIds: boardId },

@@ -1,7 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { Mongo } from 'meteor/mongo';
 import { ReactiveCache } from '/imports/reactiveCache';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
 const Integrations = new Mongo.Collection('integrations');
 
@@ -130,7 +130,9 @@ Integrations.attachSchema(
     },
   }),
 );
-Integrations.Const = {
+// Custom constants attached to the collection instance; not part of the
+// Mongo.Collection type, so the assignment goes through `any`.
+(Integrations as any).Const = {
   GLOBAL_WEBHOOK_ID: '_global',
   ONEWAY: 'outgoing-webhooks',
   TWOWAY: 'bidirectional-webhooks',
