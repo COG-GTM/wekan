@@ -264,6 +264,30 @@ interface WekanConnectRouter {
   options(path: string, ...handlers: WekanConnectHandler[]): WekanConnectRouter;
 }
 
+// meteor/reywood:publish-composite — declarative publication of related cursors
+// (no bundled types). The publish callback is bound to a Meteor.Subscription and
+// returns a tree of find()/children specs (or an array to clear the client).
+// Documents passed to a child spec's find() are dynamic per-collection Mongo
+// docs, so they are `any`; the callback likewise returns cursors/arrays of
+// dynamic docs.
+declare module 'meteor/reywood:publish-composite' {
+  interface PublishCompositeConfig {
+    // Receives the parent documents (one per ancestor level); a top-level
+    // find() takes none. Returns a cursor, array of cursors, or null.
+    find(...parents: any[]): any;
+    children?: PublishCompositeConfig[];
+  }
+  type PublishCompositeCallback = (
+    this: import('meteor/meteor').Meteor.Subscription,
+    ...args: any[]
+  ) => PublishCompositeConfig | any[] | Promise<PublishCompositeConfig | any[]>;
+  function publishComposite(
+    name: string,
+    config: PublishCompositeConfig | PublishCompositeCallback,
+  ): void;
+  export { publishComposite };
+}
+
 // meteor/wekan-accounts-lockout — brute-force account lockout package (no bundled
 // types). Configured with numeric policy bags for known/unknown users, then
 // started via `.startup()`.
