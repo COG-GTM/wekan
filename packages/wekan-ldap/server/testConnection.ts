@@ -16,7 +16,7 @@ Meteor.methods({
       throw new Meteor.Error('LDAP_disabled');
     }
 
-    let ldap;
+    let ldap: LDAP;
     try {
       ldap = new LDAP();
       await ldap.connect();

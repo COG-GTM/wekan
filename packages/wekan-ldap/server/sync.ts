@@ -2,9 +2,12 @@ import { SyncedCron } from 'meteor/quave:synced-cron';
 import limax from 'limax';
 import LDAP from './ldap';
 import { log_debug, log_info, log_warn, log_error } from './logger';
+import { LdapUser, LdapUniqueId } from '../types';
 
 Object.defineProperty(Object.prototype, "getLDAPValue", {
-  value: function (prop) {
+  // `this` is the arbitrary object the accessor is invoked on, so it is typed
+  // as a dynamic dictionary.
+  value: function (this: Record<string, any>, prop: string) {
       const self = this;
       for (let key in self) {
           if (key.toLowerCase() == prop.toLowerCase()) {
@@ -18,14 +21,14 @@ Object.defineProperty(Object.prototype, "getLDAPValue", {
 
 // #4737: parse a comma-separated LDAP group allowlist setting into a trimmed,
 // non-empty array. Returns [] when unset/empty, meaning "no restriction".
-function parseGroupAllowlist(value) {
+function parseGroupAllowlist(value: string) {
   if (typeof value !== 'string' || value.trim() === '') {
     return [];
   }
   return value.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
-export function slug(text) {
+export function slug(text: string) {
   if (LDAP.settings_get('LDAP_UTF8_NAMES_SLUGIFY') !== true) {
     return text;
   }
@@ -33,7 +36,7 @@ export function slug(text) {
   return text.replace(/[^0-9a-z-_.]/g, '');
 }
 
-function templateVarHandler (variable, object) {
+function templateVarHandler (variable: string, object: LdapUser): string | undefined {
 
   const templateRegex = /#{([\w\-]+)}/gi;
   let match = templateRegex.exec(variable);
@@ -61,7 +64,8 @@ function templateVarHandler (variable, object) {
   }
 }
 
-export function getPropertyValue(obj, key) {
+// `obj` is a dynamic object traversed by a dotted key path, so it is typed `any`.
+export function getPropertyValue(obj: any, key: string) {
   try {
     return key.split('.').reduce((acc, el) => acc[el], obj);
   } catch (err) {
@@ -69,11 +73,11 @@ export function getPropertyValue(obj, key) {
   }
 }
 
-export function getLdapUsername(ldapUser) {
+export function getLdapUsername(ldapUser: LdapUser): string {
   const usernameField = LDAP.settings_get('LDAP_USERNAME_FIELD');
 
   if (usernameField.indexOf('#{') > -1) {
-    return usernameField.replace(/#{(.+?)}/g, function(match, field) {
+    return usernameField.replace(/#{(.+?)}/g, function(match: string, field: string) {
       return ldapUser.getLDAPValue(field);
     });
   }
@@ -81,11 +85,11 @@ export function getLdapUsername(ldapUser) {
   return ldapUser.getLDAPValue(usernameField);
 }
 
-export function getLdapEmail(ldapUser) {
+export function getLdapEmail(ldapUser: LdapUser): string {
   const emailField = LDAP.settings_get('LDAP_EMAIL_FIELD');
 
   if (emailField.indexOf('#{') > -1) {
-    return emailField.replace(/#{(.+?)}/g, function(match, field) {
+    return emailField.replace(/#{(.+?)}/g, function(match: string, field: string) {
       return ldapUser.getLDAPValue(field);
     });
   }
@@ -98,17 +102,17 @@ export function getLdapEmail(ldapUser) {
   }
 }
 
-export function getLdapFullname(ldapUser) {
+export function getLdapFullname(ldapUser: LdapUser): string {
   const fullnameField = LDAP.settings_get('LDAP_FULLNAME_FIELD');
   if (fullnameField.indexOf('#{') > -1) {
-    return fullnameField.replace(/#{(.+?)}/g, function(match, field) {
+    return fullnameField.replace(/#{(.+?)}/g, function(match: string, field: string) {
       return ldapUser.getLDAPValue(field);
     });
   }
   return ldapUser.getLDAPValue(fullnameField);
 }
 
-export function getLdapUserUniqueID(ldapUser) {
+export function getLdapUserUniqueID(ldapUser: LdapUser): LdapUniqueId | undefined {
   let Unique_Identifier_Field = LDAP.settings_get('LDAP_UNIQUE_IDENTIFIER_FIELD');
 
   if (Unique_Identifier_Field !== '') {
@@ -128,7 +132,7 @@ export function getLdapUserUniqueID(ldapUser) {
   Unique_Identifier_Field = Unique_Identifier_Field.concat(User_Search_Field);
 
   if (Unique_Identifier_Field.length > 0) {
-    Unique_Identifier_Field = Unique_Identifier_Field.find((field) => {
+    Unique_Identifier_Field = Unique_Identifier_Field.find((field: string) => {
       const val = ldapUser._raw.getLDAPValue(field);
       return val != null && val !== '' && !(Array.isArray(val) && val.length === 0);
     });
@@ -143,17 +147,18 @@ export function getLdapUserUniqueID(ldapUser) {
   }
 }
 
-export function getDataToSyncUserData(ldapUser, user) {
+export function getDataToSyncUserData(ldapUser: LdapUser, user: Partial<Meteor.User>) {
   const syncUserData = LDAP.settings_get('LDAP_SYNC_USER_DATA');
   const syncUserDataFieldMap = LDAP.settings_get('LDAP_SYNC_USER_DATA_FIELDMAP').trim();
 
-  const userData = {};
+  // Mongo $set field map whose dotted keys are only known at runtime.
+  const userData: Record<string, any> = {};
 
   if (syncUserData && syncUserDataFieldMap) {
     const whitelistedUserFields = ['email', 'name', 'customFields'];
     const fieldMap = JSON.parse(syncUserDataFieldMap);
-    const emailList = [];
-    Object.entries(fieldMap).forEach(function([ldapField, userField]) {
+    const emailList: Array<{ address: string; verified: boolean }> = [];
+    Object.entries(fieldMap).forEach(function([ldapField, userField]: [string, any]) {
 		    log_debug(`Mapping field ${ldapField} -> ${userField}`);
       switch (userField) {
       case 'email':
@@ -163,7 +168,8 @@ export function getDataToSyncUserData(ldapUser, user) {
         }
 
         if (typeof ldapUser[ldapField] === 'object' && ldapUser[ldapField] !== null) {
-          Array.from(ldapUser[ldapField]).forEach(function(item) {
+          // `item` is a directory attribute value of a runtime-dependent type.
+          Array.from(ldapUser[ldapField]).forEach(function(item: any) {
             emailList.push({ address: item, verified: true });
           });
         } else {
@@ -206,7 +212,7 @@ export function getDataToSyncUserData(ldapUser, user) {
           // TODO: Find a better solution.
           const dKeys = userField.split('.');
           const lastKey = dKeys.at(-1);
-          dKeys.reduce((obj, currKey) =>
+          dKeys.reduce((obj: Record<string, any>, currKey: string) =>
             (currKey === lastKey)
               ? obj[currKey] = tmpLdapField
               : obj[currKey] = obj[currKey] || {}
@@ -240,7 +246,7 @@ export function getDataToSyncUserData(ldapUser, user) {
 }
 
 
-export async function syncUserData(user, ldapUser) {
+export async function syncUserData(user: Partial<Meteor.User>, ldapUser: LdapUser) {
   log_info('Syncing user data');
   log_debug('user', {'email': user.email, '_id': user._id});
   // log_debug('ldapUser', ldapUser.object);
@@ -249,7 +255,10 @@ export async function syncUserData(user, ldapUser) {
     const username = slug(getLdapUsername(ldapUser));
     if (user && user._id && username !== user.username) {
       log_info('Syncing user username', user.username, '->', username);
-      await Meteor.users.findOneAsync({ _id: user._id }, { $set: { username }});
+      // Preserved as-is: the original passes a Mongo modifier as findOneAsync's
+      // options argument, which does not match the typed options shape, so the
+      // argument is asserted to bypass the mismatch without altering behaviour.
+      await Meteor.users.findOneAsync({ _id: user._id }, { $set: { username }} as any);
     }
   }
 
@@ -280,10 +289,10 @@ export async function syncUserData(user, ldapUser) {
 
 }
 
-export async function addLdapUser(ldapUser, username, password) {
+export async function addLdapUser(ldapUser: LdapUser, username?: string, password?: string) {
   const uniqueId = getLdapUserUniqueID(ldapUser);
 
-  const userObject = {
+  const userObject: LdapUserObject = {
   };
 
   if (username) {
@@ -301,7 +310,7 @@ export async function addLdapUser(ldapUser, username, password) {
   } else if (ldapUser.mail && ldapUser.mail.indexOf('@') > -1) {
     userObject.email = ldapUser.mail;
   } else if (LDAP.settings_get('LDAP_DEFAULT_DOMAIN') !== '') {
-    userObject.email = `${ username || uniqueId.value }@${ LDAP.settings_get('LDAP_DEFAULT_DOMAIN') }`;
+    userObject.email = `${ username || uniqueId!.value }@${ LDAP.settings_get('LDAP_DEFAULT_DOMAIN') }`;
   } else {
     const error = new Meteor.Error('LDAP-login-error', 'LDAP Authentication succeded, there is no email to create an account. Have you tried setting your Default Domain in LDAP Settings?');
     log_error(error);
@@ -322,7 +331,7 @@ export async function addLdapUser(ldapUser, username, password) {
     // Add the services.ldap identifiers
     await Meteor.users.updateAsync({ _id:  userObject._id }, {
 		    $set: {
-		        'services.ldap': { id: uniqueId.value },
+		        'services.ldap': { id: uniqueId!.value },
 		        'emails.0.verified': true,
 		        'authenticationMethod': 'ldap',
 		    }});
@@ -338,7 +347,7 @@ export async function addLdapUser(ldapUser, username, password) {
   };
 }
 
-export async function importNewUsers(ldap) {
+export async function importNewUsers(ldap?: LDAP) {
   if (LDAP.settings_get('LDAP_ENABLE') !== true) {
     log_error('Can\'t run LDAP Import, LDAP is disabled');
     return;
@@ -358,12 +367,12 @@ export async function importNewUsers(ldap) {
     const uniqueId = getLdapUserUniqueID(ldapUser);
     // Look to see if user already exists
     const userQuery = {
-      'services.ldap.id': uniqueId.value,
+      'services.ldap.id': uniqueId!.value,
     };
 
     log_debug('userQuery', userQuery);
 
-    let username;
+    let username: string | undefined;
     if (LDAP.settings_get('LDAP_USERNAME_FIELD') !== '') {
       username = slug(getLdapUsername(ldapUser));
     }
@@ -404,7 +413,7 @@ export async function importNewUsers(ldap) {
 // in the app (server method setUserOrgsTeamsFromLdap) and is add-only, so it
 // never removes a user's existing memberships. Shared by the background sync
 // and the login handler.
-export async function syncUserGroupsToOrgsTeams(ldap, ldapUser, userId) {
+export async function syncUserGroupsToOrgsTeams(ldap: LDAP, ldapUser: LdapUser, userId: string) {
   const syncOrgs  = LDAP.settings_get('LDAP_SYNC_ORGANIZATIONS') === true;
   const syncTeams = LDAP.settings_get('LDAP_SYNC_TEAMS') === true;
   if (!syncOrgs && !syncTeams) {
@@ -444,7 +453,7 @@ async function sync() {
   try {
     await ldap.connect();
 
-    let users;
+    let users: Mongo.Cursor<Meteor.User> | undefined;
     if (LDAP.settings_get('LDAP_BACKGROUND_SYNC_KEEP_EXISTANT_USERS_UPDATED') === true) {
       users = Meteor.users.find({ 'services.ldap': { $exists: true }});
     }
@@ -454,13 +463,13 @@ async function sync() {
     }
 
     if (LDAP.settings_get('LDAP_BACKGROUND_SYNC_KEEP_EXISTANT_USERS_UPDATED') === true) {
-      for await (const user of users) {
-        let ldapUser;
+      for await (const user of users!) {
+        let ldapUser: LdapUser | undefined;
 
         if (user.services && user.services.ldap && user.services.ldap.id) {
           ldapUser = await ldap.getUserById(user.services.ldap.id, user.services.ldap.idAttribute);
         } else {
-          ldapUser = await ldap.getUserByUsername(user.username);
+          ldapUser = await ldap.getUserByUsername(user.username!);
         }
 
         if (ldapUser) {
@@ -535,9 +544,9 @@ async function sync() {
 
 const jobName = 'LDAP_Sync';
 
-function debounce(fn, wait) {
-  let timer = null;
-  return function (...args) {
+function debounce<A extends any[]>(fn: (...args: A) => void, wait: number) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return function (this: void, ...args: A) {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => { timer = null; fn.apply(this, args); }, wait);
   };
@@ -576,3 +585,13 @@ Meteor.startup(() => {
     if(LDAP.settings_get('LDAP_BACKGROUND_SYNC')){addCronJob();}
   });
 });
+
+// Account fields assembled while provisioning a new user from an LDAP entry,
+// before it is handed to Accounts.createUserAsync().
+interface LdapUserObject {
+  username?: string;
+  email?: string;
+  password?: string;
+  ldap?: boolean;
+  _id?: string;
+}

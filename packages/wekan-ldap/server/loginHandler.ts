@@ -1,8 +1,9 @@
 import {slug, getLdapUsername, getLdapEmail, getLdapUserUniqueID, syncUserData, addLdapUser, syncUserGroupsToOrgsTeams} from './sync';
 import LDAP from './ldap';
 import { log_debug, log_info, log_warn, log_error } from './logger';
+import { LdapUser } from '../types';
 
-function fallbackDefaultAccountSystem(bind, username, password) {
+function fallbackDefaultAccountSystem(bind: object, username: string | { username: string } | { email: string }, password: string) {
   if (typeof username === 'string') {
     if (username.indexOf('@') === -1) {
       username = {username};
@@ -38,7 +39,7 @@ Accounts.registerLoginHandler('ldap', async function(loginRequest) {
 
   const self = this;
   const ldap = new LDAP();
-  let ldapUser;
+  let ldapUser: LdapUser | null | undefined;
 
   try {
 
@@ -82,10 +83,10 @@ Accounts.registerLoginHandler('ldap', async function(loginRequest) {
 
   // Look to see if user already exists
 
-  let userQuery;
+  let userQuery: Mongo.Query<Meteor.User>;
 
   const Unique_Identifier_Field = getLdapUserUniqueID(ldapUser);
-  let user;
+  let user: Meteor.User | undefined;
    // Attempt to find user by unique identifier
 
   if (Unique_Identifier_Field) {
@@ -101,8 +102,8 @@ Accounts.registerLoginHandler('ldap', async function(loginRequest) {
 
   // Attempt to find user by username
 
-  let username;
-  let email;
+  let username: string | undefined;
+  let email: string | undefined;
 
    if (LDAP.settings_get('LDAP_USERNAME_FIELD') !== '') {
     username = slug(getLdapUsername(ldapUser));
@@ -232,14 +233,14 @@ Accounts.registerLoginHandler('ldap', async function(loginRequest) {
   if (LDAP.settings_get('LDAP_SYNC_ADMIN_STATUS') === true) {
     log_debug('Updating admin status');
     const targetGroups = LDAP.settings_get('LDAP_SYNC_ADMIN_GROUPS').split(',');
-    const groups = (await ldap.getUserGroups(username, ldapUser)).filter((value) => targetGroups.includes(value));
+    const groups = (await ldap.getUserGroups(username!, ldapUser)).filter((value) => targetGroups.includes(value));
 
     result.isAdmin = groups.length > 0;
     await Meteor.users.updateAsync({_id: result.userId}, {$set: {isAdmin: result.isAdmin}});
   }
 
   if( LDAP.settings_get('LDAP_SYNC_GROUP_ROLES') === true ) {
-    const groups = await ldap.getUserGroups(username, ldapUser);
+    const groups = await ldap.getUserGroups(username!, ldapUser);
     if( groups.length > 0 ) {
       Roles.setUserRoles(result.userId, groups );
       log_info(`Set roles to:${  groups.join(',')}`);

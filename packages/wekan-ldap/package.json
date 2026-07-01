@@ -1,0 +1,19 @@
+{
+  "name": "wekan-ldap",
+  "version": "1.0.0",
+  "description": "This packages is based on the RocketChat ldap login package",
+  "main": "package.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/meteor": "^2.9.11",
+    "@types/node": "^20.14.0",
+    "ldapts": "^4.2.6",
+    "limax": "^4.1.0",
+    "typescript": "^5.6.3"
+  }
+}
