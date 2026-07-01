@@ -10,7 +10,7 @@ import { sendJsonResult } from '/server/apiMiddleware';
 // getCurrentUser() can return null inside an async method after an await
 // (the DDP invocation context is not always preserved), so we look the caller
 // up directly by id.
-async function callerIsAdmin(userId) {
+async function callerIsAdmin(userId: string | null) {
   if (!userId) return false;
   const u = await ReactiveCache.getUser({ _id: userId }, { fields: { isAdmin: 1 } });
   return !!(u && u.isAdmin);
@@ -18,12 +18,12 @@ async function callerIsAdmin(userId) {
 
 Meteor.methods({
   async setCreateOrg(
-    orgDisplayName,
-    orgDesc,
-    orgShortName,
-    orgAutoAddUsersWithDomainName,
-    orgWebsite,
-    orgIsActive,
+    orgDisplayName: string,
+    orgDesc: string,
+    orgShortName: string,
+    orgAutoAddUsersWithDomainName: string,
+    orgWebsite: string,
+    orgIsActive: boolean,
   ) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
       check(orgDisplayName, String);
@@ -50,12 +50,12 @@ Meteor.methods({
   },
 
   async setCreateOrgFromOidc(
-    orgDisplayName,
-    orgDesc,
-    orgShortName,
-    orgAutoAddUsersWithDomainName,
-    orgWebsite,
-    orgIsActive,
+    orgDisplayName: string,
+    orgDesc: string,
+    orgShortName: string,
+    orgAutoAddUsersWithDomainName: string,
+    orgWebsite: string,
+    orgIsActive: boolean,
   ) {
     // SECURITY (GHSA-cv95-8h7c-2ffq): This *FromOidc method is an internal
     // helper invoked only server-side during the OIDC login flow (via
@@ -91,18 +91,18 @@ Meteor.methods({
     });
   },
 
-  async setOrgDisplayName(org, orgDisplayName) {
+  async setOrgDisplayName(org: WekanDocumentField, orgDisplayName: string) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
       check(org, Object);
       check(orgDisplayName, String);
       await Org.updateAsync(org, {
         $set: { orgDisplayName },
       });
-      await Meteor.callAsync('setUsersOrgsOrgDisplayName', org._id, orgDisplayName);
+      await Meteor.callAsync('setUsersOrgsOrgDisplayName', (org as WekanDocumentField)._id, orgDisplayName);
     }
   },
 
-  async setOrgDesc(org, orgDesc) {
+  async setOrgDesc(org: WekanDocumentField, orgDesc: string) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
       check(org, Object);
       check(orgDesc, String);
@@ -112,7 +112,7 @@ Meteor.methods({
     }
   },
 
-  async setOrgShortName(org, orgShortName) {
+  async setOrgShortName(org: WekanDocumentField, orgShortName: string) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
       check(org, Object);
       check(orgShortName, String);
@@ -122,7 +122,7 @@ Meteor.methods({
     }
   },
 
-  async setAutoAddUsersWithDomainName(org, orgAutoAddUsersWithDomainName) {
+  async setAutoAddUsersWithDomainName(org: WekanDocumentField, orgAutoAddUsersWithDomainName: string) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
       check(org, Object);
       check(orgAutoAddUsersWithDomainName, String);
@@ -132,7 +132,7 @@ Meteor.methods({
     }
   },
 
-  async setOrgIsActive(org, orgIsActive) {
+  async setOrgIsActive(org: WekanDocumentField, orgIsActive: boolean) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
       check(org, Object);
       check(orgIsActive, Boolean);
@@ -147,7 +147,7 @@ Meteor.methods({
   // unconditionally (audit-argument-checks), and admin is verified via the
   // method's this.userId (Meteor.user()/getCurrentUser() can lose the DDP
   // invocation context across awaits in async methods and return null).
-  async setOrgSharedTemplates(org, value) {
+  async setOrgSharedTemplates(org: WekanDocumentField, value: boolean) {
     check(org, Object);
     check(value, Boolean);
     if (await callerIsAdmin(this.userId)) {
@@ -155,7 +155,7 @@ Meteor.methods({
     }
   },
 
-  async setOrgPropagateMembersToBoards(org, value) {
+  async setOrgPropagateMembersToBoards(org: WekanDocumentField, value: boolean) {
     check(org, Object);
     check(value, Boolean);
     if (await callerIsAdmin(this.userId)) {
@@ -163,7 +163,7 @@ Meteor.methods({
     }
   },
 
-  async setOrgSyncMembersFromAuth(org, value) {
+  async setOrgSyncMembersFromAuth(org: WekanDocumentField, value: boolean) {
     check(org, Object);
     check(value, Boolean);
     if (await callerIsAdmin(this.userId)) {
@@ -172,7 +172,7 @@ Meteor.methods({
   },
 
   // Bulk select-all / unselect-all for one of the org feature columns.
-  async setAllOrgsFeature(field, value) {
+  async setAllOrgsFeature(field: string, value: boolean) {
     check(field, String);
     check(value, Boolean);
     if (await callerIsAdmin(this.userId)) {
@@ -189,13 +189,13 @@ Meteor.methods({
   },
 
   async setOrgAllFieldsFromOidc(
-    org,
-    orgDisplayName,
-    orgDesc,
-    orgShortName,
-    orgAutoAddUsersWithDomainName,
-    orgWebsite,
-    orgIsActive,
+    org: WekanDocumentField,
+    orgDisplayName: string,
+    orgDesc: string,
+    orgShortName: string,
+    orgAutoAddUsersWithDomainName: string,
+    orgWebsite: string,
+    orgIsActive: boolean,
   ) {
     // SECURITY (GHSA-cv95-8h7c-2ffq): Internal OIDC-login-only helper (called
     // server-side from packages/wekan-oidc/loginHandler.js). Performs a
@@ -222,17 +222,17 @@ Meteor.methods({
         orgIsActive,
       },
     });
-    await Meteor.callAsync('setUsersOrgsOrgDisplayName', org._id, orgDisplayName);
+    await Meteor.callAsync('setUsersOrgsOrgDisplayName', (org as WekanDocumentField)._id, orgDisplayName);
   },
 
   async setOrgAllFields(
-    org,
-    orgDisplayName,
-    orgDesc,
-    orgShortName,
-    orgAutoAddUsersWithDomainName,
-    orgWebsite,
-    orgIsActive,
+    org: WekanDocumentField,
+    orgDisplayName: string,
+    orgDesc: string,
+    orgShortName: string,
+    orgAutoAddUsersWithDomainName: string,
+    orgWebsite: string,
+    orgIsActive: boolean,
   ) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
       check(org, Object);
@@ -252,7 +252,7 @@ Meteor.methods({
           orgIsActive,
         },
       });
-      await Meteor.callAsync('setUsersOrgsOrgDisplayName', org._id, orgDisplayName);
+      await Meteor.callAsync('setUsersOrgsOrgDisplayName', (org as WekanDocumentField)._id, orgDisplayName);
     }
   },
 
@@ -338,7 +338,7 @@ WebApp.handlers.put('/api/admin/orgs/:orgId/features', async function(req, res) 
     await Authentication.checkUserId(req.userId);
     const orgId = req.params.orgId;
     const body = req.body || {};
-    const $set = {};
+    const $set: Record<string, WekanDocumentField> = {};
     ORG_FEATURE_FIELDS.forEach(field => {
       if (body[field] !== undefined) {
         $set[field] = !!body[field];

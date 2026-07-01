@@ -27,7 +27,7 @@ import {
 // color : any CSS color (e.g. "#eb144c")
 // icon  : a FontAwesome 4.7 icon name without the "fa-" prefix (e.g. "link")
 
-async function dependencyLine(sourceCard, dep) {
+async function dependencyLine(sourceCard: WekanDocumentField, dep: WekanDocumentField) {
   const target = await ReactiveCache.getCard(dep.cardId);
   return {
     from: sourceCard._id,
@@ -48,16 +48,16 @@ async function dependencyLine(sourceCard, dep) {
 // target board by _id first, then cardNumber, then exact title — so a file
 // exported from one board can be re-applied to a copy/import of it.
 Meteor.methods({
-  async importBoardDependencies(boardId, lines) {
+  async importBoardDependencies(boardId: string, lines: WekanDocumentField[]) {
     check(boardId, String);
     check(lines, [Object]);
     await Authentication.checkBoardWriteAccess(this.userId, boardId);
 
     const cards = await ReactiveCache.getCards({ boardId, archived: false });
-    const byId = {};
-    const byNumber = {};
-    const byTitle = {};
-    cards.forEach(card => {
+    const byId: Record<string, string> = {};
+    const byNumber: Record<string, string> = {};
+    const byTitle: Record<string, string> = {};
+    cards.forEach((card: WekanDocumentField) => {
       byId[card._id] = card._id;
       if (card.cardNumber !== undefined && card.cardNumber !== null) {
         byNumber[String(card.cardNumber)] = card._id;
@@ -65,7 +65,7 @@ Meteor.methods({
       if (card.title) byTitle[card.title] = card._id;
     });
 
-    const resolve = (id, number, title) => {
+    const resolve = (id: WekanDocumentField, number: WekanDocumentField, title: WekanDocumentField) => {
       if (id && byId[id]) return byId[id];
       if (number !== undefined && number !== null && byNumber[String(number)]) {
         return byNumber[String(number)];
@@ -76,7 +76,7 @@ Meteor.methods({
 
     let imported = 0;
     let unmatched = 0;
-    for (const line of lines) {
+    for (const line of lines as WekanDocumentField[]) {
       const fromId = resolve(line.from, line.fromCardNumber, line.fromTitle);
       const toId = resolve(line.to, line.toCardNumber, line.toTitle);
       if (!fromId || !toId || fromId === toId) {
@@ -88,7 +88,7 @@ Meteor.methods({
         type: line.type,
         color: line.color,
         icon: line.icon,
-      });
+      })!;
       const source = await ReactiveCache.getCard(fromId);
       const existing = normalizeDependencies(source && source.cardDependencies);
       if (existing.find(d => d.cardId === toId)) {
@@ -221,7 +221,7 @@ if (Meteor.isServer) {
         type: req.body.type || (existing && existing.type),
         color: req.body.color || (existing && existing.color),
         icon: req.body.icon || (existing && existing.icon),
-      });
+      })!;
       if (existing) {
         await Cards.updateAsync(
           { _id: paramCardId, 'cardDependencies.cardId': targetId },
@@ -271,7 +271,7 @@ if (Meteor.isServer) {
       if (req.body.type && !DEPENDENCY_TYPE_IDS.includes(req.body.type)) {
         throw new Meteor.Error('bad-request', `type must be one of: ${DEPENDENCY_TYPE_IDS.join(', ')}`);
       }
-      const modifier = {};
+      const modifier: Record<string, WekanDocumentField> = {};
       ['type', 'color', 'icon'].forEach(key => {
         if (req.body[key] !== undefined) {
           modifier[`cardDependencies.$.${key}`] = req.body[key];

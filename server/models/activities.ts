@@ -10,11 +10,11 @@ import { Notifications } from '/server/notifications/notifications';
 import { ensureIndex } from '/server/lib/mongoStartup';
 import { safeDeliver } from '/server/lib/webhookGuard';
 
-function normalizeActivityText(value, fallback = '') {
+function normalizeActivityText(value: WekanDocumentField, fallback = '') {
   return typeof value === 'string' ? value : fallback;
 }
 
-function getActivityUserName(user, fallback = '') {
+function getActivityUserName(user: WekanDocumentField, fallback = '') {
   if (!user) {
     return fallback;
   }
@@ -55,14 +55,14 @@ Meteor.startup(async () => {
 
 Activities.after.insert(async (userId, doc) => {
   const activity = Activities._transform(doc);
-  let participants = [];
-  let watchers = [];
+  let participants: string[] = [];
+  let watchers: string[] = [];
   let title = 'act-activity-notify';
   const board = activity.boardId
     ? (await ReactiveCache.getBoard(activity.boardId)) || (await Boards.findOneAsync(activity.boardId))
     : null;
   const description = `act-${activity.activityType}`;
-  const params = {
+  const params: Record<string, WekanDocumentField> = {
     activityId: activity._id,
   };
 
@@ -304,7 +304,7 @@ Activities.after.insert(async (userId, doc) => {
   });
 
   if (board) {
-    const activeMemberIds = (board.members || []).filter(m => m.isActive === true).map(m => m.userId);
+    const activeMemberIds = (board.members || []).filter((m: WekanDocumentField) => m.isActive === true).map((m: WekanDocumentField) => m.userId);
     const BIGEVENTS = process.env.BIGEVENTS_PATTERN;
     if (BIGEVENTS) {
       try {
@@ -315,8 +315,8 @@ Activities.after.insert(async (userId, doc) => {
       } catch (e) {}
     }
 
-    const watchingUsers = where(board.watchers, { level: 'watching' }).map(x => x.userId);
-    const trackingUsers = where(board.watchers, { level: 'tracking' }).map(x => x.userId);
+    const watchingUsers = where(board.watchers, { level: 'watching' }).map((x: WekanDocumentField) => x.userId);
+    const trackingUsers = where(board.watchers, { level: 'tracking' }).map((x: WekanDocumentField) => x.userId);
     if (!params.hasMentions) {
       watchers = [...new Set([
         ...watchers,
@@ -332,7 +332,7 @@ Activities.after.insert(async (userId, doc) => {
     // self-notified. Opt out with NOTIFY_ON_ASSIGN=false; on by default.
     if (
       process.env.NOTIFY_ON_ASSIGN !== 'false' &&
-      process.env.NOTIFY_ON_ASSIGN !== false
+      (process.env.NOTIFY_ON_ASSIGN as WekanDocumentField) !== false
     ) {
       const assignedUserId = activity.assigneeId || activity.memberId;
       if (
@@ -364,15 +364,15 @@ Activities.after.insert(async (userId, doc) => {
   });
   if (integrations.length > 0) {
     params.watchers = watchers;
-    integrations.forEach((integration) => {
+    integrations.forEach((integration: WekanDocumentField) => {
       // Fire-and-forget, error-isolated: a failing/slow/unreachable outgoing
       // webhook must never abort this activity insert or the originating
       // operation (e.g. adding/removing a card member). See bug #1402.
       // safeDeliver() never rejects, so we intentionally do not await it.
       safeDeliver(
         () =>
-          new Promise((resolve, reject) => {
-            Meteor.call('outgoingWebhooks', integration, description, params, (err) => {
+          new Promise<void>((resolve, reject) => {
+            Meteor.call('outgoingWebhooks', integration, description, params, (err: WekanDocumentField) => {
               if (err) {
                 reject(err);
               } else {

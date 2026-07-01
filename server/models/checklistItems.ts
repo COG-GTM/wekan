@@ -50,13 +50,13 @@ Meteor.startup(async () => {
   });
 });
 
-ChecklistItems.after.update(async (userId, doc, fieldNames) => {
+ChecklistItems.after.update(async (userId, doc) => {
   await publishCheckActivity(userId, doc);
-  await publishChekListCompleted(userId, doc, fieldNames);
+  await publishChekListCompleted(userId, doc);
 });
 
-ChecklistItems.before.update(async (userId, doc, fieldNames) => {
-  await publishChekListUncompleted(userId, doc, fieldNames);
+ChecklistItems.before.update(async (userId, doc) => {
+  await publishChekListUncompleted(userId, doc);
 });
 
 ChecklistItems.after.insert(async (userId, doc) => {
@@ -184,7 +184,7 @@ WebApp.handlers.put(
       return;
     }
 
-    function isTrue(data) {
+    function isTrue(data: WekanDocumentField) {
       try {
         return data.toLowerCase() === 'true';
       } catch (error) {

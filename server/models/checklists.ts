@@ -11,7 +11,7 @@ import { ensureIndex } from '/server/lib/mongoStartup';
 import { backfillBoardIdFromCard } from '/server/lib/denormalizeBoardId';
 
 Meteor.methods({
-  async moveChecklist(checklistId, newCardId) {
+  async moveChecklist(checklistId: string, newCardId: string) {
     check(checklistId, String);
     check(newCardId, String);
 
@@ -173,7 +173,7 @@ WebApp.handlers.get(
     }
 
     const checklists = (await ReactiveCache.getChecklists({ cardId: paramCardId })).map(function(
-      doc,
+      doc: WekanDocumentField,
     ) {
       return {
         _id: doc._id,
@@ -220,7 +220,7 @@ WebApp.handlers.get(
     if (checklist) {
       checklist.items = (await ReactiveCache.getChecklistItems({
         checklistId: checklist._id,
-      })).map(function(doc) {
+      })).map(function(doc: WekanDocumentField) {
         return {
           _id: doc._id,
           title: doc.title,
@@ -245,7 +245,7 @@ WebApp.handlers.post(
     const paramBoardId = req.params.boardId;
     await Authentication.checkBoardAccess(req.userId, paramBoardId);
     const board = await ReactiveCache.getBoard(paramBoardId);
-    const addPermission = allowIsBoardMemberCommentOnly(req.userId, board);
+    const addPermission = allowIsBoardMemberCommentOnly(req.userId!, board);
     await Authentication.checkAdminOrCondition(req.userId, addPermission);
     const paramCardId = req.params.cardId;
 

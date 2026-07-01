@@ -8,7 +8,7 @@ import { sendJsonResult } from '/server/apiMiddleware';
 
 // #5850: reliable admin check from a method's this.userId (Meteor.user() can
 // return null inside an async method after an await).
-async function callerIsAdmin(userId) {
+async function callerIsAdmin(userId: string | null) {
   if (!userId) return false;
   const u = await ReactiveCache.getUser({ _id: userId }, { fields: { isAdmin: 1 } });
   return !!(u && u.isAdmin);
@@ -16,11 +16,11 @@ async function callerIsAdmin(userId) {
 
 Meteor.methods({
   async setCreateTeam(
-    teamDisplayName,
-    teamDesc,
-    teamShortName,
-    teamWebsite,
-    teamIsActive,
+    teamDisplayName: string,
+    teamDesc: string,
+    teamShortName: string,
+    teamWebsite: string,
+    teamIsActive: boolean,
   ) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
       check(teamDisplayName, String);
@@ -45,11 +45,11 @@ Meteor.methods({
   },
 
   async setCreateTeamFromOidc(
-    teamDisplayName,
-    teamDesc,
-    teamShortName,
-    teamWebsite,
-    teamIsActive,
+    teamDisplayName: string,
+    teamDesc: string,
+    teamShortName: string,
+    teamWebsite: string,
+    teamIsActive: boolean,
   ) {
     // SECURITY (GHSA-cv95-8h7c-2ffq): This *FromOidc method is an internal
     // helper invoked only server-side during the OIDC login flow (via
@@ -83,18 +83,18 @@ Meteor.methods({
     });
   },
 
-  async setTeamDisplayName(team, teamDisplayName) {
+  async setTeamDisplayName(team: WekanDocumentField, teamDisplayName: string) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
       check(team, Object);
       check(teamDisplayName, String);
       await Team.updateAsync(team, {
         $set: { teamDisplayName },
       });
-      await Meteor.callAsync('setUsersTeamsTeamDisplayName', team._id, teamDisplayName);
+      await Meteor.callAsync('setUsersTeamsTeamDisplayName', (team as WekanDocumentField)._id, teamDisplayName);
     }
   },
 
-  async setTeamDesc(team, teamDesc) {
+  async setTeamDesc(team: WekanDocumentField, teamDesc: string) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
       check(team, Object);
       check(teamDesc, String);
@@ -104,7 +104,7 @@ Meteor.methods({
     }
   },
 
-  async setTeamShortName(team, teamShortName) {
+  async setTeamShortName(team: WekanDocumentField, teamShortName: string) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
       check(team, Object);
       check(teamShortName, String);
@@ -114,7 +114,7 @@ Meteor.methods({
     }
   },
 
-  async setTeamIsActive(team, teamIsActive) {
+  async setTeamIsActive(team: WekanDocumentField, teamIsActive: boolean) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
       check(team, Object);
       check(teamIsActive, Boolean);
@@ -126,7 +126,7 @@ Meteor.methods({
 
   // #4737/#5850: per-team feature toggles shown as columns in Admin Panel >
   // People > Teams. All default off.
-  async setTeamSharedTemplates(team, value) {
+  async setTeamSharedTemplates(team: WekanDocumentField, value: boolean) {
     check(team, Object);
     check(value, Boolean);
     if (await callerIsAdmin(this.userId)) {
@@ -134,7 +134,7 @@ Meteor.methods({
     }
   },
 
-  async setTeamPropagateMembersToBoards(team, value) {
+  async setTeamPropagateMembersToBoards(team: WekanDocumentField, value: boolean) {
     check(team, Object);
     check(value, Boolean);
     if (await callerIsAdmin(this.userId)) {
@@ -142,7 +142,7 @@ Meteor.methods({
     }
   },
 
-  async setTeamSyncMembersFromAuth(team, value) {
+  async setTeamSyncMembersFromAuth(team: WekanDocumentField, value: boolean) {
     check(team, Object);
     check(value, Boolean);
     if (await callerIsAdmin(this.userId)) {
@@ -151,7 +151,7 @@ Meteor.methods({
   },
 
   // Bulk select-all / unselect-all for one of the team feature columns.
-  async setAllTeamsFeature(field, value) {
+  async setAllTeamsFeature(field: string, value: boolean) {
     check(field, String);
     check(value, Boolean);
     if (await callerIsAdmin(this.userId)) {
@@ -168,12 +168,12 @@ Meteor.methods({
   },
 
   async setTeamAllFieldsFromOidc(
-    team,
-    teamDisplayName,
-    teamDesc,
-    teamShortName,
-    teamWebsite,
-    teamIsActive,
+    team: WekanDocumentField,
+    teamDisplayName: string,
+    teamDesc: string,
+    teamShortName: string,
+    teamWebsite: string,
+    teamIsActive: boolean,
   ) {
     // SECURITY (GHSA-cv95-8h7c-2ffq): Internal OIDC-login-only helper (called
     // server-side from packages/wekan-oidc/loginHandler.js). Performs a
@@ -198,16 +198,16 @@ Meteor.methods({
         teamIsActive,
       },
     });
-    await Meteor.callAsync('setUsersTeamsTeamDisplayName', team._id, teamDisplayName);
+    await Meteor.callAsync('setUsersTeamsTeamDisplayName', (team as WekanDocumentField)._id, teamDisplayName);
   },
 
   async setTeamAllFields(
-    team,
-    teamDisplayName,
-    teamDesc,
-    teamShortName,
-    teamWebsite,
-    teamIsActive,
+    team: WekanDocumentField,
+    teamDisplayName: string,
+    teamDesc: string,
+    teamShortName: string,
+    teamWebsite: string,
+    teamIsActive: boolean,
   ) {
     if ((await ReactiveCache.getCurrentUser())?.isAdmin) {
       check(team, Object);
@@ -225,7 +225,7 @@ Meteor.methods({
           teamIsActive,
         },
       });
-      await Meteor.callAsync('setUsersTeamsTeamDisplayName', team._id, teamDisplayName);
+      await Meteor.callAsync('setUsersTeamsTeamDisplayName', (team as WekanDocumentField)._id, teamDisplayName);
     }
   },
 
@@ -311,7 +311,7 @@ WebApp.handlers.put('/api/admin/teams/:teamId/features', async function(req, res
     await Authentication.checkUserId(req.userId);
     const teamId = req.params.teamId;
     const body = req.body || {};
-    const $set = {};
+    const $set: Record<string, WekanDocumentField> = {};
     TEAM_FEATURE_FIELDS.forEach(field => {
       if (body[field] !== undefined) {
         $set[field] = !!body[field];

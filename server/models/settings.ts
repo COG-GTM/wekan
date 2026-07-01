@@ -18,13 +18,13 @@ const { SimpleSchema } = require('/imports/simpleSchema');
 const isSandstorm =
   Meteor.settings && Meteor.settings.public && Meteor.settings.public.sandstorm;
 
-function getRandomNum(min, max) {
+function getRandomNum(min: number, max: number) {
   const range = max - min;
   const rand = Math.random();
   return min + Math.round(rand * range);
 }
 
-function getEnvVar(name) {
+function getEnvVar(name: string) {
   const value = process.env[name];
   if (value) {
     return value;
@@ -32,15 +32,15 @@ function getEnvVar(name) {
   throw new Meteor.Error([
     'var-not-exist',
     `The environment variable ${name} does not exist`,
-  ]);
+  ] as WekanDocumentField);
 }
 
-function loadOidcConfig(service) {
+function loadOidcConfig(service: string) {
   check(service, String);
   return ServiceConfiguration.configurations.findOneAsync({ service });
 }
 
-async function sendInvitationEmail(_id) {
+async function sendInvitationEmail(_id: string) {
   const icode = await getReactiveCache().getInvitationCode(_id);
   const author = await getReactiveCache().getCurrentUser();
   try {
@@ -74,7 +74,7 @@ async function sendInvitationEmail(_id) {
   }
 }
 
-async function isNonAdminAllowedToSendMail(currentUser) {
+async function isNonAdminAllowedToSendMail(currentUser: WekanDocumentField) {
   const currSett = await getReactiveCache().getCurrentSetting();
   let isAllowed = false;
   if (
@@ -94,22 +94,22 @@ async function isNonAdminAllowedToSendMail(currentUser) {
 }
 
 function isLdapEnabled() {
-  return process.env.LDAP_ENABLE === 'true' || process.env.LDAP_ENABLE === true;
+  return process.env.LDAP_ENABLE === 'true' || (process.env.LDAP_ENABLE as WekanDocumentField) === true;
 }
 
 function isOauth2Enabled() {
   return (
     process.env.OAUTH2_ENABLED === 'true' ||
-    process.env.OAUTH2_ENABLED === true
+    (process.env.OAUTH2_ENABLED as WekanDocumentField) === true
   );
 }
 
 function isCasEnabled() {
-  return process.env.CAS_ENABLED === 'true' || process.env.CAS_ENABLED === true;
+  return process.env.CAS_ENABLED === 'true' || (process.env.CAS_ENABLED as WekanDocumentField) === true;
 }
 
 function isApiEnabled() {
-  return process.env.WITH_API === 'true' || process.env.WITH_API === true;
+  return process.env.WITH_API === 'true' || (process.env.WITH_API as WekanDocumentField) === true;
 }
 
 Meteor.startup(async () => {
@@ -117,7 +117,7 @@ Meteor.startup(async () => {
   const setting = await getReactiveCache().getCurrentSetting();
   if (!setting) {
     const now = new Date();
-    const domain = process.env.ROOT_URL.match(/\/\/(?:www\.)?(.*)?(?:\/)?/)[1];
+    const domain = process.env.ROOT_URL!.match(/\/\/(?:www\.)?(.*)?(?:\/)?/)![1];
     const from = `Boards Support <support@${domain}>`;
     const defaultSetting = {
       disableRegistration: false,
@@ -145,12 +145,12 @@ Meteor.startup(async () => {
       ? process.env.MAIL_FROM
       : newSetting.mailServer.from;
   } else {
-    Accounts.emailTemplates.from = process.env.MAIL_FROM;
+    Accounts.emailTemplates.from = process.env.MAIL_FROM as string;
   }
 });
 
 if (isSandstorm) {
-  Settings.after.update((userId, doc, fieldNames) => {
+  Settings.after.update((userId, doc: WekanDocumentField, fieldNames) => {
     if (fieldNames.includes('mailServer') && doc.mailServer.host) {
       const protocol = doc.mailServer.enableTLS ? 'smtps://' : 'smtp://';
       if (!doc.mailServer.username && !doc.mailServer.password) {
@@ -166,7 +166,7 @@ if (isSandstorm) {
 }
 
 Meteor.methods({
-  async sendInvitation(emails, boards) {
+  async sendInvitation(emails: string[], boards: string[]) {
     let rc = 0;
     check(emails, [String]);
     check(boards, [String]);
@@ -351,7 +351,7 @@ Meteor.methods({
     );
   },
 
-  async getServiceConfiguration(service) {
+  async getServiceConfiguration(service: string) {
     const config = await loadOidcConfig(service);
     if (!config) return null;
     // Never expose the client secret to the caller
@@ -403,8 +403,8 @@ const REST_SETTINGS_FIELDS = [
   'supportPageText',
 ];
 
-function pickSettingsFields(doc) {
-  const out = { _id: doc && doc._id };
+function pickSettingsFields(doc: WekanDocumentField) {
+  const out: Record<string, WekanDocumentField> = { _id: doc && doc._id };
   if (doc) {
     REST_SETTINGS_FIELDS.forEach(field => {
       if (doc[field] !== undefined) {
@@ -458,14 +458,14 @@ WebApp.handlers.put('/api/settings', async function(req, res) {
       return;
     }
     const body = req.body || {};
-    const $set = {};
+    const $set: Record<string, WekanDocumentField> = {};
     REST_SETTINGS_FIELDS.forEach(field => {
       if (body[field] !== undefined) {
         $set[field] = body[field];
       }
     });
     if (Object.keys($set).length > 0) {
-      await Settings.updateAsync(setting._id, { $set });
+      await Settings.updateAsync(setting._id!, { $set });
     }
     const updated = await Settings.findOneAsync({});
     sendJsonResult(res, { code: 200, data: pickSettingsFields(updated) });

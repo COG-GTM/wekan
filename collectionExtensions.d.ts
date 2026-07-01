@@ -27,6 +27,11 @@ declare module 'meteor/mongo' {
       before: WekanCollectionMutationHooks<T>;
       after: WekanCollectionMutationHooks<T>;
       hookOptions: WekanCollectionHookOptions;
+      // matb33:collection-hooks exposes the original, hook-free CRUD methods
+      // under `.direct` (insert/update/remove and their *Async variants run
+      // without firing the before/after hooks). It mirrors the collection's own
+      // surface.
+      direct: Mongo.Collection<T, U>;
       // Wekan attaches model-specific "static" helpers directly onto collection
       // instances (e.g. Boards.userBoardIds, CardComments.textSearch). Those are
       // declared per-model where practical; this documented index signature

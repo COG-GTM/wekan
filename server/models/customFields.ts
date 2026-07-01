@@ -9,7 +9,7 @@ import Cards from '/models/cards';
 import CustomFields from '/models/customFields';
 import { ensureIndex } from '/server/lib/mongoStartup';
 
-async function customFieldCreation(userId, doc) {
+async function customFieldCreation(userId: string, doc: WekanDocumentField) {
   await Activities.insertAsync({
     userId,
     activityType: 'createCustomField',
@@ -18,7 +18,7 @@ async function customFieldCreation(userId, doc) {
   });
 }
 
-async function customFieldDeletion(userId, doc) {
+async function customFieldDeletion(userId: string, doc: WekanDocumentField) {
   await Activities.insertAsync({
     userId,
     activityType: 'deleteCustomField',
@@ -27,7 +27,7 @@ async function customFieldDeletion(userId, doc) {
   });
 }
 
-async function customFieldEdit(userId, doc) {
+async function customFieldEdit(userId: string, doc: WekanDocumentField) {
   // #5390: deleting a custom field from a board ($pull boardIds) calls this; an
   // activity may not exist (e.g. the field never had a value set), so guard the
   // lookup instead of dereferencing `.value` on undefined, which threw and
@@ -106,7 +106,7 @@ WebApp.handlers.get('/api/boards/:boardId/custom-fields', async function(req, re
   await Authentication.checkBoardAccess(req.userId, paramBoardId);
   sendJsonResult(res, {
     code: 200,
-    data: (await ReactiveCache.getCustomFields({ boardIds: { $in: [paramBoardId] } })).map(cf => ({
+    data: (await ReactiveCache.getCustomFields({ boardIds: { $in: [paramBoardId] } })).map((cf: WekanDocumentField) => ({
       _id: cf._id,
       name: cf.name,
       type: cf.type,
