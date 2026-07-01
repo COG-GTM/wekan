@@ -1,6 +1,5 @@
 import { Meteor } from 'meteor/meteor';
 import { Mongo } from 'meteor/mongo';
-import { SimpleSchema } from '/imports/simpleSchema';
 import { ReactiveCache } from '/imports/reactiveCache';
 import Boards from '/models/boards';
 import Cards from '/models/cards';
@@ -8,6 +7,7 @@ import ChecklistItems from '/models/checklistItems';
 import Checklists from '/models/checklists';
 import Lists from '/models/lists';
 import Swimlanes from '/models/swimlanes';
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
 /**
  * UserPositionHistory collection - Per-user history of entity movements

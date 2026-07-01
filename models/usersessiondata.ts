@@ -1,7 +1,8 @@
 import { Meteor } from 'meteor/meteor';
 import { Mongo } from 'meteor/mongo';
+import { Session } from 'meteor/session';
 import { incrementCounter } from './counters';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
 const SessionData = new Mongo.Collection('sessiondata');
 
@@ -148,20 +149,23 @@ SessionData.attachSchema(
 
 SessionData.helpers({
   getSelector() {
-    return SessionData.unpickle(this.selector);
+    return (SessionData as any).unpickle(this.selector);
   },
   getProjection() {
-    return SessionData.unpickle(this.projection);
+    return (SessionData as any).unpickle(this.projection);
   },
 });
 
-SessionData.unpickle = pickle => {
+// Custom (de)serialization statics attached to the collection instance; not
+// part of the Mongo.Collection type, so the assignments go through `any`.
+(SessionData as any).unpickle = (pickle: string) => {
   return JSON.parse(pickle, (key, value) => {
     return unpickleValue(value);
   });
 };
 
-function unpickleValue(value) {
+// `value` is an arbitrary JSON value from the (de)serializer, hence `any`.
+function unpickleValue(value: any) {
   if (value === null) {
     return null;
   } else if (typeof value === 'object') {
@@ -180,21 +184,22 @@ function unpickleValue(value) {
   return value;
 }
 
-function unpickleObject(obj) {
-  const newObject = {};
+function unpickleObject(obj: any) {
+  const newObject: { [key: string]: any } = {};
   Object.entries(obj).forEach(([key, value]) => {
     newObject[key] = unpickleValue(value);
   });
   return newObject;
 }
 
-SessionData.pickle = value => {
+(SessionData as any).pickle = (value: any) => {
   return JSON.stringify(value, (key, value) => {
     return pickleValue(value);
   }, 2);
 };
 
-function pickleValue(value) {
+// `value` is an arbitrary JSON value from the serializer, hence `any`.
+function pickleValue(value: any) {
   if (value === null) {
     return null;
   } else if (typeof value === 'object') {
@@ -217,8 +222,8 @@ function pickleValue(value) {
   return value;
 }
 
-function pickleObject(obj) {
-  const newObject = {};
+function pickleObject(obj: any) {
+  const newObject: { [key: string]: any } = {};
   Object.entries(obj).forEach(([key, value]) => {
     newObject[key] = pickleValue(value);
   });
@@ -226,7 +231,7 @@ function pickleObject(obj) {
 }
 
 if (!Meteor.isServer) {
-  SessionData.getSessionId = () => {
+  (SessionData as any).getSessionId = () => {
     let sessionId = Session.get('sessionId');
     if (!sessionId) {
       const randomBytes = new Uint8Array(16);

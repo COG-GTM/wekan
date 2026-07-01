@@ -10,7 +10,7 @@ const FlowRouter = Package['ostrio:flow-router-extra'].FlowRouter;
 const getReactiveCache = () => require('/imports/reactiveCache').ReactiveCache;
 // Lazy getter — avoids circular dependency (i18n/tap → reactiveCache → settings)
 const getTAPi18n = () => require('/imports/i18n').TAPi18n;
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 const InvitationCodes = require('/models/invitationCodes').default;
 //var nodemailer = require('nodemailer');
 
