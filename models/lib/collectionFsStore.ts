@@ -28,23 +28,25 @@ function getDb() {
   return db;
 }
 
-function getBucket(db, coll) {
+function getBucket(db: import('mongodb').Db, coll: string) {
   const { GridFSBucket } = MongoInternals.NpmModule;
   return new GridFSBucket(db, { bucketName: `cfs_gridfs.${coll}` });
 }
 
-function toObjectId(hexOrId) {
+function toObjectId(hexOrId: string | import('mongodb').ObjectId) {
   const { ObjectId } = MongoInternals.NpmModule;
   if (hexOrId instanceof ObjectId) return hexOrId;
   return new ObjectId(String(hexOrId));
 }
 
-function filerecordCollName(coll) {
+function filerecordCollName(coll: string) {
   return `cfs.${coll}.filerecord`;
 }
 
 // Normalize a filerecord into the common shape the migration engine consumes.
-export function normalizeCollectionFsRecord(coll, rec) {
+// `rec` is a raw legacy CollectionFS filerecord document from Mongo, whose
+// shape is not statically typed here, hence `any`.
+export function normalizeCollectionFsRecord(coll: string, rec: any) {
   const copy = (rec.copies && rec.copies[coll]) || {};
   const key = copy.key;
   return {
@@ -69,10 +71,11 @@ export function normalizeCollectionFsRecord(coll, rec) {
 }
 
 // List all CollectionFS records for a collection ('attachments' | 'avatars').
-export async function listCollectionFsRecords(coll) {
+export async function listCollectionFsRecords(coll: string) {
   if (!Meteor.isServer) return [];
   const db = getDb();
-  let recs = [];
+  // Raw legacy filerecord documents straight from Mongo, hence `any[]`.
+  let recs: any[] = [];
   try {
     recs = await db.collection(filerecordCollName(coll)).find({}).toArray();
   } catch (error) {
@@ -83,7 +86,7 @@ export async function listCollectionFsRecords(coll) {
     .filter(r => r.gridFsKey); // only records whose binary key is present
 }
 
-export async function countCollectionFsRecords(coll) {
+export async function countCollectionFsRecords(coll: string) {
   if (!Meteor.isServer) return 0;
   const db = getDb();
   try {
@@ -94,12 +97,12 @@ export async function countCollectionFsRecords(coll) {
 }
 
 // Read the binary for a normalized CollectionFS record into a Buffer.
-export async function readCollectionFsBuffer(item) {
+export async function readCollectionFsBuffer(item: NormalizedCollectionFsRecord) {
   const db = getDb();
   const bucket = getBucket(db, item.coll);
   const gridFsId = toObjectId(item.gridFsKey);
-  return await new Promise((resolve, reject) => {
-    const chunks = [];
+  return await new Promise<Buffer>((resolve, reject) => {
+    const chunks: Buffer[] = [];
     const stream = bucket.openDownloadStream(gridFsId);
     stream.on('data', c => chunks.push(c));
     stream.on('end', () => resolve(Buffer.concat(chunks)));
@@ -110,15 +113,17 @@ export async function readCollectionFsBuffer(item) {
 // Write a buffer into the CollectionFS layout (GridFS bucket + filerecord),
 // reproducing the genuine old-WeKan structure. `info` carries the normalized
 // fields (name, type, size, meta{boardId,...}, userId, uploadedAt).
-export async function writeCollectionFsRecord(coll, info, buffer) {
+export async function writeCollectionFsRecord(coll: string, info: CollectionFsWriteInfo, buffer: Buffer) {
   const db = getDb();
   const bucket = getBucket(db, coll);
 
   // 1. Write the binary; the GridFS file _id becomes the filerecord "key".
-  const gridFsId = await new Promise((resolve, reject) => {
+  const gridFsId = await new Promise<import('mongodb').ObjectId>((resolve, reject) => {
     const uploadStream = bucket.openUploadStream(info.name, {
+      // `contentType` is accepted by the GridFS driver at runtime but is absent
+      // from its option typings, so widen the options bag.
       contentType: info.type,
-    });
+    } as any);
     uploadStream.on('error', reject);
     uploadStream.on('finish', () => resolve(uploadStream.id));
     uploadStream.end(buffer);
@@ -151,15 +156,18 @@ export async function writeCollectionFsRecord(coll, info, buffer) {
       },
     },
   };
-  await db.collection(filerecordCollName(coll)).insertOne(filerecord);
+  // Legacy CollectionFS filerecords use Meteor random string _ids, which the
+  // mongodb driver's ObjectId-oriented Document typings reject; insert as-is.
+  await db.collection(filerecordCollName(coll)).insertOne(filerecord as any);
   return { sourceId: recordId, gridFsKey: gridFsId.toString() };
 }
 
 // Delete a CollectionFS record's filerecord and its GridFS binary.
-export async function deleteCollectionFsRecord(coll, sourceId, gridFsKey) {
+export async function deleteCollectionFsRecord(coll: string, sourceId: string, gridFsKey: string) {
   const db = getDb();
   try {
-    await db.collection(filerecordCollName(coll)).deleteOne({ _id: sourceId });
+    // sourceId is a Meteor random string _id (see writeCollectionFsRecord).
+    await db.collection(filerecordCollName(coll)).deleteOne({ _id: sourceId } as any);
   } catch (error) {
     console.error('[collectionFsStore] Failed to delete filerecord', sourceId, error);
   }
@@ -171,4 +179,37 @@ export async function deleteCollectionFsRecord(coll, sourceId, gridFsKey) {
       // file/chunks may already be gone
     }
   }
+}
+
+// Board/card location ids carried alongside a file.
+interface CollectionFsMeta {
+  boardId?: string;
+  swimlaneId?: string;
+  listId?: string;
+  cardId?: string;
+}
+
+// Normalized CollectionFS record shape produced by normalizeCollectionFsRecord
+// and consumed by the migration engine.
+interface NormalizedCollectionFsRecord {
+  backend: string;
+  coll: string;
+  sourceId: string;
+  gridFsKey: string;
+  name: string;
+  type: string;
+  size: number;
+  meta: CollectionFsMeta;
+  userId?: string;
+  uploadedAt: Date;
+}
+
+// The normalized fields needed to (re)write a CollectionFS record.
+interface CollectionFsWriteInfo {
+  name: string;
+  type: string;
+  size?: number;
+  meta?: CollectionFsMeta;
+  userId?: string;
+  uploadedAt?: Date;
 }

@@ -4,6 +4,13 @@ import { DDP } from 'meteor/ddp';
 import { mongodbConnectionManager } from './mongodbConnectionManager';
 import { mongodbDriverManager } from './mongodbDriverManager';
 
+// This module deliberately monkeypatches Meteor/Mongo internals that are not
+// part of @types/meteor (Meteor.connect, replacing the Mongo.Collection
+// constructor). Reach them through `any` aliases that point at the same runtime
+// objects, so reads and reassignments below still affect the real framework.
+const MeteorInternal = Meteor as any;
+const MongoInternal = Mongo as any;
+
 /**
  * Meteor MongoDB Integration
  *
@@ -19,6 +26,13 @@ import { mongodbDriverManager } from './mongodbDriverManager';
  */
 
 class MeteorMongoIntegration {
+  // Saved framework internals restored on reset(); their types are not exposed.
+  originalMongoConnect: any;
+  originalMongoCollection: any;
+  isInitialized: boolean;
+  connectionString: string | null;
+  customConnection: any;
+
   constructor() {
     this.originalMongoConnect = null;
     this.originalMongoCollection = null;
@@ -31,7 +45,7 @@ class MeteorMongoIntegration {
    * Initialize the integration
    * @param {string} connectionString - MongoDB connection string
    */
-  initialize(connectionString) {
+  initialize(connectionString: string) {
     if (this.isInitialized) {
       console.log('Meteor MongoDB Integration already initialized');
       return;
@@ -41,8 +55,8 @@ class MeteorMongoIntegration {
     console.log('Initializing Meteor MongoDB Integration...');
 
     // Store original methods
-    this.originalMongoConnect = Meteor.connect;
-    this.originalMongoCollection = Mongo.Collection;
+    this.originalMongoConnect = MeteorInternal.connect;
+    this.originalMongoCollection = MongoInternal.Collection;
 
     // Override Meteor's connection method
     this.overrideMeteorConnection();
@@ -61,8 +75,8 @@ class MeteorMongoIntegration {
     const self = this;
 
     // Override Meteor.connect if it exists
-    if (typeof Meteor.connect === 'function') {
-      Meteor.connect = async function(url, options) {
+    if (typeof MeteorInternal.connect === 'function') {
+      MeteorInternal.connect = async function(url: string, options: any) {
         try {
           console.log('Meteor.connect called, using custom MongoDB connection manager');
           return await self.createCustomConnection(url, options);
@@ -79,10 +93,10 @@ class MeteorMongoIntegration {
    */
   overrideMongoCollection() {
     const self = this;
-    const originalCollection = Mongo.Collection;
+    const originalCollection = MongoInternal.Collection;
 
     // Override Mongo.Collection constructor
-    Mongo.Collection = function(name, options = {}) {
+    MongoInternal.Collection = function(name: string, options: any = {}) {
       // If we have a custom connection, use it
       if (self.customConnection) {
         options.connection = self.customConnection;
@@ -98,8 +112,8 @@ class MeteorMongoIntegration {
     };
 
     // Copy static methods from original constructor
-    Object.setPrototypeOf(Mongo.Collection, originalCollection);
-    Object.assign(Mongo.Collection, originalCollection);
+    Object.setPrototypeOf(MongoInternal.Collection, originalCollection);
+    Object.assign(MongoInternal.Collection, originalCollection);
   }
 
   /**
@@ -108,7 +122,7 @@ class MeteorMongoIntegration {
    * @param {Object} options - Connection options
    * @returns {Promise<Object>} - MongoDB connection object
    */
-  async createCustomConnection(url, options = {}) {
+  async createCustomConnection(url: string, options: any = {}) {
     try {
       console.log('Creating custom MongoDB connection...');
 
@@ -135,7 +149,7 @@ class MeteorMongoIntegration {
    * @param {Object} connection - MongoDB connection object
    * @returns {Object} - Meteor-compatible connection
    */
-  createMeteorCompatibleConnection(connection) {
+  createMeteorCompatibleConnection(connection: any) {
     const self = this;
 
     return {
@@ -144,13 +158,13 @@ class MeteorMongoIntegration {
       _name: 'custom-mongodb-connection',
 
       // Collection creation method
-      createCollection: function(name, options = {}) {
+      createCollection: function(name: string, options: any = {}) {
         const db = connection.db();
         return db.collection(name);
       },
 
       // Database access
-      db: function(name = 'meteor') {
+      db: function(name: string = 'meteor') {
         return connection.db(name);
       },
 
@@ -183,7 +197,7 @@ class MeteorMongoIntegration {
    * Enhance a collection with additional methods
    * @param {Object} collection - Mongo.Collection instance
    */
-  enhanceCollection(collection) {
+  enhanceCollection(collection: any) {
     const self = this;
 
     // Add connection info method
@@ -241,11 +255,11 @@ class MeteorMongoIntegration {
    */
   reset() {
     if (this.originalMongoConnect) {
-      Meteor.connect = this.originalMongoConnect;
+      MeteorInternal.connect = this.originalMongoConnect;
     }
 
     if (this.originalMongoCollection) {
-      Mongo.Collection = this.originalMongoCollection;
+      MongoInternal.Collection = this.originalMongoCollection;
     }
 
     this.isInitialized = false;
