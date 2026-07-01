@@ -42,7 +42,7 @@ Meteor.methods({
   //    server, so the client can no longer create duplicate helper boards.
   //  - #4037 / #3562 "custom fields not assigned to subtask cards": the
   //    destination board's automatic custom fields are applied to the subtask.
-  async addSubtaskCard(parentCardId, title) {
+  async addSubtaskCard(parentCardId: string, title: string) {
     check(parentCardId, String);
     check(title, String);
     if (!this.userId) throw new Meteor.Error('not-authorized');
@@ -91,7 +91,7 @@ Meteor.methods({
     const boardCustomFields = await CustomFields.find({
       boardIds: targetBoard._id,
     }).fetchAsync();
-    const customFields = subtaskCustomFields(boardCustomFields);
+    const customFields = subtaskCustomFields(boardCustomFields as WekanDocumentField);
 
     const cardNumber = await targetBoard.getNextCardNumber();
     const _id = await Cards.insertAsync({
@@ -112,7 +112,7 @@ Meteor.methods({
     return _id;
   },
 
-  async createCardWithDueDate(boardId, listId, title, dueDate, swimlaneId) {
+  async createCardWithDueDate(boardId: string, listId: string, title: string, dueDate: Date, swimlaneId: string) {
     check(boardId, String);
     check(listId, String);
     check(title, String);
@@ -139,7 +139,7 @@ Meteor.methods({
     return cardId;
   },
 
-  async 'cards.pokerVote'(cardId, state) {
+  async 'cards.pokerVote'(cardId: string, state: string) {
     check(cardId, String);
     if (state !== undefined && state !== null) check(state, String);
     if (!this.userId) throw new Meteor.Error('not-authorized');
@@ -164,7 +164,7 @@ Meteor.methods({
     return await Cards.updateAsync({ _id: cardId }, mod);
   },
 
-  async 'cards.setPokerQuestion'(cardId, question, allowNonBoardMembers) {
+  async 'cards.setPokerQuestion'(cardId: string, question: boolean, allowNonBoardMembers: boolean) {
     check(cardId, String);
     check(question, Boolean);
     check(allowNonBoardMembers, Boolean);
@@ -198,7 +198,7 @@ Meteor.methods({
     return await Cards.updateAsync({ _id: cardId }, modifier);
   },
 
-  async 'cards.setPokerEnd'(cardId, end) {
+  async 'cards.setPokerEnd'(cardId: string, end: Date) {
     check(cardId, String);
     check(end, Date);
     if (!this.userId) throw new Meteor.Error('not-authorized');
@@ -220,7 +220,7 @@ Meteor.methods({
     );
   },
 
-  async 'cards.unsetPokerEnd'(cardId) {
+  async 'cards.unsetPokerEnd'(cardId: string) {
     check(cardId, String);
     if (!this.userId) throw new Meteor.Error('not-authorized');
 
@@ -238,7 +238,7 @@ Meteor.methods({
     );
   },
 
-  async 'cards.unsetPoker'(cardId) {
+  async 'cards.unsetPoker'(cardId: string) {
     check(cardId, String);
     if (!this.userId) throw new Meteor.Error('not-authorized');
 
@@ -256,7 +256,7 @@ Meteor.methods({
     );
   },
 
-  async 'cards.setPokerEstimation'(cardId, estimation) {
+  async 'cards.setPokerEstimation'(cardId: string, estimation: number) {
     check(cardId, String);
     check(estimation, Number);
     if (!this.userId) throw new Meteor.Error('not-authorized');
@@ -278,7 +278,7 @@ Meteor.methods({
     );
   },
 
-  async 'cards.unsetPokerEstimation'(cardId) {
+  async 'cards.unsetPokerEstimation'(cardId: string) {
     check(cardId, String);
     if (!this.userId) throw new Meteor.Error('not-authorized');
 
@@ -296,7 +296,7 @@ Meteor.methods({
     );
   },
 
-  async 'cards.replayPoker'(cardId) {
+  async 'cards.replayPoker'(cardId: string) {
     check(cardId, String);
     if (!this.userId) throw new Meteor.Error('not-authorized');
 
@@ -327,7 +327,7 @@ Meteor.methods({
     );
   },
 
-  async 'cards.setVoteQuestion'(cardId, question, publicVote, allowNonBoardMembers) {
+  async 'cards.setVoteQuestion'(cardId: string, question: string, publicVote: boolean, allowNonBoardMembers: boolean) {
     check(cardId, String);
     check(question, String);
     check(publicVote, Boolean);
@@ -357,7 +357,7 @@ Meteor.methods({
     );
   },
 
-  async 'cards.setVoteEnd'(cardId, end) {
+  async 'cards.setVoteEnd'(cardId: string, end: Date) {
     check(cardId, String);
     check(end, Date);
     if (!this.userId) throw new Meteor.Error('not-authorized');
@@ -379,7 +379,7 @@ Meteor.methods({
     );
   },
 
-  async 'cards.unsetVoteEnd'(cardId) {
+  async 'cards.unsetVoteEnd'(cardId: string) {
     check(cardId, String);
     if (!this.userId) throw new Meteor.Error('not-authorized');
 
@@ -397,7 +397,7 @@ Meteor.methods({
     );
   },
 
-  async 'cards.unsetVote'(cardId) {
+  async 'cards.unsetVote'(cardId: string) {
     check(cardId, String);
     if (!this.userId) throw new Meteor.Error('not-authorized');
 
@@ -415,7 +415,7 @@ Meteor.methods({
     );
   },
 
-  async 'cards.vote'(cardId, forIt) {
+  async 'cards.vote'(cardId: string, forIt: boolean) {
     check(cardId, String);
     if (forIt !== undefined && forIt !== null) check(forIt, Boolean);
     if (!this.userId) throw new Meteor.Error('not-authorized');
@@ -431,7 +431,7 @@ Meteor.methods({
       throw new Meteor.Error('not-authorized');
     }
 
-    let modifier;
+    let modifier: WekanDocumentField;
     if (forIt === true) {
       modifier = {
         $pull: { 'vote.negative': this.userId },
@@ -457,7 +457,7 @@ Meteor.methods({
     return await Cards.updateAsync({ _id: cardId }, modifier);
   },
 
-  async copyCard(cardId, boardId, swimlaneId, listId, insertAtTop, mergeCardValues) {
+  async copyCard(cardId: string, boardId: string, swimlaneId: string, listId: string, insertAtTop: boolean, mergeCardValues: WekanDocumentField) {
     check(cardId, String);
     check(boardId, String);
     check(swimlaneId, String);
@@ -469,7 +469,7 @@ Meteor.methods({
     const card = await ReactiveCache.getCard(cardId);
     if (!card) throw new Meteor.Error('not-found');
     const sourceBoard = await Boards.findOneAsync(card.boardId);
-    if (!allowIsBoardMember(this.userId, sourceBoard))
+    if (!allowIsBoardMember(this.userId, sourceBoard as WekanDocumentField))
       throw new Meteor.Error('not-authorized');
     const destBoard = await Boards.findOneAsync(boardId);
     if (!allowIsBoardMemberWithWriteAccess(this.userId, destBoard))
@@ -524,7 +524,7 @@ Cards.after.update(async (userId, doc, fieldNames) => {
   await ChecklistItems.direct.updateAsync({ cardId: doc._id }, { $set: { boardId } }, { multi: true });
 });
 
-Cards.after.update(async function(userId, doc, fieldNames) {
+Cards.after.update(async function(this: WekanDocumentField, userId, doc, fieldNames) {
   const previous = this.previous || {};
   const oldListId = previous.listId || doc.listId;
   const oldSwimlaneId = previous.swimlaneId || doc.swimlaneId;
@@ -542,19 +542,19 @@ Cards.after.update(async function(userId, doc, fieldNames) {
 // to the destination board, falling back to its default swimlane / first list.
 // Corrective only: a move whose targets already belong to the destination board
 // is left untouched. Server-only (uses the pure helper in server/lib).
-async function enforceCardBoardConsistency(doc, fieldNames, modifier) {
+async function enforceCardBoardConsistency(doc: WekanDocumentField, fieldNames: WekanDocumentField, modifier: WekanDocumentField) {
   await applyCardBoardConsistency(doc, fieldNames, modifier, {
-    swimlaneBelongs: async (swimlaneId, boardId) =>
+    swimlaneBelongs: async (swimlaneId: WekanDocumentField, boardId: WekanDocumentField) =>
       !!(await ReactiveCache.getSwimlane({ _id: swimlaneId, boardId })),
-    listBelongs: async (listId, boardId) =>
+    listBelongs: async (listId: WekanDocumentField, boardId: WekanDocumentField) =>
       !!(await ReactiveCache.getList({ _id: listId, boardId })),
-    getDefaultSwimlaneId: async boardId => {
+    getDefaultSwimlaneId: async (boardId: WekanDocumentField) => {
       const board = await ReactiveCache.getBoard(boardId);
       if (!board) return undefined;
       const swimlane = await board.getDefaultSwimlineAsync();
       return swimlane && swimlane._id;
     },
-    getFirstListId: async boardId => {
+    getFirstListId: async (boardId: WekanDocumentField) => {
       const list = await ReactiveCache.getList(
         { boardId, archived: false },
         { sort: { sort: 1 } },
@@ -607,7 +607,7 @@ Cards.before.update(async (userId, doc, fieldNames, modifier) => {
       const boardId = list.boardId;
       await Lists.direct.updateAsync(
         { _id: list._id },
-        { $set: { modifiedAt, boardId } },
+        { $set: { modifiedAt, boardId } } as WekanDocumentField,
       );
     }
     const user = await ReactiveCache.getUser(userId);
@@ -630,7 +630,7 @@ Cards.before.update(async (userId, doc, fieldNames, modifier) => {
 // Issue #3619: changing a card's title must log an activity so the
 // Activities.after.insert outgoing-webhook hook fires (like description/dueAt do).
 Cards.before.update(async (userId, doc, fieldNames, modifier) => {
-  if (!titleChanged(doc, modifier)) {
+  if (!titleChanged(doc as WekanDocumentField, modifier)) {
     return;
   }
   const oldValue = doc.title || '';
@@ -697,7 +697,7 @@ WebApp.handlers.get(
     );
     sendJsonResult(res, {
       code: 200,
-      data: cards.map(doc => ({
+      data: cards.map((doc: WekanDocumentField) => ({
         _id: doc._id,
         title: doc.title,
         description: doc.description,
@@ -727,7 +727,7 @@ WebApp.handlers.get('/api/boards/:boardId/lists/:listId/cards', async function(r
   );
   sendJsonResult(res, {
     code: 200,
-    data: cards.map(doc => ({
+    data: cards.map((doc: WekanDocumentField) => ({
       _id: doc._id,
       title: doc.title,
       description: doc.description,
@@ -782,7 +782,7 @@ WebApp.handlers.post('/api/boards/:boardId/lists/:listId/cards', async function(
   Authentication.checkLoggedIn(req.userId);
   const paramBoardId = req.params.boardId;
   const board = await ReactiveCache.getBoard(paramBoardId);
-  const addPermission = allowIsBoardMemberCommentOnly(req.userId, board);
+  const addPermission = allowIsBoardMemberCommentOnly(req.userId!, board);
   // Must be awaited: checkAdminOrCondition is async, so without await a denied
   // (non board member) caller's rejection never blocks and the card was created
   // anyway — an auth bypass (CWE-862). Awaiting enforces the membership check.
@@ -821,8 +821,8 @@ WebApp.handlers.post('/api/boards/:boardId/lists/:listId/cards', async function(
   const nextCardNumber = await board.getNextCardNumber();
 
   const customFields = await ReactiveCache.getCustomFields({ boardIds: paramBoardId });
-  const customFieldsArr = [];
-  (customFields || []).forEach(field => {
+  const customFieldsArr: WekanDocumentField[] = [];
+  (customFields || []).forEach((field: WekanDocumentField) => {
     if (field.automaticallyOnCard || field.alwaysOnCard) {
       customFieldsArr.push({ _id: field._id, value: null });
     }
@@ -844,7 +844,7 @@ WebApp.handlers.post('/api/boards/:boardId/lists/:listId/cards', async function(
     // as Date, so a raw request string is stripped by schema cleaning and the
     // date never persists. Parse each into a real Date and only include the
     // ones that parsed, so an invalid/absent date simply leaves the field unset.
-    const dateFieldsOnCreate = {};
+    const dateFieldsOnCreate: Record<string, WekanDocumentField> = {};
     ['receivedAt', 'startAt', 'dueAt', 'endAt'].forEach(dateField => {
       if (Object.prototype.hasOwnProperty.call(req.body, dateField)) {
         const parsed = parseCardDate(req.body[dateField]);
@@ -893,7 +893,7 @@ WebApp.handlers.post(
     Authentication.checkLoggedIn(req.userId);
     const paramBoardId = req.params.boardId;
     const board = await ReactiveCache.getBoard(paramBoardId);
-    const addPermission = allowIsBoardMemberCommentOnly(req.userId, board);
+    const addPermission = allowIsBoardMemberCommentOnly(req.userId!, board);
     await Authentication.checkAdminOrCondition(req.userId, addPermission);
     const paramListId = req.params.listId;
 
@@ -911,8 +911,8 @@ WebApp.handlers.post(
     }
 
     const customFields = await ReactiveCache.getCustomFields({ boardIds: paramBoardId });
-    const customFieldsArr = [];
-    (customFields || []).forEach(field => {
+    const customFieldsArr: WekanDocumentField[] = [];
+    (customFields || []).forEach((field: WekanDocumentField) => {
       if (field.automaticallyOnCard || field.alwaysOnCard) {
         customFieldsArr.push({ _id: field._id, value: null });
       }
@@ -1202,7 +1202,7 @@ WebApp.handlers.put(
         { boardId: paramBoardId, listId: destListId, archived: false },
         { sort: ['sort'] },
       );
-      const topSort = computeTopSort((destSiblings || []).map(c => c.sort));
+      const topSort = computeTopSort((destSiblings || []).map((c: WekanDocumentField) => c.sort));
       await Cards.direct.updateAsync(
         { _id: paramCardId, listId: paramListId, boardId: paramBoardId, archived: false },
         { $set: { listId: destListId, sort: topSort } },
@@ -1213,7 +1213,7 @@ WebApp.handlers.put(
       // cardMove() does fieldNames.includes(...), so this MUST be an array of
       // changed field names — not an object. Passing { fieldName: 'listId' }
       // threw "fieldNames.includes is not a function" (HTTP 500). See #6423.
-      await cardMove(req.userId, card, ['listId'], paramListId);
+      await (cardMove as WekanDocumentField)(req.userId, card, ['listId'], paramListId);
     }
     if (moveParams.isBoardMove) {
       await Authentication.checkBoardWriteAccess(req.userId, newBoardId);
@@ -1248,7 +1248,7 @@ WebApp.handlers.put(
         { boardId: newBoardId, listId: newListId, archived: false },
         { sort: ['sort'] },
       );
-      const topSort = computeTopSort((destSiblings || []).map(c => c.sort));
+      const topSort = computeTopSort((destSiblings || []).map((c: WekanDocumentField) => c.sort));
       await Cards.direct.updateAsync(
         { _id: paramCardId, listId: paramListId, boardId: paramBoardId, archived: false },
         { $set: { boardId: newBoardId, swimlaneId: newSwimlaneId, listId: newListId, sort: topSort } },
@@ -1256,7 +1256,7 @@ WebApp.handlers.put(
       updated = true;
 
       const card = await ReactiveCache.getCard(paramCardId);
-      await cardMove(req.userId, card, ['boardId', 'swimlaneId', 'listId'], newListId, newSwimlaneId, newBoardId);
+      await (cardMove as WekanDocumentField)(req.userId, card, ['boardId', 'swimlaneId', 'listId'], newListId, newSwimlaneId, newBoardId);
     }
     // Issue #5546: archive / de-archive a card. The selector intentionally does
     // NOT pin listId: a caller who only wants to set archived=false cannot
@@ -1298,8 +1298,8 @@ WebApp.handlers.put(
       if (typeof locations === 'string') locations = JSON.parse(locations);
       // Each location entry requires an `_id` (schema), and coordinates must be
       // numbers (form-encoded values arrive as strings).
-      locations = locations.map(loc => {
-        const out = {
+      locations = locations.map((loc: WekanDocumentField) => {
+        const out: Record<string, WekanDocumentField> = {
           _id: loc._id || Random.id(),
           name: loc.name || '',
           address: loc.address || '',
@@ -1449,8 +1449,8 @@ WebApp.handlers.post('/api/boards/:boardId/cards/labels', async function(req, re
 
   // Validate that every label being added actually exists on this board.
   const board = await ReactiveCache.getBoard(paramBoardId);
-  const boardLabelIds = new Set((board.labels || []).map(label => label._id));
-  const invalidLabelIds = addLabelIds.filter(labelId => !boardLabelIds.has(labelId));
+  const boardLabelIds = new Set((board.labels || []).map((label: WekanDocumentField) => label._id));
+  const invalidLabelIds = addLabelIds.filter((labelId: WekanDocumentField) => !boardLabelIds.has(labelId));
   if (invalidLabelIds.length > 0) {
     sendJsonResult(res, {
       code: 400,
@@ -1517,7 +1517,7 @@ WebApp.handlers.post(
     if (!card) {
       throw new Meteor.Error(404, 'Card not found');
     }
-    const updatedCustomFields = (card.customFields || []).map(cf =>
+    const updatedCustomFields = (card.customFields || []).map((cf: WekanDocumentField) =>
       cf._id === paramCustomFieldId ? { _id: cf._id, value: paramCustomFieldValue } : cf,
     );
     await Cards.direct.updateAsync(
@@ -1583,7 +1583,7 @@ WebApp.handlers.post(
 // or assignee, MERGE-style ($addToSet/$pull via Card.assignMember etc.), so
 // callers don't have to read-modify-write the whole members/assignees array.
 // The userId must be an active member of the card's board, otherwise 400.
-async function cardMemberFieldHandler(req, res, field, paramUserKey, addNotRemove) {
+async function cardMemberFieldHandler(req: WekanWebAppRequest, res: WekanWebAppResponse, field: string, paramUserKey: string, addNotRemove: boolean) {
   const paramBoardId = req.params.boardId;
   const paramListId = req.params.listId;
   const paramCardId = req.params.cardId;
@@ -1710,7 +1710,7 @@ WebApp.handlers.get('/api/user/cards', async function(req, res) {
   }
   const userId = req.userId;
 
-  const selector = {
+  const selector: Record<string, WekanDocumentField> = {
     archived: false,
     $or: [{ members: userId }, { assignees: userId }],
   };
@@ -1734,7 +1734,7 @@ WebApp.handlers.get('/api/user/cards', async function(req, res) {
   const cards = await ReactiveCache.getCards(selector, { sort: { dueAt: 1 } });
   sendJsonResult(res, {
     code: 200,
-    data: (cards || []).map(card => ({
+    data: (cards || []).map((card: WekanDocumentField) => ({
       _id: card._id,
       title: card.title,
       boardId: card.boardId,
