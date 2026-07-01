@@ -1,3 +1,7 @@
+import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 import { TAPi18n } from '/imports/i18n';
 import { CardSearchPaged } from '../../lib/cardSearch';
 import { LABEL_COLORS } from '/models/metadata/colors';
@@ -32,7 +36,7 @@ Template.globalSearchViewChangePopup.events({
   },
 });
 
-Template.globalSearch.onCreated(function () {
+Template.globalSearch.onCreated(function (this: GlobalSearchInstance) {
   const search = new CardSearchPaged(this);
   this.search = search;
 
@@ -42,26 +46,26 @@ Template.globalSearch.onCreated(function () {
   this.parsingErrors = new QueryErrors();
   this.queryParams = null;
 
-  Meteor.call('myLists', (err, data) => {
+  Meteor.call('myLists', (err: any, data: any) => {
     if (!err) {
       this.myLists.set(data);
     }
   });
 
-  Meteor.call('myLabelNames', (err, data) => {
+  Meteor.call('myLabelNames', (err: any, data: any) => {
     if (!err) {
       this.myLabelNames.set(data);
     }
   });
 
-  Meteor.call('myBoardNames', (err, data) => {
+  Meteor.call('myBoardNames', (err: any, data: any) => {
     if (!err) {
       this.myBoardNames.set(data);
     }
   });
 });
 
-Template.globalSearch.onRendered(function () {
+Template.globalSearch.onRendered(function (this: GlobalSearchInstance) {
   Meteor.subscribe('setting');
 
   const tpl = this;
@@ -98,10 +102,11 @@ Template.globalSearch.onRendered(function () {
 // multi-select drag are intentionally out of scope here; wiring those would
 // require modifying the (non-owned) list/minicard sortable `receive` handler.
 // Drag is only enabled when the board is editable and a board is open.
-function setupResultDrag(tpl) {
+function setupResultDrag(tpl: GlobalSearchInstance) {
   try {
-    if (typeof window === 'undefined' || !window.jQuery) return;
-    const $ = window.jQuery;
+    // window.jQuery is provided by the bundled jQuery; not typed on Window.
+    if (typeof window === 'undefined' || !(window as any).jQuery) return;
+    const $ = (window as any).jQuery;
 
     const $items = tpl.$('.global-search-results-list .result-card-wrapper');
     if (!$items.length || typeof $items.draggable !== 'function') return;
@@ -115,7 +120,7 @@ function setupResultDrag(tpl) {
         : false;
     if (!canModify) return;
 
-    $items.each(function () {
+    $items.each(function (this: HTMLElement) {
       const el = this;
       // Avoid double-initialising the same element.
       if ($(el).data('uiDraggable')) return;
@@ -127,7 +132,8 @@ function setupResultDrag(tpl) {
         revertDuration: 150,
         cursor: 'grabbing',
         zIndex: 1000,
-        start(evt, ui) {
+        // evt/ui are jQuery UI draggable callback args (untyped widget API).
+        start(evt: any, ui: any) {
           ui.helper.addClass('global-search-result-drag-helper');
           ui.helper.css('width', $(el).width());
         },
@@ -138,7 +144,7 @@ function setupResultDrag(tpl) {
     const $lists = $('.list .js-minicards');
     if (!$lists.length || typeof $lists.droppable !== 'function') return;
 
-    $lists.each(function () {
+    $lists.each(function (this: HTMLElement) {
       const listEl = this;
       if ($(listEl).data('uiDroppable')) return;
 
@@ -146,7 +152,8 @@ function setupResultDrag(tpl) {
         accept: '.result-card-wrapper',
         tolerance: 'pointer',
         hoverClass: 'global-search-drop-hover',
-        drop(evt, ui) {
+        // evt/ui are jQuery UI droppable callback args (untyped widget API).
+        drop(evt: any, ui: any) {
           onResultDroppedOnList(listEl, ui.draggable.get(0));
         },
       });
@@ -158,16 +165,18 @@ function setupResultDrag(tpl) {
 
 // Resolve the dragged result card + target list and perform the move using the
 // existing card model `move()` method (mirrors the in-board card sortable).
-function onResultDroppedOnList(listEl, draggedEl) {
+function onResultDroppedOnList(listEl: HTMLElement, draggedEl: HTMLElement) {
   try {
     if (!listEl || !draggedEl) return;
 
     // Card data from the dragged result item (Blaze data on the result wrapper,
     // falling back to the inner minicard).
-    let cardData = Blaze.getData(draggedEl);
+    // Blaze.getData returns the element's dynamic data context (card/list/
+    // swimlane docs here), typed `Object` by @types; cast to any to read _id.
+    let cardData: any = Blaze.getData(draggedEl);
     if (!cardData || !cardData._id) {
       const inner = draggedEl.querySelector('.js-minicard');
-      if (inner) cardData = Blaze.getData(inner);
+      if (inner) cardData = Blaze.getData(inner as HTMLElement);
     }
     if (!cardData || !cardData._id) return;
 
@@ -175,7 +184,7 @@ function onResultDroppedOnList(listEl, draggedEl) {
     if (!card || typeof card.move !== 'function') return;
 
     // Target list / swimlane / board from the drop target.
-    const listData = Blaze.getData(listEl.closest('.list') || listEl);
+    const listData: any = Blaze.getData((listEl.closest('.list') || listEl) as HTMLElement);
     if (!listData || !listData._id) return;
     const listId = listData._id;
 
@@ -186,7 +195,7 @@ function onResultDroppedOnList(listEl, draggedEl) {
     if (!swimlaneId) {
       const swimlaneEl = listEl.closest('.swimlane');
       if (swimlaneEl) {
-        const swimlaneData = Blaze.getData(swimlaneEl);
+        const swimlaneData: any = Blaze.getData(swimlaneEl as HTMLElement);
         swimlaneId = swimlaneData && swimlaneData._id;
       }
     }
@@ -215,7 +224,7 @@ function onResultDroppedOnList(listEl, draggedEl) {
   }
 }
 
-function searchAllBoards(tpl, queryText) {
+function searchAllBoards(tpl: GlobalSearchInstance, queryText: string) {
   const search = tpl.search;
 
   queryText = (queryText || '').trim();
@@ -260,7 +269,7 @@ function searchAllBoards(tpl, queryText) {
   search.runGlobalSearch(queryParams);
 }
 
-function errorMessages(tpl) {
+function errorMessages(tpl: GlobalSearchInstance) {
   if (tpl.parsingErrors.hasErrors()) {
     return tpl.parsingErrors.errorMessages();
   }
@@ -274,70 +283,70 @@ Template.globalSearch.helpers({
 
   // Return ReactiveVar values so Blaze can use them
   searching() {
-    const val = Template.instance().search.searching.get();
+    const val = (Template.instance() as GlobalSearchInstance).search.searching.get();
     return val;
   },
   hasResults() {
-    const val = Template.instance().search.hasResults.get();
+    const val = (Template.instance() as GlobalSearchInstance).search.hasResults.get();
     return val;
   },
   hasQueryErrors() {
-    const val = Template.instance().search.hasQueryErrors.get();
+    const val = (Template.instance() as GlobalSearchInstance).search.hasQueryErrors.get();
     return val;
   },
   serverError() {
-    const val = Template.instance().search.serverError.get();
+    const val = (Template.instance() as GlobalSearchInstance).search.serverError.get();
     return val;
   },
   query() {
-    return Template.instance().search.query;
+    return (Template.instance() as GlobalSearchInstance).search.query;
   },
   debug() {
-    const val = Template.instance().search.debug.get();
+    const val = (Template.instance() as GlobalSearchInstance).search.debug.get();
     return val;
   },
   resultsHeading() {
-    const rv = Template.instance().search.resultsHeading;
+    const rv = (Template.instance() as GlobalSearchInstance).search.resultsHeading;
     return rv ? rv.get() : '';
   },
   results() {
-    const rv = Template.instance().search.results;
+    const rv = (Template.instance() as GlobalSearchInstance).search.results;
     return rv ? rv.get() : [];
   },
   hasNextPage() {
-    const rv = Template.instance().search.hasNextPage;
+    const rv = (Template.instance() as GlobalSearchInstance).search.hasNextPage;
     return rv ? rv.get() : false;
   },
   hasPreviousPage() {
-    const rv = Template.instance().search.hasPreviousPage;
+    const rv = (Template.instance() as GlobalSearchInstance).search.hasPreviousPage;
     return rv ? rv.get() : false;
   },
   sessionData() {
-    return Template.instance().search.sessionData;
+    return (Template.instance() as GlobalSearchInstance).search.sessionData;
   },
   getSearchHref() {
-    return Template.instance().search.getSearchHref();
+    return (Template.instance() as GlobalSearchInstance).search.getSearchHref();
   },
 
   myLists() {
-    const rv = Template.instance().myLists;
+    const rv = (Template.instance() as GlobalSearchInstance).myLists;
     return rv ? rv.get() : [];
   },
   myLabelNames() {
-    const rv = Template.instance().myLabelNames;
+    const rv = (Template.instance() as GlobalSearchInstance).myLabelNames;
     return rv ? rv.get() : [];
   },
   myBoardNames() {
-    const rv = Template.instance().myBoardNames;
+    const rv = (Template.instance() as GlobalSearchInstance).myBoardNames;
     return rv ? rv.get() : [];
   },
 
   errorMessages() {
-    return errorMessages(Template.instance());
+    return errorMessages(Template.instance() as GlobalSearchInstance);
   },
 
   getSearchData() {
-    return Template.instance().search;
+    return (Template.instance() as GlobalSearchInstance).search;
   },
 
   boardColorClass() {
@@ -433,7 +442,7 @@ Template.globalSearch.helpers({
         ['\n- ', 'globalSearch-instructions-notes-3-2'],
         ['\n- ', 'globalSearch-instructions-notes-4'],
         ['\n- ', 'globalSearch-instructions-notes-5'],
-      ].forEach(([prefix, instruction]) => {
+      ].forEach(([prefix, instruction]: string[]) => {
         text += `${prefix}${TAPi18n.__(instruction, tags)}`
           // Replace *<text>* with `<text>` so markdown shows correctly
           .replace(/\*\</, '`<')
@@ -450,7 +459,7 @@ Template.globalSearch.helpers({
     try {
       if (!LABEL_COLORS) return [];
       return LABEL_COLORS.map(
-        color => {
+        (color: string) => {
           return { color, name: TAPi18n.__(`color-${color}`) };
         },
       );
@@ -462,84 +471,84 @@ Template.globalSearch.helpers({
 });
 
 Template.globalSearch.events({
-  'click input.global-search-query-input'(evt) {
+  'click input.global-search-query-input'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     evt.stopPropagation();
   },
-  'focus input.global-search-query-input'(evt) {
+  'focus input.global-search-query-input'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     evt.stopPropagation();
   },
-  'keyup input.global-search-query-input'(evt, tpl) {
+  'keyup input.global-search-query-input'(evt: JQuery.TriggeredEvent, tpl: GlobalSearchInstance) {
     evt.preventDefault();
     evt.stopPropagation();
     // Store the query value
-    tpl.search.query.set(evt.target.value);
+    tpl.search.query.set((evt.target as HTMLInputElement).value);
   },
-  'keydown input.global-search-query-input'(evt, tpl) {
+  'keydown input.global-search-query-input'(evt: JQuery.TriggeredEvent, tpl: GlobalSearchInstance) {
     // Allow normal key behavior but capture Enter key
     if (evt.key === 'Enter') {
       evt.preventDefault();
       evt.stopPropagation();
-      searchAllBoards(tpl, evt.target.value);
+      searchAllBoards(tpl, (evt.target as HTMLInputElement).value);
     }
   },
-  'submit .js-search-query-form'(evt, tpl) {
+  'submit .js-search-query-form'(evt: JQuery.TriggeredEvent, tpl: GlobalSearchInstance) {
     evt.preventDefault();
-    searchAllBoards(tpl, evt.target.searchQuery.value);
+    searchAllBoards(tpl, (evt.target as any).searchQuery.value);
   },
-  'click .js-label-color'(evt, tpl) {
+  'click .js-label-color'(evt: JQuery.TriggeredEvent, tpl: GlobalSearchInstance) {
     evt.preventDefault();
-    const input = document.getElementById('global-search-input');
+    const input = document.getElementById('global-search-input') as HTMLInputElement;
     tpl.search.query.set(
       `${input.value} ${TAPi18n.__('operator-label')}:"${
         evt.currentTarget.textContent
       }"`,
     );
-    document.getElementById('global-search-input').focus();
+    document.getElementById('global-search-input')!.focus();
   },
-  'click .js-board-title'(evt, tpl) {
+  'click .js-board-title'(evt: JQuery.TriggeredEvent, tpl: GlobalSearchInstance) {
     evt.preventDefault();
-    const input = document.getElementById('global-search-input');
+    const input = document.getElementById('global-search-input') as HTMLInputElement;
     tpl.search.query.set(
       `${input.value} ${TAPi18n.__('operator-board')}:"${
         evt.currentTarget.textContent
       }"`,
     );
-    document.getElementById('global-search-input').focus();
+    document.getElementById('global-search-input')!.focus();
   },
-  'click .js-list-title'(evt, tpl) {
+  'click .js-list-title'(evt: JQuery.TriggeredEvent, tpl: GlobalSearchInstance) {
     evt.preventDefault();
-    const input = document.getElementById('global-search-input');
+    const input = document.getElementById('global-search-input') as HTMLInputElement;
     tpl.search.query.set(
       `${input.value} ${TAPi18n.__('operator-list')}:"${
         evt.currentTarget.textContent
       }"`,
     );
-    document.getElementById('global-search-input').focus();
+    document.getElementById('global-search-input')!.focus();
   },
-  'click .js-label-name'(evt, tpl) {
+  'click .js-label-name'(evt: JQuery.TriggeredEvent, tpl: GlobalSearchInstance) {
     evt.preventDefault();
-    const input = document.getElementById('global-search-input');
+    const input = document.getElementById('global-search-input') as HTMLInputElement;
     tpl.search.query.set(
       `${input.value} ${TAPi18n.__('operator-label')}:"${
         evt.currentTarget.textContent
       }"`,
     );
-    document.getElementById('global-search-input').focus();
+    document.getElementById('global-search-input')!.focus();
   },
-  'click .js-new-search'(evt, tpl) {
+  'click .js-new-search'(evt: JQuery.TriggeredEvent, tpl: GlobalSearchInstance) {
     evt.preventDefault();
-    const input = document.getElementById('global-search-input');
+    const input = document.getElementById('global-search-input') as HTMLInputElement;
     input.value = '';
     tpl.search.query.set('');
     tpl.search.hasResults.set(false);
   },
-  'click .js-next-page'(evt, tpl) {
+  'click .js-next-page'(evt: JQuery.TriggeredEvent, tpl: GlobalSearchInstance) {
     evt.preventDefault();
     tpl.search.nextPage();
   },
-  'click .js-previous-page'(evt, tpl) {
+  'click .js-previous-page'(evt: JQuery.TriggeredEvent, tpl: GlobalSearchInstance) {
     evt.preventDefault();
     tpl.search.previousPage();
   },
@@ -589,10 +598,11 @@ Template.resultsPaged.helpers({
 });
 
 Template.resultsPaged.events({
-  'click .js-next-page'(evt) {
+  'click .js-next-page'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
-    // Walk up to find the search instance
-    let view = Template.instance().view;
+    // Walk up to find the search instance. view is walked dynamically up the
+    // Blaze view tree looking for the instance that owns `search`.
+    let view: any = Template.instance().view;
     while (view) {
       const tplInst = view.templateInstance && view.templateInstance();
       if (tplInst && tplInst.search) {
@@ -602,9 +612,10 @@ Template.resultsPaged.events({
       view = view.parentView;
     }
   },
-  'click .js-previous-page'(evt) {
+  'click .js-previous-page'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
-    let view = Template.instance().view;
+    // view is walked dynamically up the Blaze view tree (see above).
+    let view: any = Template.instance().view;
     while (view) {
       const tplInst = view.templateInstance && view.templateInstance();
       if (tplInst && tplInst.search) {
@@ -615,3 +626,14 @@ Template.resultsPaged.events({
     }
   },
 });
+
+interface GlobalSearchInstance extends Blaze.TemplateInstance {
+  search: CardSearchPaged;
+  myLists: ReactiveVar<any[]>;
+  myLabelNames: ReactiveVar<any[]>;
+  myBoardNames: ReactiveVar<any[]>;
+  parsingErrors: QueryErrors;
+  // Parsed query params object returned by Query#getQueryParams().getParams();
+  // its shape is dynamic (predicate map), so it is `any`.
+  queryParams: any;
+}

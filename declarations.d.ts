@@ -121,6 +121,11 @@ interface JQuery {
   // Its API is dynamic (init with an options bag, or invoke string commands),
   // and it ships no usable types, so args/return are `any`.
   summernote(...args: any[]): any;
+  // jQuery UI draggable/droppable widgets (client/lib/jquery-ui.ts), used by
+  // global-search drag-and-drop. Only the options-bag form is used; the widget
+  // option shapes are dynamic so the argument is `any`.
+  draggable(options?: any): JQuery;
+  droppable(options?: any): JQuery;
 }
 
 // The `ui` object passed to jQuery UI sortable start/stop callbacks.
