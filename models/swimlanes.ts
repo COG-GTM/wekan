@@ -8,9 +8,9 @@ import Boards from '/models/boards';
 import Cards from '/models/cards';
 import Lists, { normalizeListColor } from '/models/lists';
 import { remapLabelIds } from '/server/lib/labelRemap';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const Swimlanes = new Mongo.Collection('swimlanes');
+const Swimlanes = new Mongo.Collection<SwimlaneDocument>('swimlanes');
 
 /**
  * A swimlane is an line in the kaban board.
@@ -137,7 +137,7 @@ Swimlanes.attachSchema(
 );
 
 Swimlanes.helpers({
-  async copy(boardId, targetSwimlaneId = null, position = 'below', title = '', cardIdMap = null) {
+  async copy(boardId: string, targetSwimlaneId: string | null = null, position: string = 'below', title: string = '', cardIdMap: WekanDocumentField = null) {
     const oldId = this._id;
     const oldBoardId = this.boardId;
     const desiredTitle = typeof title === 'string' && title.trim().length > 0
@@ -160,12 +160,12 @@ Swimlanes.helpers({
       { boardId, archived: false },
       { sort: { sort: 1 } },
     ))
-      .sort((a, b) => a.sort - b.sort);
+      .sort((a: WekanDocumentField, b: WekanDocumentField) => a.sort - b.sort);
 
     let targetSort = boardSwimlanes.length;
     if (targetSwimlaneId) {
       const targetIndex = boardSwimlanes.findIndex(
-        swimlane => swimlane._id === targetSwimlaneId,
+        (swimlane: WekanDocumentField) => swimlane._id === targetSwimlaneId,
       );
       if (targetIndex >= 0) {
         const selected = boardSwimlanes[targetIndex];
@@ -202,7 +202,7 @@ Swimlanes.helpers({
 
     // Copy all lists in swimlane
     const sourceLists = (await ReactiveCache.getLists(listQuery, { sort: { sort: 1 } }))
-      .sort((a, b) => a.sort - b.sort);
+      .sort((a: WekanDocumentField, b: WekanDocumentField) => a.sort - b.sort);
 
     if (process.env.DEBUG === 'true') {
       console.log('[copySwimlane] source lists found', {
@@ -223,7 +223,7 @@ Swimlanes.helpers({
       const destBoard = await ReactiveCache.getBoard(boardId);
       if (destBoard) {
         // Collect every label id referenced by the cards being copied.
-        const referencedLabelIds = new Set();
+        const referencedLabelIds = new Set<string>();
         for (const sourceList of sourceLists) {
           const cards = await ReactiveCache.getCards({
             listId: sourceList._id,
@@ -245,7 +245,7 @@ Swimlanes.helpers({
 
         for (const name of missingNames) {
           const sourceLabel = sourceBoardLabels.find(
-            label => label && label.name === name,
+            (label: WekanDocumentField) => label && label.name === name,
           );
           await destBoard.addLabel(name, sourceLabel && sourceLabel.color);
         }
@@ -281,7 +281,7 @@ Swimlanes.helpers({
     return newSwimlaneId;
   },
 
-  async move(toBoardId, targetSwimlaneId = null, position = 'below', title = '') {
+  async move(toBoardId: string, targetSwimlaneId: string | null = null, position: string = 'below', title: string = '') {
     const desiredTitle = typeof title === 'string' && title.trim().length > 0
       ? title.trim()
       : this.title;
@@ -289,13 +289,13 @@ Swimlanes.helpers({
       { boardId: toBoardId, archived: false },
       { sort: { sort: 1 } },
     ))
-      .filter(swimlane => swimlane._id !== this._id)
-      .sort((a, b) => a.sort - b.sort);
+      .filter((swimlane: WekanDocumentField) => swimlane._id !== this._id)
+      .sort((a: WekanDocumentField, b: WekanDocumentField) => a.sort - b.sort);
 
     let targetSort = boardSwimlanes.length;
     if (targetSwimlaneId) {
       const targetIndex = boardSwimlanes.findIndex(
-        swimlane => swimlane._id === targetSwimlaneId,
+        (swimlane: WekanDocumentField) => swimlane._id === targetSwimlaneId,
       );
       if (targetIndex >= 0) {
         const selected = boardSwimlanes[targetIndex];
@@ -345,7 +345,7 @@ Swimlanes.helpers({
       }
     }
 
-    await Swimlanes.updateAsync(this._id, {
+    await Swimlanes.updateAsync(this._id!, {
       $set: {
         boardId: toBoardId,
         sort: targetSort,
@@ -416,7 +416,7 @@ Swimlanes.helpers({
   // (e.g. the swimlane was deleted after the per-swimlane migration).
   // These are collected separately so the template can display them in the
   // first swimlane as a fallback — keeping them visible without touching DB.
-  orphanedSwimlaneLists(validSwimlaneIds) {
+  orphanedSwimlaneLists(validSwimlaneIds: string[]) {
     // validSwimlaneIds: array of _id strings for currently-existing swimlanes.
     // A list is "orphaned" when its swimlaneId is a non-empty string that is
     // not among the valid IDs (so it can never appear via myLists()).
@@ -491,8 +491,8 @@ Swimlanes.helpers({
     return await Swimlanes.removeAsync({ _id: this._id });
   },
 
-  async rename(title) {
-    return await Swimlanes.updateAsync(this._id, { $set: { title } });
+  async rename(title: string) {
+    return await Swimlanes.updateAsync(this._id!, { $set: { title } });
   },
 
   // NOTE: collapse() removed - collapsed state is per-user only
@@ -504,7 +504,7 @@ Swimlanes.helpers({
         await list.archive();
       }
     }
-    return await Swimlanes.updateAsync(this._id, { $set: { archived: true, archivedAt: new Date() } });
+    return await Swimlanes.updateAsync(this._id!, { $set: { archived: true, archivedAt: new Date() } });
   },
 
   async restore() {
@@ -513,20 +513,20 @@ Swimlanes.helpers({
         await list.restore();
       }
     }
-    return await Swimlanes.updateAsync(this._id, { $set: { archived: false } });
+    return await Swimlanes.updateAsync(this._id!, { $set: { archived: false } });
   },
 
-  async setColor(newColor) {
+  async setColor(newColor: string) {
     // Normalize so an offered-but-unsupported color (or a removal) becomes None
     // instead of being silently saved as the wrong color or rejected (#5382).
     // normalizeListColor returns '' for None; store null so the optional,
     // allowedValues-constrained schema field accepts it (as cards do).
     const color = normalizeListColor(newColor) || null;
-    return await Swimlanes.updateAsync(this._id, { $set: { color } });
+    return await Swimlanes.updateAsync(this._id!, { $set: { color } });
   },
 });
 
-Swimlanes.userArchivedSwimlanes = async userId => {
+Swimlanes.userArchivedSwimlanes = async (userId: string) => {
   return await ReactiveCache.getSwimlanes({
     boardId: { $in: await Boards.userBoardIds(userId, null) },
     archived: true,
@@ -535,7 +535,7 @@ Swimlanes.userArchivedSwimlanes = async userId => {
 
 Swimlanes.userArchivedSwimlaneIds = async () => {
   const swimlanes = await Swimlanes.userArchivedSwimlanes();
-  return swimlanes.map(swim => { return swim._id; });
+  return swimlanes.map((swim: WekanDocumentField) => { return swim._id; });
 };
 
 Swimlanes.archivedSwimlanes = async () => {
@@ -544,7 +544,7 @@ Swimlanes.archivedSwimlanes = async () => {
 
 Swimlanes.archivedSwimlaneIds = async () => {
   const swimlanes = await Swimlanes.archivedSwimlanes();
-  return swimlanes.map(swim => {
+  return swimlanes.map((swim: WekanDocumentField) => {
     return swim._id;
   });
 };
@@ -576,7 +576,7 @@ Swimlanes.helpers({
     };
 
     if (Meteor.isServer) {
-      return PositionHistory.findOneAsync(selector).then(existingHistory => {
+      return PositionHistory.findOneAsync(selector).then<WekanDocumentField>(existingHistory => {
         if (!existingHistory) {
           return PositionHistory.insertAsync(document);
         }
@@ -627,3 +627,20 @@ Swimlanes.helpers({
 });
 
 export default Swimlanes;
+
+interface SwimlaneDocument {
+  _id?: string;
+  title: string;
+  archived?: boolean;
+  archivedAt?: Date;
+  boardId: string;
+  createdAt?: Date;
+  sort?: number;
+  color?: string | null;
+  updatedAt?: Date;
+  modifiedAt?: Date;
+  type?: string;
+  height?: number;
+  collapsed?: boolean;
+  [field: string]: WekanDocumentField;
+}

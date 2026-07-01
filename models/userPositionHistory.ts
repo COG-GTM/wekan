@@ -1,6 +1,5 @@
 import { Meteor } from 'meteor/meteor';
 import { Mongo } from 'meteor/mongo';
-import { SimpleSchema } from '/imports/simpleSchema';
 import { ReactiveCache } from '/imports/reactiveCache';
 import Boards from '/models/boards';
 import Cards from '/models/cards';
@@ -8,12 +7,13 @@ import ChecklistItems from '/models/checklistItems';
 import Checklists from '/models/checklists';
 import Lists from '/models/lists';
 import Swimlanes from '/models/swimlanes';
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
 /**
  * UserPositionHistory collection - Per-user history of entity movements
  * Similar to Activities but specifically for tracking position changes with undo/redo support
  */
-const UserPositionHistory = new Mongo.Collection('userPositionHistory');
+const UserPositionHistory = new Mongo.Collection<UserPositionHistoryDocument>('userPositionHistory');
 
 UserPositionHistory.attachSchema(
   new SimpleSchema({
@@ -262,7 +262,7 @@ UserPositionHistory.helpers({
             const sort = this.previousSort !== undefined ? this.previousSort : item.sort;
             const checklistId = this.previousState?.checklistId || item.checklistId;
 
-            await ChecklistItems.updateAsync(item._id, {
+            await ChecklistItems.updateAsync(item._id!, {
               $set: {
                 sort,
                 checklistId,
@@ -277,3 +277,27 @@ UserPositionHistory.helpers({
 });
 
 export default UserPositionHistory;
+
+interface UserPositionHistoryDocument {
+  _id?: string;
+  userId: string;
+  boardId: string;
+  entityType: string;
+  entityId: string;
+  actionType: string;
+  previousState?: WekanDocumentField;
+  newState: WekanDocumentField;
+  previousSort?: number;
+  newSort?: number;
+  previousSwimlaneId?: string;
+  newSwimlaneId?: string;
+  previousListId?: string;
+  newListId?: string;
+  previousBoardId?: string;
+  newBoardId?: string;
+  createdAt?: Date;
+  isCheckpoint?: boolean;
+  checkpointName?: string;
+  batchId?: string;
+  [field: string]: WekanDocumentField;
+}
