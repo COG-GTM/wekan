@@ -1,3 +1,6 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { Meteor } from 'meteor/meteor';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
 import { CustomFieldStringTemplate } from '/client/lib/customFields';
@@ -8,7 +11,9 @@ import ChecklistItems from '/models/checklistItems';
 import Cards from '/models/cards';
 import { normalizeDependencies } from '/models/metadata/dependencies';
 
-function getMinicardFlag(board, onMinicardField, legacyField, defaultValue) {
+// `board` is a dynamic board model doc indexed by the (legacy/current) flag
+// field names; `legacyField` is null when a flag has no card-details fallback.
+function getMinicardFlag(board: any, onMinicardField: string, legacyField: string | null, defaultValue: boolean) {
   if (!board) return false;
   if (board[onMinicardField] !== null && board[onMinicardField] !== undefined) {
     return board[onMinicardField];
@@ -27,14 +32,14 @@ Template.minicard.helpers({
   // #3392: show a drag-to-connect handle on the minicard when the board's
   // dependency overlay is on and the user can edit the board. Dragging it onto
   // another card creates a dependency (handled in dependencyOverlay.js).
-  showDependencyConnectHandle() {
+  showDependencyConnectHandle(this: any) {
     const board = ReactiveCache.getBoard(this.boardId);
     return !!(board && board.showDependencies && Utils.canModifyBoard());
   },
   // #3392: PI Program Board "Red Strings". Show a small badge on the minicard
   // when a card has dependencies: the first dependency's icon and color plus the
   // total count.
-  dependencyBadge() {
+  dependencyBadge(this: any) {
     const deps = normalizeDependencies(this.cardDependencies);
     if (deps.length === 0) return null;
     return {
@@ -45,7 +50,7 @@ Template.minicard.helpers({
   },
   // #3984: visual card aging — fade cards that have not been touched recently,
   // based on dateLastActivity, when the board has card aging enabled.
-  agingClass() {
+  agingClass(this: any) {
     const board = ReactiveCache.getBoard(this.boardId);
     if (!board || !board.cardAging) return '';
     const last = this.dateLastActivity || this.modifiedAt || this.createdAt;
@@ -61,10 +66,10 @@ Template.minicard.helpers({
     if (days >= d1) return 'minicard-aging-1';
     return '';
   },
-  formattedCurrencyCustomFieldValue(definition) {
+  formattedCurrencyCustomFieldValue(this: any, definition: any) {
     const customField = this
       .customFieldsWD()
-      .find(f => f._id === definition._id);
+      .find((f: any) => f._id === definition._id);
     const customFieldTrueValue =
       customField && customField.trueValue ? customField.trueValue : '';
 
@@ -75,10 +80,10 @@ Template.minicard.helpers({
     }).format(customFieldTrueValue);
   },
 
-  formattedStringtemplateCustomFieldValue(definition) {
+  formattedStringtemplateCustomFieldValue(this: any, definition: any) {
     const customField = this
       .customFieldsWD()
-      .find(f => f._id === definition._id);
+      .find((f: any) => f._id === definition._id);
 
     const customFieldTrueValue =
       customField && customField.trueValue ? customField.trueValue : [];
@@ -87,7 +92,7 @@ Template.minicard.helpers({
     return ret;
   },
 
-  showCreatorOnMinicard() {
+  showCreatorOnMinicard(this: any) {
     // cache "board" to reduce the mini-mongodb access
     const board = this.board();
     let ret = false;
@@ -96,51 +101,51 @@ Template.minicard.helpers({
     }
     return ret;
   },
-  isWatching() {
+  isWatching(this: any) {
     return this.findWatcher(Meteor.userId());
   },
 
-  showMembers() {
+  showMembers(this: any) {
     const board = this.board();
     return getMinicardFlag(board, 'allowsMembersOnMinicard', 'allowsMembers', true);
   },
 
-  showAssignee() {
+  showAssignee(this: any) {
     const board = this.board();
     return getMinicardFlag(board, 'allowsAssigneeOnMinicard', 'allowsAssignee', true);
   },
-  showReceived() {
+  showReceived(this: any) {
     const board = this.board();
     return getMinicardFlag(board, 'allowsReceivedDateOnMinicard', 'allowsReceivedDate', true);
   },
-  showStart() {
+  showStart(this: any) {
     const board = this.board();
     return getMinicardFlag(board, 'allowsStartDateOnMinicard', 'allowsStartDate', true);
   },
-  showDue() {
+  showDue(this: any) {
     const board = this.board();
     return getMinicardFlag(board, 'allowsDueDateOnMinicard', 'allowsDueDate', true);
   },
-  showEnd() {
+  showEnd(this: any) {
     const board = this.board();
     return getMinicardFlag(board, 'allowsEndDateOnMinicard', 'allowsEndDate', true);
   },
-  showLabels() {
+  showLabels(this: any) {
     const board = this.board();
     return getMinicardFlag(board, 'allowsLabelsOnMinicard', 'allowsLabels', true);
   },
-  showCardNumber() {
+  showCardNumber(this: any) {
     const board = this.board();
     return getMinicardFlag(board, 'allowsCardNumberOnMinicard', 'allowsCardNumber', false);
   },
   // "Mark as complete" toggle on the minicard. No legacy fallback to the
   // card-details setting (allowsDueComplete): hidden by default so it only
   // appears when explicitly enabled in Card Settings > Show at Minicard.
-  showDueComplete() {
+  showDueComplete(this: any) {
     const board = this.board();
     return getMinicardFlag(board, 'allowsDueCompleteOnMinicard', null, false);
   },
-  showSubtasks() {
+  showSubtasks(this: any) {
     const board = this.board();
     return getMinicardFlag(board, 'allowsSubtasksOnMinicard', 'allowsSubtasks', true);
   },
@@ -155,7 +160,7 @@ Template.minicard.helpers({
       return false;
     }
   },
-  cover() {
+  cover(this: any) {
     if (!this.coverId) return null;
     const attachment = ReactiveCache.getAttachment(this.coverId);
     if (!attachment) return null;
@@ -169,26 +174,28 @@ Template.minicard.helpers({
   },
   // XXX resolve this nasty hack for https://github.com/veliovgroup/Meteor-Files/issues/763
   sess() {
-    return Meteor.connection && Meteor.connection._lastSessionId
-      ? Meteor.connection._lastSessionId
+    // Meteor.connection (and its internal _lastSessionId) is not in @types/meteor.
+    const connection = (Meteor as any).connection;
+    return connection && connection._lastSessionId
+      ? connection._lastSessionId
       : null;
   },
   // Upload progress helpers
-  hasActiveUploads() {
+  hasActiveUploads(this: any) {
     return uploadProgressManager.hasActiveUploads(this._id);
   },
-  uploads() {
+  uploads(this: any) {
     return uploadProgressManager.getUploadsForCard(this._id);
   },
-  uploadCount() {
+  uploadCount(this: any) {
     return uploadProgressManager.getUploadCountForCard(this._id);
   },
-  listName() {
+  listName(this: any) {
     const list = this.list();
     return list ? list.title : '';
   },
 
-  shouldShowListOnMinicard() {
+  shouldShowListOnMinicard(this: any) {
     // Show list name if either:
     // 1. Board-wide setting is enabled, OR
     // 2. This specific card has the setting enabled
@@ -197,15 +204,15 @@ Template.minicard.helpers({
     return currentBoard.allowsShowListsOnMinicard || this.showListOnMinicard;
   },
 
-  shouldShowChecklistAtMinicard() {
+  shouldShowChecklistAtMinicard(this: any) {
     // Return checklists that should be shown on minicard
     const currentBoard = this.board();
     if (!currentBoard) return [];
 
     const checklists = this.checklists();
-    const visibleChecklists = [];
+    const visibleChecklists: any[] = [];
 
-    checklists.forEach(checklist => {
+    checklists.forEach((checklist: any) => {
       // Show checklist if either:
       // 1. Board-wide setting is enabled, OR
       // 2. This specific checklist has the setting enabled
@@ -225,12 +232,12 @@ Template.minicard.helpers({
 // #459: accessible reordering — keyboard/screen-reader users can move a card up
 // or down within its list via sr-only buttons (no drag-and-drop required). The
 // move swaps the card's sort value with its neighbour in the same list+swimlane.
-function moveCardBy(card, delta) {
+function moveCardBy(card: any, delta: number) {
   const siblings = ReactiveCache.getCards(
     { listId: card.listId, swimlaneId: card.swimlaneId, archived: false },
     { sort: { sort: 1 } },
   );
-  const idx = siblings.findIndex(c => c._id === card._id);
+  const idx = siblings.findIndex((c: any) => c._id === card._id);
   const target = siblings[idx + delta];
   if (idx < 0 || !target) return;
   // Capture both sort values before either update; the docs are reactive and
@@ -245,24 +252,24 @@ function moveCardBy(card, delta) {
 }
 
 Template.minicard.events({
-  'click .js-linked-link'() {
+  'click .js-linked-link'(this: any) {
     if (this.isLinkedCard()) Utils.goCardId(this.linkedId);
     else if (this.isLinkedBoard())
       Utils.goBoardId(this.linkedId);
   },
-  'click .js-card-move-up'(event) {
+  'click .js-card-move-up'(this: any, event: JQuery.TriggeredEvent) {
     // The move buttons sit inside the minicard anchor; don't let the click
     // bubble up and open the card detail view.
     event.preventDefault();
     event.stopPropagation();
     moveCardBy(this, -1);
   },
-  'click .js-card-move-down'(event) {
+  'click .js-card-move-down'(this: any, event: JQuery.TriggeredEvent) {
     event.preventDefault();
     event.stopPropagation();
     moveCardBy(this, 1);
   },
-  'click .js-toggle-card-complete'(event) {
+  'click .js-toggle-card-complete'(this: any, event: JQuery.TriggeredEvent) {
     // Trello-style "mark complete" toggle (left of the title). Don't let the
     // click open the card.
     event.preventDefault();
@@ -280,28 +287,28 @@ Template.minicard.events({
     }
   },
   'click span.badge-icon.fa.fa-sort, click span.badge-text.check-list-sort' : Popup.open("editCardSortOrder"),
-  'click .minicard-labels'(event, tpl) {
+  'click .minicard-labels'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     if (tpl.find('.js-card-label:hover')) {
       Popup.open("cardLabels")(event, {dataContextIfCurrentDataIsUndefined: Template.currentData()});
     }
   },
-  'click .js-open-minicard-details-menu'(event, tpl) {
+  'click .js-open-minicard-details-menu'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     event.preventDefault();
     event.stopPropagation();
     const card = Template.currentData();
     Popup.open('cardDetailsActions').call({currentData: () => card}, event);
   },
   // Drag and drop file upload handlers
-  'dragover .minicard'(event) {
+  'dragover .minicard'(event: JQuery.TriggeredEvent) {
     // Only prevent default for file drags to avoid interfering with sortable
-    const dataTransfer = event.originalEvent.dataTransfer;
+    const dataTransfer = (event.originalEvent as DragEvent).dataTransfer;
     if (dataTransfer && dataTransfer.types && dataTransfer.types.includes('Files')) {
       event.preventDefault();
       event.stopPropagation();
     }
   },
-  'dragenter .minicard'(event) {
-    const dataTransfer = event.originalEvent.dataTransfer;
+  'dragenter .minicard'(this: any, event: JQuery.TriggeredEvent) {
+    const dataTransfer = (event.originalEvent as DragEvent).dataTransfer;
     if (dataTransfer && dataTransfer.types && dataTransfer.types.includes('Files')) {
       event.preventDefault();
       event.stopPropagation();
@@ -313,16 +320,16 @@ Template.minicard.events({
       }
     }
   },
-  'dragleave .minicard'(event) {
-    const dataTransfer = event.originalEvent.dataTransfer;
+  'dragleave .minicard'(event: JQuery.TriggeredEvent) {
+    const dataTransfer = (event.originalEvent as DragEvent).dataTransfer;
     if (dataTransfer && dataTransfer.types && dataTransfer.types.includes('Files')) {
       event.preventDefault();
       event.stopPropagation();
       $(event.currentTarget).removeClass('is-dragging-over');
     }
   },
-  'drop .minicard'(event) {
-    const dataTransfer = event.originalEvent.dataTransfer;
+  'drop .minicard'(this: any, event: JQuery.TriggeredEvent) {
+    const dataTransfer = (event.originalEvent as DragEvent).dataTransfer;
     if (dataTransfer && dataTransfer.types && dataTransfer.types.includes('Files')) {
       event.preventDefault();
       event.stopPropagation();
@@ -350,11 +357,11 @@ Template.minicard.events({
 });
 
 Template.minicardChecklist.helpers({
-  visibleItems() {
+  visibleItems(this: any) {
     const checklist = this.checklist || this;
     const items = checklist.items();
 
-    return items.filter(item => {
+    return items.filter((item: any) => {
       // Hide finished items if hideCheckedChecklistItems is true
       if (item.isFinished && checklist.hideCheckedChecklistItems) {
         return false;
@@ -369,39 +376,42 @@ Template.minicardChecklist.helpers({
 });
 
 Template.minicardChecklist.events({
-  'click .js-convert-checklist-item-to-card'(event) {
+  'click .js-convert-checklist-item-to-card'(event: JQuery.TriggeredEvent) {
     event.stopPropagation();
-    const formData = Blaze.getData(event.currentTarget);
+    // dynamic Blaze data context of the checklist-item form
+    const formData = Blaze.getData(event.currentTarget) as any;
     if (!formData) return;
     const context = { currentData: () => formData };
     Popup.open('convertChecklistItemToCard').call(context, event);
   },
-  'click .js-open-checklist-menu'(event) {
+  'click .js-open-checklist-menu'(this: any, event: JQuery.TriggeredEvent) {
     const data = Template.currentData();
     const checklist = data.checklist || data;
     const card = data.card || this;
     const context = { currentData: () => ({ checklist, card }) };
     Popup.open('checklistActions').call(context, event);
   },
-  'click .js-checklist-item .check-box-container'(event) {
+  'click .js-checklist-item .check-box-container'(event: JQuery.TriggeredEvent) {
     event.stopPropagation();
     event.preventDefault();
-    const data = Blaze.getData(event.target) || Blaze.getData(event.currentTarget);
+    // dynamic Blaze data context of the checklist item row
+    const data = (Blaze.getData(event.target) || Blaze.getData(event.currentTarget)) as any;
     const item = data && data.item;
     if (item && item._id) {
       item.toggleItem();
     }
   },
-  'click .js-submit-edit-checklist-item-form'(event) {
+  'click .js-submit-edit-checklist-item-form'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     event.stopPropagation();
     const $btn = $(event.currentTarget);
     const $form = $btn.closest('form');
-    const textarea = $form.find('textarea.js-edit-checklist-item')[0];
+    const textarea = $form.find('textarea.js-edit-checklist-item')[0] as HTMLTextAreaElement;
     if (!textarea) return;
     const title = textarea.value.trim();
     if (!title) return;
-    const formData = Blaze.getData($form[0]);
+    // dynamic Blaze data context of the checklist-item edit form
+    const formData = Blaze.getData($form[0]) as any;
     if (formData && formData.item && formData.item._id) {
       formData.item.setTitle(title);
     } else if (formData && formData.checklist && formData.checklist._id) {
@@ -409,9 +419,9 @@ Template.minicardChecklist.events({
     }
     $form.find('.js-close-inlined-form').trigger('click');
   },
-  'submit .js-add-checklist-item'(event, tpl) {
+  'submit .js-add-checklist-item'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     event.preventDefault();
-    const textarea = tpl.find('textarea.js-add-checklist-item');
+    const textarea = tpl.find('textarea.js-add-checklist-item') as HTMLTextAreaElement;
     if (!textarea) return;
     const title = textarea.value.trim();
     const data = Template.currentData() || {};
@@ -429,14 +439,14 @@ Template.minicardChecklist.events({
     textarea.value = '';
     textarea.focus();
   },
-  'click .js-delete-checklist-item': Popup.afterConfirm('checklistItemDelete', function () {
+  'click .js-delete-checklist-item': Popup.afterConfirm('checklistItemDelete', function (this: any) {
     Popup.back();
     const item = this && this.item ? this.item : this;
     if (item && item._id) {
       ChecklistItems.remove(item._id);
     }
   }),
-  'keydown textarea.js-add-checklist-item'(event) {
+  'keydown textarea.js-add-checklist-item'(event: JQuery.TriggeredEvent) {
     if (event.keyCode === 13 && !event.shiftKey) {
       event.preventDefault();
       const $form = $(event.currentTarget).closest('form');
@@ -446,19 +456,21 @@ Template.minicardChecklist.events({
 });
 
 Template.editCardSortOrderPopup.events({
-  'keydown input.js-edit-card-sort-popup'(evt, tpl) {
+  'keydown input.js-edit-card-sort-popup'(evt: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     // enter = save
     if (evt.keyCode === 13) {
-      tpl.find('button[type=submit]').click();
+      (tpl.find('button[type=submit]') as HTMLElement).click();
     }
   },
-  'click button.js-submit-edit-card-sort-popup'(event, tpl) {
+  'click button.js-submit-edit-card-sort-popup'(this: any, event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     // save button pressed
     event.preventDefault();
-    const sort = tpl.$('.js-edit-card-sort-popup')[0]
+    const sort = (tpl.$('.js-edit-card-sort-popup')[0] as HTMLInputElement)
       .value
       .trim();
-    if (!Number.isNaN(sort)) {
+    // `sort` is a string here; Number.isNaN(string) is always false (kept to
+    // preserve the original runtime behavior).
+    if (!Number.isNaN(sort as any)) {
       let card = this;
       card.move(card.boardId, card.swimlaneId, card.listId, sort);
       Popup.back();
