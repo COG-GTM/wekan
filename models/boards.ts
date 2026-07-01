@@ -23,10 +23,10 @@ import { pullMemberById } from '/server/lib/removeMember';
 import getSlug from 'limax';
 import { findWhere, where, groupBy } from '/imports/lib/collectionHelpers';
 import { generateUniversalAttachmentUrl } from '/models/lib/universalUrlGenerator';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 const getTAPi18n = () => require('/imports/i18n').TAPi18n;
 
-function getTranslatedString(key, fallback, options) {
+function getTranslatedString(key: string, fallback: string, options?: any) {
   const i18n = getTAPi18n && getTAPi18n();
   if (!i18n || !i18n.i18n) {
     return fallback;
@@ -35,8 +35,8 @@ function getTranslatedString(key, fallback, options) {
   return typeof translated === 'string' ? translated : fallback;
 }
 
-function sanitizeBoardMembers(members) {
-  return (members || []).map(member => ({
+function sanitizeBoardMembers(members: any[]) {
+  return (members || []).map((member: any) => ({
     userId: member.userId,
     isAdmin: !!member.isAdmin,
     isActive: member.isActive !== false,
@@ -993,7 +993,8 @@ Boards.helpers({
     // Copy all swimlanes in board. cardIdMap collects old card id -> new card
     // id so card-to-card dependencies (#3392 "Red Strings") can be remapped to
     // the copies once every card has been created.
-    const cardIdMap = {};
+    // Maps old card ids to their newly-created copies; keys/values are ids.
+    const cardIdMap: { [key: string]: any } = {};
     const swimlanes = await ReactiveCache.getSwimlanes({
       boardId: oldId,
       archived: false,
@@ -1011,7 +1012,7 @@ Boards.helpers({
     });
     for (const depCard of depCards) {
       const remapped = (depCard.cardDependencies || [])
-        .map(dep => {
+        .map((dep: any) => {
           // Tolerate legacy bare-string entries as well as { cardId, ... }.
           const oldDepId = typeof dep === 'string' ? dep : dep.cardId;
           const newDepId = cardIdMap[oldDepId];
@@ -1027,7 +1028,7 @@ Boards.helpers({
     }
 
     // copy custom field definitions
-    const cfMap = {};
+    const cfMap: { [key: string]: any } = {};
     const customFields = await ReactiveCache.getCustomFields({ boardIds: oldId });
     for (const cf of customFields) {
       const id = cf._id;
@@ -1039,7 +1040,7 @@ Boards.helpers({
     for (const card of cards) {
       await Cards.updateAsync(card._id, {
         $set: {
-          customFields: card.customFields.map(cf => {
+          customFields: card.customFields.map((cf: any) => {
             cf._id = cfMap[cf._id];
             return cf;
           }),
@@ -1048,7 +1049,7 @@ Boards.helpers({
     }
 
     // copy rules, actions, and triggers
-    const actionsMap = {};
+    const actionsMap: { [key: string]: any } = {};
     const actions = await ReactiveCache.getActions({ boardId: oldId });
     for (const action of actions) {
       const id = action._id;
@@ -1056,7 +1057,7 @@ Boards.helpers({
       action.boardId = _id;
       actionsMap[id] = await Actions.insertAsync(action);
     }
-    const triggersMap = {};
+    const triggersMap: { [key: string]: any } = {};
     const triggers = await ReactiveCache.getTriggers({ boardId: oldId });
     for (const trigger of triggers) {
       const id = trigger._id;
@@ -1098,7 +1099,8 @@ Boards.helpers({
    * @returns {string|null}
    */
   async copyTitle() {
-    return await Boards.uniqueTitle(this.title);
+    // `uniqueTitle` is a custom Boards static not on Mongo.Collection.
+    return await (Boards as any).uniqueTitle(this.title);
   },
 
   /**
@@ -1123,7 +1125,7 @@ Boards.helpers({
   isActiveMember(userId) {
     if (userId) {
       return this.members.find(
-        member => member.userId === userId && member.isActive,
+        (member: any) => member.userId === userId && member.isActive,
       );
     } else {
       return false;
@@ -1242,7 +1244,7 @@ Boards.helpers({
     ReactiveCache.getCards({
       "type": "cardType-linkedBoard",
       "boardId": this._id
-    }).forEach(card => {
+    }).forEach((card: any) => {
       linkedBoardId.push(card.linkedId);
     });
     const ret = ReactiveCache.getActivities({ boardId: { $in: linkedBoardId } }, { sort: { createdAt: -1 } });
@@ -1251,27 +1253,27 @@ Boards.helpers({
 
   activeMembers(){
     // Depend on the users collection for reactivity when users are loaded
-    const memberUserIds = this.members.map(x => x.userId);
+    const memberUserIds = this.members.map((x: any) => x.userId);
     // Use findOne with limit for reactivity trigger instead of count() which loads all users
     if (Meteor.isClient) {
       Meteor.users.findOne({ _id: { $in: memberUserIds } }, { fields: { _id: 1 }, limit: 1 });
     }
-    const members = (this.members || []).filter(m => m.isActive === true);
+    const members: any[] = (this.members || []).filter((m: any) => m.isActive === true);
     // Group by userId to handle duplicates
     const grouped = groupBy(members, 'userId');
-    const uniqueMembers = Object.values(grouped).map(group => {
+    const uniqueMembers = Object.values(grouped).map((group: any) => {
       // Prefer admin member if exists, otherwise take the first
-      const selected = group.find(m => m.isAdmin) || group[0];
+      const selected = group.find((m: any) => m.isAdmin) || group[0];
       return selected;
     });
     // Filter out members where user is not loaded
-    const filteredMembers = uniqueMembers.filter(member => {
+    const filteredMembers = uniqueMembers.filter((member: any) => {
       const user = ReactiveCache.getUser(member.userId);
       return user !== undefined;
     });
 
     // Sort by role priority first (admin, normal, normal-assigned, no-comments, comment-only, comment-assigned, worker, read-only, read-assigned), then by fullname
-    const sortKey = member => {
+    const sortKey = (member: any) => {
       const user = ReactiveCache.getUser(member.userId);
       let rolePriority = 8; // Default for normal
 
@@ -1317,7 +1319,7 @@ Boards.helpers({
   },
 
   memberUsers() {
-    return ReactiveCache.getUsers({ _id: { $in: this.members.map(x => x.userId) } });
+    return ReactiveCache.getUsers({ _id: { $in: this.members.map((x: any) => x.userId) } });
   },
 
   getLabel(name, color) {
@@ -1329,11 +1331,11 @@ Boards.helpers({
   },
 
   labelIndex(labelId) {
-    return this.labels.map(x => x._id).indexOf(labelId);
+    return this.labels.map((x: any) => x._id).indexOf(labelId);
   },
 
   memberIndex(memberId) {
-    return this.members.map(x => x.userId).indexOf(memberId);
+    return this.members.map((x: any) => x.userId).indexOf(memberId);
   },
 
   hasMember(memberId) {
@@ -1422,7 +1424,7 @@ Boards.helpers({
   // the global site-admin flag `user.isAdmin`. A member with no restriction
   // flag set is a plain 'normal' member.
   memberRole(memberId) {
-    const member = findWhere(this.members, { userId: memberId, isActive: true });
+    const member: any = findWhere(this.members, { userId: memberId, isActive: true });
     if (!member) return null;
     if (member.isAdmin) return 'board-admin';
     if (member.isWorker) return 'worker';
@@ -1484,7 +1486,7 @@ Boards.helpers({
    */
   setNewLabelOrder(newLabelOrderOnlyIds) {
     if (this.labels.length == newLabelOrderOnlyIds.length) {
-      if (this.labels.every(_label => newLabelOrderOnlyIds.indexOf(_label._id) >= 0)) {
+      if (this.labels.every((_label: any) => newLabelOrderOnlyIds.indexOf(_label._id) >= 0)) {
         const newLabels = [...this.labels].sort((a, b) => newLabelOrderOnlyIds.indexOf(a._id) - newLabelOrderOnlyIds.indexOf(b._id));
         if (this.labels.length == newLabels.length) {
           Boards.direct.update(this._id, {$set: {labels: newLabels}});
@@ -1496,7 +1498,7 @@ Boards.helpers({
   searchBoards(term) {
     check(term, Match.OneOf(String, null, undefined));
 
-    const query = { boardId: this._id };
+    const query: { [key: string]: any } = { boardId: this._id };
     query.type = 'cardType-linkedBoard';
     query.archived = false;
 
@@ -1515,7 +1517,7 @@ Boards.helpers({
   searchSwimlanes(term) {
     check(term, Match.OneOf(String, null, undefined));
 
-    const query = { boardId: this._id };
+    const query: { [key: string]: any } = { boardId: this._id };
     if (this.isTemplatesBoard()) {
       query.type = 'template-swimlane';
       query.archived = false;
@@ -1540,7 +1542,7 @@ Boards.helpers({
       term = term.trim();
     }
     if (term) {
-      const query = { boardId: this._id };
+      const query: { [key: string]: any } = { boardId: this._id };
       if (this.isTemplatesBoard()) {
         query.type = 'template-list';
         query.archived = false;
@@ -1567,7 +1569,7 @@ Boards.helpers({
       term = term.trim();
     }
     if (term) {
-      const query = { boardId: this._id };
+      const query: { [key: string]: any } = { boardId: this._id };
       if (excludeLinked) {
         query.linkedId = null;
       }
@@ -2266,8 +2268,9 @@ Boards.helpers({
   },
 });
 
-Boards.uniqueTitle = async title => {
-  const m = title.match(
+(Boards as any).uniqueTitle = async (title: string) => {
+  // Regex match groups are dynamic; access via `any`.
+  const m: any = title.match(
     new RegExp('^(?<title>.*?)\\s*(\\[(?<num>\\d+)]\\s*$|\\s*$)'),
   );
   const base = escapeForRegex(m.groups.title);
@@ -2292,10 +2295,10 @@ Boards.uniqueTitle = async title => {
 
 // Non-async: returns data on client, Promise on server.
 // Server callers must await.
-Boards.userSearch = (
-  userId,
-  selector = {},
-  projection = {},
+(Boards as any).userSearch = (
+  userId: string,
+  selector: any = {},
+  projection: any = {},
   // includeArchived = false,
 ) => {
   // if (!includeArchived) {
@@ -2311,13 +2314,13 @@ Boards.userSearch = (
 
 // Non-async: returns data on client (for Blaze templates), Promise on server.
 // Server callers must await.
-Boards.userBoards = (
-  userId,
-  archived = false,
-  selector = {},
-  projection = {},
+(Boards as any).userBoards = (
+  userId: string,
+  archived: boolean = false,
+  selector: any = {},
+  projection: any = {},
 ) => {
-  const _buildSelector = (user) => {
+  const _buildSelector = (user: any) => {
     if (!user) return null;
     if (typeof archived === 'boolean') {
       selector.archived = archived;
@@ -2354,20 +2357,20 @@ Boards.userBoards = (
   return ReactiveCache.getBoards(selector, projection);
 };
 
-Boards.userBoardIds = async (userId, archived = false, selector = {}) => {
-  const boards = await Boards.userBoards(userId, archived, selector, {
+(Boards as any).userBoardIds = async (userId: string, archived: boolean = false, selector: any = {}) => {
+  const boards = await (Boards as any).userBoards(userId, archived, selector, {
     fields: { _id: 1 },
   });
-  return boards.map(board => {
+  return boards.map((board: any) => {
     return board._id;
   });
 };
 
-Boards.colorMap = () => {
-  const colors = {};
+(Boards as any).colorMap = () => {
+  const colors: { [key: string]: any } = {};
   try {
     const TAPi18n = getTAPi18n();
-    for (const color of Boards.labelColors()) {
+    for (const color of (Boards as any).labelColors()) {
       colors[TAPi18n.__(`color-${color}`)] = color;
     }
   } catch (e) {
@@ -2377,7 +2380,7 @@ Boards.colorMap = () => {
   return colors;
 };
 
-Boards.labelColors = () => {
+(Boards as any).labelColors = () => {
   return LABEL_COLORS;
 };
 
