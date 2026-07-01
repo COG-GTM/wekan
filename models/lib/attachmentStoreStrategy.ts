@@ -19,7 +19,7 @@ const currentActingUserId = () => {
 // is taken from Meteor.userId() (set during the DDP remove call on the server),
 // falling back to the uploader when there is no acting user (server/system
 // removal). The 'addAttachment'/upload activity keeps the uploader unchanged.
-const insertActivity = (fileObj, activityType, actingUserId) =>
+const insertActivity = (fileObj: any, activityType: string, actingUserId?: string | null) =>
   Activities.insertAsync({
     userId: activityType === 'deleteAttachment'
       ? deleteActivityUserId(actingUserId, fileObj.userId)
@@ -44,7 +44,7 @@ export class AttachmentStoreStrategyGridFs extends FileStoreStrategyGridFs {
    * @param fileObj the current file object
    * @param versionName the current version
    */
-  constructor(gridFsBucket, fileObj, versionName, collection) {
+  constructor(gridFsBucket: any, fileObj: any, versionName: string, collection?: any) {
     super(gridFsBucket, fileObj, versionName, collection);
   }
 
@@ -72,7 +72,7 @@ export class AttachmentStoreStrategyFilesystem extends FileStoreStrategyFilesyst
    * @param fileObj the current file object
    * @param versionName the current version
    */
-  constructor(fileObj, versionName, collection) {
+  constructor(fileObj: any, versionName: string, collection?: any) {
     super(fileObj, versionName, collection);
   }
 
@@ -101,7 +101,7 @@ export class AttachmentStoreStrategyCloud extends FileStoreStrategyCloud {
    * @param fileObj the current file object
    * @param versionName the current version
    */
-  constructor(provider, fileObj, versionName, collection) {
+  constructor(provider: string, fileObj: any, versionName: string, collection?: any) {
     super(provider, fileObj, versionName, collection);
   }
 

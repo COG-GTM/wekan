@@ -30,12 +30,12 @@ export {
 // models/lib/filenameSanitizer.js (#6412).
 const { sanitizeFilename } = require('./filenameSanitizer');
 
-function normalizeForCompare(inputPath) {
+function normalizeForCompare(inputPath: string) {
   const normalized = path.resolve(inputPath);
   return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
 }
 
-function isPathInside(basePath, targetPath) {
+function isPathInside(basePath: string, targetPath: string) {
   const normalizedBase = normalizeForCompare(basePath);
   const normalizedTarget = normalizeForCompare(targetPath);
   const relative = path.relative(normalizedBase, normalizedTarget);
@@ -43,7 +43,7 @@ function isPathInside(basePath, targetPath) {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
-function tryRealPath(inputPath) {
+function tryRealPath(inputPath: string) {
   try {
     return fs.realpathSync(inputPath);
   } catch (err) {
@@ -51,7 +51,7 @@ function tryRealPath(inputPath) {
   }
 }
 
-function isSafeReadableFile(candidatePath, storageRootPath) {
+function isSafeReadableFile(candidatePath: string, storageRootPath: string) {
   if (!candidatePath || !storageRootPath) {
     return false;
   }
@@ -75,6 +75,14 @@ function isSafeReadableFile(candidatePath, storageRootPath) {
 
 /** Factory for FileStoreStrategy */
 export default class FileStoreStrategyFactory {
+  // Strategy classes (constructors) selected at runtime; the GridFS bucket and
+  // FilesCollection come from untyped packages, hence `any`.
+  classFileStoreStrategyFilesystem: any;
+  storagePath: string;
+  classFileStoreStrategyGridFs: any;
+  gridFsBucket: any;
+  classFileStoreStrategyCloud: any;
+  collection: WekanFilesCollection;
 
   /** constructor
    * @param classFileStoreStrategyFilesystem use this strategy for filesystem storage
@@ -83,7 +91,7 @@ export default class FileStoreStrategyFactory {
    * @param gridFsBucket use this GridFS Bucket as GridFS Storage
    * @param classFileStoreStrategyCloud strategy class for cloud backends (S3/Azure/GCS), optional
    */
-  constructor(classFileStoreStrategyFilesystem, storagePath, classFileStoreStrategyGridFs, gridFsBucket, classFileStoreStrategyCloud, collection) {
+  constructor(classFileStoreStrategyFilesystem: any, storagePath: string, classFileStoreStrategyGridFs: any, gridFsBucket: any, classFileStoreStrategyCloud: any, collection: WekanFilesCollection) {
     this.classFileStoreStrategyFilesystem = classFileStoreStrategyFilesystem;
     this.storagePath = storagePath;
     this.classFileStoreStrategyGridFs = classFileStoreStrategyGridFs;
@@ -104,7 +112,7 @@ export default class FileStoreStrategyFactory {
    * @param versionName the current version
    * @param use this storage, or if not set, get the storage from fileObj
    */
-  getFileStrategy(fileObj, versionName, storage) {
+  getFileStrategy(fileObj: FileObj, versionName: string, storage?: string) {
     if (!storage) {
       storage = fileObj.versions[versionName].storage;
       if (!storage) {
@@ -117,13 +125,15 @@ export default class FileStoreStrategyFactory {
         }
       }
     }
-    let ret;
+    // One of several strategy instances chosen dynamically by storage kind;
+    // the strategy classes are untyped constructors, so the result is `any`.
+    let ret: any;
     if (storage == STORAGE_NAME_FILESYSTEM) {
       ret = new this.classFileStoreStrategyFilesystem(fileObj, versionName, this.collection);
     } else if (storage == STORAGE_NAME_GRIDFS) {
       ret = new this.classFileStoreStrategyGridFs(this.gridFsBucket, fileObj, versionName, this.collection);
-    } else if (CLOUD_STORAGE_NAMES.includes(storage)) {
-      if (this.classFileStoreStrategyCloud && isCloudConfigured(storage)) {
+    } else if (CLOUD_STORAGE_NAMES.includes(storage!)) {
+      if (this.classFileStoreStrategyCloud && isCloudConfigured(storage!)) {
         ret = new this.classFileStoreStrategyCloud(storage, fileObj, versionName, this.collection);
       } else {
         // Cloud strategy unavailable or provider not configured — fall back to
@@ -139,12 +149,15 @@ export default class FileStoreStrategyFactory {
 
 /** Strategy to store files */
 class FileStoreStrategy {
+  fileObj: FileObj;
+  versionName: string;
+  collection: WekanFilesCollection;
 
   /** constructor
    * @param fileObj the current file object
    * @param versionName the current version
    */
-  constructor(fileObj, versionName, collection) {
+  constructor(fileObj: FileObj, versionName: string, collection?: WekanFilesCollection) {
     this.fileObj = fileObj;
     this.versionName = versionName;
     // FilesCollection to persist changes to (Attachments or Avatars). Falls
@@ -160,7 +173,7 @@ class FileStoreStrategy {
    * @param http the current http request
    * @param cacheControl cacheControl of FilesCollection
    */
-  interceptDownload(http, cacheControl) {
+  interceptDownload(http: any, cacheControl?: any): boolean | void {
   }
 
   /** after file remove */
@@ -177,20 +190,20 @@ class FileStoreStrategy {
    * @param filePath if set, use this path
    * @return the write stream
    */
-  getWriteStream(filePath) {
+  getWriteStream(filePath?: string) {
   }
 
   /** writing finished
    * @param finishedData the data of the write stream finish event
    */
-  writeStreamFinished(finishedData) {
+  writeStreamFinished(finishedData?: any) {
   }
 
   /** returns the new file path
    * @param storagePath use this storage path
    * @return the new file path
    */
-  getNewPath(storagePath, name) {
+  getNewPath(storagePath: string, name?: string) {
     if (typeof name !== 'string') {
       name = this.fileObj.name;
     }
@@ -208,7 +221,7 @@ class FileStoreStrategy {
    * @li at database the filename is updated after this method
    * @param newFilePath the new file path
    */
-  rename(newFilePath) {
+  rename(newFilePath: string) {
   }
 
   /** return the storage name
@@ -220,13 +233,16 @@ class FileStoreStrategy {
 
 /** Strategy to store attachments at GridFS (MongoDB) */
 export class FileStoreStrategyGridFs extends FileStoreStrategy {
+  // GridFS bucket and its write stream come from the untyped mongodb driver.
+  gridFsBucket: any;
+  gridFsWriteStream: any;
 
   /** constructor
    * @param gridFsBucket use this GridFS Bucket
    * @param fileObj the current file object
    * @param versionName the current version
    */
-  constructor(gridFsBucket, fileObj, versionName, collection) {
+  constructor(gridFsBucket: any, fileObj: FileObj, versionName: string, collection?: WekanFilesCollection) {
     super(fileObj, versionName, collection);
     this.gridFsBucket = gridFsBucket;
   }
@@ -235,7 +251,7 @@ export class FileStoreStrategyGridFs extends FileStoreStrategy {
    * @param http the current http request
    * @param cacheControl cacheControl of FilesCollection
    */
-  interceptDownload(http, cacheControl) {
+  interceptDownload(http: any, cacheControl?: any) {
     const readStream = this.getReadStream();
     const downloadFlag = http?.params?.query?.download;
 
@@ -270,7 +286,7 @@ export class FileStoreStrategyGridFs extends FileStoreStrategy {
    * @param filePath if set, use this path
    * @return the write stream
    */
-  getWriteStream(filePath) {
+  getWriteStream(filePath?: string) {
     const fileObj = this.fileObj;
     const versionName = this.versionName;
     const metadata = { ...fileObj.meta, versionName, fileId: fileObj._id };
@@ -288,7 +304,7 @@ export class FileStoreStrategyGridFs extends FileStoreStrategy {
   /** writing finished
    * @param finishedData the data of the write stream finish event
    */
-  writeStreamFinished(finishedData) {
+  writeStreamFinished(finishedData?: any) {
     const gridFsFileIdName = this.getGridFsFileIdName();
     // Older mongodb drivers passed the stored file document to the 'finish'
     // event; current drivers emit it with no argument (so finishedData is
@@ -322,7 +338,8 @@ export class FileStoreStrategyGridFs extends FileStoreStrategy {
   unlink() {
     const gfsId = this.getGridFsObjectId();
     if (gfsId) {
-      this.gridFsBucket.delete(gfsId, err => {
+      // gridFsBucket is the untyped mongodb GridFS driver, so `err` is `any`.
+      this.gridFsBucket.delete(gfsId, (err: any) => {
         if (err) {
           console.error("error on gfs bucket.delete: ", err);
         }
@@ -382,7 +399,7 @@ export class FileStoreStrategyFilesystem extends FileStoreStrategy {
    * @param fileObj the current file object
    * @param versionName the current version
    */
-  constructor(fileObj, versionName, collection) {
+  constructor(fileObj: FileObj, versionName: string, collection?: WekanFilesCollection) {
     super(fileObj, versionName, collection);
   }
 
@@ -406,7 +423,7 @@ export class FileStoreStrategyFilesystem extends FileStoreStrategy {
     const candidates = [];
 
     // 0) Try to find project root and resolve from there
-    let projectRoot = null;
+    let projectRoot: string | null = null;
     if (originalPath) {
       // Find project root by looking for .meteor directory
       let current = process.cwd();
@@ -478,7 +495,7 @@ export class FileStoreStrategyFilesystem extends FileStoreStrategy {
     }
 
     // Pick first existing candidate
-    let chosen;
+    let chosen: string | undefined;
     for (const c of candidates) {
       if (isSafeReadableFile(c, resolvedStorageRoot)) {
         chosen = c;
@@ -496,32 +513,32 @@ export class FileStoreStrategyFilesystem extends FileStoreStrategy {
    * @param filePath if set, use this path
    * @return the write stream
    */
-  getWriteStream(filePath) {
+  getWriteStream(filePath?: string) {
     if (typeof filePath !== 'string') {
       filePath = this.fileObj.versions[this.versionName].path;
     }
-    const ret = fs.createWriteStream(filePath);
+    const ret = fs.createWriteStream(filePath!);
     return ret;
   }
 
   /** writing finished
    * @param finishedData the data of the write stream finish event
    */
-  writeStreamFinished(finishedData) {
+  writeStreamFinished(finishedData?: any) {
   }
 
   /** remove the file */
   unlink() {
     const filePath = this.fileObj.versions[this.versionName].path;
-    fs.unlink(filePath, () => {});
+    fs.unlink(filePath!, () => {});
   }
 
   /** rename the file (physical)
    * @li at database the filename is updated after this method
    * @param newFilePath the new file path
    */
-  rename(newFilePath) {
-    fs.renameSync(this.fileObj.versions[this.versionName].path, newFilePath);
+  rename(newFilePath: string) {
+    fs.renameSync(this.fileObj.versions[this.versionName].path!, newFilePath);
   }
 
   /** return the storage name
@@ -551,24 +568,29 @@ export class FileStoreStrategyFilesystem extends FileStoreStrategy {
  * the object again regardless of provider.
  */
 export class FileStoreStrategyCloud extends FileStoreStrategy {
+  provider: string;
+  _uploadPromise: Promise<void> | null;
+  _key: string | null;
+  _uploadError: Error | null;
 
   /** constructor
    * @param provider cloud storage name ('s3' | 'azure' | 'gcs')
    * @param fileObj the current file object
    * @param versionName the current version
    */
-  constructor(provider, fileObj, versionName, collection) {
+  constructor(provider: string, fileObj: FileObj, versionName: string, collection?: WekanFilesCollection) {
     super(fileObj, versionName, collection);
     this.provider = provider;
     this._uploadPromise = null;
     this._key = null;
+    this._uploadError = null;
   }
 
   /** download the file
    * @param http the current http request
    * @param cacheControl cacheControl of FilesCollection
    */
-  interceptDownload(http, cacheControl) {
+  interceptDownload(http: any, cacheControl?: any) {
     const readStream = this.getReadStream();
     const downloadFlag = http?.params?.query?.download;
 
@@ -597,16 +619,18 @@ export class FileStoreStrategyCloud extends FileStoreStrategy {
       return pass;
     }
     const key = this.getObjectKey();
+    // storage-abstraction ships no exported types, so its stream result and the
+    // rejection reasons here are `any`.
     adapter.storage.getFileAsStream(adapter.bucketName, key)
-      .then(result => {
+      .then((result: any) => {
         if (!result || result.error || !result.value) {
           pass.destroy(new Error(result && result.error ? result.error : 'No cloud read stream'));
           return;
         }
-        result.value.on('error', error => pass.destroy(error));
+        result.value.on('error', (error: any) => pass.destroy(error));
         result.value.pipe(pass);
       })
-      .catch(error => pass.destroy(error));
+      .catch((error: any) => pass.destroy(error));
     return pass;
   }
 
@@ -614,7 +638,7 @@ export class FileStoreStrategyCloud extends FileStoreStrategy {
    * @param filePath the object key to write to (from getNewPath)
    * @return the write stream
    */
-  getWriteStream(filePath) {
+  getWriteStream(filePath?: string) {
     const pass = new PassThrough();
     this._key = (typeof filePath === 'string' && filePath) ? filePath : this.getObjectKey();
     this._uploadError = null;
@@ -623,7 +647,7 @@ export class FileStoreStrategyCloud extends FileStoreStrategy {
     if (!adapter) {
       this._uploadError = new Error(`Cloud storage "${this.provider}" is not configured`);
       this._uploadPromise = Promise.resolve();
-      process.nextTick(() => pass.destroy(this._uploadError));
+      process.nextTick(() => pass.destroy(this._uploadError!));
       return pass;
     }
 
@@ -637,8 +661,8 @@ export class FileStoreStrategyCloud extends FileStoreStrategy {
     // happens. The bulk move processes one file at a time, so peak memory is one
     // file. The upload promise NEVER rejects — any failure is captured in
     // this._uploadError (read by waitUntilStored()).
-    const chunks = [];
-    this._uploadPromise = new Promise(resolve => {
+    const chunks: Buffer[] = [];
+    this._uploadPromise = new Promise<void>(resolve => {
       pass.on('data', chunk => chunks.push(chunk));
       pass.on('error', error => {
         if (!this._uploadError) {
@@ -682,7 +706,7 @@ export class FileStoreStrategyCloud extends FileStoreStrategy {
   }
 
   /** writing finished — persist the object key in the version meta */
-  writeStreamFinished(finishedData) {
+  writeStreamFinished(finishedData?: any) {
     const field = this.getCloudFileIdName();
     this.collection.updateAsync(
       { _id: this.fileObj._id },
@@ -727,7 +751,7 @@ export class FileStoreStrategyCloud extends FileStoreStrategy {
   }
 
   /** the object key for a fresh write (no leading storage directory) */
-  getNewPath(storagePath, name) {
+  getNewPath(storagePath: string, name?: string) {
     if (typeof name !== 'string') {
       name = this.fileObj.name;
     }
@@ -743,7 +767,7 @@ export class FileStoreStrategyCloud extends FileStoreStrategy {
   /** rename the file: cloud objects are keyed by id+version+name, so a rename
    * is a server-side copy to the new key followed by removal of the old one.
    */
-  rename(newFilePath) {
+  rename(newFilePath: string) {
     const adapter = getCloudAdapter(this.provider);
     if (!adapter) {
       return;
@@ -753,8 +777,10 @@ export class FileStoreStrategyCloud extends FileStoreStrategy {
     if (!oldKey || !newKey || oldKey === newKey) {
       return;
     }
+    // storage-abstraction ships no exported types, so its stream result and the
+    // rejection reason here are `any`.
     adapter.storage.getFileAsStream(adapter.bucketName, oldKey)
-      .then(result => {
+      .then((result: any) => {
         if (!result || result.error || !result.value) {
           throw new Error(result && result.error ? result.error : 'No cloud read stream for rename');
         }
@@ -765,7 +791,7 @@ export class FileStoreStrategyCloud extends FileStoreStrategy {
         });
       })
       .then(() => adapter.storage.removeFile(adapter.bucketName, oldKey))
-      .catch(error => console.error('Failed to rename cloud file:', error));
+      .catch((error: any) => console.error('Failed to rename cloud file:', error));
   }
 
   /** return the storage name (the provider) */
@@ -783,7 +809,7 @@ export class FileStoreStrategyCloud extends FileStoreStrategy {
  *   Existing callers may ignore the return value (fire-and-forget); the
  *   server-side bulk move job awaits it to move attachments sequentially.
  */
-export const moveToStorage = function(fileObj, storageDestination, fileStoreStrategyFactory) {
+export const moveToStorage = function(fileObj: FileObj, storageDestination: string, fileStoreStrategyFactory: FileStoreStrategyFactory) {
   // SECURITY: Sanitize filename to prevent path traversal attacks
   // This ensures any malicious names already in the database are cleaned up
   const safeName = sanitizeFilename(fileObj.name);
@@ -796,7 +822,7 @@ export const moveToStorage = function(fileObj, storageDestination, fileStoreStra
     fileObj.name = safeName;
   }
 
-  const versionPromises = Object.keys(fileObj.versions).map(versionName => new Promise(resolve => {
+  const versionPromises = Object.keys(fileObj.versions).map(versionName => new Promise<void>(resolve => {
     const strategyRead = fileStoreStrategyFactory.getFileStrategy(fileObj, versionName);
     const strategyWrite = fileStoreStrategyFactory.getFileStrategy(fileObj, versionName, storageDestination);
 
@@ -878,7 +904,7 @@ export const moveToStorage = function(fileObj, storageDestination, fileStoreStra
       }
     };
 
-    const fail = (error, label) => {
+    const fail = (error: any, label: string) => {
       console.error(`[${label}]: `, error, fileObj._id);
       if (!settled) {
         settled = true;
@@ -886,10 +912,12 @@ export const moveToStorage = function(fileObj, storageDestination, fileStoreStra
       }
     };
 
-    writeStream.on('error', error => fail(error, 'writeStream error'));
-    readStream.on('error', error => fail(error, 'readStream error'));
+    // readStream/writeStream come from the dynamically-selected strategy, so
+    // their event payloads are `any`.
+    writeStream.on('error', (error: any) => fail(error, 'writeStream error'));
+    readStream.on('error', (error: any) => fail(error, 'readStream error'));
 
-    writeStream.on('finish', finishedData => {
+    writeStream.on('finish', (finishedData: any) => {
       try {
         strategyWrite.writeStreamFinished(finishedData);
       } catch (error) {
@@ -912,8 +940,10 @@ export const moveToStorage = function(fileObj, storageDestination, fileStoreStra
   return Promise.all(versionPromises);
 };
 
-export const copyFile = async function(fileObj, newCardId, fileStoreStrategyFactory) {
-  const newCard = await ReactiveCache.getCard(newCardId);
+export const copyFile = async function(fileObj: FileObj, newCardId: string, fileStoreStrategyFactory: FileStoreStrategyFactory) {
+  // reactiveCache.ts infers a `null` parameter type from getCard's `= null`
+  // default; the runtime accepts a card id string, so call through `any`.
+  const newCard = await (ReactiveCache.getCard as any)(newCardId);
   Object.keys(fileObj.versions).forEach(versionName => {
     const strategyRead = fileStoreStrategyFactory.getFileStrategy(fileObj, versionName);
     const readStream = strategyRead.getReadStream();
@@ -934,11 +964,13 @@ export const copyFile = async function(fileObj, newCardId, fileStoreStrategyFact
       return;
     }
 
-    writeStream.on('error', error => {
+    // readStream/writeStream come from the dynamically-selected strategy, so
+    // their event payloads are `any`.
+    writeStream.on('error', (error: any) => {
       console.error('[writeStream error]: ', error, fileObj._id);
     });
 
-    readStream.on('error', error => {
+    readStream.on('error', (error: any) => {
       console.error('[readStream error]: ', error, fileObj._id);
     });
 
@@ -981,7 +1013,7 @@ export const copyFile = async function(fileObj, newCardId, fileStoreStrategyFact
   });
 };
 
-export const rename = function(fileObj, newName, fileStoreStrategyFactory) {
+export const rename = function(fileObj: FileObj, newName: string, fileStoreStrategyFactory: FileStoreStrategyFactory) {
   // Sanitize the new name to prevent path traversal
   const safeName = sanitizeFilename(newName);
 
@@ -1004,3 +1036,29 @@ export const rename = function(fileObj, newName, fileStoreStrategyFactory) {
     });
   });
 };
+
+// A single stored version of a Meteor-Files file document (original, thumbnail,
+// etc.). `meta` is a free-form bag whose keys include dynamic, provider-specific
+// entries (e.g. `gridFsFileId`, `${provider}FileId`), hence `any` values.
+interface FileVersion {
+  storage?: string;
+  path?: string;
+  size?: number;
+  type?: string;
+  meta: { [key: string]: any };
+}
+
+// A Meteor-Files file document as handled by the storage strategies. Only the
+// fields these strategies read are enumerated; the index signature covers the
+// remaining dynamic ostrio:files properties.
+interface FileObj {
+  _id: string;
+  name: string;
+  type?: string;
+  userId?: string;
+  fileSize?: number;
+  collectionName?: string;
+  meta: { [key: string]: any };
+  versions: { [versionName: string]: FileVersion };
+  [key: string]: any;
+}

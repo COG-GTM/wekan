@@ -200,3 +200,29 @@ declare module 'meteor/blaze' {
 interface Window {
   __meteor_runtime_config__?: { ROOT_URL?: string };
 }
+
+// Some legacy model files reference these values from Meteor's package scope
+// without an explicit import. Declare them as ambient globals with real types
+// where available so those files type-check without changing their runtime.
+declare const Random: typeof import('meteor/random').Random;
+declare const ReactiveCache: typeof import('/imports/reactiveCache').ReactiveCache;
+// Minimal shape of the ostrio:files FilesCollection wrappers (Attachments,
+// Avatars) that model code interacts with. `collection` is the underlying
+// Mongo.Collection (dynamic legacy docs); the rest of the ostrio API is dynamic
+// too, covered by the index signature, while the enumerated methods give the
+// callbacks passed to them proper contextual types.
+interface WekanFilesCollection {
+  collection: any;
+  updateAsync(selector: any, modifier: any, options?: any): Promise<any>;
+  addFile(
+    path: string,
+    config?: any,
+    callback?: (error: any, fileRef: any) => void,
+    proceedAfterUpload?: boolean,
+  ): any;
+  [key: string]: any;
+}
+
+// The global Attachments FilesCollection (ostrio:files) comes from the untyped
+// models/attachments module.
+declare const Attachments: WekanFilesCollection;
