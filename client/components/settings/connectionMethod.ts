@@ -1,7 +1,13 @@
-Template.connectionMethod.onCreated(function() {
+import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
+
+Template.connectionMethod.onCreated(function(this: ConnectionMethodInstance) {
   this.authenticationMethods = new ReactiveVar([]);
 
-  Meteor.call('getAuthenticationsEnabled', (_, result) => {
+  // _/result: any — untyped Meteor method callback; result maps method -> enabled.
+  Meteor.call('getAuthenticationsEnabled', (_: any, result: any) => {
     if (result) {
       // Only enabled auth methods without OAuth2/OpenID which is a separate button
       const tmp = Object.keys(result).filter((k) => result[k]).filter((k) => k !== 'oauth2');
@@ -31,9 +37,15 @@ Template.connectionMethod.onRendered(() => {
 
 Template.connectionMethod.helpers({
   authentications() {
-    return Template.instance().authenticationMethods.get();
+    return (Template.instance() as ConnectionMethodInstance).authenticationMethods.get();
   },
-  isSelected(match) {
-    return Template.instance().data.authenticationMethod === match;
+  isSelected(match: any) {
+    // data: any — the template data context carries authenticationMethod.
+    return (Template.instance().data as any).authenticationMethod === match;
   },
 });
+
+// connectionMethod instance: the list of enabled authentication methods.
+interface ConnectionMethodInstance extends Blaze.TemplateInstance {
+  authenticationMethods: ReactiveVar<any>;
+}

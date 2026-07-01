@@ -1,9 +1,13 @@
+import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { InfiniteScrolling } from '/client/lib/infiniteScrolling';
 
 const translationsPerPage = 25;
 
-Template.translation.onCreated(function () {
+Template.translation.onCreated(function (this: TranslationInstance) {
   this.error = new ReactiveVar('');
   this.loading = new ReactiveVar(false);
   this.translationSetting = new ReactiveVar(true);
@@ -45,13 +49,13 @@ Template.translation.onCreated(function () {
 
 Template.translation.helpers({
   loading() {
-    return Template.instance().loading;
+    return (Template.instance() as TranslationInstance).loading;
   },
   translationSetting() {
-    return Template.instance().translationSetting;
+    return (Template.instance() as TranslationInstance).translationSetting;
   },
   translationList() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as TranslationInstance;
     const translations = ReactiveCache.getTranslations(tpl.findTranslationsOptions.get(), {
       sort: { modifiedAt: 1 },
       fields: { _id: true },
@@ -60,21 +64,21 @@ Template.translation.helpers({
     return translations;
   },
   translationNumber() {
-    return Template.instance().numberTranslations.get();
+    return (Template.instance() as TranslationInstance).numberTranslations.get();
   },
-  setError(error) {
-    Template.instance().error.set(error);
+  setError(error: any) {
+    (Template.instance() as TranslationInstance).error.set(error);
   },
-  setLoading(w) {
-    Template.instance().loading.set(w);
+  setLoading(w: any) {
+    (Template.instance() as TranslationInstance).loading.set(w);
   },
 });
 
 Template.translation.events({
-  'click #searchTranslationButton'(event, tpl) {
+  'click #searchTranslationButton'(event: JQuery.TriggeredEvent, tpl: TranslationInstance) {
     _filterTranslation(tpl);
   },
-  'keydown #searchTranslationInput'(event, tpl) {
+  'keydown #searchTranslationInput'(event: JQuery.TriggeredEvent, tpl: TranslationInstance) {
     if (event.keyCode === 13 && !event.shiftKey) {
       _filterTranslation(tpl);
     }
@@ -82,7 +86,7 @@ Template.translation.events({
   'click #newTranslationButton'() {
     Popup.open('newTranslation');
   },
-  'click a.js-translation-menu'(event, tpl) {
+  'click a.js-translation-menu'(event: JQuery.TriggeredEvent, tpl: TranslationInstance) {
     const target = $(event.target);
     if (!target.hasClass('active')) {
       $('.side-menu li.active').removeClass('active');
@@ -91,19 +95,19 @@ Template.translation.events({
       tpl.translationSetting.set('translation-setting' === targetID);
     }
   },
-  'scroll .main-body'(event, tpl) {
+  'scroll .main-body'(event: JQuery.TriggeredEvent, tpl: TranslationInstance) {
     tpl.infiniteScrolling.checkScrollPosition(event.currentTarget, () => {
       tpl.loadNextPage();
     });
   },
 });
 
-function _filterTranslation(tpl) {
+function _filterTranslation(tpl: TranslationInstance) {
   const value = $('#searchTranslationInput').first().val();
   if (value === '') {
     tpl.findTranslationsOptions.set({});
   } else {
-    const regex = new RegExp(value, 'i');
+    const regex = new RegExp(value as string, 'i');
     tpl.findTranslationsOptions.set({
       $or: [
         { language: regex },
@@ -115,35 +119,39 @@ function _filterTranslation(tpl) {
 }
 
 Template.translationRow.helpers({
-  translationData() {
+  // this: any — the translation-row data context exposes `translationId`.
+  translationData(this: any) {
     return ReactiveCache.getTranslation(this.translationId);
   },
 });
 
 Template.editTranslationPopup.helpers({
-  translation() {
+  // this: any — the popup data context exposes `translationId`.
+  translation(this: any) {
     return ReactiveCache.getTranslation(this.translationId);
   },
   errorMessage() {
-    return Template.instance().errorMessage.get();
+    return (Template.instance() as ErrorMessageInstance).errorMessage.get();
   },
 });
 
-Template.newTranslationPopup.onCreated(function () {
+Template.newTranslationPopup.onCreated(function (this: ErrorMessageInstance) {
   this.errorMessage = new ReactiveVar('');
 });
 
 Template.newTranslationPopup.helpers({
-  translation() {
+  // this: any — the popup data context exposes `translationId`.
+  translation(this: any) {
     return ReactiveCache.getTranslation(this.translationId);
   },
   errorMessage() {
-    return Template.instance().errorMessage.get();
+    return (Template.instance() as ErrorMessageInstance).errorMessage.get();
   },
 });
 
 Template.translationRow.helpers({
-  translation() {
+  // this: any — the translation-row data context exposes `translationId`.
+  translation(this: any) {
     return ReactiveCache.getTranslation(this.translationId);
   },
 });
@@ -158,10 +166,11 @@ Template.newTranslationRow.events({
 });
 
 Template.editTranslationPopup.events({
-  submit(event, templateInstance) {
+  // this: any — the popup data context exposes `translationId`.
+  submit(this: any, event: JQuery.TriggeredEvent, templateInstance: Blaze.TemplateInstance) {
     event.preventDefault();
     const translation = ReactiveCache.getTranslation(this.translationId);
-    const translationText = templateInstance.find('.js-translation-translation-text').value.trim();
+    const translationText = (templateInstance.find('.js-translation-translation-text') as HTMLInputElement).value.trim();
 
     Meteor.call(
       'setTranslationText',
@@ -174,18 +183,19 @@ Template.editTranslationPopup.events({
 });
 
 Template.newTranslationPopup.events({
-  submit(event, templateInstance) {
+  submit(event: JQuery.TriggeredEvent, templateInstance: Blaze.TemplateInstance) {
     event.preventDefault();
-    const language = templateInstance.find('.js-translation-language').value.trim();
-    const text = templateInstance.find('.js-translation-text').value.trim();
-    const translationText = templateInstance.find('.js-translation-translation-text').value.trim();
+    const language = (templateInstance.find('.js-translation-language') as HTMLInputElement).value.trim();
+    const text = (templateInstance.find('.js-translation-text') as HTMLInputElement).value.trim();
+    const translationText = (templateInstance.find('.js-translation-translation-text') as HTMLInputElement).value.trim();
 
     Meteor.call(
       'setCreateTranslation',
       language,
       text,
       translationText,
-      function(error) {
+      // error: any — untyped Meteor method callback.
+      function(error: any) {
         const textMessageElement = templateInstance.$('.text-taken');
         if (error) {
           const errorElement = error.error;
@@ -203,9 +213,30 @@ Template.newTranslationPopup.events({
 });
 
 Template.settingsTranslationPopup.events({
-  'click #deleteButton'(event) {
+  // this: any — the popup data context exposes `translationId`.
+  'click #deleteButton'(this: any, event: JQuery.TriggeredEvent) {
     event.preventDefault();
     Meteor.call('deleteTranslation', this.translationId);
     Popup.back();
   }
 });
+
+// translation instance: search/paging state and infinite-scrolling helper.
+interface TranslationInstance extends Blaze.TemplateInstance {
+  error: ReactiveVar<any>;
+  loading: ReactiveVar<any>;
+  translationSetting: ReactiveVar<any>;
+  findTranslationsOptions: ReactiveVar<any>;
+  numberTranslations: ReactiveVar<any>;
+  page: ReactiveVar<any>;
+  loadNextPageLocked: boolean;
+  // infiniteScrolling: any — an InfiniteScrolling instance.
+  infiniteScrolling: any;
+  loadNextPage: () => void;
+  calculateNextPeak: () => void;
+}
+
+// Popups that expose a reactive errorMessage var.
+interface ErrorMessageInstance extends Blaze.TemplateInstance {
+  errorMessage: ReactiveVar<any>;
+}

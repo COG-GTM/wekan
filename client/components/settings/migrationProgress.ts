@@ -3,6 +3,7 @@
  * Displays detailed progress for comprehensive board migration
  */
 
+import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveCache } from '/imports/reactiveCache';
 
@@ -18,6 +19,9 @@ export const migrationTotalSteps = new ReactiveVar(0);
 export const isMigrating = new ReactiveVar(false);
 
 class MigrationProgressManager {
+  // progressHistory: any[] — timestamped snapshots of progress updates.
+  progressHistory: any[];
+
   constructor() {
     this.progressHistory = [];
   }
@@ -25,7 +29,7 @@ class MigrationProgressManager {
   /**
    * Update migration progress
    */
-  updateProgress(progressData) {
+  updateProgress(progressData: any) {
     const {
       overallProgress,
       currentStep,
@@ -94,7 +98,7 @@ class MigrationProgressManager {
   /**
    * Fail migration
    */
-  failMigration(error) {
+  failMigration(error: any) {
     isMigrating.set(false);
     migrationStatus.set(`Migration failed: ${error.message || error}`);
     migrationStepStatus.set('Error occurred');
@@ -182,7 +186,7 @@ Template.migrationProgress.helpers({
     // Convert snake_case to Title Case
     return stepName
       .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
   },
 
@@ -196,7 +200,7 @@ Template.migrationProgress.helpers({
         .split(/(?=[A-Z])/)
         .join(' ')
         .toLowerCase()
-        .replace(/^\w/, c => c.toUpperCase());
+        .replace(/^\w/, (c: string) => c.toUpperCase());
       formatted.push(`${formattedKey}: ${value}`);
     }
 
