@@ -18,7 +18,7 @@
  * @param {number[]} existingSorts sort values of the cards already in the list
  * @returns {number} a sort value placing the card on top
  */
-export function computeTopSort(existingSorts) {
+export function computeTopSort(existingSorts: number[]) {
   const sorts = (Array.isArray(existingSorts) ? existingSorts : [])
     .filter(s => typeof s === 'number' && !Number.isNaN(s));
   if (sorts.length === 0) {
@@ -48,7 +48,7 @@ export function computeTopSort(existingSorts) {
  *   isBoardMove: boolean,
  * }}
  */
-export function normalizeMoveParams(body) {
+export function normalizeMoveParams(body: MoveParamsBody | null | undefined) {
   const b = body || {};
   const newBoardId = b.newBoardId || undefined;
   const newSwimlaneId = b.newSwimlaneId || undefined;
@@ -76,7 +76,7 @@ export function normalizeMoveParams(body) {
  * @param {(string|number|Date)} value
  * @returns {(Date|null)}
  */
-export function parseCardDate(value) {
+export function parseCardDate(value: string | number | Date | null | undefined) {
   if (value instanceof Date) {
     return Number.isNaN(value.getTime()) ? null : value;
   }
@@ -102,4 +102,12 @@ export function parseCardDate(value) {
     return Number.isNaN(d.getTime()) ? null : d;
   }
   return null;
+}
+
+interface MoveParamsBody {
+  newBoardId?: string;
+  newSwimlaneId?: string;
+  newListId?: string;
+  listId?: string;
+  swimlaneId?: string;
 }

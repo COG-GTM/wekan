@@ -22,7 +22,9 @@
  * @param {*} value the raw REST body value for members / assignees
  * @return {string[]} a normalized array of id strings (possibly empty)
  */
-function coerceRestArrayParam(value) {
+// `value` is an arbitrary REST body value of unknown shape (array, string,
+// null, number, object), so `any` is unavoidable at this boundary.
+function coerceRestArrayParam(value: any) {
   if (Array.isArray(value)) {
     return value.filter(v => typeof v === 'string' && v !== '');
   }
@@ -33,4 +35,4 @@ function coerceRestArrayParam(value) {
   return [];
 }
 
-module.exports = { coerceRestArrayParam };
+export { coerceRestArrayParam };

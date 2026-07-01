@@ -22,7 +22,7 @@ const {
   safeUserLanguage,
   buildEmailTemplateField,
   wrapSendResetPasswordEmail,
-} = require('../../server/lib/resetPasswordEmail');
+} = require('../../server/lib/resetPasswordEmail.ts');
 
 let passed = 0;
 // Collect tests (sync or async) and run them sequentially below so that a

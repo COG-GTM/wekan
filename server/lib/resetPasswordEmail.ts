@@ -18,7 +18,7 @@
 
 // Resolve the display name for a user without ever throwing.
 // Prefers the collection-helper getName(), then profile.fullname, then username.
-function safeUserName(user) {
+function safeUserName(user: ResetUser | null | undefined) {
   // Prefer the collection-helper getName(), but if it is missing or throws, fall
   // through to the raw profile/username so a registered user still gets a name.
   try {
@@ -29,7 +29,7 @@ function safeUserName(user) {
     // fall through to the profile-based fallback below
   }
   try {
-    const profile = (user && user.profile) || {};
+    const profile: ResetUserProfile = (user && user.profile) || {};
     return profile.fullname || (user && user.username) || '';
   } catch (e) {
     return '';
@@ -37,7 +37,7 @@ function safeUserName(user) {
 }
 
 // Resolve the language for a user without ever throwing. Falls back to 'en'.
-function safeUserLanguage(user) {
+function safeUserLanguage(user: ResetUser | null | undefined) {
   // Prefer the collection-helper getLanguage(), but if it is missing or throws,
   // fall through to the raw profile language, defaulting to English.
   try {
@@ -48,7 +48,7 @@ function safeUserLanguage(user) {
     // fall through to the profile-based fallback below
   }
   try {
-    const profile = (user && user.profile) || {};
+    const profile: ResetUserProfile = (user && user.profile) || {};
     return profile.language || 'en';
   } catch (e) {
     return 'en';
@@ -59,7 +59,13 @@ function safeUserLanguage(user) {
 // key `str` (e.g. 'resetPassword-text'). `translate` is the TAPi18n.__-style
 // function (key, params, language) => string. Never throws: on any failure it
 // returns a minimal, safe fallback so the caller cannot produce an HTTP 500.
-function buildEmailTemplateField(str, translate, siteName, user, url) {
+function buildEmailTemplateField(
+  str: string,
+  translate: TranslateFn,
+  siteName: string,
+  user: ResetUser | null | undefined,
+  url: string,
+) {
   try {
     return translate(
       `email-${str}`,
@@ -80,11 +86,13 @@ function buildEmailTemplateField(str, translate, siteName, user, url) {
 // missing MAIL_URL/MAIL_FROM, mail server error) is converted via `makeError`
 // into a clean, catchable error instead of an unhandled exception (HTTP 500).
 // `makeError(code, message)` builds the thrown error (e.g. new Meteor.Error).
-function wrapSendResetPasswordEmail(originalSend, makeError) {
+function wrapSendResetPasswordEmail(originalSend: SendResetPasswordEmail | null | undefined, makeError: MakeResetError) {
   if (typeof originalSend !== 'function') {
     return originalSend;
   }
-  return async function wrappedSendResetPasswordEmail(...args) {
+  // `this` and `args` are forwarded verbatim to the wrapped Meteor send
+  // function, whose signature is arbitrary, so `any` is unavoidable here.
+  return async function wrappedSendResetPasswordEmail(this: any, ...args: any[]) {
     try {
       return await originalSend.apply(this, args);
     } catch (e) {
@@ -96,9 +104,29 @@ function wrapSendResetPasswordEmail(originalSend, makeError) {
   };
 }
 
-module.exports = {
+export {
   safeUserName,
   safeUserLanguage,
   buildEmailTemplateField,
   wrapSendResetPasswordEmail,
 };
+
+interface ResetUserProfile {
+  fullname?: string;
+  language?: string;
+}
+
+interface ResetUser {
+  getName?: () => string;
+  getLanguage?: () => string;
+  profile?: ResetUserProfile;
+  username?: string;
+}
+
+type TranslateFn = (key: string, params: object, language: string) => string;
+
+// The wrapped sender comes from accounts-password and takes arbitrary
+// arguments, so `any` is unavoidable here.
+type SendResetPasswordEmail = (this: any, ...args: any[]) => Promise<any>;
+
+type MakeResetError = (code: string, message: string) => Error;

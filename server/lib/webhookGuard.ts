@@ -26,7 +26,7 @@
  *   be synchronous or return a Promise.
  * @returns {Promise<{ok: boolean, error?: Error}>}
  */
-export async function safeDeliver(deliverFn) {
+export async function safeDeliver(deliverFn: DeliverFn) {
   try {
     if (typeof deliverFn !== 'function') {
       throw new TypeError('safeDeliver: deliverFn must be a function');
@@ -44,3 +44,7 @@ export async function safeDeliver(deliverFn) {
     return { ok: false, error };
   }
 }
+
+// `deliverFn` may be synchronous or return a Promise, and its resolved value is
+// ignored, so its return type is arbitrary (any is unavoidable here).
+type DeliverFn = () => any;

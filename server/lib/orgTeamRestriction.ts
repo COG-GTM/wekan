@@ -10,7 +10,7 @@
  * Return true iff the two arrays share at least one element (string ids).
  * Null/undefined are treated as empty arrays.
  */
-function hasIntersection(a, b) {
+function hasIntersection(a: string[] | null | undefined, b: string[] | null | undefined) {
   if (!Array.isArray(a) || !Array.isArray(b) || a.length === 0 || b.length === 0) {
     return false;
   }
@@ -38,7 +38,7 @@ export function canAddUserToBoard({
   adderTeams,
   candidateOrgs,
   candidateTeams,
-} = {}) {
+}: OrgTeamRestrictionOpts = {}) {
   // Disabled => preserve current unrestricted behaviour.
   if (!restrictEnabled) {
     return true;
@@ -51,3 +51,11 @@ export function canAddUserToBoard({
 }
 
 export default canAddUserToBoard;
+
+interface OrgTeamRestrictionOpts {
+  restrictEnabled?: boolean;
+  adderOrgs?: string[];
+  adderTeams?: string[];
+  candidateOrgs?: string[];
+  candidateTeams?: string[];
+}

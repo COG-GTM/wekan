@@ -1,11 +1,11 @@
 let syncedCronConfigured = false;
-let syncedCronInstance = null;
+let syncedCronInstance: SyncedCronInstance | null = null;
 
-function getSyncedCronInstance() {
+function getSyncedCronInstance(): SyncedCronInstance {
   if (!syncedCronInstance) {
     syncedCronInstance = require('meteor/quave:synced-cron').SyncedCron;
   }
-  return syncedCronInstance;
+  return syncedCronInstance!;
 }
 
 export function configureSyncedCron() {
@@ -40,4 +40,20 @@ export const SyncedCron = new Proxy(
       return true;
     },
   },
-);
+) as SyncedCronInstance;
+
+interface SyncedCronConfig {
+  log?: boolean;
+  collectionName?: string;
+  utc?: boolean;
+  collectionTTL?: number;
+}
+
+interface SyncedCronInstance {
+  config(options: SyncedCronConfig): void;
+  start(): void;
+  // The quave:synced-cron package exposes many other members that the Proxy
+  // above forwards verbatim; they are untyped, so any is unavoidable here.
+  [key: string]: any;
+  [key: symbol]: any;
+}

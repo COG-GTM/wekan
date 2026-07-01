@@ -73,7 +73,7 @@ function getRawDb() {
 // Resolve a node-mongodb rawCollection from a Meteor Mongo.Collection, a
 // Meteor-Files FilesCollection (its Mongo.Collection is at `.collection`), or
 // anything that already exposes rawCollection().
-function getRawCollection(collection) {
+function getRawCollection(collection: RawCollectionSource | null | undefined) {
   if (!collection) return null;
   if (typeof collection.rawCollection === 'function') {
     return collection.rawCollection();
@@ -140,7 +140,11 @@ export async function waitForMongoReady() {
  * @param {Object} [options] passed straight through to createIndex (unique, etc.)
  * @returns {Promise<boolean>} true if an index was created, false if skipped
  */
-export async function ensureIndex(collection, keys, options = {}) {
+export async function ensureIndex(
+  collection: RawCollectionSource | null | undefined,
+  keys: object,
+  options: object = {},
+) {
   const raw = getRawCollection(collection);
   if (!raw) {
     console.error('WeKan ensureIndex: could not resolve rawCollection, skipping', keys);
@@ -148,7 +152,7 @@ export async function ensureIndex(collection, keys, options = {}) {
   }
   const wanted = JSON.stringify(keys);
   try {
-    let existing = [];
+    let existing: RawIndex[] = [];
     try {
       existing = await raw.indexes();
     } catch (e) {
@@ -169,4 +173,20 @@ export async function ensureIndex(collection, keys, options = {}) {
     );
     return false;
   }
+}
+
+interface RawIndex {
+  key: object;
+}
+
+interface RawCollection {
+  indexes(): Promise<RawIndex[]>;
+  createIndex(keys: object, options?: object): Promise<string>;
+  collectionName: string;
+}
+
+interface RawCollectionSource {
+  rawCollection?: () => RawCollection;
+  _collection?: { rawCollection?: () => RawCollection };
+  collection?: { rawCollection?: () => RawCollection };
 }

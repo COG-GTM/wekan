@@ -6,11 +6,21 @@
 // differs from the current document's title. This mirrors how sibling tracked
 // fields (e.g. dueAt) are detected in the before.update hook, so the existing
 // Activities.after.insert outgoing-webhook hook fires on title changes too.
-export function titleChanged(oldDoc, modifier) {
+export function titleChanged(oldDoc: TitleDoc | null | undefined, modifier: TitleModifier | null | undefined) {
   if (!modifier || !modifier.$set || !('title' in modifier.$set)) {
     return false;
   }
   const oldTitle = (oldDoc && oldDoc.title) || '';
   const newTitle = modifier.$set.title;
   return newTitle !== oldTitle;
+}
+
+interface TitleDoc {
+  title?: string;
+}
+
+interface TitleModifier {
+  $set?: {
+    title?: string;
+  };
 }

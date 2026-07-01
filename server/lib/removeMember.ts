@@ -27,7 +27,11 @@
  * @param {string} userId - userId of the member entry to remove
  * @returns {Array<{userId:string}>} members without the matching entry
  */
-export function pullMemberById(members, userId) {
+export function pullMemberById(members: BoardMember[], userId: string) {
   const list = Array.isArray(members) ? members : [];
   return list.filter(member => !(member && member.userId === userId));
+}
+
+interface BoardMember {
+  userId?: string;
 }
