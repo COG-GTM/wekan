@@ -13,12 +13,14 @@ import AttachmentMigrationStatus from '/models/attachmentMigrationStatus';
 // Reactive variables for tracking migration progress
 const migrationProgress = new ReactiveVar(0);
 const migrationStatus = new ReactiveVar('');
-const unconvertedAttachments = new ReactiveVar([]);
+const unconvertedAttachments = new ReactiveVar<WekanReactiveDocument[]>([]);
 
 // Track migrated boards on server side
-const migratedBoards = new Set();
+const migratedBoards = new Set<string>();
 
 class AttachmentMigrationService {
+  migrationCache: Map<string | undefined, boolean>;
+
   constructor() {
     this.migrationCache = new Map();
   }
@@ -28,7 +30,7 @@ class AttachmentMigrationService {
    * @param {string} boardId - The board ID
    * @returns {boolean} - True if board has been migrated
    */
-  async isBoardMigrated(boardId) {
+  async isBoardMigrated(boardId: string) {
     const isMigrated = migratedBoards.has(boardId);
 
     // Update status collection for pub/sub
@@ -50,7 +52,7 @@ class AttachmentMigrationService {
    * Migrate all attachments for a board
    * @param {string} boardId - The board ID
    */
-  async migrateBoardAttachments(boardId) {
+  async migrateBoardAttachments(boardId: string) {
     try {
       // Check if board has already been migrated
       if (await this.isBoardMigrated(boardId)) {
@@ -132,7 +134,7 @@ class AttachmentMigrationService {
    * @param {Object} attachment - The attachment object
    * @returns {boolean} - True if attachment needs migration
    */
-  needsMigration(attachment) {
+  needsMigration(attachment: WekanReactiveDocument) {
     if (this.migrationCache.has(attachment._id)) {
       return false; // Already migrated
     }
@@ -148,7 +150,7 @@ class AttachmentMigrationService {
    * Migrate a single attachment
    * @param {Object} attachment - The attachment object
    */
-  async migrateAttachment(attachment) {
+  async migrateAttachment(attachment: WekanReactiveDocument) {
     try {
       // Get the card to find board and list information
       const card = await ReactiveCache.getCard(attachment.cardId);
@@ -198,7 +200,7 @@ class AttachmentMigrationService {
    * @param {string} boardId - The board ID
    * @returns {Array} - Array of unconverted attachments
    */
-  async getUnconvertedAttachments(boardId) {
+  async getUnconvertedAttachments(boardId: string) {
     try {
       const attachments = await Attachments.find({
         'meta.boardId': boardId
@@ -216,7 +218,7 @@ class AttachmentMigrationService {
    * @param {string} boardId - The board ID
    * @returns {Object} - Migration progress data
    */
-  async getMigrationProgress(boardId) {
+  async getMigrationProgress(boardId: string) {
     const progress = migrationProgress.get();
     const status = migrationStatus.get();
     const unconverted = await this.getUnconvertedAttachments(boardId);

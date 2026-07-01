@@ -73,6 +73,16 @@ declare module 'meteor/meteor' {
     // read back.
     interface UserServices {
       'accounts-lockout'?: AccountsLockoutUserService;
+      // The TOTP secret the login REST route validates when a user has 2FA
+      // enabled. Its concrete shape is 2FA-package-internal, so it comes in
+      // through the documented interop alias.
+      twoFactorAuthentication?: WekanDocumentField;
+    }
+    // @types/meteor models Meteor.Error but not the ad-hoc `statusCode` the
+    // Wekan Authentication helpers stamp on the error before throwing so REST
+    // handlers can map it to an HTTP status.
+    interface Error {
+      statusCode?: number;
     }
   }
 }
@@ -93,6 +103,11 @@ declare namespace Meteor {
   interface User {
     isAdmin?: boolean;
   }
+  // The Authentication helpers stamp an HTTP `statusCode` on the error they
+  // throw; the global Meteor.Error (used without importing) needs it too.
+  interface Error {
+    statusCode?: number;
+  }
 }
 
 declare module 'meteor/accounts-base' {
@@ -104,6 +119,35 @@ declare module 'meteor/accounts-base' {
       options: WekanDocumentField,
       user: WekanDocumentField,
     ): string;
+
+    // Internal Accounts helpers used by the login/register REST routes and the
+    // token-parsing middleware (server/apiMiddleware, server/apiAuthRoutes,
+    // server/header-login). @types/meteor models the sync `_checkPassword` but
+    // not these async / 2FA / token internals, so they are declared here.
+    function _checkPasswordAsync(
+      user: Meteor.User,
+      password: WekanDocumentField,
+    ): Promise<{ userId: string; error?: WekanDocumentField }>;
+    function _insertLoginToken(
+      userId: string,
+      stampedLoginToken: StampedLoginToken,
+    ): Promise<void>;
+    function _tokenExpiration(when: Date): Date;
+    const _options: {
+      forbidClientAccountCreation?: boolean;
+      [option: string]: WekanDocumentField;
+    };
+    // Optional at runtime: only present in builds with the 2FA feature.
+    const _check2faEnabled: ((user: Meteor.User) => boolean) | undefined;
+    function _isTokenValid(
+      secret: WekanDocumentField,
+      code: WekanDocumentField,
+    ): boolean;
+    function _handleError(
+      message: string,
+      throwError?: boolean,
+      errorCode?: string,
+    ): void;
   }
 }
 
@@ -141,6 +185,15 @@ interface WekanMongoNpmModule {
 type WekanMongoInternals = typeof import('meteor/mongo').MongoInternals & {
   NpmModule: WekanMongoNpmModule;
 };
+
+// The raw Mongo connection object behind `defaultRemoteCollectionDriver().mongo`.
+// @types/meteor models `.db` but not the oplog handle / raw driver client that
+// the admin statistics method reads for oplog and active-session diagnostics.
+interface WekanMongoConnection {
+  db: MeteorMongoDb;
+  _oplogHandle?: { onOplogEntry?: WekanDocumentField } | null;
+  client?: { s?: { activeSessions?: { size?: number } } };
+}
 
 // ---------------------------------------------------------------------------
 // Wekan attachment/file-storage shapes and globals used by models/lib.
@@ -433,7 +486,11 @@ declare module 'meteor/ostrio:files' {
   class FilesCollection {
     constructor(config?: FilesCollectionConfig);
     collection: import('meteor/mongo').Mongo.Collection<WekanFileObj>;
-    find(selector?: WekanDocumentField): { fetch(): WekanFileObj[] };
+    find(selector?: WekanDocumentField): {
+      fetch(): WekanFileObj[];
+      fetchAsync(): Promise<WekanFileObj[]>;
+      countAsync(): Promise<number>;
+    };
     link(fileRef?: WekanFileObj, version?: string): string;
     addFile(
       path: string,
@@ -441,7 +498,7 @@ declare module 'meteor/ostrio:files' {
       callback?: (error: Error | null, fileRef: WekanFileObj) => void,
       proceedAfterUpload?: boolean,
     ): void;
-    updateAsync(selector: object, modifier: object): Promise<number>;
+    updateAsync(selector: WekanDocumentField, modifier: object): Promise<number>;
     removeAsync(selector: WekanDocumentField): Promise<number>;
     storagePath?: string | (() => string);
     onAfterUpload?: (
@@ -845,6 +902,7 @@ declare module 'meteor/webapp' {
     post(path: string, handler: WekanWebAppRouteHandler): void;
     put(path: string, handler: WekanWebAppRouteHandler): void;
     delete(path: string, handler: WekanWebAppRouteHandler): void;
+    options(path: string, handler: WekanWebAppRouteHandler): void;
   }
 
   namespace WebApp {

@@ -2,11 +2,14 @@
 // Replaces communitypackages:json-routes middleware chain.
 // Must be imported before model files that register API routes.
 
-const { Meteor } = require('meteor/meteor');
-const { Accounts } = require('meteor/accounts-base');
-const { WebApp } = require('meteor/webapp');
+import { Meteor } from 'meteor/meteor';
+import { Accounts } from 'meteor/accounts-base';
+import { WebApp } from 'meteor/webapp';
+import { safeJsonStringify } from '/server/lib/apiResponseHelpers';
+
+// body-parser ships express-style RequestHandler types that don't line up with
+// WekanWebAppRouteHandler, so it stays a CommonJS require at the interop edge.
 const bodyParser = require('body-parser');
-const { safeJsonStringify } = require('/server/lib/apiResponseHelpers');
 
 // ---------------------------------------------------------------------------
 // 1. Body parsing (previously registered by json-routes)
@@ -71,7 +74,7 @@ WebApp.handlers.use(async function authenticateByToken(req, res, next) {
 // ---------------------------------------------------------------------------
 // 5. sendJsonResult — drop-in replacement for JsonRoutes.sendResult
 // ---------------------------------------------------------------------------
-function sendJsonResult(res, options) {
+function sendJsonResult(res: WekanWebAppResponse, options?: SendJsonResultOptions) {
   options = options || {};
 
   // Default response headers (matching json-routes behavior)
@@ -102,4 +105,11 @@ function sendJsonResult(res, options) {
   res.end();
 }
 
-module.exports = { sendJsonResult };
+export { sendJsonResult };
+
+interface SendJsonResultOptions {
+  headers?: Record<string, string | number>;
+  code?: number;
+  // Arbitrary JSON-serialisable response payload handed to safeJsonStringify.
+  data?: WekanDocumentField;
+}

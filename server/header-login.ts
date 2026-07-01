@@ -7,7 +7,11 @@ import {
   shouldProcessHeaderLoginMiddlewareRequest,
 } from '/server/lib/headerLoginAuth';
 
-async function issueLoginTokenCookies(userId, req, res) {
+async function issueLoginTokenCookies(
+  userId: string,
+  req: WekanWebAppRequest,
+  res: WekanWebAppResponse,
+) {
   if (!userId) {
     return;
   }

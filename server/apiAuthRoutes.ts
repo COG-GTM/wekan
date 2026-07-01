@@ -2,13 +2,13 @@
 // Replaces communitypackages:rest-accounts-password.
 // Logic copied from the package source to maintain identical API behavior.
 
-const { Meteor } = require('meteor/meteor');
-const { Accounts } = require('meteor/accounts-base');
-const { WebApp } = require('meteor/webapp');
-const { check, Match } = require('meteor/check');
-const { sendJsonResult } = require('/server/apiMiddleware');
+import { Meteor } from 'meteor/meteor';
+import { Accounts } from 'meteor/accounts-base';
+import { WebApp } from 'meteor/webapp';
+import { check, Match } from 'meteor/check';
+import { sendJsonResult } from '/server/apiMiddleware';
 
-const NonEmptyString = Match.Where(function (x) {
+const NonEmptyString = Match.Where(function (x: string) {
   check(x, String);
   return x.length > 0;
 });
@@ -65,7 +65,7 @@ WebApp.handlers.post('/users/login', async function (req, res) {
       }
       if (
         !Accounts._isTokenValid(
-          user.services.twoFactorAuthentication.secret,
+          user.services!.twoFactorAuthentication.secret,
           options.code,
         )
       ) {
@@ -121,7 +121,11 @@ WebApp.handlers.post('/users/register', async function (req, res) {
       password: String,
     });
 
-    const userOptions = { password: options.password };
+    const userOptions: {
+      password?: string;
+      username?: string;
+      email?: string;
+    } = { password: options.password };
     if (options.username) userOptions.username = options.username;
     if (options.email) userOptions.email = options.email;
 

@@ -14,7 +14,11 @@ import Team from '/models/team';
 // from another source — are preserved, so enabling LDAP org/team sync never
 // removes a user's other memberships.
 Meteor.methods({
-  async setUserOrgsTeamsFromLdap(userId, groupNames, asOrganization) {
+  async setUserOrgsTeamsFromLdap(
+    userId: string,
+    groupNames: string[],
+    asOrganization: boolean,
+  ) {
     // Check ALL arguments first, unconditionally: audit-argument-checks throws
     // "Did not check() all arguments" otherwise, and that rejection (when the
     // admin guard below throws first) escapes as an unhandledRejection that
@@ -56,7 +60,7 @@ Meteor.methods({
         } else if (org.orgSyncMembersFromAuth !== true) {
           await Org.updateAsync({ _id: org._id }, { $set: { orgSyncMembersFromAuth: true } });
         }
-        const alreadyMember = (user.orgs || []).some(o => o.orgId === org._id);
+        const alreadyMember = (user.orgs || []).some((o: WekanReactiveDocument) => o.orgId === org._id);
         if (!alreadyMember) {
           await Meteor.users.updateAsync(
             { _id: userId },
@@ -77,7 +81,7 @@ Meteor.methods({
         } else if (team.teamSyncMembersFromAuth !== true) {
           await Team.updateAsync({ _id: team._id }, { $set: { teamSyncMembersFromAuth: true } });
         }
-        const alreadyMember = (user.teams || []).some(t => t.teamId === team._id);
+        const alreadyMember = (user.teams || []).some((t: WekanReactiveDocument) => t.teamId === team._id);
         if (!alreadyMember) {
           await Meteor.users.updateAsync(
             { _id: userId },

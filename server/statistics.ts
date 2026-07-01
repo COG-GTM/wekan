@@ -13,7 +13,7 @@ Meteor.methods({
     if (currentUser?.isAdmin) {
       const os = require('os');
       const pjson = require('/package.json');
-      const statistics = {};
+      const statistics: AppStatistics = {};
       let wekanVersion = pjson.version;
       wekanVersion = wekanVersion.replace('v', '');
       statistics.version = wekanVersion;
@@ -67,7 +67,8 @@ Meteor.methods({
       let mongoStorageEngine;
       let mongoOplogEnabled;
       try {
-        const { mongo } = MongoInternals.defaultRemoteCollectionDriver();
+        const mongo = MongoInternals.defaultRemoteCollectionDriver()
+          .mongo as WekanMongoConnection;
         mongoOplogEnabled = Boolean(
           mongo._oplogHandle && mongo._oplogHandle.onOplogEntry,
         );
@@ -92,7 +93,8 @@ Meteor.methods({
         mongoStorageEngine,
         mongoOplogEnabled,
       };
-      const client = MongoInternals.defaultRemoteCollectionDriver()?.mongo?.client;
+      const client = (MongoInternals.defaultRemoteCollectionDriver()?.mongo as
+        WekanMongoConnection | undefined)?.client;
       const sessionsCount = client?.s?.activeSessions?.size;
       statistics.session = {
         sessionsCount,
@@ -103,3 +105,70 @@ Meteor.methods({
     }
   },
 });
+
+interface OsStatistics {
+  type: string;
+  platform: string;
+  arch: string;
+  release: string;
+  uptime: number;
+  loadavg: number[];
+  totalmem: number;
+  freemem: number;
+  // node's os.cpus() detail array; its per-core shape is not consumed here.
+  cpus: WekanDocumentField;
+}
+
+interface ProcessStatistics {
+  nodeVersion: string;
+  pid: number;
+  uptime: number;
+}
+
+interface NodeHeapStatistics {
+  totalHeapSize: number;
+  totalHeapSizeExecutable: number;
+  totalPhysicalSize: number;
+  totalAvailableSize: number;
+  usedHeapSize: number;
+  heapSizeLimit: number;
+  mallocedMemory: number;
+  peakMallocedMemory: number;
+  doesZapGarbage: number;
+  numberOfNativeContexts: number;
+  numberOfDetachedContexts: number;
+}
+
+interface NodeMemoryUsage {
+  rss: number;
+  heapTotal: number;
+  heapUsed: number;
+  external: number;
+}
+
+interface MeteorStatistics {
+  meteorVersion: string;
+}
+
+interface MongoStatistics {
+  // Values come from the untyped Mongo `serverStatus`/`buildinfo` commands or a
+  // literal 'unknown' fallback, so they arrive through the interop alias.
+  mongoVersion: WekanDocumentField;
+  mongoStorageEngine: WekanDocumentField;
+  mongoOplogEnabled: boolean;
+}
+
+interface SessionStatistics {
+  sessionsCount?: number;
+}
+
+interface AppStatistics {
+  version?: string;
+  os?: OsStatistics;
+  process?: ProcessStatistics;
+  nodeHeapStats?: NodeHeapStatistics;
+  nodeMemoryUsage?: NodeMemoryUsage;
+  meteor?: MeteorStatistics;
+  mongo?: MongoStatistics;
+  session?: SessionStatistics;
+}

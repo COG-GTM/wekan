@@ -34,8 +34,11 @@ Meteor.methods({
 
     // Add the given member userIds to a single board, add-only. Returns the
     // number of members actually added (0 if all were already present).
-    const addMembersToBoard = async (board, memberUserIds) => {
-      const existing = new Set((board.members || []).map(m => m.userId));
+    const addMembersToBoard = async (
+      board: WekanReactiveDocument,
+      memberUserIds: string[],
+    ) => {
+      const existing = new Set((board.members || []).map((m: WekanReactiveDocument) => m.userId));
       const toAdd = memberUserIds.filter(userId => !existing.has(userId));
       if (toAdd.length === 0) {
         return 0;
@@ -58,7 +61,12 @@ Meteor.methods({
     // Propagate one org or team. `field` is the user-doc membership array
     // ('orgs'/'teams') and `idField` is the id within it ('orgId'/'teamId');
     // `boardField` is the board array ('orgs'/'teams').
-    const propagate = async (groupId, field, idField, boardField) => {
+    const propagate = async (
+      groupId: string | undefined,
+      field: string,
+      idField: string,
+      boardField: string,
+    ) => {
       const memberUsers = await Meteor.users
         .find({ [`${field}.${idField}`]: groupId }, { fields: { _id: 1 } })
         .fetchAsync();

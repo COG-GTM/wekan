@@ -1,8 +1,8 @@
 import '../models/users';
-const fs = require('fs');
-const os = require('os');
+import fs from 'fs';
+import os from 'os';
 
-let errors = [];
+const errors: string[] = [];
 if (!process.env.WRITABLE_PATH) {
   errors.push("WRITABLE_PATH environment variable missing and/or unset, please configure !");
 } else {
