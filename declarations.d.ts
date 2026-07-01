@@ -198,6 +198,35 @@ interface AccountsStatic {
 
 declare const Accounts: AccountsStatic;
 
+// Server-internal `Accounts.insertUserDoc` (accounts-base) is not part of
+// @types/meteor's public surface, but server/lib/headerLoginAuth.ts uses it to
+// mint a user document from a header-provided identity. Augment the module with
+// its real signature: it takes an options bag and a partial user document and
+// returns the new user id.
+declare module 'meteor/accounts-base' {
+  namespace Accounts {
+    function insertUserDoc(options: object, user: object): string;
+  }
+}
+
+// Meteor's server-side global `Email` (meteor/email), used by
+// server/lib/emailLocalization.ts to send localized mail.
+interface EmailSendOptions {
+  to?: string | string[];
+  from?: string;
+  cc?: string | string[];
+  bcc?: string | string[];
+  replyTo?: string | string[];
+  subject?: string;
+  text?: string;
+  html?: string;
+}
+
+declare const Email: {
+  send(options: EmailSendOptions): void;
+  sendAsync(options: EmailSendOptions): Promise<void>;
+};
+
 // Raw MongoDB handle exposed to migration scripts (migrations/).
 interface MigrationCollection {
   findOne(filter?: MongoQuery, options?: MongoQuery): Promise<MongoQuery | null>;

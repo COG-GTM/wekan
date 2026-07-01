@@ -1,7 +1,9 @@
 import DOMPurify from 'dompurify';
 
 // Server-side input sanitization to prevent CSS injection and XSS attacks
-export function sanitizeInput(input) {
+// `input` is arbitrary user-supplied data: non-string values are returned
+// unchanged, so `any` is unavoidable at this validation boundary.
+export function sanitizeInput(input: any) {
   if (typeof input !== 'string') {
     return input;
   }
@@ -15,7 +17,6 @@ export function sanitizeInput(input) {
     FORBID_ATTR: ['style', 'class', 'id', 'onload', 'onerror', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'onchange', 'onsubmit', 'onreset', 'onselect', 'onunload', 'onresize', 'onscroll', 'onkeydown', 'onkeyup', 'onkeypress', 'onmousedown', 'onmouseup', 'onmouseover', 'onmouseout', 'onmousemove', 'ondblclick', 'oncontextmenu', 'onwheel', 'ontouchstart', 'ontouchend', 'ontouchmove', 'ontouchcancel', 'onabort', 'oncanplay', 'oncanplaythrough', 'ondurationchange', 'onemptied', 'onended', 'onerror', 'onloadeddata', 'onloadedmetadata', 'onloadstart', 'onpause', 'onplay', 'onplaying', 'onprogress', 'onratechange', 'onseeked', 'onseeking', 'onstalled', 'onsuspend', 'ontimeupdate', 'onvolumechange', 'onwaiting', 'onbeforeunload', 'onhashchange', 'onpagehide', 'onpageshow', 'onpopstate', 'onstorage', 'onunload', 'xlink:href', 'href', 'data-*', 'aria-*'],
     ALLOW_UNKNOWN_PROTOCOLS: false,
     SANITIZE_DOM: true,
-    KEEP_CONTENT: true,
     ADD_ATTR: [],
     ALLOW_DATA_ATTR: false
   });
@@ -47,7 +48,9 @@ export function sanitizeInput(input) {
 }
 
 // Specific function for sanitizing titles
-export function sanitizeTitle(title) {
+// `title` is arbitrary user-supplied data: non-string values are returned
+// unchanged, so `any` is unavoidable at this validation boundary.
+export function sanitizeTitle(title: any) {
   if (typeof title !== 'string') {
     return title;
   }

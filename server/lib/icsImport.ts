@@ -25,7 +25,7 @@
  * @param {string} icsText raw .ics text
  * @returns {string[]} array of logical (unfolded) lines
  */
-function unfoldLines(icsText) {
+function unfoldLines(icsText: string) {
   if (typeof icsText !== 'string' || icsText.length === 0) {
     return [];
   }
@@ -33,7 +33,7 @@ function unfoldLines(icsText) {
   // Normalize CRLF / CR to LF, then split into physical lines.
   const physicalLines = icsText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
-  const logicalLines = [];
+  const logicalLines: string[] = [];
   for (const line of physicalLines) {
     if ((line.startsWith(' ') || line.startsWith('\t')) && logicalLines.length > 0) {
       // Continuation: strip the single leading whitespace char and append.
@@ -54,7 +54,7 @@ function unfoldLines(icsText) {
  * @param {string} line a single unfolded content line
  * @returns {{ name: string, params: Object, value: string } | null}
  */
-function parseContentLine(line) {
+function parseContentLine(line: string) {
   if (!line) {
     return null;
   }
@@ -82,7 +82,7 @@ function parseContentLine(line) {
   const propertySegments = propertyPart.split(';');
   const name = propertySegments[0].toUpperCase();
 
-  const params = {};
+  const params: IcsParams = {};
   for (let i = 1; i < propertySegments.length; i += 1) {
     const segment = propertySegments[i];
     const eqIndex = segment.indexOf('=');
@@ -109,7 +109,7 @@ function parseContentLine(line) {
  * @param {string} text raw escaped TEXT value
  * @returns {string}
  */
-function unescapeText(text) {
+function unescapeText(text: string) {
   if (typeof text !== 'string') {
     return '';
   }
@@ -146,7 +146,7 @@ function unescapeText(text) {
  * @param {string} value the raw property value
  * @returns {Date|null} a Date, or null if it cannot be parsed
  */
-function parseIcsDate(value) {
+function parseIcsDate(value: string) {
   if (typeof value !== 'string') {
     return null;
   }
@@ -188,14 +188,14 @@ function parseIcsDate(value) {
  * @param {string} icsText raw .ics file contents
  * @returns {Array<{ summary: string, description: string, start: Date|null, end: Date|null, uid: string }>}
  */
-export function parseIcs(icsText) {
+export function parseIcs(icsText: string) {
   const lines = unfoldLines(icsText);
   if (lines.length === 0) {
     return [];
   }
 
-  const events = [];
-  let current = null;
+  const events: IcsEvent[] = [];
+  let current: IcsEvent | null = null;
 
   for (const rawLine of lines) {
     if (rawLine === '') {
@@ -259,8 +259,11 @@ export function parseIcs(icsText) {
  * @param {string} [opts.swimlaneId]
  * @returns {{ title: string, description: string, startAt: Date|null, dueAt: Date|null, boardId: (string|undefined), listId: (string|undefined), swimlaneId: (string|undefined) }}
  */
-export function icsEventToCard(event, { boardId, listId, swimlaneId } = {}) {
-  const safeEvent = event || {};
+export function icsEventToCard(
+  event: IcsEvent | null | undefined,
+  { boardId, listId, swimlaneId }: IcsCardOpts = {},
+) {
+  const safeEvent: Partial<IcsEvent> = event || {};
   return {
     title: safeEvent.summary || '',
     description: safeEvent.description || '',
@@ -280,6 +283,24 @@ export function icsEventToCard(event, { boardId, listId, swimlaneId } = {}) {
  * @param {Object} [opts] passed through to icsEventToCard ({ boardId, listId, swimlaneId })
  * @returns {Array<Object>} array of card-shaped objects
  */
-export function icsToCards(icsText, opts) {
+export function icsToCards(icsText: string, opts?: IcsCardOpts) {
   return parseIcs(icsText).map(event => icsEventToCard(event, opts));
+}
+
+interface IcsParams {
+  [key: string]: string;
+}
+
+interface IcsEvent {
+  summary: string;
+  description: string;
+  start: Date | null;
+  end: Date | null;
+  uid: string;
+}
+
+interface IcsCardOpts {
+  boardId?: string;
+  listId?: string;
+  swimlaneId?: string;
 }
