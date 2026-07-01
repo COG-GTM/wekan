@@ -3,7 +3,9 @@ import { EJSON } from 'meteor/ejson';
 import { DataCache } from '/imports/lib/dataCache';
 import { groupBy, indexBy } from '/imports/lib/collectionHelpers';
 
-function lazyCollectionProxy(loadCollection) {
+function lazyCollectionProxy(loadCollection: () => any) {
+  // The proxy transparently forwards every operation to the lazily-required
+  // Mongo collection, so its effective type is that dynamic collection (`any`).
   return new Proxy(
     {},
     {
@@ -39,7 +41,7 @@ function lazyCollectionProxy(loadCollection) {
         };
       },
     },
-  );
+  ) as any;
 }
 
 const Actions = lazyCollectionProxy(() => require('/models/actions').default);
@@ -194,7 +196,7 @@ const ReactiveCacheServer = {
     }
     return ret;
   },
-  async getAttachments(selector = {}, options = {}, getQuery = false) {
+  async getAttachments(selector: MongoQuery = {}, options = {}, getQuery = false) {
     // Try new structure first
     let ret = Attachments.find(selector, options);
     if (getQuery !== true) {
@@ -363,7 +365,7 @@ const ReactiveCacheServer = {
 // only the Client is reactive
 // saving the result has a big advantage if the query is big and often searched for the same data again and again
 // if the data is changed in the client, the data is saved to the server and depending code is reactive called again
-const ReactiveCacheClient = {
+const ReactiveCacheClient: CacheHolder = {
   getBoard(idOrFirstObjectSelector = {}, options = {}) {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__board) {
@@ -674,13 +676,13 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__attachments) {
       this.__attachments = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select: any = EJSON.parse(_select); // deserialized, dynamic shape
         // Try new structure first
         let _ret = Attachments.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
           // If no results and we have a cardId selector, try old structure
-          if (_ret.length === 0 && __select.selector['meta.cardId']) {
+          if (_ret.length === 0 && (__select.selector as any)['meta.cardId']) {
             _ret = Attachments.getAttachmentsWithBackwardCompatibility(
               __select.selector,
             );
@@ -1498,21 +1500,21 @@ const ReactiveCache = {
 
 // Server isn't reactive, so search for the data always.
 const ReactiveMiniMongoIndexServer = {
-  async getSubTasksWithParentId(parentId, addSelect = {}, options = {}) {
+  async getSubTasksWithParentId(parentId: string, addSelect = {}, options = {}) {
     let ret = [];
     if (parentId) {
       ret = await ReactiveCache.getCards({ parentId, ...addSelect }, options);
     }
     return ret;
   },
-  async getChecklistsWithCardId(cardId, addSelect = {}, options = {}) {
+  async getChecklistsWithCardId(cardId: string, addSelect = {}, options = {}) {
     let ret = [];
     if (cardId) {
       ret = await ReactiveCache.getChecklists({ cardId, ...addSelect }, options);
     }
     return ret;
   },
-  async getChecklistItemsWithChecklistId(checklistId, addSelect = {}, options = {}) {
+  async getChecklistItemsWithChecklistId(checklistId: string, addSelect = {}, options = {}) {
     let ret = [];
     if (checklistId) {
       ret = await ReactiveCache.getChecklistItems(
@@ -1522,14 +1524,14 @@ const ReactiveMiniMongoIndexServer = {
     }
     return ret;
   },
-  async getCardCommentsWithCardId(cardId, addSelect = {}, options = {}) {
+  async getCardCommentsWithCardId(cardId: string, addSelect = {}, options = {}) {
     let ret = [];
     if (cardId) {
       ret = await ReactiveCache.getCardComments({ cardId, ...addSelect }, options);
     }
     return ret;
   },
-  async getActivityWithId(activityId, addSelect = {}, options = {}) {
+  async getActivityWithId(activityId: string, addSelect = {}, options = {}) {
     let ret = [];
     if (activityId) {
       ret = await ReactiveCache.getActivities(
@@ -1542,14 +1544,14 @@ const ReactiveMiniMongoIndexServer = {
 };
 
 // Client side little MiniMongo DB "Index"
-const ReactiveMiniMongoIndexClient = {
-  getSubTasksWithParentId(parentId, addSelect = {}, options = {}) {
+const ReactiveMiniMongoIndexClient: CacheHolder = {
+  getSubTasksWithParentId(parentId: string, addSelect = {}, options = {}) {
     let ret = [];
     if (parentId) {
       const select = { addSelect, options };
       if (!this.__subTasksWithId) {
         this.__subTasksWithId = new DataCache((_select) => {
-          const __select = EJSON.parse(_select);
+          const __select: any = EJSON.parse(_select); // deserialized, dynamic shape
           const _subTasks = ReactiveCache.getCards(
             { parentId: { $exists: true }, ...__select.addSelect },
             __select.options,
@@ -1565,13 +1567,13 @@ const ReactiveMiniMongoIndexClient = {
     }
     return ret;
   },
-  getChecklistsWithCardId(cardId, addSelect = {}, options = {}) {
+  getChecklistsWithCardId(cardId: string, addSelect = {}, options = {}) {
     let ret = [];
     if (cardId) {
       const select = { addSelect, options };
       if (!this.__checklistsWithId) {
         this.__checklistsWithId = new DataCache((_select) => {
-          const __select = EJSON.parse(_select);
+          const __select: any = EJSON.parse(_select); // deserialized, dynamic shape
           const _checklists = ReactiveCache.getChecklists(
             { cardId: { $exists: true }, ...__select.addSelect },
             __select.options,
@@ -1587,13 +1589,13 @@ const ReactiveMiniMongoIndexClient = {
     }
     return ret;
   },
-  getChecklistItemsWithChecklistId(checklistId, addSelect = {}, options = {}) {
+  getChecklistItemsWithChecklistId(checklistId: string, addSelect = {}, options = {}) {
     let ret = [];
     if (checklistId) {
       const select = { addSelect, options };
       if (!this.__checklistItemsWithId) {
         this.__checklistItemsWithId = new DataCache((_select) => {
-          const __select = EJSON.parse(_select);
+          const __select: any = EJSON.parse(_select); // deserialized, dynamic shape
           const _checklistItems = ReactiveCache.getChecklistItems(
             { checklistId: { $exists: true }, ...__select.addSelect },
             __select.options,
@@ -1609,13 +1611,13 @@ const ReactiveMiniMongoIndexClient = {
     }
     return ret;
   },
-  getCardCommentsWithCardId(cardId, addSelect = {}, options = {}) {
+  getCardCommentsWithCardId(cardId: string, addSelect = {}, options = {}) {
     let ret = [];
     if (cardId) {
       const select = { addSelect, options };
       if (!this.__cardCommentsWithId) {
         this.__cardCommentsWithId = new DataCache((_select) => {
-          const __select = EJSON.parse(_select);
+          const __select: any = EJSON.parse(_select); // deserialized, dynamic shape
           const _cardComments = ReactiveCache.getCardComments(
             { cardId: { $exists: true }, ...__select.addSelect },
             __select.options,
@@ -1631,13 +1633,13 @@ const ReactiveMiniMongoIndexClient = {
     }
     return ret;
   },
-  getActivityWithId(activityId, addSelect = {}, options = {}) {
+  getActivityWithId(activityId: string, addSelect = {}, options = {}) {
     let ret = [];
     if (activityId) {
       const select = { addSelect, options };
       if (!this.__activityWithId) {
         this.__activityWithId = new DataCache((_select) => {
-          const __select = EJSON.parse(_select);
+          const __select: any = EJSON.parse(_select); // deserialized, dynamic shape
           const _activities = ReactiveCache.getActivities(
             { _id: { $exists: true }, ...__select.addSelect },
             __select.options,
@@ -1662,7 +1664,7 @@ const ReactiveMiniMongoIndexClient = {
 // - The Programmer hasn't to care about in which context he call's this class
 // - having all queries together in 1 class to make it possible to see which queries in Wekan happens, e.g. with console.log
 const ReactiveMiniMongoIndex = {
-  getSubTasksWithParentId(parentId, addSelect = {}, options = {}) {
+  getSubTasksWithParentId(parentId: string, addSelect = {}, options = {}) {
     let ret;
     if (Meteor.isServer) {
       ret = ReactiveMiniMongoIndexServer.getSubTasksWithParentId(
@@ -1679,7 +1681,7 @@ const ReactiveMiniMongoIndex = {
     }
     return ret;
   },
-  getChecklistsWithCardId(cardId, addSelect = {}, options = {}) {
+  getChecklistsWithCardId(cardId: string, addSelect = {}, options = {}) {
     let ret;
     if (Meteor.isServer) {
       ret = ReactiveMiniMongoIndexServer.getChecklistsWithCardId(
@@ -1696,7 +1698,7 @@ const ReactiveMiniMongoIndex = {
     }
     return ret;
   },
-  getChecklistItemsWithChecklistId(checklistId, addSelect = {}, options = {}) {
+  getChecklistItemsWithChecklistId(checklistId: string, addSelect = {}, options = {}) {
     let ret;
     if (Meteor.isServer) {
       ret = ReactiveMiniMongoIndexServer.getChecklistItemsWithChecklistId(
@@ -1713,7 +1715,7 @@ const ReactiveMiniMongoIndex = {
     }
     return ret;
   },
-  getCardCommentsWithCardId(cardId, addSelect = {}, options = {}) {
+  getCardCommentsWithCardId(cardId: string, addSelect = {}, options = {}) {
     let ret;
     if (Meteor.isServer) {
       ret = ReactiveMiniMongoIndexServer.getCardCommentsWithCardId(
@@ -1730,7 +1732,7 @@ const ReactiveMiniMongoIndex = {
     }
     return ret;
   },
-  getActivityWithId(activityId, addSelect = {}, options = {}) {
+  getActivityWithId(activityId: string, addSelect = {}, options = {}) {
     let ret;
     if (Meteor.isServer) {
       ret = ReactiveMiniMongoIndexServer.getActivityWithId(
@@ -1748,5 +1750,11 @@ const ReactiveMiniMongoIndex = {
     return ret;
   },
 };
+
+// These caches attach lazily-created DataCache instances under dynamic `__*`
+// keys (e.g. `this.__board`), so the object is indexed by arbitrary string.
+interface CacheHolder {
+  [key: string]: any;
+}
 
 export { ReactiveCache, ReactiveMiniMongoIndex };

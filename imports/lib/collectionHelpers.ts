@@ -7,9 +7,12 @@
  * Find the first object in an array where all key-value pairs in `props` match.
  * Replacement for _.findWhere(arr, props)
  */
-export function findWhere(arr, props) {
+export function findWhere<T>(
+  arr: T[] | null | undefined,
+  props: Partial<T>,
+): T | undefined {
   if (!arr) return undefined;
-  const keys = Object.keys(props);
+  const keys = Object.keys(props) as Array<keyof T>;
   return arr.find(item => keys.every(k => item[k] === props[k]));
 }
 
@@ -17,9 +20,12 @@ export function findWhere(arr, props) {
  * Find all objects in an array where all key-value pairs in `props` match.
  * Replacement for _.where(arr, props)
  */
-export function where(arr, props) {
+export function where<T>(
+  arr: T[] | null | undefined,
+  props: Partial<T>,
+): T[] {
   if (!arr) return [];
-  const keys = Object.keys(props);
+  const keys = Object.keys(props) as Array<keyof T>;
   return arr.filter(item => keys.every(k => item[k] === props[k]));
 }
 
@@ -27,9 +33,12 @@ export function where(arr, props) {
  * Deduplicate an array of objects by a property name, keeping first occurrence.
  * Replacement for _.uniq(arr, prop)
  */
-export function uniqBy(arr, prop) {
+export function uniqBy<T>(
+  arr: T[] | null | undefined,
+  prop: keyof T,
+): T[] {
   if (!arr) return [];
-  const seen = new Set();
+  const seen = new Set<T[keyof T]>();
   return arr.filter(item => {
     const val = item[prop];
     if (seen.has(val)) return false;
@@ -42,12 +51,16 @@ export function uniqBy(arr, prop) {
  * Group an array by a property name or function.
  * Replacement for _.groupBy(arr, keyOrFn)
  */
-export function groupBy(arr, keyOrFn) {
+export function groupBy<T>(
+  arr: T[] | null | undefined,
+  keyOrFn: keyof T | ((item: T) => PropertyKey),
+): Record<string, T[]> {
   if (!arr) return {};
-  const getKey = typeof keyOrFn === 'function' ? keyOrFn : item => item[keyOrFn];
-  const result = {};
+  const getKey =
+    typeof keyOrFn === 'function' ? keyOrFn : (item: T) => item[keyOrFn];
+  const result: Record<string, T[]> = {};
   for (const item of arr) {
-    const key = getKey(item);
+    const key = String(getKey(item));
     (result[key] || (result[key] = [])).push(item);
   }
   return result;
@@ -57,11 +70,14 @@ export function groupBy(arr, keyOrFn) {
  * Index an array by a property, mapping each key to a single item (last wins).
  * Replacement for _.indexBy(arr, prop)
  */
-export function indexBy(arr, prop) {
+export function indexBy<T>(
+  arr: T[] | null | undefined,
+  prop: keyof T,
+): Record<string, T> {
   if (!arr) return {};
-  const result = {};
+  const result: Record<string, T> = {};
   for (const item of arr) {
-    result[item[prop]] = item;
+    result[String(item[prop])] = item;
   }
   return result;
 }
@@ -70,9 +86,14 @@ export function indexBy(arr, prop) {
  * Create a debounced version of a function.
  * Replacement for _.debounce(fn, wait)
  */
-export function debounce(fn, wait) {
-  let timer = null;
-  return function (...args) {
+// `A`/`this` are `any` because this is a generic wrapper over an arbitrary
+// callback whose argument tuple and receiver are defined entirely by the caller.
+export function debounce<A extends any[]>(
+  fn: (...args: A) => void,
+  wait: number,
+) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return function (this: any, ...args: A) {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
       timer = null;
@@ -85,10 +106,12 @@ export function debounce(fn, wait) {
  * Create a function that executes at most once.
  * Replacement for _.once(fn)
  */
-export function once(fn) {
+// `A`/`this` are `any` for the same reason as debounce(): the wrapped callback's
+// argument tuple and receiver are entirely caller-defined.
+export function once<A extends any[], R>(fn: (...args: A) => R) {
   let called = false;
-  let result;
-  return function (...args) {
+  let result: R;
+  return function (this: any, ...args: A) {
     if (called) return result;
     called = true;
     result = fn.apply(this, args);

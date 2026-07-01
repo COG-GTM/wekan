@@ -7,6 +7,7 @@ meteor-base@1.5.2
 
 # Build system
 ecmascript@0.18.1-rc350.0
+typescript
 standard-minifier-js@3.2.0
 rspack@1.1.0
 

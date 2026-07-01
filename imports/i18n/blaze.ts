@@ -1,7 +1,9 @@
 import { Blaze } from 'meteor/blaze';
 import { TAPi18n } from './tap';
 
-Blaze.registerHelper('_', (...args) => {
+// Blaze passes a helper's positional args followed by a Spacebars options/kw
+// object, so the argument list is genuinely arbitrary here.
+Blaze.registerHelper('_', (...args: any[]) => {
   const lastArg = args.pop() || {};
   const { hash = {} } = lastArg;
   const [key] = args.splice(0, 1);

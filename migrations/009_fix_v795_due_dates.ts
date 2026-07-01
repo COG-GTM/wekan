@@ -22,7 +22,7 @@ export default async function migrate() {
   
   let fixed = 0;
   for (const card of cardsToFix) {
-    const updateDoc = {
+    const updateDoc: DueDateMigrationUpdate = {
       $rename: { "dueDate": "dueAt" },
       $set: {
         dueAt: new Date(card.dueDate),
@@ -76,4 +76,19 @@ export default async function migrate() {
   
   console.log(`✅ Migration complete! ${finalCount} cards now have properly formatted due dates.`);
   console.log(`   Fixed ${fixed} cards with old dueDate format.`);
+}
+
+// Mongo `$rename` + `$set` update built while migrating; the board/list/swimlane
+// reference fields are added conditionally, so they are optional here.
+interface DueDateMigrationUpdate {
+  $rename: { [field: string]: string };
+  $set: {
+    dueAt: Date;
+    userId: string;
+    members: string[];
+    modifiedAt: Date;
+    boardId?: string;
+    listId?: string;
+    swimlaneId?: string;
+  };
 }

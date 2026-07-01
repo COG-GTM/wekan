@@ -19,7 +19,7 @@
  * @param {*} value - Value that may contain non-Latin digits
  * @returns {*} The value with any Persian/Arabic-Indic digits replaced by ASCII
  */
-export function normalizeDigits(value) {
+export function normalizeDigits(value: string | number | Date) {
   if (typeof value !== 'string') return value;
 
   return value.replace(/[۰-۹٠-٩]/g, ch => {
@@ -38,7 +38,7 @@ export function normalizeDigits(value) {
  * @param {Date|string|number} value - Value to convert to a Date
  * @returns {Date} The resulting Date (possibly invalid, like `new Date`)
  */
-function toDate(value) {
+function toDate(value: string | number | Date) {
   return new Date(normalizeDigits(value));
 }
 
@@ -47,7 +47,7 @@ function toDate(value) {
  * @param {Date|string} date - Date to format
  * @returns {string} Formatted date string
  */
-export function formatDateTime(date) {
+export function formatDateTime(date: Date | string) {
   const d = toDate(date);
   if (isNaN(d.getTime())) return '';
 
@@ -65,7 +65,7 @@ export function formatDateTime(date) {
  * @param {Date|string} date - Date to format
  * @returns {string} Formatted date string
  */
-export function formatDate(date) {
+export function formatDate(date: Date | string) {
   const d = toDate(date);
   if (isNaN(d.getTime())) return '';
 
@@ -84,7 +84,7 @@ export function formatDate(date) {
  * @returns {string} Formatted date string
  */
 export function formatDateByUserPreference(
-  date,
+  date: Date | string,
   format = 'YYYY-MM-DD',
   includeTime = true,
 ) {
@@ -123,7 +123,7 @@ export function formatDateByUserPreference(
  * @param {Date|string} date - Date to format
  * @returns {string} Formatted time string
  */
-export function formatTime(date) {
+export function formatTime(date: Date | string) {
   const d = toDate(date);
   if (isNaN(d.getTime())) return '';
 
@@ -138,7 +138,7 @@ export function formatTime(date) {
  * @param {Date|string} date - Date to get week number for
  * @returns {number} ISO week number
  */
-export function getISOWeek(date) {
+export function getISOWeek(date: Date | string) {
   const d = toDate(date);
   if (isNaN(d.getTime())) return 0;
 
@@ -155,7 +155,7 @@ export function getISOWeek(date) {
     target.setMonth(0, 1 + ((4 - target.getDay() + 7) % 7));
   }
 
-  return 1 + Math.ceil((firstThursday - target) / 604800000); // 604800000 = 7 * 24 * 3600 * 1000
+  return 1 + Math.ceil((firstThursday - target.getTime()) / 604800000); // 604800000 = 7 * 24 * 3600 * 1000
 }
 
 /**
@@ -163,7 +163,7 @@ export function getISOWeek(date) {
  * @param {Date|string} date - Date to check
  * @returns {boolean} True if date is valid
  */
-export function isValidDate(date) {
+export function isValidDate(date: Date | string) {
   const d = toDate(date);
   return !isNaN(d.getTime());
 }
@@ -175,7 +175,11 @@ export function isValidDate(date) {
  * @param {string} unit - Unit of comparison ('minute', 'hour', 'day', etc.)
  * @returns {boolean} True if date1 is before date2
  */
-export function isBefore(date1, date2, unit = 'millisecond') {
+export function isBefore(
+  date1: Date | string,
+  date2: Date | string,
+  unit = 'millisecond',
+) {
   const d1 = toDate(date1);
   const d2 = toDate(date2);
 
@@ -222,7 +226,11 @@ export function isBefore(date1, date2, unit = 'millisecond') {
  * @param {string} unit - Unit of comparison ('minute', 'hour', 'day', etc.)
  * @returns {boolean} True if date1 is after date2
  */
-export function isAfter(date1, date2, unit = 'millisecond') {
+export function isAfter(
+  date1: Date | string,
+  date2: Date | string,
+  unit = 'millisecond',
+) {
   return isBefore(date2, date1, unit);
 }
 
@@ -233,7 +241,11 @@ export function isAfter(date1, date2, unit = 'millisecond') {
  * @param {string} unit - Unit of comparison ('minute', 'hour', 'day', etc.)
  * @returns {boolean} True if dates are the same
  */
-export function isSame(date1, date2, unit = 'millisecond') {
+export function isSame(
+  date1: Date | string,
+  date2: Date | string,
+  unit = 'millisecond',
+) {
   const d1 = toDate(date1);
   const d2 = toDate(date2);
 
@@ -274,7 +286,7 @@ export function isSame(date1, date2, unit = 'millisecond') {
  * @param {string} unit - Unit ('years', 'months', 'days', 'hours', 'minutes', 'seconds')
  * @returns {Date} New date
  */
-export function add(date, amount, unit) {
+export function add(date: Date | string, amount: number, unit: string) {
   const d = toDate(date);
   if (isNaN(d.getTime())) return new Date();
 
@@ -311,7 +323,7 @@ export function add(date, amount, unit) {
  * @param {string} unit - Unit ('years', 'months', 'days', 'hours', 'minutes', 'seconds')
  * @returns {Date} New date
  */
-export function subtract(date, amount, unit) {
+export function subtract(date: Date | string, amount: number, unit: string) {
   return add(date, -amount, unit);
 }
 
@@ -321,7 +333,7 @@ export function subtract(date, amount, unit) {
  * @param {string} unit - Unit ('year', 'month', 'day', 'hour', 'minute', 'second')
  * @returns {Date} Start of unit
  */
-export function startOf(date, unit) {
+export function startOf(date: Date | string, unit: string) {
   const d = toDate(date);
   if (isNaN(d.getTime())) return new Date();
 
@@ -357,7 +369,7 @@ export function startOf(date, unit) {
  * @param {string} unit - Unit ('year', 'month', 'day', 'hour', 'minute', 'second')
  * @returns {Date} End of unit
  */
-export function endOf(date, unit) {
+export function endOf(date: Date | string, unit: string) {
   const d = toDate(date);
   if (isNaN(d.getTime())) return new Date();
 
@@ -393,7 +405,7 @@ export function endOf(date, unit) {
  * @param {string} format - Format string (simplified)
  * @returns {string} Formatted date string
  */
-export function format(date, format = 'L') {
+export function format(date: Date | string, format = 'L') {
   const d = toDate(date);
   if (isNaN(d.getTime())) return '';
 
@@ -437,7 +449,11 @@ export function format(date, format = 'L') {
  * @param {boolean} strict - Whether to use strict parsing
  * @returns {Date|null} Parsed date or null if invalid
  */
-export function parseDate(dateString, formats = [], strict = true) {
+export function parseDate(
+  dateString: string,
+  formats: string[] = [],
+  strict = true,
+) {
   if (!dateString) return null;
 
   // Try native Date parsing first
@@ -478,7 +494,7 @@ export function parseDate(dateString, formats = [], strict = true) {
  * @param {string} format - Format string
  * @returns {Date|null} Parsed date or null
  */
-function parseWithFormat(dateString, format) {
+function parseWithFormat(dateString: string, format: string) {
   // Simple format parsing - can be extended as needed
   const formatMap = {
     YYYY: '\\d{4}',
@@ -498,9 +514,9 @@ function parseWithFormat(dateString, format) {
   if (!match) return null;
 
   const groups = match.slice(1);
-  let year,
-    month,
-    day,
+  let year: number | undefined,
+    month: number | undefined,
+    day: number | undefined,
     hour = 0,
     minute = 0,
     second = 0;
@@ -558,7 +574,14 @@ export function now() {
  * @param {number} second - Second (optional)
  * @returns {Date} Created date
  */
-export function createDate(year, month, day, hour = 0, minute = 0, second = 0) {
+export function createDate(
+  year: number,
+  month: number,
+  day: number,
+  hour = 0,
+  minute = 0,
+  second = 0,
+) {
   return new Date(year, month, day, hour, minute, second);
 }
 
@@ -568,7 +591,7 @@ export function createDate(year, month, day, hour = 0, minute = 0, second = 0) {
  * @param {Date|string} now - Current date (optional)
  * @returns {string} Relative time string
  */
-export function fromNow(date, now = new Date()) {
+export function fromNow(date: Date | string, now: Date | string = new Date()) {
   const d = toDate(date);
   const n = toDate(now);
 
@@ -602,7 +625,7 @@ export function fromNow(date, now = new Date()) {
  * @param {Date|string} now - Current date (optional)
  * @returns {string} Calendar format string
  */
-export function calendar(date, now = new Date()) {
+export function calendar(date: Date | string, now: Date | string = new Date()) {
   const d = toDate(date);
   const n = toDate(now);
 
@@ -627,7 +650,11 @@ export function calendar(date, now = new Date()) {
  * @param {string} unit - Unit of measurement ('millisecond', 'second', 'minute', 'hour', 'day', 'week', 'month', 'year')
  * @returns {number} Difference in the specified unit
  */
-export function diff(date1, date2, unit = 'millisecond') {
+export function diff(
+  date1: Date | string,
+  date2: Date | string,
+  unit = 'millisecond',
+) {
   const d1 = toDate(date1);
   const d2 = toDate(date2);
 

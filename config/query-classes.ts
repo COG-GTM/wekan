@@ -74,9 +74,9 @@ import {
 import Boards from '../models/boards';
 
 export class QueryDebug {
-  predicate = null;
+  predicate: string | null = null;
 
-  constructor(predicate) {
+  constructor(predicate?: string | null) {
     if (predicate) {
       this.set(predicate)
     }
@@ -86,8 +86,8 @@ export class QueryDebug {
     return this.predicate;
   }
 
-  set(predicate) {
-    if ([PREDICATE_ALL, PREDICATE_SELECTOR, PREDICATE_PROJECTION].includes(
+  set(predicate: string | null) {
+    if (([PREDICATE_ALL, PREDICATE_SELECTOR, PREDICATE_PROJECTION] as (string | null)[]).includes(
       predicate
     )) {
       this.predicate = predicate;
@@ -114,14 +114,17 @@ export class QueryDebug {
 }
 
 export class QueryParams {
+  // Maps an operator to its predicate(s); values are predicate arrays or
+  // scalars whose shape depends on the operator, hence `any`.
+  params: Record<string, any>;
   text = '';
 
-  constructor(params = {}, text = '') {
+  constructor(params: Record<string, any> = {}, text = '') {
     this.params = params;
     this.text = text;
   }
 
-  hasOperator(operator) {
+  hasOperator(operator: string) {
     return (
       this.params[operator] !== undefined &&
       (this.params[operator].length === undefined ||
@@ -129,18 +132,18 @@ export class QueryParams {
     );
   }
 
-  addPredicate(operator, predicate) {
+  addPredicate(operator: string, predicate: any) {
     if (!this.hasOperator(operator)) {
       this.params[operator] = [];
     }
     this.params[operator].push(predicate);
   }
 
-  setPredicate(operator, predicate) {
+  setPredicate(operator: string, predicate: any) {
     this.params[operator] = predicate;
   }
 
-  getPredicate(operator) {
+  getPredicate(operator: string) {
     if (this.hasOperator(operator)){
       if (typeof this.params[operator] === 'object') {
         return this.params[operator][0];
@@ -151,7 +154,7 @@ export class QueryParams {
     return null;
   }
 
-  getPredicates(operator) {
+  getPredicates(operator: string) {
     return this.params[operator];
   }
 
@@ -161,13 +164,16 @@ export class QueryParams {
 }
 
 export class QueryErrors {
-  operatorTagMap = [
+  // Each entry maps an operator to either a translation tag (string) or a
+  // builder function that produces an error object; hence the mixed `any`.
+  operatorTagMap: Array<[string, any]> = [
     [OPERATOR_BOARD, 'board-title-not-found'],
     [OPERATOR_SWIMLANE, 'swimlane-title-not-found'],
     [
       OPERATOR_LABEL,
-      label => {
-        if (Boards.labelColors().includes(label)) {
+      (label: string) => {
+        // Boards is a not-yet-migrated model whose helpers are added at runtime.
+        if ((Boards as any).labelColors().includes(label)) {
           return {
             tag: 'label-color-not-found',
             value: label,
@@ -192,6 +198,10 @@ export class QueryErrors {
     [OPERATOR_TEAM, 'team-name-not-found'],
   ];
 
+  _errors: Record<string, any[]>;
+  operatorTags: Record<string, any>;
+  colorMap: any;
+
   constructor() {
     this._errors = {};
 
@@ -200,17 +210,17 @@ export class QueryErrors {
       this.operatorTags[operator] = tag;
     });
 
-    this.colorMap = Boards.colorMap();
+    this.colorMap = (Boards as any).colorMap();
   }
 
-  addError(operator, error) {
+  addError(operator: string, error: any) {
     if (!this._errors[operator]) {
       this._errors[operator] = [];
     }
     this._errors[operator].push(error);
   }
 
-  addNotFound(operator, value) {
+  addNotFound(operator: string, value: string) {
     if (typeof this.operatorTags[operator] === 'function') {
       this.addError(operator, this.operatorTags[operator](value));
     } else {
@@ -223,10 +233,10 @@ export class QueryErrors {
   }
 
   errors() {
-    const errs = [];
+    const errs: any[] = [];
     // eslint-disable-next-line no-unused-vars
     Object.entries(this._errors).forEach(([, errors]) => {
-      errors.forEach(err => {
+      errors.forEach((err: any) => {
         errs.push(err);
       });
     });
@@ -234,10 +244,10 @@ export class QueryErrors {
   }
 
   errorMessages() {
-    const messages = [];
+    const messages: any[] = [];
     // eslint-disable-next-line no-unused-vars
     Object.entries(this._errors).forEach(([, errors]) => {
-      errors.forEach(err => {
+      errors.forEach((err: any) => {
         messages.push(TAPi18n.__(err.tag, err.value));
       });
     });
@@ -246,13 +256,16 @@ export class QueryErrors {
 }
 
 export class Query {
-  selector = {};
-  projection = {};
+  selector: MongoQuery = {};
+  projection: MongoQuery = {};
+  _errors: QueryErrors;
+  queryParams: QueryParams;
+  colorMap: any;
 
-  constructor(selector, projection) {
+  constructor(selector?: MongoQuery, projection?: MongoQuery) {
     this._errors = new QueryErrors();
     this.queryParams = new QueryParams();
-    this.colorMap = Boards.colorMap();
+    this.colorMap = (Boards as any).colorMap();
 
     if (selector) {
       this.selector = selector;
@@ -271,7 +284,7 @@ export class Query {
     return this._errors.errors();
   }
 
-  addError(operator, error) {
+  addError(operator: string, error: any) {
     this._errors.addError(operator, error)
   }
 
@@ -283,15 +296,15 @@ export class Query {
     return this.queryParams;
   }
 
-  setQueryParams(queryParams) {
+  setQueryParams(queryParams: QueryParams) {
     this.queryParams = queryParams;
   }
 
-  addPredicate(operator, predicate) {
+  addPredicate(operator: string, predicate: any) {
     this.queryParams.addPredicate(operator, predicate);
   }
 
-  buildParams(queryText) {
+  buildParams(queryText: string) {
     this.queryParams = new QueryParams();
 
     queryText = queryText.trim();
@@ -351,7 +364,7 @@ export class Query {
       'operator-checklist-text': OPERATOR_CHECKLIST_TEXT,
     };
 
-    const predicates = {
+    const predicates: Record<string, Record<string, string>> = {
       durations: {
         'predicate-week': PREDICATE_WEEK,
         'predicate-month': PREDICATE_MONTH,
@@ -391,7 +404,7 @@ export class Query {
       'predicate-projection': PREDICATE_PROJECTION,
     };
 
-    const predicateTranslations = {};
+    const predicateTranslations: Record<string, Record<string, string>> = {};
     Object.entries(predicates).forEach(([category, catPreds]) => {
       predicateTranslations[category] = {};
       Object.entries(catPreds).forEach(([tag, value]) => {
@@ -401,7 +414,7 @@ export class Query {
     // eslint-disable-next-line no-console
     // console.log('predicateTranslations:', predicateTranslations);
 
-    const operatorMap = {};
+    const operatorMap: Record<string, string> = {};
     Object.entries(operators).forEach(([key, value]) => {
       operatorMap[TAPi18n.__(key).toLowerCase()] = value;
     });
@@ -421,15 +434,18 @@ export class Query {
       }
       if (m) {
         let op;
-        if (m.groups.operator) {
-          op = m.groups.operator.toLowerCase();
+        // Named-group regexes always populate `groups` on a successful match.
+        if (m.groups!.operator) {
+          op = m.groups!.operator.toLowerCase();
         } else {
-          op = m.groups.abbrev.toLowerCase();
+          op = m.groups!.abbrev.toLowerCase();
         }
         // eslint-disable-next-line no-prototype-builtins
         if (operatorMap.hasOwnProperty(op)) {
           const operator = operatorMap[op];
-          let value = m.groups.value;
+          // The parsed predicate value is polymorphic (string, number, or a
+          // structured predicate object built below), hence `any`.
+          let value: any = m.groups!.value;
           if (operator === OPERATOR_LABEL) {
             if (value in this.colorMap) {
               value = this.colorMap[value];
@@ -441,12 +457,12 @@ export class Query {
             )
           ) {
             const days = parseInt(value, 10);
-            let duration = null;
+            let duration: string | null = null;
             if (isNaN(days)) {
               // duration was specified as text
               if (predicateTranslations.durations[value]) {
                 duration = predicateTranslations.durations[value];
-                let date = null;
+                let date: Date | null = null;
                 switch (duration) {
                   case PREDICATE_WEEK:
                     // eslint-disable-next-line no-case-declarations
@@ -610,7 +626,7 @@ export class Query {
         queryText = queryText.replace(reQuotedText, '');
       }
       if (m) {
-        text += (text ? ' ' : '') + m.groups.text;
+        text += (text ? ' ' : '') + m.groups!.text;
       }
     }
 

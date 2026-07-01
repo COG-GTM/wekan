@@ -8,22 +8,23 @@ export { CronJobStatus };
 export const cronMigrationProgress = new ReactiveVar(0);
 export const cronMigrationStatus = new ReactiveVar('');
 export const cronMigrationCurrentStep = new ReactiveVar('');
-export const cronMigrationSteps = new ReactiveVar([]);
+// Holds dynamic migration step / cron job documents, hence `any[]`.
+export const cronMigrationSteps = new ReactiveVar<any[]>([]);
 export const cronIsMigrating = new ReactiveVar(false);
-export const cronJobs = new ReactiveVar([]);
+export const cronJobs = new ReactiveVar<any[]>([]);
 export const cronMigrationCurrentStepNum = new ReactiveVar(0);
 export const cronMigrationTotalSteps = new ReactiveVar(0);
 export const cronMigrationCurrentAction = new ReactiveVar('');
 export const cronMigrationJobProgress = new ReactiveVar(0);
 export const cronMigrationJobStepNum = new ReactiveVar(0);
 export const cronMigrationJobTotalSteps = new ReactiveVar(0);
-export const cronMigrationEtaSeconds = new ReactiveVar(null);
-export const cronMigrationElapsedSeconds = new ReactiveVar(null);
-export const cronMigrationCurrentNumber = new ReactiveVar(null);
+export const cronMigrationEtaSeconds = new ReactiveVar<number | null>(null);
+export const cronMigrationElapsedSeconds = new ReactiveVar<number | null>(null);
+export const cronMigrationCurrentNumber = new ReactiveVar<number | null>(null);
 export const cronMigrationCurrentName = new ReactiveVar('');
 
 function fetchProgress() {
-  Meteor.call('cron.getMigrationProgress', (err, res) => {
+  Meteor.call('cron.getMigrationProgress', (err: Meteor.Error | undefined, res?: MigrationProgress) => {
     if (err) return;
     if (!res) return;
     cronMigrationProgress.set(res.progress || 0);
@@ -123,6 +124,29 @@ if (Meteor.isClient) {
   Meteor.setInterval(() => {
     fetchProgress();
   }, 10000);
+}
+
+// Payload returned by the `cron.getMigrationProgress` Meteor method. All fields
+// are optional as the method omits them depending on migration state; `steps`
+// holds dynamic step descriptors, hence `any[]`.
+interface MigrationProgress {
+  progress?: number;
+  status?: string;
+  currentStep?: string;
+  steps?: any[];
+  isMigrating?: boolean;
+  currentStepNum?: number;
+  totalSteps?: number;
+  currentAction?: string;
+  jobProgress?: number;
+  jobStepNum?: number;
+  jobTotalSteps?: number;
+  etaSeconds?: number | null;
+  elapsedSeconds?: number | null;
+  migrationNumber?: number | null;
+  migrationName?: string;
+  migrationStepsLoaded?: number;
+  migrationStepsTotal?: number;
 }
 
 export default {

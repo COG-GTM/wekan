@@ -13,7 +13,8 @@ const Mongo = MongoPackage && MongoPackage.Mongo;
 const CollectionHooks = CollectionHooksPackage && CollectionHooksPackage.CollectionHooks;
 
 if (Mongo && Mongo.Collection && Mongo.Collection.prototype && !Mongo.Collection.prototype.helpers) {
-  Mongo.Collection.prototype.helpers = function helpers(helpersMap) {
+  // A map of helper name -> helper function of arbitrary signature.
+  Mongo.Collection.prototype.helpers = function helpers(helpersMap: Record<string, any>) {
     if (this._transform && !this._helpersConstructor) {
       throw new Error(
         `Can't apply helpers to '${this._name}': a transform function already exists.`,
@@ -21,10 +22,10 @@ if (Mongo && Mongo.Collection && Mongo.Collection.prototype && !Mongo.Collection
     }
 
     if (!this._helpersConstructor) {
-      this._helpersConstructor = function CollectionDocument(doc) {
+      this._helpersConstructor = function CollectionDocument(this: any, doc: any) {
         Object.assign(this, doc);
       };
-      this._transform = doc => new this._helpersConstructor(doc);
+      this._transform = (doc: any) => new this._helpersConstructor(doc);
     }
 
     Object.keys(helpersMap).forEach(key => {
@@ -34,7 +35,8 @@ if (Mongo && Mongo.Collection && Mongo.Collection.prototype && !Mongo.Collection
 }
 
 if (Mongo && Mongo.Collection && Mongo.Collection.prototype && !Mongo.Collection.prototype.attachSchema) {
-  Mongo.Collection.prototype.attachSchema = function attachSchema(schema) {
+  // `schema` is a SimpleSchema instance (dynamic aldeed API shape).
+  Mongo.Collection.prototype.attachSchema = function attachSchema(schema: any) {
     if (schema && schema._schemaDefinition) {
       schema._schema = schema._schemaDefinition;
     }
@@ -53,7 +55,7 @@ if (Mongo && Mongo.Collection && CollectionHooks && !Mongo.Collection._wekanHook
   const OriginalCollection = Mongo.Collection;
   const originalExtendCollectionInstance = CollectionHooks.extendCollectionInstance;
 
-  function ensureHookSurface(collection, constructor) {
+  function ensureHookSurface(collection: any, constructor: any) {
     if (!collection || collection._wekanHookSurfaceReady) {
       return collection;
     }
@@ -87,11 +89,11 @@ if (Mongo && Mongo.Collection && CollectionHooks && !Mongo.Collection._wekanHook
     return collection;
   }
 
-  CollectionHooks.extendCollectionInstance = function extendCollectionInstance(collection, constructor) {
+  CollectionHooks.extendCollectionInstance = function extendCollectionInstance(collection: any, constructor: any) {
     return ensureHookSurface(collection, constructor);
   };
 
-  function PatchedCollection(...args) {
+  function PatchedCollection(this: any, ...args: any[]) {
     const ret = OriginalCollection.apply(this, args);
     const collection =
       ret && typeof ret === 'object' ? ret : this;
@@ -104,7 +106,8 @@ if (Mongo && Mongo.Collection && CollectionHooks && !Mongo.Collection._wekanHook
   PatchedCollection.prototype.constructor = PatchedCollection;
 
   Object.keys(OriginalCollection).forEach(key => {
-    PatchedCollection[key] = OriginalCollection[key];
+    // Copy arbitrary static members onto the patched constructor.
+    (PatchedCollection as any)[key] = OriginalCollection[key];
   });
 
   Object.defineProperty(PatchedCollection, '_wekanHookBootstrapPatched', {
@@ -120,4 +123,4 @@ if (Mongo && Mongo.Collection && CollectionHooks && !Mongo.Collection._wekanHook
   }
 }
 
-module.exports = {};
+export {};

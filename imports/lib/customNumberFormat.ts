@@ -9,7 +9,9 @@
 // Lives under /imports/lib so it is isomorphic (shared by the client card
 // detail / minicard renderers) and free of any Meteor/Mongo runtime
 // dependency, so it can also be unit tested directly.
-export function formatNumberValue(value) {
+export function formatNumberValue(
+  value: string | number | null | undefined,
+) {
   // Reject blank/empty-ish values up front so '' / null / undefined render empty.
   if (value === '' || value === null || value === undefined) {
     return '';

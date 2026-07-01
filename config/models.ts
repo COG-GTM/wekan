@@ -1,4 +1,4 @@
-module.exports.models = {
+export const models = {
   connection: 'mongodb',
   migrate: 'safe',
 };

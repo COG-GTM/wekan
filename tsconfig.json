@@ -1,0 +1,47 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "baseUrl": ".",
+    "paths": {
+      "/*": ["./*"]
+    },
+    // `baseUrl` is deprecated in TypeScript 6/7 but required by the migration
+    // playbook to resolve app-absolute imports (e.g. '/models/cards'); silence
+    // the removal warning until the app moves off baseUrl-style resolution.
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "noImplicitAny": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "useUnknownInCatchVariables": false,
+    "forceConsistentCasingInFileNames": true,
+    // Kept true during the incremental multi-session migration so partially
+    // converted states still resolve remaining `.js` imports. The FINAL
+    // cleanup session flips this to false and drives `tsc --noEmit` to zero.
+    "allowJs": true
+  },
+  "include": [
+    "client/**/*.ts",
+    "client/**/*.tsx",
+    "server/**/*.ts",
+    "models/**/*.ts",
+    "imports/**/*.ts",
+    "config/**/*.ts",
+    "migrations/**/*.ts",
+    "declarations.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".meteor",
+    "packages",
+    "npm-packages",
+    "tests",
+    "public"
+  ]
+}

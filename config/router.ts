@@ -1,14 +1,14 @@
 import { Meteor } from 'meteor/meteor';
 import { Session } from 'meteor/session';
 import { TAPi18n } from '/imports/i18n';
-import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
+import { FlowRouter, type FlowRouterRouteContext } from 'meteor/ostrio:flow-router-extra';
 import { ReactiveCache } from '/imports/reactiveCache';
 import Settings from '/models/settings';
 import { EscapeActions } from '/client/lib/escapeActions';
 import { Filter } from '/client/lib/filter';
 import { Utils } from '/client/lib/utils';
 
-let previousPath;
+let previousPath: string | undefined;
 
 FlowRouter.triggers.exit([
   ({ path }) => {
@@ -20,7 +20,7 @@ FlowRouter.triggers.exit([
 // addressable via their own URL suffixes (#5850) so they can be linked and
 // redirected to; the chosen view is passed to boardList through the
 // `boardListMenu` Session value.
-function renderBoardList(ctx, menu) {
+function renderBoardList(ctx: FlowRouterRouteContext, menu: string) {
   // Redirect to sign-in immediately if user is not logged in
   if (!Meteor.userId()) {
     FlowRouter.go('atSignIn');
@@ -358,7 +358,8 @@ FlowRouter.route('/global-search', {
     if (FlowRouter.getQueryParam('q')) {
       Session.set(
         'globalQuery',
-        decodeURIComponent(FlowRouter.getQueryParam('q')),
+        // Guarded by the `getQueryParam('q')` truthiness check just above.
+        decodeURIComponent(FlowRouter.getQueryParam('q')!),
       );
     }
     this.render('defaultLayout', {

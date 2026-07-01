@@ -1,4 +1,15 @@
-export default {
+// A single supported-language entry. `load` dynamically imports that language's
+// translation JSON; its resolved shape is dynamic (an ES-module namespace or the
+// bare translation map), so it is typed `any`.
+interface LanguageEntry {
+  code: string;
+  tag: string;
+  name: string;
+  load: () => Promise<any>;
+  rtl: boolean;
+}
+
+const languages: Record<string, LanguageEntry> = {
   "ace": {
     code: "ace",
     tag: "ace",
@@ -994,3 +1005,5 @@ export default {
     rtl: false,
   }
 };
+
+export default languages;
