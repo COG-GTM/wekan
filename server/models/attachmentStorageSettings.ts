@@ -18,7 +18,7 @@ import { refreshCloudStorageFromSettings, testCloudConnection } from '/models/li
 
 // Secret fields per cloud provider — never published to the client and only
 // overwritten when a non-empty replacement value is supplied.
-const CLOUD_SECRET_FIELDS = {
+const CLOUD_SECRET_FIELDS: { [key: string]: string[] } = {
   [STORAGE_NAME_S3]: ['secretAccessKey'],
   [STORAGE_NAME_AZURE]: ['accountKey', 'connectionString'],
   [STORAGE_NAME_GCS]: ['credentials'],
@@ -27,7 +27,8 @@ const CLOUD_SECRET_FIELDS = {
 // Mask secret fields in a settings document before returning it to the client,
 // replacing each secret with '' and adding a boolean `<field>Set` marker so the
 // admin UI can show that a value exists without revealing it.
-function maskStorageSecrets(settings) {
+// `settings` is a raw attachment-storage-settings document (dynamic shape), hence `any`.
+function maskStorageSecrets(settings: any) {
   if (!settings || !settings.storageConfig) {
     return settings;
   }
@@ -45,7 +46,8 @@ function maskStorageSecrets(settings) {
   return masked;
 }
 
-function parseNonNegativeInt(value, fallback = 0) {
+// `value` comes from an untyped request body and is coerced via Number.parseInt, hence `any`.
+function parseNonNegativeInt(value: any, fallback: number = 0) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed < 0) {
     return fallback;
@@ -53,7 +55,8 @@ function parseNonNegativeInt(value, fallback = 0) {
   return parsed;
 }
 
-async function countCollectionDocumentsSafe(db, collectionName) {
+// `db` is a raw node-mongodb Db handle (untyped here), hence `any`.
+async function countCollectionDocumentsSafe(db: any, collectionName: string) {
   try {
     const exists = await db.listCollections({ name: collectionName }, { nameOnly: true }).toArray();
     if (!Array.isArray(exists) || exists.length === 0) {
@@ -65,7 +68,8 @@ async function countCollectionDocumentsSafe(db, collectionName) {
   }
 }
 
-async function countByStorageSafe(db, collectionName, storageName) {
+// `db` is a raw node-mongodb Db handle (untyped here), hence `any`.
+async function countByStorageSafe(db: any, collectionName: string, storageName: string) {
   try {
     const exists = await db.listCollections({ name: collectionName }, { nameOnly: true }).toArray();
     if (!Array.isArray(exists) || exists.length === 0) {
@@ -91,7 +95,8 @@ async function countByStorageSafe(db, collectionName, storageName) {
   }
 }
 
-function highestCount(...counts) {
+// `counts` are mixed count values coerced to numbers via Number(), hence `any[]`.
+function highestCount(...counts: any[]) {
   return counts.reduce((max, value) => Math.max(max, Number(value) || 0), 0);
 }
 
@@ -101,7 +106,8 @@ function highestCount(...counts) {
 // FileStoreStrategyFactory.getFileStrategy() and the bulk-move source matcher.
 // This must NOT count every metadata document, because the `attachments`
 // collection holds metadata for filesystem- and cloud-stored files too.
-async function countGridFsStoredSafe(db, collectionName) {
+// `db` is a raw node-mongodb Db handle (untyped here), hence `any`.
+async function countGridFsStoredSafe(db: any, collectionName: string) {
   try {
     const exists = await db.listCollections({ name: collectionName }, { nameOnly: true }).toArray();
     if (!Array.isArray(exists) || exists.length === 0) {
@@ -135,7 +141,7 @@ async function countGridFsStoredSafe(db, collectionName) {
 
 // Build a direct-connection URL to a specific replica set member, stripping replicaSet
 // routing so the driver connects to exactly the given host (required for compact on secondaries).
-function buildDirectNodeUrl(mongoUrl, targetHostPort) {
+function buildDirectNodeUrl(mongoUrl: string, targetHostPort: string) {
   const protoEnd = mongoUrl.indexOf('://');
   const withoutProto = protoEnd !== -1 ? mongoUrl.slice(protoEnd + 3) : mongoUrl;
   const firstSlash = withoutProto.indexOf('/');
@@ -153,8 +159,9 @@ function buildDirectNodeUrl(mongoUrl, targetHostPort) {
   return `mongodb://${auth}${targetHostPort}${dbPath}?${params.toString()}`;
 }
 
-async function compactCollectionsOnNode(nodeDb, candidates, force = false) {
-  const results = {};
+// `nodeDb` is a raw node-mongodb Db handle (untyped here), hence `any`.
+async function compactCollectionsOnNode(nodeDb: any, candidates: string[], force: boolean = false) {
+  const results: { [key: string]: string } = {};
   for (const collName of candidates) {
     try {
       const exists = await nodeDb.listCollections({ name: collName }, { nameOnly: true }).toArray();
@@ -470,12 +477,14 @@ Meteor.methods({
       'cfs.avatars.filerecord',
     ];
 
-    const allResults = {};
+    // Per-node compaction results (strings or nested result maps), keyed dynamically.
+    const allResults: { [key: string]: any } = {};
 
     // Compact secondaries first (best practice: keep primary available during compaction)
     try {
       const rsStatus = await db.admin().command({ replSetGetStatus: 1 });
-      const secondaries = (rsStatus.members || []).filter(m => m.state === 2);
+      // `m` is a raw replica-set member status entry (dynamic shape), hence `any`.
+      const secondaries = (rsStatus.members || []).filter((m: any) => m.state === 2);
 
       if (secondaries.length > 0 && process.env.MONGO_URL) {
         const { MongoClient } = MongoInternals.NpmModules.mongodb.module;
@@ -511,7 +520,7 @@ Meteor.methods({
   },
 
   async updateAttachmentStorageSettings(settings) {
-    check(settings, Object);
+    check(settings as object, Object);
 
     if (!this.userId) {
       throw new Meteor.Error('not-authorized', 'Must be logged in');
@@ -533,7 +542,8 @@ Meteor.methods({
     // real secret, only a "set" marker) so saving other fields can't wipe it.
     if (cleanSettings.storageConfig) {
       const incoming = cleanSettings.storageConfig;
-      const merged = {};
+      // Merged per-provider storageConfig, keyed dynamically by provider name.
+      const merged: { [key: string]: any } = {};
 
       ['filesystem', 'gridfs'].forEach(key => {
         if (incoming[key] !== undefined) {
@@ -634,7 +644,7 @@ Meteor.methods({
   // the admin form; blank secrets fall back to the stored value.
   async testAttachmentCloudConnection(provider, config) {
     check(provider, String);
-    check(config, Object);
+    check(config as object, Object);
 
     if (!this.userId) {
       throw new Meteor.Error('not-authorized', 'Must be logged in');
