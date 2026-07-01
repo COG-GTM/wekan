@@ -1,13 +1,16 @@
 import { ReactiveCache } from '/imports/reactiveCache';
 
-export function csvGetMembersToMap(data) {
+// data: any — the parsed CSV rows (array of arrays) from the import payload.
+export function csvGetMembersToMap(data: any) {
   // we will work on the list itself (an ordered array of objects) when a
   // mapping is done, we add a 'wekan' field to the object representing the
   // imported member
 
-  const membersToMap = [];
-  const importedMembers = [];
-  let membersIndex;
+  // membersToMap/importedMembers: any[] — plain member records built below.
+  const membersToMap: any[] = [];
+  const importedMembers: any[] = [];
+  // membersIndex: any — the 'members' column index (undefined until found).
+  let membersIndex: any;
 
   for (let i = 0; i < data[0].length; i++) {
     if (data[0][i].toLowerCase() === 'members') {

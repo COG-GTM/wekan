@@ -1,17 +1,19 @@
 import { ReactiveCache } from '/imports/reactiveCache';
 
-export function wekanGetMembersToMap(data) {
+// data: any — the raw WeKan export payload.
+export function wekanGetMembersToMap(data: any) {
   // we will work on the list itself (an ordered array of objects) when a
   // mapping is done, we add a 'wekan' field to the object representing the
   // imported member
   const membersToMap = data.members || [];
   const users = data.users || [];
   // auto-map based on username
-  const mappable = [];
-  membersToMap.forEach(importedMember => {
+  // mappable: any[] — plain member records built below.
+  const mappable: any[] = [];
+  membersToMap.forEach((importedMember: any) => {
     importedMember.id = importedMember.userId;
     delete importedMember.userId;
-    const user = users.filter(user => {
+    const user = users.filter((user: any) => {
       return user._id === importedMember.id;
     })[0];
     // The exported `users` array only contains users that still exist in the

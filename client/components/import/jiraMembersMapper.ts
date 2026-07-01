@@ -1,9 +1,11 @@
 // Extract the distinct assignees from a Jira export so the import "map members"
 // step can map each Jira user to a WeKan user.
-export function jiraGetMembersToMap(data) {
+// data: any — the raw Jira export (array of issues or { issues: [] }).
+export function jiraGetMembersToMap(data: any) {
   const issues = Array.isArray(data) ? data : data.issues || [];
-  const byId = {};
-  issues.forEach(issue => {
+  // byId: keyed by Jira user id with plain member records.
+  const byId: Record<string, any> = {};
+  issues.forEach((issue: any) => {
     const assignee = issue.fields && issue.fields.assignee;
     if (!assignee) return;
     const id = assignee.accountId || assignee.name || assignee.emailAddress;
