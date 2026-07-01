@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import { Meteor } from 'meteor/meteor';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { allowIsAnyBoardMemberWithWriteAccess } from '/server/lib/utils';
+import type { CaughtError } from './types';
 
 // Tests that client-side permission gates are also enforced server-side.
 // See the "client-side permissions verified server-side" audit.
@@ -13,12 +14,14 @@ describe('server-side permission enforcement', function() {
   });
 
   // Helper: build a board whose single member has the given role flags.
-  const boardWithMember = (userId, flags = {}) => ({
+  const boardWithMember = (userId: string, flags: Partial<BoardMemberFlags> = {}) => ({
     members: [Object.assign(
       { userId, isActive: true, isNoComments: false, isCommentOnly: false, isWorker: false, isReadOnly: false, isReadAssignedOnly: false },
       flags,
     )],
-  });
+    // The write-access checks only read `.members`; this fixture intentionally
+    // omits the BoardAccess methods, so it is cast with `any` at this one point.
+  } as any);
 
   describe('allowIsAnyBoardMemberWithWriteAccess (CustomFields / multi-board write)', function() {
     it('denies a read-only member on every board', function() {
@@ -51,20 +54,20 @@ describe('server-side permission enforcement', function() {
       const archiveStub = sinon.stub().resolves();
       sinon.stub(ReactiveCache, 'getBoard').resolves({ hasAdmin: () => false, archive: archiveStub });
       sinon.stub(ReactiveCache, 'getUser').resolves({ isAdmin: false });
-      let thrown;
+      let thrown: CaughtError | undefined;
       try {
         await handler().apply({ userId: 'member' }, ['board-1']);
       } catch (error) {
         thrown = error;
       }
       expect(thrown).to.exist;
-      expect(thrown.error).to.equal('error-board-notAdmin');
+      expect(thrown!.error).to.equal('error-board-notAdmin');
       expect(archiveStub.called).to.equal(false);
     });
 
     it('allows a board admin', async function() {
       const archiveStub = sinon.stub().resolves();
-      sinon.stub(ReactiveCache, 'getBoard').resolves({ hasAdmin: (id) => id === 'admin', archive: archiveStub });
+      sinon.stub(ReactiveCache, 'getBoard').resolves({ hasAdmin: (id: string) => id === 'admin', archive: archiveStub });
       sinon.stub(ReactiveCache, 'getUser').resolves({ isAdmin: false });
       const result = await handler().apply({ userId: 'admin' }, ['board-1']);
       expect(result).to.equal(true);
@@ -90,14 +93,24 @@ describe('server-side permission enforcement', function() {
         emails: [{ address: 'user@example.com' }],
         getLanguage: () => 'en',
       });
-      let thrown;
+      let thrown: CaughtError | undefined;
       try {
         await handler().apply({ userId: 'user-1', unblock: () => {} }, []);
       } catch (error) {
         thrown = error;
       }
       expect(thrown).to.exist;
-      expect(thrown.error).to.equal('error-notAuthorized');
+      expect(thrown!.error).to.equal('error-notAuthorized');
     });
   });
 });
+
+// Role flags overridable on the single member of a boardWithMember fixture.
+interface BoardMemberFlags {
+  isActive: boolean;
+  isNoComments: boolean;
+  isCommentOnly: boolean;
+  isWorker: boolean;
+  isReadOnly: boolean;
+  isReadAssignedOnly: boolean;
+}

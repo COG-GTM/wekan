@@ -10,8 +10,8 @@ describe('boards security', function() {
     it('denies anonymous updates even if fieldNames include sort', function() {
       const userId = null;
       const board = {
-        hasMember: () => true,
-      };
+        hasMember: (): boolean => true,
+      } as Parameters<typeof canUpdateBoardSort>[1];
       const fieldNames = ['sort'];
 
       expect(canUpdateBoardSort(userId, board, fieldNames)).to.equal(false);
@@ -20,8 +20,8 @@ describe('boards security', function() {
     it('denies updates by non-members', function() {
       const userId = Random.id();
       const board = {
-        hasMember: (id) => id === 'someone-else',
-      };
+        hasMember: (id: string): boolean => id === 'someone-else',
+      } as Parameters<typeof canUpdateBoardSort>[1];
       const fieldNames = ['sort'];
 
       expect(canUpdateBoardSort(userId, board, fieldNames)).to.equal(false);
@@ -30,8 +30,8 @@ describe('boards security', function() {
     it('allows updates when user is a member and updating sort', function() {
       const userId = Random.id();
       const board = {
-        hasMember: (id) => id === userId,
-      };
+        hasMember: (id: string) => id === userId,
+      } as Parameters<typeof canUpdateBoardSort>[1];
       const fieldNames = ['sort'];
 
       expect(canUpdateBoardSort(userId, board, fieldNames)).to.equal(true);
@@ -40,8 +40,8 @@ describe('boards security', function() {
     it('denies updates when not updating sort', function() {
       const userId = Random.id();
       const board = {
-        hasMember: (id) => id === userId,
-      };
+        hasMember: (id: string) => id === userId,
+      } as Parameters<typeof canUpdateBoardSort>[1];
       const fieldNames = ['title'];
 
       expect(canUpdateBoardSort(userId, board, fieldNames)).to.equal(false);

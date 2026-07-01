@@ -128,7 +128,7 @@ export async function allowIsBoardMemberByCard(userId: string, card: CardRef | n
 //  - user must be authenticated
 //  - update must include 'sort' field
 //  - user must be a member of the board
-export function canUpdateBoardSort(userId: string, board: BoardAccess | null | undefined, fieldNames: string[]) {
+export function canUpdateBoardSort(userId: string | null | undefined, board: BoardAccess | null | undefined, fieldNames: string[]) {
   return !!userId && (fieldNames || []).includes('sort') && allowIsBoardMember(userId, board);
 }
 
