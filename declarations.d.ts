@@ -171,11 +171,18 @@ declare module 'meteor/ostrio:flow-router-extra' {
   const FlowRouter: {
     route(path: string, options?: FlowRouterRoute): void;
     go(pathOrName: string, params?: { [key: string]: string }): void;
-    path(pathDef: string, params?: { [key: string]: string }): string;
+    path(pathDef: string, params?: { [key: string]: string }, queryParams?: { [key: string]: string | null | undefined }): string;
     url(pathDef: string, params?: { [key: string]: string }, queryParams?: { [key: string]: string }): string;
     reload(): void;
     getRouteName(): string;
     getQueryParam(key: string): string | undefined;
+    // Current matched route: path plus resolved path/query params.
+    current(): {
+      path: string;
+      params: { [key: string]: string };
+      queryParams: { [key: string]: string };
+      route?: FlowRouterRoute;
+    };
     triggers: FlowRouterTriggers;
   };
   export { FlowRouter };

@@ -1,3 +1,8 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { Meteor } from 'meteor/meteor';
+import { Tracker } from 'meteor/tracker';
+import { ReactiveDict } from 'meteor/reactive-dict';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
 import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
@@ -14,8 +19,9 @@ import { isTextSelectionInsideCard } from '/client/lib/cardCloseGuard';
 // Which dependency the icon picker should apply its choice to. The icon popup's
 // own data context is the dependency row (not the source card), so we capture
 // the source card + target id here when the picker is opened.
-let editingDependencyTargetId = null;
-let editingDependencyCard = null;
+let editingDependencyTargetId: string | null = null;
+// Dynamic source card model doc captured when the dependency icon picker opens.
+let editingDependencyCard: any = null;
 import {
   setupDatePicker,
   datePickerRendered,
@@ -51,7 +57,8 @@ import Lists from '/models/lists';
 import CardComments from '/models/cardComments';
 import { ALLOWED_COLORS } from '/config/const';
 import { uniqBy } from '/imports/lib/collectionHelpers';
-import { UserAvatar } from '../users/userAvatar';
+// userAvatar registers Blaze templates as a side effect; it has no exports.
+import '../users/userAvatar';
 import { Filter } from '/client/lib/filter';
 import { BoardSwimlaneListCardDialog } from '/client/lib/dialogWithBoardSwimlaneListCard';
 import { handleFileUpload } from './attachments';
@@ -70,7 +77,7 @@ import autosize from 'autosize';
 
 // Id of the location currently being edited in the cardLocationsPopup; null
 // when adding a new location.
-const editingLocationId = new ReactiveVar(null);
+const editingLocationId = new ReactiveVar<string | null>(null);
 
 // Chinese datum conversions ("eviltransform" algorithm). Baidu Maps uses BD-09
 // and Amap (Gaode) uses GCJ-02; both are offset from the WGS-84 coordinates
@@ -82,23 +89,23 @@ const GCJ = (() => {
   const A = 6378245.0; // Krasovsky 1940 semi-major axis
   const EE = 0.00669342162296594323; // eccentricity squared
   const XPI = (PI * 3000.0) / 180.0;
-  const outOfChina = (lat, lon) =>
+  const outOfChina = (lat: number, lon: number) =>
     lon < 72.004 || lon > 137.8347 || lat < 0.8293 || lat > 55.8271;
-  const tLat = (x, y) => {
+  const tLat = (x: number, y: number) => {
     let r = -100 + 2 * x + 3 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
     r += ((20 * Math.sin(6 * x * PI) + 20 * Math.sin(2 * x * PI)) * 2) / 3;
     r += ((20 * Math.sin(y * PI) + 40 * Math.sin((y / 3) * PI)) * 2) / 3;
     r += ((160 * Math.sin((y / 12) * PI) + 320 * Math.sin((y * PI) / 30)) * 2) / 3;
     return r;
   };
-  const tLon = (x, y) => {
+  const tLon = (x: number, y: number) => {
     let r = 300 + x + 2 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
     r += ((20 * Math.sin(6 * x * PI) + 20 * Math.sin(2 * x * PI)) * 2) / 3;
     r += ((20 * Math.sin(x * PI) + 40 * Math.sin((x / 3) * PI)) * 2) / 3;
     r += ((150 * Math.sin((x / 12) * PI) + 300 * Math.sin((x / 30) * PI)) * 2) / 3;
     return r;
   };
-  const wgs2gcj = (lat, lon) => {
+  const wgs2gcj = (lat: number, lon: number) => {
     if (outOfChina(lat, lon)) return [lat, lon];
     let dLat = tLat(lon - 105, lat - 35);
     let dLon = tLon(lon - 105, lat - 35);
@@ -111,7 +118,7 @@ const GCJ = (() => {
     return [lat + dLat, lon + dLon];
   };
   // Approximate inverse by fixed-point iteration (converges to ~1e-9 deg).
-  const gcj2wgs = (lat, lon) => {
+  const gcj2wgs = (lat: number, lon: number) => {
     if (outOfChina(lat, lon)) return [lat, lon];
     let wLat = lat;
     let wLon = lon;
@@ -125,12 +132,12 @@ const GCJ = (() => {
     }
     return [wLat, wLon];
   };
-  const gcj2bd = (lat, lon) => {
+  const gcj2bd = (lat: number, lon: number) => {
     const z = Math.sqrt(lon * lon + lat * lat) + 0.00002 * Math.sin(lat * XPI);
     const theta = Math.atan2(lat, lon) + 0.000003 * Math.cos(lon * XPI);
     return [z * Math.sin(theta) + 0.006, z * Math.cos(theta) + 0.0065];
   };
-  const bd2gcj = (lat, lon) => {
+  const bd2gcj = (lat: number, lon: number) => {
     const x = lon - 0.0065;
     const y = lat - 0.006;
     const z = Math.sqrt(x * x + y * y) - 0.00002 * Math.sin(y * XPI);
@@ -140,12 +147,12 @@ const GCJ = (() => {
   return {
     wgs2gcj,
     gcj2wgs,
-    wgs2bd: (lat, lon) => {
+    wgs2bd: (lat: number, lon: number) => {
       if (outOfChina(lat, lon)) return [lat, lon];
       const [gLat, gLon] = wgs2gcj(lat, lon);
       return gcj2bd(gLat, gLon);
     },
-    bd2wgs: (lat, lon) => {
+    bd2wgs: (lat: number, lon: number) => {
       if (outOfChina(lat, lon)) return [lat, lon];
       const [gLat, gLon] = bd2gcj(lat, lon);
       return gcj2wgs(gLat, gLon);
@@ -160,14 +167,14 @@ const GCJ = (() => {
 //   Asia:   Baidu Maps, Amap (Gaode)
 // plus generic `?q=lat,lon` / `?ll=lat,lon` links. Returns whatever it can find
 // as { latitude, longitude, name, address }.
-function parseMapLink(url) {
-  const result = {};
+function parseMapLink(url: any) {
+  const result: ParsedMapLink = {};
   if (!url) return result;
   const s = String(url).trim();
 
-  let lat;
-  let lon;
-  const setCoords = (la, lo) => {
+  let lat: number | undefined;
+  let lon: number | undefined;
+  const setCoords = (la: any, lo: any) => {
     if (lat !== undefined) return;
     const a = parseFloat(la);
     const o = parseFloat(lo);
@@ -231,14 +238,14 @@ function parseMapLink(url) {
     result.longitude = lon;
   }
 
-  const decode = (raw) => {
+  const decode = (raw: string) => {
     try {
       return decodeURIComponent(raw.replace(/\+/g, ' ')).trim();
     } catch (e) {
       return raw.replace(/\+/g, ' ').trim();
     }
   };
-  const isCoordText = (t) => /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(t);
+  const isCoordText = (t: string) => /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(t);
 
   // Place name from Google Maps /place/<Name>/
   if ((m = s.match(/\/place\/([^/@?]+)/))) {
@@ -258,7 +265,7 @@ function parseMapLink(url) {
 // the providers offered in the location popup's "Open map links at" selector,
 // grouped by region (USA, Europe, Asia). Note that several non-US providers
 // expect the coordinates in lon,lat order rather than lat,lon.
-function mapLinkFor(provider, lat, lon) {
+function mapLinkFor(provider: string, lat: any, lon: any) {
   switch (provider) {
     // --- USA ---
     case 'google':
@@ -300,23 +307,24 @@ function getCardId() {
   return getCurrentCardIdFromContext();
 }
 
-function getBoardBodyInstance() {
+function getBoardBodyInstance(tpl?: any) {
   const boardBodyEl = document.querySelector('.board-body');
   if (boardBodyEl) {
-    const view = Blaze.getView(boardBodyEl);
-    if (view && view.templateInstance) return view.templateInstance();
+    const view = Blaze.getView(boardBodyEl as HTMLElement);
+    // boardBody instance carries custom reactive state (showOverlay etc.).
+    if (view && view.templateInstance) return view.templateInstance() as any;
   }
   return null;
 }
 
-function getCardDetailsElement(cardId) {
+function getCardDetailsElement(cardId: any) {
   if (!cardId) {
     return null;
   }
 
   const cardDetailsElements = document.querySelectorAll('.js-card-details');
   for (const element of cardDetailsElements) {
-    if (Blaze.getData(element)?._id === cardId) {
+    if ((Blaze.getData(element as HTMLElement) as any)?._id === cardId) {
       return element;
     }
   }
@@ -324,7 +332,7 @@ function getCardDetailsElement(cardId) {
   return null;
 }
 
-Template.cardDetails.onCreated(function () {
+Template.cardDetails.onCreated(function (this: CardDetailsInstance) {
   this.currentBoard = Utils.getCurrentBoard();
   this.isLoaded = new ReactiveVar(false);
   this.infiniteScrolling = new InfiniteScrolling();
@@ -352,7 +360,8 @@ Template.cardDetails.onCreated(function () {
     if (activitiesEl) {
       const view = Blaze.getView(activitiesEl);
       if (view && view.templateInstance) {
-        const activitiesTpl = view.templateInstance();
+        // activities template instance exposes a custom loadNextPage method.
+        const activitiesTpl: any = view.templateInstance();
         if (activitiesTpl && activitiesTpl.loadNextPage) {
           activitiesTpl.loadNextPage();
         }
@@ -373,12 +382,13 @@ Template.cardDetails.onCreated(function () {
   });
 });
 
-Template.cardDetails.onRendered(function () {
+Template.cardDetails.onRendered(function (this: CardDetailsInstance) {
   // A reactive re-render (e.g. a card moving between the inline swimlane render
   // and the draggable openCards popup) can create and then remove this instance
   // within the same flush. If our DOM range is already gone, calling this.$()
   // below throws "Can't select in removed DomRange", so bail out early.
-  if (this.view && this.view.isDestroyed) return;
+  // Blaze.View's isDestroyed flag is not in the ambient view type.
+  if (this.view && (this.view as any).isDestroyed) return;
   this.calculateNextPeak();
   if (Meteor.settings.public.CARD_OPENED_WEBHOOK_ENABLED) {
     // Send Webhook but not create Activities records ---
@@ -394,13 +404,13 @@ Template.cardDetails.onRendered(function () {
     };
 
     const integrations = ReactiveCache.getIntegrations({
-      boardId: { $in: [card.boardId, Integrations.Const.GLOBAL_WEBHOOK_ID] },
+      boardId: { $in: [card.boardId, (Integrations as any).Const.GLOBAL_WEBHOOK_ID] },
       enabled: true,
       activities: { $in: ['CardDetailsRendered', 'all'] },
     });
 
     if (integrations.length > 0) {
-      integrations.forEach((integration) => {
+      integrations.forEach((integration: any) => {
         Meteor.call(
           'outgoingWebhooks',
           integration,
@@ -423,22 +433,22 @@ Template.cardDetails.onRendered(function () {
     placeholder: 'checklist placeholder',
     distance: 7,
     start(evt, ui) {
-      ui.placeholder.height(ui.helper.height());
+      ui.placeholder.height(ui.helper.height()!);
       EscapeActions.clickExecute(evt.target, 'inlinedForm');
     },
     stop(evt, ui) {
-      let prevChecklist = ui.item.prev('.js-checklist').get(0);
+      let prevChecklist: any = ui.item.prev('.js-checklist').get(0);
       if (prevChecklist) {
-        prevChecklist = Blaze.getData(prevChecklist).checklist;
+        prevChecklist = (Blaze.getData(prevChecklist) as any).checklist;
       }
-      let nextChecklist = ui.item.next('.js-checklist').get(0);
+      let nextChecklist: any = ui.item.next('.js-checklist').get(0);
       if (nextChecklist) {
-        nextChecklist = Blaze.getData(nextChecklist).checklist;
+        nextChecklist = (Blaze.getData(nextChecklist) as any).checklist;
       }
       const sortIndex = calculateIndexData(prevChecklist, nextChecklist, 1);
 
       $checklistsDom.sortable('cancel');
-      const checklist = Blaze.getData(ui.item.get(0)).checklist;
+      const checklist = (Blaze.getData(ui.item.get(0) as HTMLElement) as any).checklist;
 
       Checklists.update(checklist._id, {
         $set: {
@@ -458,22 +468,22 @@ Template.cardDetails.onRendered(function () {
     placeholder: 'subtasks placeholder',
     distance: 7,
     start(evt, ui) {
-      ui.placeholder.height(ui.helper.height());
+      ui.placeholder.height(ui.helper.height()!);
       EscapeActions.executeUpTo('popup-close');
     },
     stop(evt, ui) {
-      let prevSubtask = ui.item.prev('.js-subtasks').get(0);
+      let prevSubtask: any = ui.item.prev('.js-subtasks').get(0);
       if (prevSubtask) {
-        prevSubtask = Blaze.getData(prevSubtask).subtask;
+        prevSubtask = (Blaze.getData(prevSubtask) as any).subtask;
       }
-      let nextSubtask = ui.item.next('.js-subtasks').get(0);
+      let nextSubtask: any = ui.item.next('.js-subtasks').get(0);
       if (nextSubtask) {
-        nextSubtask = Blaze.getData(nextSubtask).subtask;
+        nextSubtask = (Blaze.getData(nextSubtask) as any).subtask;
       }
       const sortIndex = calculateIndexData(prevSubtask, nextSubtask, 1);
 
       $subtasksDom.sortable('cancel');
-      const subtask = Blaze.getData(ui.item.get(0)).subtask;
+      const subtask = (Blaze.getData(ui.item.get(0) as HTMLElement) as any).subtask;
 
       Cards.updateAsync(subtask._id, {
         $set: {
@@ -533,7 +543,7 @@ Template.cardDetails.helpers({
     if (!card || !card.getLocations) return [];
     const user = ReactiveCache.getCurrentUser();
     const provider = user ? user.getMapProvider() : 'openstreetmap';
-    return card.getLocations().map(loc => {
+    return card.getLocations().map((loc: any) => {
       const hasCoordinates =
         typeof loc.latitude === 'number' && typeof loc.longitude === 'number';
       const mapUrl = hasCoordinates
@@ -550,7 +560,7 @@ Template.cardDetails.helpers({
     if (!card || typeof card.getDependencies !== 'function') return [];
     return card
       .getDependencies()
-      .map(dep => {
+      .map((dep: any) => {
         const target = ReactiveCache.getCard(dep.cardId);
         if (!target) return null;
         return {
@@ -593,15 +603,17 @@ Template.cardDetails.helpers({
     if (user && user.profile) {
       return !!user.profile.cardCollapsed;
     }
-    if (Users.getPublicCardCollapsed) {
-      const stored = Users.getPublicCardCollapsed();
+    // getPublicCardCollapsed is a static helper on the Users model, not the
+    // ambient collection type.
+    if ((Users as any).getPublicCardCollapsed) {
+      const stored = (Users as any).getPublicCardCollapsed();
       if (typeof stored === 'boolean') return stored;
     }
     return false;
   },
 
   presentParentTask() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDetailsInstance;
     let result = tpl.currentBoard.presentParentTask;
     if (result === null || result === undefined) {
       result = 'no-parent';
@@ -660,7 +672,7 @@ Template.cardDetails.helpers({
     const board = ReactiveCache.getBoard(card.boardId);
     if (!board) return [];
     const swimlaneId = card.swimlaneId;
-    const selector = { boardId: card.boardId, archived: false };
+    const selector: Record<string, any> = { boardId: card.boardId, archived: false };
     if (swimlaneId) {
       const defaultSwimlane = board.getDefaultSwimline && board.getDefaultSwimline();
       if (defaultSwimlane && defaultSwimlane._id === swimlaneId) {
@@ -672,7 +684,7 @@ Template.cardDetails.helpers({
     return ReactiveCache.getLists(selector, { sort: { sort: 1 } });
   },
 
-  isCurrentListId(listId) {
+  isCurrentListId(listId: any) {
     let data = Template.currentData();
     if (!data || typeof data.listId === 'undefined') {
       data = Template.parentData(1);
@@ -682,42 +694,44 @@ Template.cardDetails.helpers({
   },
 
   isLoaded() {
-    return Template.instance().isLoaded;
+    return (Template.instance() as CardDetailsInstance).isLoaded;
   },
 });
 
 Template.cardDetails.events({
-  [`${CSSEvents.transitionend} .js-card-details`](event, tpl) {
+  [`${CSSEvents.transitionend} .js-card-details`](event: JQuery.TriggeredEvent, tpl: CardDetailsInstance) {
     tpl.isLoaded.set(true);
   },
-  [`${CSSEvents.animationend} .js-card-details`](event, tpl) {
+  [`${CSSEvents.animationend} .js-card-details`](event: JQuery.TriggeredEvent, tpl: CardDetailsInstance) {
     tpl.isLoaded.set(true);
   },
-  'scroll .js-card-details'(event, tpl) {
+  'scroll .js-card-details'(event: JQuery.TriggeredEvent, tpl: CardDetailsInstance) {
     tpl.infiniteScrolling.checkScrollPosition(event.currentTarget, () => {
       tpl.reachNextPeak();
     });
   },
-  'click .js-card-collapse-toggle'(event, tpl) {
+  'click .js-card-collapse-toggle'(event: JQuery.TriggeredEvent, tpl: CardDetailsInstance) {
     const user = ReactiveCache.getCurrentUser();
-    const currentState = user && user.profile ? !!user.profile.cardCollapsed : !!Users.getPublicCardCollapsed();
+    // getPublicCardCollapsed/setPublicCardCollapsed are static helpers on the
+    // Users model, not the ambient collection type.
+    const currentState = user && user.profile ? !!user.profile.cardCollapsed : !!(Users as any).getPublicCardCollapsed();
     if (user) {
       Meteor.call('setCardCollapsed', !currentState);
-    } else if (Users.setPublicCardCollapsed) {
-      Users.setPublicCardCollapsed(!currentState);
+    } else if ((Users as any).setPublicCardCollapsed) {
+      (Users as any).setPublicCardCollapsed(!currentState);
     }
   },
-  'mousedown .js-card-drag-handle'(event) {
+  'mousedown .js-card-drag-handle'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const $card = $(event.target).closest('.card-details');
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const startLeft = $card.offset().left;
-    const startTop = $card.offset().top;
+    const startX = event.clientX!;
+    const startY = event.clientY!;
+    const startLeft = $card.offset()!.left;
+    const startTop = $card.offset()!.top;
 
-    const onMouseMove = (e) => {
-      const deltaX = e.clientX - startX;
-      const deltaY = e.clientY - startY;
+    const onMouseMove = (e: JQuery.TriggeredEvent) => {
+      const deltaX = e.clientX! - startX;
+      const deltaY = e.clientY! - startY;
       $card.css({
         left: startLeft + deltaX + 'px',
         top: startTop + deltaY + 'px'
@@ -732,7 +746,7 @@ Template.cardDetails.events({
     $(document).on('mousemove', onMouseMove);
     $(document).on('mouseup', onMouseUp);
   },
-  'mousedown .js-card-title-drag-handle'(event) {
+  'mousedown .js-card-title-drag-handle'(event: JQuery.TriggeredEvent) {
     // Allow dragging from title for ReadOnly users
     // Don't interfere with text selection
     if (event.target.tagName === 'A' || $(event.target).closest('a').length > 0) {
@@ -741,14 +755,14 @@ Template.cardDetails.events({
 
     event.preventDefault();
     const $card = $(event.target).closest('.card-details');
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const startLeft = $card.offset().left;
-    const startTop = $card.offset().top;
+    const startX = event.clientX!;
+    const startY = event.clientY!;
+    const startLeft = $card.offset()!.left;
+    const startTop = $card.offset()!.top;
 
-    const onMouseMove = (e) => {
-      const deltaX = e.clientX - startX;
-      const deltaY = e.clientY - startY;
+    const onMouseMove = (e: JQuery.TriggeredEvent) => {
+      const deltaX = e.clientX! - startX;
+      const deltaY = e.clientY! - startY;
       $card.css({
         left: startLeft + deltaX + 'px',
         top: startTop + deltaY + 'px'
@@ -763,7 +777,7 @@ Template.cardDetails.events({
     $(document).on('mousemove', onMouseMove);
     $(document).on('mouseup', onMouseUp);
   },
-  'click .js-close-card-details'(event) {
+  'click .js-close-card-details'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     event.stopPropagation();
 
@@ -772,8 +786,10 @@ Template.cardDetails.events({
     // is hidden, so this is the only close button. Close the popup and clear its
     // session state instead of running the board/route close flow below.
     if (Popup.isOpen() && Utils.getPopupCardId()) {
-      Session.delete('popupCardId');
-      Session.delete('popupCardBoardId');
+      // @types/meteor omits Session.delete (`delete` is a reserved word that
+      // can't be declared on the Session namespace); it is a real Meteor API.
+      (Session as any).delete('popupCardId');
+      (Session as any).delete('popupCardBoardId');
       Popup.close();
       return;
     }
@@ -788,7 +804,7 @@ Template.cardDetails.events({
     if (!Utils.isMiniScreen()) {
       if (cardId) {
         const openCards = Session.get('openCards') || [];
-        const nextOpenCards = openCards.filter((id) => id !== cardId);
+        const nextOpenCards = openCards.filter((id: any) => id !== cardId);
         Session.set('openCards', nextOpenCards);
 
         if (Session.get('currentCard') === cardId) {
@@ -807,14 +823,15 @@ Template.cardDetails.events({
 
     // Mini-screen/card-route flow: clear active card state and go back to board.
     Session.set('currentCard', null);
-    Session.delete('popupCardId');
-    Session.delete('popupCardBoardId');
+    // Session.delete is a real Meteor API missing from @types/meteor.
+    (Session as any).delete('popupCardId');
+    (Session as any).delete('popupCardBoardId');
 
     if (boardId) {
       Utils.goBoardId(boardId);
     }
   },
-  'click .js-copy-link'(event, tpl) {
+  'click .js-copy-link'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     event.preventDefault();
     const card = Template.currentData();
     const url = card.absoluteUrl();
@@ -823,7 +840,7 @@ Template.cardDetails.events({
     const $tooltip = tpl.$('.card-details-header .copied-tooltip');
     Utils.showCopied(promise, $tooltip);
   },
-  'change .js-date-format-selector'(event) {
+  'change .js-date-format-selector'(event: JQuery.TriggeredEvent) {
     const dateFormat = event.target.value;
     if (Meteor.userId()) {
       Meteor.call('changeDateFormat', dateFormat);
@@ -833,31 +850,31 @@ Template.cardDetails.events({
   },
   'click .js-open-card-details-menu': Popup.open('cardDetailsActions'),
   // Mobile: switch to desktop popup view (maximize)
-  'click .js-mobile-switch-to-desktop'(event) {
+  'click .js-mobile-switch-to-desktop'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     // Switch global mode to desktop so the card appears as desktop popup
     Utils.setMobileMode(false);
   },
-  'click .js-card-zoom-in'(event) {
+  'click .js-card-zoom-in'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const current = Utils.getCardZoom();
     const newZoom = Math.min(3.0, current + 0.1);
     Utils.setCardZoom(newZoom);
   },
-  'click .js-card-zoom-out'(event) {
+  'click .js-card-zoom-out'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const current = Utils.getCardZoom();
     const newZoom = Math.max(0.5, current - 0.1);
     Utils.setCardZoom(newZoom);
   },
-  'click .js-card-mobile-desktop-toggle'(event) {
+  'click .js-card-mobile-desktop-toggle'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const currentMode = Utils.getMobileMode();
     Utils.setMobileMode(!currentMode);
   },
-  async 'submit .js-card-description'(event, tpl) {
+  async 'submit .js-card-description'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     event.preventDefault();
-    const description = tpl.find('.js-new-description-input').value;
+    const description = (tpl.find('.js-new-description-input') as HTMLInputElement).value;
     const card = Template.currentData();
     // #5809: surface a visible error instead of failing silently — e.g. editing
     // a linked card whose target is on a board the user cannot write to gets a
@@ -868,9 +885,9 @@ Template.cardDetails.events({
       alert(error?.reason || error?.message || 'Failed to save description');
     }
   },
-  async 'submit .js-card-details-title'(event, tpl) {
+  async 'submit .js-card-details-title'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     event.preventDefault();
-    const titleInput = tpl.find('.js-edit-card-title');
+    const titleInput = tpl.find('.js-edit-card-title') as HTMLInputElement | null;
     const title = titleInput ? titleInput.value.trim() : '';
     const card = Template.currentData();
     // #5809: surface a visible error instead of failing silently (see above).
@@ -880,9 +897,9 @@ Template.cardDetails.events({
       alert(error?.reason || error?.message || 'Failed to save title');
     }
   },
-  'submit .js-card-details-assigner'(event, tpl) {
+  'submit .js-card-details-assigner'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     event.preventDefault();
-    const assignerInput = tpl.find('.js-edit-card-assigner');
+    const assignerInput = tpl.find('.js-edit-card-assigner') as HTMLInputElement | null;
     const assigner = assignerInput ? assignerInput.value.trim() : '';
     const card = Template.currentData();
     if (assigner) {
@@ -891,9 +908,9 @@ Template.cardDetails.events({
       card.setAssignedBy('');
     }
   },
-  'submit .js-card-details-requester'(event, tpl) {
+  'submit .js-card-details-requester'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     event.preventDefault();
-    const requesterInput = tpl.find('.js-edit-card-requester');
+    const requesterInput = tpl.find('.js-edit-card-requester') as HTMLInputElement | null;
     const requester = requesterInput ? requesterInput.value.trim() : '';
     const card = Template.currentData();
     if (requester) {
@@ -902,22 +919,22 @@ Template.cardDetails.events({
       card.setRequestedBy('');
     }
   },
-  'keydown input.js-edit-card-sort'(evt, tpl) {
+  'keydown input.js-edit-card-sort'(evt: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     // enter = save
     if (evt.keyCode === 13) {
-      tpl.find('button[type=submit]').click();
+      (tpl.find('button[type=submit]') as HTMLElement).click();
     }
   },
-  async 'submit .js-card-details-sort'(event, tpl) {
+  async 'submit .js-card-details-sort'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     event.preventDefault();
-    const sortInput = tpl.find('.js-edit-card-sort');
+    const sortInput = tpl.find('.js-edit-card-sort') as HTMLInputElement | null;
     const sort = parseFloat(sortInput ? sortInput.value.trim() : '');
     if (!Number.isNaN(sort)) {
       let card = Template.currentData();
       await card.move(card.boardId, card.swimlaneId, card.listId, sort);
     }
   },
-  async 'change .js-select-card-details-lists'(event, tpl) {
+  async 'change .js-select-card-details-lists'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const listId = event.target.value;
     let card = Template.currentData();
 
@@ -929,7 +946,7 @@ Template.cardDetails.events({
     Utils.goCardId(card.linkedId);
   },
   'click .js-add-dependency': Popup.open('cardDependencies'),
-  'click .js-remove-dependency'(event) {
+  'click .js-remove-dependency'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     event.stopPropagation();
     if (!Utils.canModifyCard()) return;
@@ -939,7 +956,7 @@ Template.cardDetails.events({
       card.removeDependency(targetId);
     }
   },
-  'change .js-dependency-type'(event) {
+  'change .js-dependency-type'(event: JQuery.TriggeredEvent) {
     if (!Utils.canModifyCard()) return;
     const targetId = event.currentTarget.dataset.targetId;
     const card = Template.currentData();
@@ -947,7 +964,7 @@ Template.cardDetails.events({
       card.setDependencyProps(targetId, { type: event.currentTarget.value });
     }
   },
-  'change .js-dependency-color'(event) {
+  'change .js-dependency-color'(event: JQuery.TriggeredEvent) {
     if (!Utils.canModifyCard()) return;
     const targetId = event.currentTarget.dataset.targetId;
     const card = Template.currentData();
@@ -955,7 +972,7 @@ Template.cardDetails.events({
       card.setDependencyProps(targetId, { color: event.currentTarget.value });
     }
   },
-  'click .js-dependency-icon'(event) {
+  'click .js-dependency-icon'(event: JQuery.TriggeredEvent) {
     if (!Utils.canModifyCard()) return;
     // Remember the source card + which dependency the picked icon applies to.
     editingDependencyCard = Template.currentData();
@@ -968,7 +985,7 @@ Template.cardDetails.events({
   'click .js-add-assignees': Popup.open('cardAssignees'),
   'click .js-add-labels': Popup.open('cardLabels'),
   'click .js-add-stickers': Popup.open('cardStickers'),
-  'click .js-remove-sticker'(event) {
+  'click .js-remove-sticker'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     event.stopPropagation();
     if (!Utils.canModifyCard()) return;
@@ -978,7 +995,7 @@ Template.cardDetails.events({
       card.removeStickerAt(index);
     }
   },
-  'click .js-add-location'(event) {
+  'click .js-add-location'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     if (!Utils.canModifyCard()) return;
     const card = Template.currentData();
@@ -987,7 +1004,7 @@ Template.cardDetails.events({
       dataContextIfCurrentDataIsUndefined: card,
     });
   },
-  'click .js-edit-location'(event) {
+  'click .js-edit-location'(event: JQuery.TriggeredEvent) {
     // Let the "Open in map" link work without also opening the edit popup.
     if ($(event.target).closest('a.card-location-map').length) return;
     event.preventDefault();
@@ -998,7 +1015,7 @@ Template.cardDetails.events({
       dataContextIfCurrentDataIsUndefined: card,
     });
   },
-  'click .js-remove-location'(event) {
+  'click .js-remove-location'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     event.stopPropagation();
     if (!Utils.canModifyCard()) return;
@@ -1011,7 +1028,7 @@ Template.cardDetails.events({
   'click .js-received-date': Popup.open('editCardReceivedDate'),
   'click .js-start-date': Popup.open('editCardStartDate'),
   'click .js-due-date': Popup.open('editCardDueDate'),
-  'click .js-toggle-due-complete'(event) {
+  'click .js-toggle-due-complete'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     event.stopPropagation();
     if (!Utils.canModifyCard()) return;
@@ -1022,7 +1039,7 @@ Template.cardDetails.events({
   'click .js-show-positive-votes': Popup.open('positiveVoteMembers'),
   'click .js-show-negative-votes': Popup.open('negativeVoteMembers'),
   'click .js-custom-fields': Popup.open('cardCustomFields'),
-  'mouseenter .js-card-details'(event, tpl) {
+  'mouseenter .js-card-details'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const boardBody = getBoardBodyInstance(tpl);
     if (boardBody === null) return;
     boardBody.showOverlay.set(true);
@@ -1068,10 +1085,10 @@ Template.cardDetails.events({
     }
     autosize($('.card-details'));
   },
-  'click .js-vote'(e) {
+  'click .js-vote'(e: JQuery.TriggeredEvent) {
     const card = Template.currentData();
     const forIt = $(e.target).hasClass('js-vote-positive');
-    let newState = null;
+    let newState: boolean | null = null;
     if (
       card.voteState() === null ||
       (card.voteState() === false && forIt) ||
@@ -1082,9 +1099,9 @@ Template.cardDetails.events({
     // Use secure server method; direct client updates to vote are blocked
     Meteor.call('cards.vote', card._id, newState);
   },
-  'click .js-poker'(e) {
+  'click .js-poker'(e: JQuery.TriggeredEvent) {
     const card = Template.currentData();
-    let newState = null;
+    let newState: string | null = null;
     if ($(e.target).hasClass('js-poker-vote-one')) {
       newState = 'one';
       Meteor.call('cards.pokerVote', card._id, newState);
@@ -1126,7 +1143,7 @@ Template.cardDetails.events({
       Meteor.call('cards.pokerVote', card._id, newState);
     }
   },
-  'click .js-poker-finish'(e) {
+  'click .js-poker-finish'(e: JQuery.TriggeredEvent) {
     if ($(e.target).hasClass('js-poker-finish')) {
       e.preventDefault();
       const card = Template.currentData();
@@ -1134,7 +1151,7 @@ Template.cardDetails.events({
       Meteor.call('cards.setPokerEnd', card._id, now);
     }
   },
-  'click .js-poker-replay'(e) {
+  'click .js-poker-replay'(e: JQuery.TriggeredEvent) {
     if ($(e.target).hasClass('js-poker-replay')) {
       e.preventDefault();
       const currentCard = Template.currentData();
@@ -1143,12 +1160,12 @@ Template.cardDetails.events({
       Meteor.call('cards.unsetPokerEstimation', currentCard._id);
     }
   },
-  'click .js-poker-estimation'(event, tpl) {
+  'click .js-poker-estimation'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     event.preventDefault();
     const card = Template.currentData();
-    const ruleTitle = tpl.find('#pokerEstimation').value;
+    const ruleTitle = (tpl.find('#pokerEstimation') as HTMLInputElement).value;
     if (ruleTitle !== undefined && ruleTitle !== '') {
-      tpl.find('#pokerEstimation').value = '';
+      (tpl.find('#pokerEstimation') as HTMLInputElement).value = '';
 
       if (ruleTitle) {
         Meteor.call('cards.setPokerEstimation', card._id, parseInt(ruleTitle, 10));
@@ -1158,16 +1175,16 @@ Template.cardDetails.events({
     }
   },
   // Drag and drop file upload handlers
-  'dragover .js-card-details'(event) {
+  'dragover .js-card-details'(event: JQuery.TriggeredEvent) {
     // Only prevent default for file drags to avoid interfering with other drag operations
-    const dataTransfer = event.originalEvent.dataTransfer;
+    const dataTransfer = (event.originalEvent as DragEvent).dataTransfer;
     if (dataTransfer && dataTransfer.types && dataTransfer.types.includes('Files')) {
       event.preventDefault();
       event.stopPropagation();
     }
   },
-  'dragenter .js-card-details'(event) {
-    const dataTransfer = event.originalEvent.dataTransfer;
+  'dragenter .js-card-details'(event: JQuery.TriggeredEvent) {
+    const dataTransfer = (event.originalEvent as DragEvent).dataTransfer;
     if (dataTransfer && dataTransfer.types && dataTransfer.types.includes('Files')) {
       event.preventDefault();
       event.stopPropagation();
@@ -1179,16 +1196,16 @@ Template.cardDetails.events({
       }
     }
   },
-  'dragleave .js-card-details'(event) {
-    const dataTransfer = event.originalEvent.dataTransfer;
+  'dragleave .js-card-details'(event: JQuery.TriggeredEvent) {
+    const dataTransfer = (event.originalEvent as DragEvent).dataTransfer;
     if (dataTransfer && dataTransfer.types && dataTransfer.types.includes('Files')) {
       event.preventDefault();
       event.stopPropagation();
       $(event.currentTarget).removeClass('is-dragging-over');
     }
   },
-  'drop .js-card-details'(event) {
-    const dataTransfer = event.originalEvent.dataTransfer;
+  'drop .js-card-details'(event: JQuery.TriggeredEvent) {
+    const dataTransfer = (event.originalEvent as DragEvent).dataTransfer;
     if (dataTransfer && dataTransfer.types && dataTransfer.types.includes('Files')) {
       event.preventDefault();
       event.stopPropagation();
@@ -1220,7 +1237,7 @@ Template.cardDetails.helpers({
     let ret = !!Utils.getPopupCardId();
     return ret;
   },
-  isDateFormat(format) {
+  isDateFormat(format: any) {
     const currentUser = ReactiveCache.getCurrentUser();
     if (!currentUser) {
       const stored = window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD';
@@ -1229,19 +1246,20 @@ Template.cardDetails.helpers({
     return currentUser.getDateFormat() === format;
   },
   // Upload progress helpers
-  hasActiveUploads() {
+  hasActiveUploads(this: any) {
     return uploadProgressManager.hasActiveUploads(this._id);
   },
-  uploads() {
+  uploads(this: any) {
     return uploadProgressManager.getUploadsForCard(this._id);
   },
-  uploadCount() {
+  uploadCount(this: any) {
     return uploadProgressManager.getUploadCountForCard(this._id);
   }
 });
 Template.cardDetailsPopup.onDestroyed(() => {
-  Session.delete('popupCardId');
-  Session.delete('popupCardBoardId');
+  // Session.delete is a real Meteor API missing from @types/meteor.
+  (Session as any).delete('popupCardId');
+  (Session as any).delete('popupCardBoardId');
 });
 Template.cardDetailsPopup.helpers({
   popupCard() {
@@ -1264,15 +1282,17 @@ const EXCEL_EXPORT_FIELDS = [
   { field: 'attachments', label: 'attachments' },
 ];
 
-Template.exportCardPopup.onCreated(function () {
+Template.exportCardPopup.onCreated(function (this: ExportCardPopupInstance) {
   // Track which Excel sections the user wants to include (all on by default)
-  const initial = {};
+  const initial: Record<string, boolean> = {};
   EXCEL_EXPORT_FIELDS.forEach(({ field }) => { initial[field] = true; });
-  this.excelFields = new ReactiveDict(initial);
+  // Meteor's ReactiveDict accepts initial data as its first arg at runtime, but
+  // @types only types the name there; pass it as the (typed) second arg.
+  this.excelFields = new ReactiveDict<Record<string, boolean>>(undefined, initial);
 });
 
 Template.exportCardPopup.helpers({
-  exportUrlCardPDF() {
+  exportUrlCardPDF(this: any) {
     const card = getCurrentCardFromContext({ ignorePopupCard: true }) || this;
     const params = {
       boardId: card.boardId || Session.get('currentBoard'),
@@ -1285,7 +1305,7 @@ Template.exportCardPopup.helpers({
       { authToken: Accounts._storedLoginToken() },
     );
   },
-  exportFilenameCardPDF() {
+  exportFilenameCardPDF(this: any) {
     const card = getCurrentCardFromContext({ ignorePopupCard: true }) || this;
     return `${String(card.title || 'export-card')
       .replace(/[^a-z0-9._-]+/gi, '-')
@@ -1294,15 +1314,15 @@ Template.exportCardPopup.helpers({
   },
   // Returns the field list with current checked state — reactive
   excelExportFields() {
-    const instance = Template.instance();
+    const instance = Template.instance() as ExportCardPopupInstance;
     return EXCEL_EXPORT_FIELDS.map(f => ({
       field:   f.field,
       label:   f.label,
       checked: instance.excelFields.get(f.field),
     }));
   },
-  exportUrlCardExcel() {
-    const instance = Template.instance();
+  exportUrlCardExcel(this: any) {
+    const instance = Template.instance() as ExportCardPopupInstance;
     const card = getCurrentCardFromContext({ ignorePopupCard: true }) || this;
     const params = {
       boardId: card.boardId || Session.get('currentBoard'),
@@ -1318,7 +1338,7 @@ Template.exportCardPopup.helpers({
       { authToken: Accounts._storedLoginToken(), fields: selectedFields.join(','), lang: TAPi18n.getLanguage() },
     );
   },
-  exportFilenameCardExcel() {
+  exportFilenameCardExcel(this: any) {
     const card = getCurrentCardFromContext({ ignorePopupCard: true }) || this;
     return `${String(card.title || 'export-card')
       .replace(/[^a-z0-9._-]+/gi, '-')
@@ -1328,17 +1348,17 @@ Template.exportCardPopup.helpers({
 });
 
 Template.exportCardPopup.events({
-  'click .js-excel-field-toggle'(event, instance) {
+  'click .js-excel-field-toggle'(event: JQuery.TriggeredEvent, instance: ExportCardPopupInstance) {
     event.preventDefault();
-    const field = event.currentTarget.dataset.field;
+    const field = event.currentTarget.dataset.field as string;
     instance.excelFields.set(field, !instance.excelFields.get(field));
   },
 });
 
 // only allow number input
-Template.editCardSortOrderForm.onRendered(function () {
-  this.$('input').on("keypress paste", function (event) {
-    let keyCode = event.keyCode;
+Template.editCardSortOrderForm.onRendered(function (this: Blaze.TemplateInstance) {
+  this.$('input').on("keypress paste", function (this: HTMLElement, event: JQuery.TriggeredEvent) {
+    let keyCode = event.keyCode!;
     let charCode = String.fromCharCode(keyCode);
     let regex = new RegExp('[-0-9.]');
     let ret = regex.test(charCode);
@@ -1349,7 +1369,7 @@ Template.editCardSortOrderForm.onRendered(function () {
 
 // inlinedCardDescription extends the normal inlinedForm to support UnsavedEdits
 // draft feature for card descriptions.
-Template.inlinedCardDescription.onCreated(function () {
+Template.inlinedCardDescription.onCreated(function (this: InlinedCardDescriptionInstance) {
   this.isOpen = new ReactiveVar(false);
 
   this._getUnsavedEditKey = () => ({
@@ -1358,7 +1378,7 @@ Template.inlinedCardDescription.onCreated(function () {
   });
 
   this._getValue = () => {
-    const input = this.find('textarea,input[type=text]');
+    const input = this.find('textarea,input[type=text]') as HTMLInputElement | null;
     return this.isOpen.get() && input && input.value.replaceAll(/[ \f\r\t\v]+$/gm, '');
   };
 
@@ -1381,25 +1401,25 @@ Template.inlinedCardDescription.onCreated(function () {
 
 Template.inlinedCardDescription.helpers({
   isOpen() {
-    return Template.instance().isOpen;
+    return (Template.instance() as InlinedCardDescriptionInstance).isOpen;
   },
 });
 
 Template.inlinedCardDescription.events({
-  'click .js-close-inlined-form'(evt, tpl) {
+  'click .js-close-inlined-form'(evt: JQuery.TriggeredEvent, tpl: InlinedCardDescriptionInstance) {
     tpl._reset();
   },
-  'click .js-open-inlined-form'(evt, tpl) {
+  'click .js-open-inlined-form'(evt: JQuery.TriggeredEvent, tpl: InlinedCardDescriptionInstance) {
     evt.preventDefault();
     EscapeActions.clickExecute(evt.target, 'inlinedForm');
     tpl.isOpen.set(true);
   },
-  'keydown form textarea'(evt, tpl) {
+  'keydown form textarea'(evt: JQuery.TriggeredEvent, tpl: InlinedCardDescriptionInstance) {
     if (evt.keyCode === 13 && (evt.metaKey || evt.ctrlKey)) {
-      tpl.find('button[type=submit]').click();
+      (tpl.find('button[type=submit]') as HTMLElement).click();
     }
   },
-  submit(evt, tpl) {
+  submit(evt: JQuery.TriggeredEvent, tpl: InlinedCardDescriptionInstance) {
     const data = Template.currentData();
     if (data.autoclose !== false) {
       Tracker.afterFlush(() => {
@@ -1410,7 +1430,7 @@ Template.inlinedCardDescription.events({
 });
 
 Template.cardDetailsActionsPopup.helpers({
-  isWatching() {
+  isWatching(this: any) {
     if (!this || typeof this.findWatcher !== 'function') return false;
     return this.findWatcher(Meteor.userId());
   },
@@ -1419,7 +1439,7 @@ Template.cardDetailsActionsPopup.helpers({
     return ReactiveCache.getCurrentUser()?.isBoardAdmin();
   },
 
-  showListOnMinicard() {
+  showListOnMinicard(this: any) {
     return this.showListOnMinicard;
   },
 });
@@ -1442,7 +1462,7 @@ Template.cardDetailsActionsPopup.events({
   'click .js-convert-checklist-item-to-card': Popup.open('convertChecklistItemToCard'),
   'click .js-copy-checklist-cards': Popup.open('copyManyCards'),
   'click .js-set-card-color': Popup.open('setCardColor'),
-  async 'click .js-move-card-to-top'(event) {
+  async 'click .js-move-card-to-top'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const card = Cards.findOne(getCardId());
     if (!card) return;
@@ -1450,7 +1470,7 @@ Template.cardDetailsActionsPopup.events({
     await card.move(card.boardId, card.swimlaneId, card.listId, minOrder - 1);
     Popup.back();
   },
-  async 'click .js-move-card-to-bottom'(event) {
+  async 'click .js-move-card-to-bottom'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const card = Cards.findOne(getCardId());
     if (!card) return;
@@ -1471,7 +1491,8 @@ Template.cardDetailsActionsPopup.events({
     const currentCard = Cards.findOne(getCardId());
     if (!currentCard) return;
     const level = currentCard.findWatcher(Meteor.userId()) ? null : 'watching';
-    Meteor.call('watch', 'card', currentCard._id, level, (err, ret) => {
+    // Meteor.call callback error/result are untyped.
+    Meteor.call('watch', 'card', currentCard._id, level, (err: any, ret: any) => {
       if (!err && ret) Popup.close();
     });
   },
@@ -1484,19 +1505,19 @@ Template.cardDetailsActionsPopup.events({
   },
 });
 
-Template.editCardTitleForm.onRendered(function () {
+Template.editCardTitleForm.onRendered(function (this: Blaze.TemplateInstance) {
   autosize(this.$('textarea.js-edit-card-title'));
 });
 
 Template.editCardTitleForm.events({
-  'click a.fa.fa-copy'(event, tpl) {
+  'click a.fa.fa-copy'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     const $editor = tpl.$('textarea');
-    const promise = Utils.copyTextToClipboard($editor[0].value);
+    const promise = Utils.copyTextToClipboard(($editor[0] as HTMLTextAreaElement).value);
 
     const $tooltip = tpl.$('.copied-tooltip');
     Utils.showCopied(promise, $tooltip);
   },
-  'keydown .js-edit-card-title'(event) {
+  'keydown .js-edit-card-title'(event: JQuery.TriggeredEvent) {
     // If enter key was pressed, submit the data
     // Unless the shift key is also being pressed
     if (event.keyCode === 13 && !event.shiftKey) {
@@ -1505,7 +1526,7 @@ Template.editCardTitleForm.events({
   },
 });
 
-Template.cardMembersPopup.onCreated(function () {
+Template.cardMembersPopup.onCreated(function (this: FilterTermPopupInstance) {
   // #4965: only the filter term is stored reactively; the candidate list is
   // derived reactively in the members() helper (via filterMembers, which reads
   // board.activeMembers() on each call). Previously the list was snapshotted
@@ -1516,20 +1537,20 @@ Template.cardMembersPopup.onCreated(function () {
 });
 
 Template.cardMembersPopup.events({
-  'click .js-select-member'(event) {
+  'click .js-select-member'(this: any, event: JQuery.TriggeredEvent) {
     const card = getCurrentCardFromContext();
     if (!card) return;
     const memberId = this.userId;
     card.toggleMember(memberId);
     event.preventDefault();
   },
-  'keyup .card-members-filter'(event) {
-    Template.instance().filterTerm.set(event.target.value);
+  'keyup .card-members-filter'(event: JQuery.TriggeredEvent) {
+    (Template.instance() as FilterTermPopupInstance).filterTerm.set(event.target.value);
   }
 });
 
 Template.cardMembersPopup.helpers({
-  isCardMember() {
+  isCardMember(this: any) {
     const card = getCurrentCardFromContext();
     if (!card) return false;
     const cardMembers = card.getMembers();
@@ -1538,9 +1559,9 @@ Template.cardMembersPopup.helpers({
   },
 
   members() {
-    const members = filterMembers(Template.instance().filterTerm.get());
+    const members = filterMembers((Template.instance() as FilterTermPopupInstance).filterTerm.get());
     const uniqueMembers = uniqBy(members, 'userId');
-    return [...uniqueMembers].sort((a, b) => {
+    return [...uniqueMembers].sort((a: any, b: any) => {
       const userA = ReactiveCache.getUser(a.userId);
       const userB = ReactiveCache.getUser(b.userId);
       const nameA = userA ? userA.profile.fullname : '';
@@ -1548,14 +1569,14 @@ Template.cardMembersPopup.helpers({
       return nameA.localeCompare(nameB);
     });
   },
-  userData() {
+  userData(this: any) {
     return ReactiveCache.getUser(this.userId);
   },
 });
 
 // Popup that adds or edits a single card location (name, address, latitude,
 // longitude). Cards can hold multiple locations, like members.
-Template.cardLocationsPopup.onCreated(function () {
+Template.cardLocationsPopup.onCreated(function (this: CardLocationsPopupInstance) {
   const data = Template.currentData();
   this.cardId = data && data._id;
   this.detectMsg = new ReactiveVar('');
@@ -1564,64 +1585,64 @@ Template.cardLocationsPopup.onCreated(function () {
 
 Template.cardLocationsPopup.helpers({
   location() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardLocationsPopupInstance;
     const card = ReactiveCache.getCard(tpl.cardId);
     const id = editingLocationId.get();
     if (card && id) {
-      const found = card.getLocations().find(loc => loc._id === id);
+      const found = card.getLocations().find((loc: any) => loc._id === id);
       if (found) return found;
     }
     return {};
   },
   detectMessage() {
-    return Template.instance().detectMsg.get();
+    return (Template.instance() as CardLocationsPopupInstance).detectMsg.get();
   },
-  isMapProvider(provider) {
+  isMapProvider(provider: any) {
     const user = ReactiveCache.getCurrentUser();
     const current = user ? user.getMapProvider() : 'openstreetmap';
     return current === provider;
   },
   mapSavedMessage() {
-    return Template.instance().mapSavedMsg.get();
+    return (Template.instance() as CardLocationsPopupInstance).mapSavedMsg.get();
   },
 });
 
 Template.cardLocationsPopup.events({
-  'click .js-detect-location'(event) {
+  'click .js-detect-location'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
-    const tpl = Template.instance();
-    const linkInput = tpl.find('.js-location-map-link');
+    const tpl = Template.instance() as CardLocationsPopupInstance;
+    const linkInput = tpl.find('.js-location-map-link') as HTMLInputElement | null;
     const parsed = parseMapLink(linkInput ? linkInput.value : '');
     let filled = false;
     if (typeof parsed.latitude === 'number') {
-      tpl.find('.js-location-latitude').value = parsed.latitude;
-      tpl.find('.js-location-longitude').value = parsed.longitude;
+      (tpl.find('.js-location-latitude') as HTMLInputElement).value = String(parsed.latitude);
+      (tpl.find('.js-location-longitude') as HTMLInputElement).value = String(parsed.longitude);
       filled = true;
     }
     if (parsed.name) {
-      tpl.find('.js-location-name').value = parsed.name;
+      (tpl.find('.js-location-name') as HTMLInputElement).value = parsed.name;
       filled = true;
     }
     if (parsed.address) {
-      tpl.find('.js-location-address').value = parsed.address;
+      (tpl.find('.js-location-address') as HTMLInputElement).value = parsed.address;
       filled = true;
     }
     tpl.detectMsg.set(
       TAPi18n.__(filled ? 'location-detect-done' : 'location-detect-none'),
     );
   },
-  'submit .js-card-location-form'(event) {
+  'submit .js-card-location-form'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardLocationsPopupInstance;
     const card = ReactiveCache.getCard(tpl.cardId);
     if (!card) {
       Popup.back();
       return;
     }
-    const name = tpl.find('.js-location-name').value.trim();
-    const address = tpl.find('.js-location-address').value.trim();
-    const latRaw = tpl.find('.js-location-latitude').value.trim();
-    const lonRaw = tpl.find('.js-location-longitude').value.trim();
+    const name = (tpl.find('.js-location-name') as HTMLInputElement).value.trim();
+    const address = (tpl.find('.js-location-address') as HTMLInputElement).value.trim();
+    const latRaw = (tpl.find('.js-location-latitude') as HTMLInputElement).value.trim();
+    const lonRaw = (tpl.find('.js-location-longitude') as HTMLInputElement).value.trim();
     const latitude = latRaw === '' ? undefined : parseFloat(latRaw);
     const longitude = lonRaw === '' ? undefined : parseFloat(lonRaw);
     const data = { name, address, latitude, longitude };
@@ -1633,9 +1654,9 @@ Template.cardLocationsPopup.events({
     }
     Popup.back();
   },
-  'click .js-delete-location'(event) {
+  'click .js-delete-location'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardLocationsPopupInstance;
     const card = ReactiveCache.getCard(tpl.cardId);
     const id = editingLocationId.get();
     if (card && id) {
@@ -1643,12 +1664,13 @@ Template.cardLocationsPopup.events({
     }
     Popup.back();
   },
-  'click .js-save-map-provider'(event) {
+  'click .js-save-map-provider'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
-    const tpl = Template.instance();
-    const select = tpl.find('.js-map-provider');
+    const tpl = Template.instance() as CardLocationsPopupInstance;
+    const select = tpl.find('.js-map-provider') as HTMLSelectElement | null;
     const provider = select ? select.value : 'openstreetmap';
-    Meteor.call('setMapProvider', provider, err => {
+    // Meteor.call callback error is untyped.
+    Meteor.call('setMapProvider', provider, (err: any) => {
       tpl.mapSavedMsg.set(
         TAPi18n.__(err ? 'server-error' : 'map-provider-saved'),
       );
@@ -1656,18 +1678,18 @@ Template.cardLocationsPopup.events({
   },
 });
 
-const filterMembers = (filterTerm) => {
+const filterMembers = (filterTerm: string) => {
   let currBoard = Utils.getCurrentBoard();
   let members = currBoard.activeMembers();
 
   if (filterTerm) {
     const searchTerm = filterTerm.toLowerCase();
     members = members
-      .map(member => ({
+      .map((member: any) => ({
         member,
         user: ReactiveCache.getUser(member.userId)
       }))
-      .filter(({ user }) => {
+      .filter(({ user }: any) => {
         // Check if user data is available
         if (!user || !user.profile) {
           return false;
@@ -1676,17 +1698,17 @@ const filterMembers = (filterTerm) => {
         const username = (user.username || '').toLowerCase();
         return fullname.indexOf(searchTerm) !== -1 || username.indexOf(searchTerm) !== -1;
       })
-      .map(({ member }) => member);
+      .map(({ member }: any) => member);
   }
   return members;
 }
 
-Template.editCardRequesterForm.onRendered(function () {
+Template.editCardRequesterForm.onRendered(function (this: Blaze.TemplateInstance) {
   autosize(this.$('.js-edit-card-requester'));
 });
 
 Template.editCardRequesterForm.events({
-  'keydown .js-edit-card-requester'(event) {
+  'keydown .js-edit-card-requester'(event: JQuery.TriggeredEvent) {
     // If enter key was pressed, submit the data
     if (event.keyCode === 13) {
       $('.js-submit-edit-card-requester-form').click();
@@ -1694,12 +1716,12 @@ Template.editCardRequesterForm.events({
   },
 });
 
-Template.editCardAssignerForm.onRendered(function () {
+Template.editCardAssignerForm.onRendered(function (this: Blaze.TemplateInstance) {
   autosize(this.$('.js-edit-card-assigner'));
 });
 
 Template.editCardAssignerForm.events({
-  'keydown .js-edit-card-assigner'(event) {
+  'keydown .js-edit-card-assigner'(event: JQuery.TriggeredEvent) {
     // If enter key was pressed, submit the data
     if (event.keyCode === 13) {
       $('.js-submit-edit-card-assigner-form').click();
@@ -1711,48 +1733,49 @@ Template.editCardAssignerForm.events({
  * Helper: register standard board/swimlane/list/card dialog helpers and events
  * for a template that uses BoardSwimlaneListCardDialog.
  */
-function registerCardDialogTemplate(templateName) {
-  Template[templateName].helpers({
+function registerCardDialogTemplate(templateName: string) {
+  // Template is indexed dynamically by name here; the static type has no index.
+  (Template as any)[templateName].helpers({
     boards() {
-      return Template.instance().dialog.boards();
+      return (Template.instance() as CardDialogInstance).dialog.boards();
     },
     swimlanes() {
-      return Template.instance().dialog.swimlanes();
+      return (Template.instance() as CardDialogInstance).dialog.swimlanes();
     },
     lists() {
-      return Template.instance().dialog.lists();
+      return (Template.instance() as CardDialogInstance).dialog.lists();
     },
     cards() {
-      return Template.instance().dialog.cards();
+      return (Template.instance() as CardDialogInstance).dialog.cards();
     },
-    isDialogOptionBoardId(boardId) {
-      return Template.instance().dialog.isDialogOptionBoardId(boardId);
+    isDialogOptionBoardId(boardId: any) {
+      return (Template.instance() as CardDialogInstance).dialog.isDialogOptionBoardId(boardId);
     },
-    isDialogOptionSwimlaneId(swimlaneId) {
-      return Template.instance().dialog.isDialogOptionSwimlaneId(swimlaneId);
+    isDialogOptionSwimlaneId(swimlaneId: any) {
+      return (Template.instance() as CardDialogInstance).dialog.isDialogOptionSwimlaneId(swimlaneId);
     },
-    isDialogOptionListId(listId) {
-      return Template.instance().dialog.isDialogOptionListId(listId);
+    isDialogOptionListId(listId: any) {
+      return (Template.instance() as CardDialogInstance).dialog.isDialogOptionListId(listId);
     },
-    isSelectedBoardId(boardId) {
-      return Template.instance().dialog.isSelectedBoardId(boardId);
+    isSelectedBoardId(boardId: any) {
+      return (Template.instance() as CardDialogInstance).dialog.isSelectedBoardId(boardId);
     },
-    isSelectedSwimlaneId(swimlaneId) {
-      return Template.instance().dialog.isSelectedSwimlaneId(swimlaneId);
+    isSelectedSwimlaneId(swimlaneId: any) {
+      return (Template.instance() as CardDialogInstance).dialog.isSelectedSwimlaneId(swimlaneId);
     },
-    isSelectedListId(listId) {
-      return Template.instance().dialog.isSelectedListId(listId);
+    isSelectedListId(listId: any) {
+      return (Template.instance() as CardDialogInstance).dialog.isSelectedListId(listId);
     },
-    isDialogOptionCardId(cardId) {
-      return Template.instance().dialog.isDialogOptionCardId(cardId);
+    isDialogOptionCardId(cardId: any) {
+      return (Template.instance() as CardDialogInstance).dialog.isDialogOptionCardId(cardId);
     },
-    isTitleDefault(title) {
-      return Template.instance().dialog.isTitleDefault(title);
+    isTitleDefault(title: any) {
+      return (Template.instance() as CardDialogInstance).dialog.isTitleDefault(title);
     },
   });
 
-  Template[templateName].events({
-    async 'click .js-done'(event, tpl) {
+  (Template as any)[templateName].events({
+    async 'click .js-done'(event: JQuery.TriggeredEvent, tpl: CardDialogInstance) {
       const dialog = tpl.dialog;
       // Read the target board/swimlane/list from the dialog's live reactive
       // selection rather than the DOM <select> elements.  A reactive re-render
@@ -1765,9 +1788,9 @@ function registerCardDialogTemplate(templateName) {
       const swimlaneId = dialog.selectedSwimlaneId.get();
       const listId = dialog.selectedListId.get();
 
-      const cardSelect = tpl.$('.js-select-cards')[0];
-      const cardId = cardSelect?.options?.length > 0
-        ? cardSelect.options[cardSelect.selectedIndex].value
+      const cardSelect = tpl.$('.js-select-cards')[0] as HTMLSelectElement | undefined;
+      const cardId = (cardSelect?.options?.length ?? 0) > 0
+        ? cardSelect!.options[cardSelect!.selectedIndex].value
         : null;
 
       const options = { boardId, swimlaneId, listId, cardId };
@@ -1778,20 +1801,20 @@ function registerCardDialogTemplate(templateName) {
       }
       Popup.back(2);
     },
-    'change .js-select-boards'(event, tpl) {
+    'change .js-select-boards'(event: JQuery.TriggeredEvent, tpl: CardDialogInstance) {
       tpl.dialog.getBoardData($(event.currentTarget).val());
     },
-    'change .js-select-swimlanes'(event, tpl) {
+    'change .js-select-swimlanes'(event: JQuery.TriggeredEvent, tpl: CardDialogInstance) {
       tpl.dialog.selectedSwimlaneId.set($(event.currentTarget).val());
       tpl.dialog.setFirstListId();
     },
-    'change .js-select-lists'(event, tpl) {
+    'change .js-select-lists'(event: JQuery.TriggeredEvent, tpl: CardDialogInstance) {
       tpl.dialog.selectedListId.set($(event.currentTarget).val());
       if (tpl.dialog.selectedCardId) {
         tpl.dialog.selectedCardId.set('');
       }
     },
-    'change .js-select-cards'(event, tpl) {
+    'change .js-select-cards'(event: JQuery.TriggeredEvent, tpl: CardDialogInstance) {
       if (tpl.dialog.selectedCardId) {
         tpl.dialog.selectedCardId.set($(event.currentTarget).val());
       }
@@ -1800,14 +1823,14 @@ function registerCardDialogTemplate(templateName) {
 }
 
 /** Move Card Dialog */
-Template.moveCardPopup.onCreated(function () {
+Template.moveCardPopup.onCreated(function (this: CardDialogInstance) {
   this.dialog = new BoardSwimlaneListCardDialog(this, {
     getDialogOptions() {
       return ReactiveCache.getCurrentUser().getMoveAndCopyDialogOptions();
     },
-    async setDone(cardId, options) {
+    async setDone(this: any, cardId: any, options: any) {
       const tpl = Template.instance();
-      const title = tpl.$('#move-card-title').val().trim();
+      const title = (tpl.$('#move-card-title').val() as string).trim();
       const position = tpl.$('input[name="position"]:checked').val();
 
       ReactiveCache.getCurrentUser().setMoveAndCopyDialogOption(this.currentBoardId, options);
@@ -1839,15 +1862,15 @@ Template.moveCardPopup.onCreated(function () {
 registerCardDialogTemplate('moveCardPopup');
 
 /** Copy Card Dialog */
-Template.copyCardPopup.onCreated(function () {
+Template.copyCardPopup.onCreated(function (this: CardDialogInstance) {
   this.dialog = new BoardSwimlaneListCardDialog(this, {
     getDialogOptions() {
       return ReactiveCache.getCurrentUser().getMoveAndCopyDialogOptions();
     },
-    async setDone(cardId, options) {
+    async setDone(this: any, cardId: any, options: any) {
       const tpl = Template.instance();
       const textarea = tpl.$('#copy-card-title');
-      const title = textarea.val().trim();
+      const title = (textarea.val() as string).trim();
       const position = tpl.$('input[name="position"]:checked').val();
 
       ReactiveCache.getCurrentUser().setMoveAndCopyDialogOption(this.currentBoardId, options);
@@ -1892,15 +1915,15 @@ Template.copyCardPopup.onCreated(function () {
 registerCardDialogTemplate('copyCardPopup');
 
 /** Convert Checklist-Item to card dialog */
-Template.convertChecklistItemToCardPopup.onCreated(function () {
+Template.convertChecklistItemToCardPopup.onCreated(function (this: CardDialogInstance) {
   this.dialog = new BoardSwimlaneListCardDialog(this, {
     getDialogOptions() {
       return ReactiveCache.getCurrentUser().getMoveAndCopyDialogOptions();
     },
-    async setDone(cardId, options) {
+    async setDone(this: any, cardId: any, options: any) {
       const tpl = Template.instance();
       const textarea = tpl.$('#copy-card-title');
-      const title = textarea.val().trim();
+      const title = (textarea.val() as string).trim();
       const position = tpl.$('input[name="position"]:checked').val();
 
       ReactiveCache.getCurrentUser().setMoveAndCopyDialogOption(this.currentBoardId, options);
@@ -1942,15 +1965,15 @@ Template.convertChecklistItemToCardPopup.onCreated(function () {
 registerCardDialogTemplate('convertChecklistItemToCardPopup');
 
 /** Copy many cards dialog */
-Template.copyManyCardsPopup.onCreated(function () {
+Template.copyManyCardsPopup.onCreated(function (this: CardDialogInstance) {
   this.dialog = new BoardSwimlaneListCardDialog(this, {
     getDialogOptions() {
       return ReactiveCache.getCurrentUser().getMoveAndCopyDialogOptions();
     },
-    async setDone(cardId, options) {
+    async setDone(this: any, cardId: any, options: any) {
       const tpl = Template.instance();
       const textarea = tpl.$('#copy-card-title');
-      const title = textarea.val().trim();
+      const title = (textarea.val() as string).trim();
       const position = tpl.$('input[name="position"]:checked').val();
 
       ReactiveCache.getCurrentUser().setMoveAndCopyDialogOption(this.currentBoardId, options);
@@ -1995,7 +2018,7 @@ Template.copyManyCardsPopup.onCreated(function () {
 });
 registerCardDialogTemplate('copyManyCardsPopup');
 
-Template.setCardColorPopup.onCreated(function () {
+Template.setCardColorPopup.onCreated(function (this: ColorPopupInstance) {
   const cardId = getCardId();
   this.currentCard = Cards.findOne(cardId);
   this.currentColor = new ReactiveVar(this.currentCard?.color);
@@ -2003,11 +2026,11 @@ Template.setCardColorPopup.onCreated(function () {
 
 Template.setCardColorPopup.helpers({
   colors() {
-    return ALLOWED_COLORS.map((color) => ({ color, name: '' }));
+    return ALLOWED_COLORS.map((color: any) => ({ color, name: '' }));
   },
 
-  isSelected(color) {
-    const tpl = Template.instance();
+  isSelected(color: any) {
+    const tpl = Template.instance() as ColorPopupInstance;
     if (tpl.currentColor.get() === null) {
       return color === 'white';
     }
@@ -2016,18 +2039,19 @@ Template.setCardColorPopup.helpers({
 });
 
 Template.setCardColorPopup.events({
-  'click .js-palette-color'(event, tpl) {
-    const paletteData = Blaze.getData(event.currentTarget);
+  'click .js-palette-color'(event: JQuery.TriggeredEvent, tpl: ColorPopupInstance) {
+    // Dynamic per-swatch data context holds the color value.
+    const paletteData = Blaze.getData(event.currentTarget) as any;
     tpl.currentColor.set(paletteData?.color);
   },
-  async 'click .js-submit'(event, tpl) {
+  async 'click .js-submit'(event: JQuery.TriggeredEvent, tpl: ColorPopupInstance) {
     event.preventDefault();
     const card = Cards.findOne(getCardId());
     if (!card) return;
     await card.setColor(tpl.currentColor.get());
     Popup.back();
   },
-  async 'click .js-remove-color'(event) {
+  async 'click .js-remove-color'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const card = Cards.findOne(getCardId());
     if (!card) return;
@@ -2036,31 +2060,31 @@ Template.setCardColorPopup.events({
   },
 });
 
-Template.setSelectionColorPopup.onCreated(function () {
+Template.setSelectionColorPopup.onCreated(function (this: ColorPopupInstance) {
   const selectedCards = ReactiveCache.getCards(MultiSelection.getMongoSelector());
-  const uniqueColors = [...new Set(selectedCards.map(card => card.color || null))];
+  const uniqueColors = [...new Set(selectedCards.map((card: any) => card.color || null))];
   this.currentColor = new ReactiveVar(uniqueColors.length === 1 ? uniqueColors[0] : null);
 });
 
 Template.setSelectionColorPopup.helpers({
   colors() {
-    return ALLOWED_COLORS.map((color) => ({ color, name: '' }));
+    return ALLOWED_COLORS.map((color: any) => ({ color, name: '' }));
   },
 
-  isSelected(color) {
-    return Template.instance().currentColor.get() === color;
+  isSelected(color: any) {
+    return (Template.instance() as ColorPopupInstance).currentColor.get() === color;
   },
 });
 
 Template.setSelectionColorPopup.events({
-  'click .js-palette-color'(event, tpl) {
+  'click .js-palette-color'(event: JQuery.TriggeredEvent, tpl: ColorPopupInstance) {
     // Extract color from class name like "card-details-red"
-    const classes = $(event.currentTarget).attr('class').split(' ');
-    const colorClass = classes.find(cls => cls.startsWith('card-details-'));
+    const classes = $(event.currentTarget).attr('class')!.split(' ');
+    const colorClass = classes.find((cls: string) => cls.startsWith('card-details-'));
     const color = colorClass ? colorClass.replace('card-details-', '') : null;
     tpl.currentColor.set(color);
   },
-  async 'submit form.edit-label'(event, tpl) {
+  async 'submit form.edit-label'(event: JQuery.TriggeredEvent, tpl: ColorPopupInstance) {
     event.preventDefault();
     const color = tpl.currentColor.get();
     try {
@@ -2072,11 +2096,11 @@ Template.setSelectionColorPopup.events({
       alert(error?.reason || error?.message || 'Failed to save selection color');
     }
   },
-  async 'click .js-submit'(event, tpl) {
+  async 'click .js-submit'(event: JQuery.TriggeredEvent, tpl: ColorPopupInstance) {
     event.preventDefault();
     await tpl.$('form.edit-label').trigger('submit');
   },
-  async 'click .js-remove-color'(event, tpl) {
+  async 'click .js-remove-color'(event: JQuery.TriggeredEvent, tpl: ColorPopupInstance) {
     event.preventDefault();
     try {
       for (const card of ReactiveCache.getCards(MultiSelection.getMongoSelector())) {
@@ -2089,7 +2113,7 @@ Template.setSelectionColorPopup.events({
   },
 });
 
-Template.cardMorePopup.onCreated(function () {
+Template.cardMorePopup.onCreated(function (this: CardMorePopupInstance) {
   const cardId = getCardId();
   this.currentCard = Cards.findOne(cardId);
   this.parentBoard = new ReactiveVar(null);
@@ -2107,7 +2131,7 @@ Template.cardMorePopup.onCreated(function () {
     this.parentBoard.set(null);
   }
 
-  this.setParentCardId = (cardId) => {
+  this.setParentCardId = (cardId: any) => {
     if (cardId) {
       this.parentCard = ReactiveCache.getCard(cardId);
     } else {
@@ -2134,7 +2158,7 @@ Template.cardMorePopup.helpers({
   },
 
   cards() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardMorePopupInstance;
     const currentId = getCardId();
     // #3745: don't list cards until the selected board's subscription is ready,
     // otherwise the first open shows an empty list. Depending on parentBoardReady
@@ -2151,7 +2175,7 @@ Template.cardMorePopup.helpers({
   },
 
   isParentBoard() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardMorePopupInstance;
     const board = Template.currentData();
     if (tpl.parentBoard.get()) {
       return board._id === tpl.parentBoard.get();
@@ -2160,7 +2184,7 @@ Template.cardMorePopup.helpers({
   },
 
   isParentCard() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardMorePopupInstance;
     const card = Template.currentData();
     if (tpl.parentCard) {
       return card._id === tpl.parentCard;
@@ -2170,8 +2194,8 @@ Template.cardMorePopup.helpers({
 });
 
 Template.cardMorePopup.events({
-  'click .js-copy-card-link-to-clipboard'(event, tpl) {
-    const promise = Utils.copyTextToClipboard(location.origin + document.getElementById('cardURL').value);
+  'click .js-copy-card-link-to-clipboard'(event: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
+    const promise = Utils.copyTextToClipboard(location.origin + (document.getElementById('cardURL') as HTMLInputElement).value);
 
     const $tooltip = tpl.$('.copied-tooltip');
     Utils.showCopied(promise, $tooltip);
@@ -2198,7 +2222,7 @@ Template.cardMorePopup.events({
     }
     Utils.goBoardId(card.boardId);
   }),
-  'change .js-field-parent-board'(event, tpl) {
+  'change .js-field-parent-board'(event: JQuery.TriggeredEvent, tpl: CardMorePopupInstance) {
     const selection = $(event.currentTarget).val();
     const list = $('.js-field-parent-card');
     if (selection === 'none') {
@@ -2217,13 +2241,13 @@ Template.cardMorePopup.events({
     }
     tpl.setParentCardId(null);
   },
-  'change .js-field-parent-card'(event, tpl) {
+  'change .js-field-parent-card'(event: JQuery.TriggeredEvent, tpl: CardMorePopupInstance) {
     const selection = $(event.currentTarget).val();
     tpl.setParentCardId(selection);
   },
 });
 
-Template.cardStartVotingPopup.onCreated(function () {
+Template.cardStartVotingPopup.onCreated(function (this: any) {
   const cardId = getCardId();
   this.currentCard = Cards.findOne(cardId);
   this.voteQuestion = new ReactiveVar(this.currentCard?.voteQuestion);
@@ -2250,7 +2274,7 @@ Template.cardStartVotingPopup.helpers({
 
 Template.cardStartVotingPopup.events({
   'click .js-end-date': Popup.open('editVoteEndDate'),
-  'submit .edit-vote-question'(evt) {
+  'submit .edit-vote-question'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     const card = Cards.findOne(getCardId());
     if (!card) return;
@@ -2272,11 +2296,11 @@ Template.cardStartVotingPopup.events({
     Meteor.call('cards.unsetVote', card._id);
     Popup.back();
   }),
-  'click a.js-toggle-vote-public'(event) {
+  'click a.js-toggle-vote-public'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     $('#vote-public').toggleClass('is-checked');
   },
-  'click a.js-toggle-vote-allow-non-members'(event) {
+  'click a.js-toggle-vote-allow-non-members'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     $('#vote-allow-non-members').toggleClass('is-checked');
   },
@@ -2311,7 +2335,7 @@ Template.cardArchivePopup.helpers({
 });
 
 // editVoteEndDatePopup
-Template.editVoteEndDatePopup.onCreated(function () {
+Template.editVoteEndDatePopup.onCreated(function (this: EditDatePopupInstance) {
   const card = Cards.findOne(getCardId());
   setupDatePicker(this, {
     defaultTime: formatDateTime(now()),
@@ -2319,22 +2343,22 @@ Template.editVoteEndDatePopup.onCreated(function () {
   });
 });
 
-Template.editVoteEndDatePopup.onRendered(function () {
+Template.editVoteEndDatePopup.onRendered(function (this: EditDatePopupInstance) {
   datePickerRendered(this);
 });
 
 Template.editVoteEndDatePopup.helpers(datePickerHelpers());
 
 Template.editVoteEndDatePopup.events(datePickerEvents({
-  storeDate(date) {
+  storeDate(this: any, date: Date) {
     Meteor.call('cards.setVoteEnd', this.datePicker.card._id, date);
   },
-  deleteDate() {
+  deleteDate(this: any) {
     Meteor.call('cards.unsetVoteEnd', this.datePicker.card._id);
   },
 }));
 
-Template.cardStartPlanningPokerPopup.onCreated(function () {
+Template.cardStartPlanningPokerPopup.onCreated(function (this: any) {
   const cardId = getCardId();
   this.currentCard = Cards.findOne(cardId);
   this.pokerQuestion = new ReactiveVar(this.currentCard?.pokerQuestion);
@@ -2357,7 +2381,7 @@ Template.cardStartPlanningPokerPopup.helpers({
 
 Template.cardStartPlanningPokerPopup.events({
   'click .js-end-date': Popup.open('editPokerEndDate'),
-  'submit .edit-poker-question'(evt) {
+  'submit .edit-poker-question'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     const card = Cards.findOne(getCardId());
     if (!card) return;
@@ -2379,14 +2403,14 @@ Template.cardStartPlanningPokerPopup.events({
     Meteor.call('cards.unsetPoker', card._id);
     Popup.back();
   }),
-  'click a.js-toggle-poker-allow-non-members'(event) {
+  'click a.js-toggle-poker-allow-non-members'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     $('#poker-allow-non-members').toggleClass('is-checked');
   },
 });
 
 // editPokerEndDatePopup
-Template.editPokerEndDatePopup.onCreated(function () {
+Template.editPokerEndDatePopup.onCreated(function (this: EditDatePopupInstance) {
   const card = Cards.findOne(getCardId());
   setupDatePicker(this, {
     defaultTime: formatDateTime(now()),
@@ -2394,17 +2418,17 @@ Template.editPokerEndDatePopup.onCreated(function () {
   });
 });
 
-Template.editPokerEndDatePopup.onRendered(function () {
+Template.editPokerEndDatePopup.onRendered(function (this: EditDatePopupInstance) {
   datePickerRendered(this);
 });
 
 Template.editPokerEndDatePopup.helpers(datePickerHelpers());
 
 Template.editPokerEndDatePopup.events(datePickerEvents({
-  storeDate(date) {
+  storeDate(this: any, date: Date) {
     Meteor.call('cards.setPokerEnd', this.datePicker.card._id, date);
   },
-  deleteDate() {
+  deleteDate(this: any) {
     Meteor.call('cards.unsetPokerEnd', this.datePicker.card._id);
   },
 }));
@@ -2421,7 +2445,7 @@ EscapeActions.register(
         const cardDetailsElement = getCardDetailsElement(currentCard?._id);
         const currentDescription = cardDetailsElement?.querySelector(
           '.editor.js-new-description-input',
-        );
+        ) as HTMLInputElement | null | undefined;
         if (currentDescription?.value && currentCard && !(currentDescription.value === currentCard.getDescription())) {
           if (confirm(TAPi18n.__('rescue-card-description-dialogue'))) {
             await currentCard.setDescription(currentDescription.value);
@@ -2443,7 +2467,9 @@ EscapeActions.register(
       typeof window !== 'undefined' && window.getSelection
         ? window.getSelection()
         : null,
-      getCardDetailsElement(getCurrentCardFromContext()?._id),
+      // A real DOM Element satisfies cardCloseGuard's DOM-light shape; the cast
+      // bridges the intentionally narrow { contains? } interface it expects.
+      getCardDetailsElement(getCurrentCardFromContext()?._id) as { contains?: (node: object | null) => boolean } | null,
     );
     if (Session.get('cardDetailsIsDragging') || selectingInsideCard) {
       // Reset dragging status as the mouse landed outside the cardDetails template area and this will prevent a mousedown event from firing
@@ -2463,28 +2489,28 @@ EscapeActions.register(
   },
 );
 
-Template.cardAssigneesPopup.onCreated(function () {
+Template.cardAssigneesPopup.onCreated(function (this: MembersReactivePopupInstance) {
   let currBoard = Utils.getCurrentBoard();
   let members = currBoard.activeMembers();
   this.members = new ReactiveVar(members);
 });
 
 Template.cardAssigneesPopup.events({
-  'click .js-select-assignee'(event) {
+  'click .js-select-assignee'(this: any, event: JQuery.TriggeredEvent) {
     const card = getCurrentCardFromContext();
     if (!card) return;
     const assigneeId = this.userId;
     card.toggleAssignee(assigneeId);
     event.preventDefault();
   },
-  'keyup .card-assignees-filter'(event) {
+  'keyup .card-assignees-filter'(event: JQuery.TriggeredEvent) {
     const members = filterMembers(event.target.value);
-    Template.instance().members.set(members);
+    (Template.instance() as MembersReactivePopupInstance).members.set(members);
   },
 });
 
 Template.cardAssigneesPopup.helpers({
-  isCardAssignee() {
+  isCardAssignee(this: any) {
     const card = getCurrentCardFromContext();
     if (!card) return false;
     const cardAssignees = card.getAssignees();
@@ -2493,9 +2519,9 @@ Template.cardAssigneesPopup.helpers({
   },
 
   members() {
-    const members = Template.instance().members.get();
+    const members = (Template.instance() as MembersReactivePopupInstance).members.get();
     const uniqueMembers = uniqBy(members, 'userId');
-    return [...uniqueMembers].sort((a, b) => {
+    return [...uniqueMembers].sort((a: any, b: any) => {
       const userA = ReactiveCache.getUser(a.userId);
       const userB = ReactiveCache.getUser(b.userId);
       const nameA = userA ? userA.profile.fullname : '';
@@ -2504,13 +2530,13 @@ Template.cardAssigneesPopup.helpers({
     });
   },
 
-  userData() {
+  userData(this: any) {
     return ReactiveCache.getUser(this.userId);
   },
 });
 
 Template.cardAssigneePopup.helpers({
-  userData() {
+  userData(this: any) {
     return ReactiveCache.getUser(this.userId, {
       fields: {
         profile: 1,
@@ -2519,12 +2545,12 @@ Template.cardAssigneePopup.helpers({
     });
   },
 
-  memberType() {
+  memberType(this: any) {
     const user = ReactiveCache.getUser(this.userId);
     return user && user.isBoardAdmin() ? 'admin' : 'normal';
   },
 
-  isCardAssignee() {
+  isCardAssignee(this: any) {
     const card = getCurrentCardFromContext();
     if (!card) return false;
     const cardAssignees = card.getAssignees();
@@ -2532,13 +2558,13 @@ Template.cardAssigneePopup.helpers({
     return (cardAssignees || []).includes(this.userId);
   },
 
-  user() {
+  user(this: any) {
     return ReactiveCache.getUser(this.userId);
   },
 });
 
 Template.cardAssigneePopup.events({
-  'click .js-remove-assignee'() {
+  'click .js-remove-assignee'(this: any) {
     ReactiveCache.getCard(this.cardId).unassignAssignee(this.userId);
     Popup.back();
   },
@@ -2548,7 +2574,7 @@ Template.cardAssigneePopup.events({
 // #3392: PI Program Board "Red Strings". Popup to pick another card on the
 // same board to add as a dependency. The popup's data context is the source
 // card (set by Popup.open on the .js-add-dependency element inside cardDetails).
-Template.cardDependenciesPopup.onCreated(function () {
+Template.cardDependenciesPopup.onCreated(function (this: DependenciesPopupInstance) {
   this.searchTerm = new ReactiveVar('');
   this.newType = new ReactiveVar(DEPENDENCY_TYPES[0].id);
   this.newColor = new ReactiveVar(DEFAULT_DEPENDENCY_COLOR);
@@ -2556,10 +2582,10 @@ Template.cardDependenciesPopup.onCreated(function () {
 
 Template.cardDependenciesPopup.helpers({
   defaultColor() {
-    return Template.instance().newColor.get();
+    return (Template.instance() as DependenciesPopupInstance).newColor.get();
   },
   typeOption() {
-    const current = Template.instance().newType.get();
+    const current = (Template.instance() as DependenciesPopupInstance).newType.get();
     return DEPENDENCY_TYPES.map(t => ({
       id: t.id,
       label: `dependency-type-${t.id}`,
@@ -2569,16 +2595,16 @@ Template.cardDependenciesPopup.helpers({
   candidateCards() {
     const sourceCard = Template.currentData();
     if (!sourceCard) return [];
-    const term = Template.instance().searchTerm.get().toLowerCase();
+    const term = (Template.instance() as DependenciesPopupInstance).searchTerm.get().toLowerCase();
     const existingIds = (sourceCard.getDependencies
       ? sourceCard.getDependencies()
       : []
-    ).map(dep => dep.cardId);
+    ).map((dep: any) => dep.cardId);
     const cards = ReactiveCache.getCards({
       boardId: sourceCard.boardId,
       archived: false,
     });
-    return cards.filter(card => {
+    return cards.filter((card: any) => {
       if (card._id === sourceCard._id) return false;
       if (existingIds.includes(card._id)) return false;
       if (term && !(card.title || '').toLowerCase().includes(term)) return false;
@@ -2588,18 +2614,18 @@ Template.cardDependenciesPopup.helpers({
 });
 
 Template.cardDependenciesPopup.events({
-  'keyup .js-dependency-search'(event) {
-    Template.instance().searchTerm.set(event.currentTarget.value || '');
+  'keyup .js-dependency-search'(event: JQuery.TriggeredEvent) {
+    (Template.instance() as DependenciesPopupInstance).searchTerm.set(event.currentTarget.value || '');
   },
-  'change .js-new-dependency-type'(event) {
-    Template.instance().newType.set(event.currentTarget.value);
+  'change .js-new-dependency-type'(event: JQuery.TriggeredEvent) {
+    (Template.instance() as DependenciesPopupInstance).newType.set(event.currentTarget.value);
   },
-  'change .js-new-dependency-color'(event) {
-    Template.instance().newColor.set(event.currentTarget.value);
+  'change .js-new-dependency-color'(event: JQuery.TriggeredEvent) {
+    (Template.instance() as DependenciesPopupInstance).newColor.set(event.currentTarget.value);
   },
-  'click .js-pick-dependency'(event) {
+  'click .js-pick-dependency'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
-    const tpl = Template.instance();
+    const tpl = Template.instance() as DependenciesPopupInstance;
     const sourceCard = Template.currentData();
     const targetId = event.currentTarget.dataset.targetId;
     if (sourceCard && targetId) {
@@ -2617,12 +2643,12 @@ Template.cardDependenciesPopup.events({
 // .js-dependency-icon click handler.
 Template.cardDependencyIconPopup.helpers({
   dependencyIcons() {
-    return DEPENDENCY_ICON_CHOICES.map(name => ({ name }));
+    return DEPENDENCY_ICON_CHOICES.map((name: any) => ({ name }));
   },
 });
 
 Template.cardDependencyIconPopup.events({
-  'click .js-pick-dependency-icon'(event) {
+  'click .js-pick-dependency-icon'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     // Use the source card captured when the picker was opened (the popup's own
     // data context is the dependency row, which has no setDependencyProps).
@@ -2636,3 +2662,84 @@ Template.cardDependencyIconPopup.events({
     Popup.back();
   },
 });
+
+// Coordinates (and optional place name / address) extracted from a map link.
+interface ParsedMapLink {
+  latitude?: number;
+  longitude?: number;
+  name?: string;
+  address?: string;
+}
+
+interface CardDetailsInstance extends Blaze.TemplateInstance {
+  // Board doc for the card; used to read presentParentTask.
+  currentBoard: any;
+  isLoaded: ReactiveVar<boolean>;
+  infiniteScrolling: InfiniteScrolling;
+  calculateNextPeak: () => void;
+  reachNextPeak: () => void;
+}
+
+interface ExportCardPopupInstance extends Blaze.TemplateInstance {
+  excelFields: ReactiveDict<Record<string, boolean>>;
+}
+
+interface InlinedCardDescriptionInstance extends Blaze.TemplateInstance {
+  isOpen: ReactiveVar<boolean>;
+  // The following mirror the inlinedForm helper contract used at runtime.
+  _getUnsavedEditKey: () => any;
+  _getValue: () => any;
+  _close: (isReset?: boolean) => void;
+  _reset: () => void;
+}
+
+interface FilterTermPopupInstance extends Blaze.TemplateInstance {
+  filterTerm: ReactiveVar<string>;
+}
+
+interface CardLocationsPopupInstance extends Blaze.TemplateInstance {
+  // Card id resolved from the popup's data context.
+  cardId: any;
+  detectMsg: ReactiveVar<string>;
+  mapSavedMsg: ReactiveVar<string>;
+}
+
+interface CardDialogInstance extends Blaze.TemplateInstance {
+  // BoardSwimlaneListCardDialog instance (untyped helper class).
+  dialog: any;
+}
+
+interface ColorPopupInstance extends Blaze.TemplateInstance {
+  // Selected color reactive var; holds a color string or null.
+  currentColor: ReactiveVar<any>;
+  // Card doc when editing a single card's color.
+  currentCard?: any;
+}
+
+interface CardMorePopupInstance extends Blaze.TemplateInstance {
+  // Card doc for the open card.
+  currentCard: any;
+  // Selected parent board id (or null).
+  parentBoard: ReactiveVar<any>;
+  parentBoardReady: ReactiveVar<boolean>;
+  // Parent card doc (or null).
+  parentCard: any;
+  setParentCardId: (cardId: any) => void;
+}
+
+interface MembersReactivePopupInstance extends Blaze.TemplateInstance {
+  // Reactive list of board members (active member docs).
+  members: ReactiveVar<any>;
+}
+
+interface DependenciesPopupInstance extends Blaze.TemplateInstance {
+  searchTerm: ReactiveVar<string>;
+  // Selected dependency type/color values.
+  newType: ReactiveVar<any>;
+  newColor: ReactiveVar<any>;
+}
+
+interface EditDatePopupInstance extends Blaze.TemplateInstance {
+  // Shared datepicker state attached by setupDatePicker.
+  datePicker: any;
+}
