@@ -8,6 +8,7 @@ Package.describe({
 
 Package.onUse(function(api) {
   api.versionsFrom(['2.16', '3.0']);
+  api.use('typescript');
   api.use('accounts-base', ['client', 'server']);
   // Export Accounts (etc) to packages using this one.
   api.imply('accounts-base', ['client', 'server']);
@@ -16,5 +17,5 @@ Package.onUse(function(api) {
 
   api.addFiles('oidc_login_button.css', 'client');
 
-  api.addFiles('oidc.js');
+  api.addFiles('oidc.ts');
 });
