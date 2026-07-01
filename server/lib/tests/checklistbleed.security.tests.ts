@@ -27,20 +27,22 @@ describe('ChecklistBleed — checklist/item cross-board move deny rules (GHSA-gv
     members: [{ userId: 'victim', isActive: true, isNoComments: false, isCommentOnly: false, isWorker: false, isReadOnly: false, isReadAssignedOnly: false }],
   };
 
-  const boards = { sourceBoard, victimBoard };
-  const cards = {
+  const boards: Record<string, BleedBoard> = { sourceBoard, victimBoard };
+  const cards: Record<string, BleedCard> = {
     attackerCard: { _id: 'attackerCard', boardId: 'sourceBoard' },
     victimCard: { _id: 'victimCard', boardId: 'victimBoard' },
   };
-  const checklists = {
+  const checklists: Record<string, BleedChecklist> = {
     victimChecklist: { _id: 'victimChecklist', cardId: 'victimCard' },
     attackerChecklist: { _id: 'attackerChecklist', cardId: 'attackerCard' },
   };
 
   beforeEach(function() {
-    sinon.stub(Boards, 'findOneAsync').callsFake(async id => boards[id] || null);
-    sinon.stub(Cards, 'findOneAsync').callsFake(async id => cards[id] || null);
-    sinon.stub(Checklists, 'findOneAsync').callsFake(async id => checklists[id] || null);
+    // sinon types the stubbed selector arg as a Mongo query; the fixtures are
+    // keyed by their string id, so coerce with String() before the lookup.
+    sinon.stub(Boards, 'findOneAsync').callsFake(async id => boards[String(id)] || null);
+    sinon.stub(Cards, 'findOneAsync').callsFake(async id => cards[String(id)] || null);
+    sinon.stub(Checklists, 'findOneAsync').callsFake(async id => checklists[String(id)] || null);
   });
 
   afterEach(function() {
@@ -91,3 +93,28 @@ describe('ChecklistBleed — checklist/item cross-board move deny rules (GHSA-gv
     });
   });
 });
+
+// Fixture shapes keyed by id in the findOneAsync stubs above.
+interface BleedBoardMember {
+  userId: string;
+  isActive: boolean;
+  isNoComments: boolean;
+  isCommentOnly: boolean;
+  isWorker: boolean;
+  isReadOnly: boolean;
+  isReadAssignedOnly: boolean;
+}
+
+interface BleedBoard {
+  members: BleedBoardMember[];
+}
+
+interface BleedCard {
+  _id: string;
+  boardId: string;
+}
+
+interface BleedChecklist {
+  _id: string;
+  cardId: string;
+}

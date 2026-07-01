@@ -250,6 +250,9 @@ interface UpdateModifier {
     boardId?: string;
     cardId?: string;
     checklistId?: string;
+    // A Mongo `$set` may carry any other document fields (e.g. `title`); only
+    // the move-related ids above are inspected by the deny helpers.
+    [field: string]: string | undefined;
   };
 }
 

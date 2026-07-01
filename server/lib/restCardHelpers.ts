@@ -18,9 +18,11 @@
  * @param {number[]} existingSorts sort values of the cards already in the list
  * @returns {number} a sort value placing the card on top
  */
-export function computeTopSort(existingSorts: number[]) {
+export function computeTopSort(
+  existingSorts: (number | string | null | undefined)[] | string | null | undefined,
+) {
   const sorts = (Array.isArray(existingSorts) ? existingSorts : [])
-    .filter(s => typeof s === 'number' && !Number.isNaN(s));
+    .filter((s): s is number => typeof s === 'number' && !Number.isNaN(s));
   if (sorts.length === 0) {
     return 0;
   }

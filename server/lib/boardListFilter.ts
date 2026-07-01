@@ -20,7 +20,7 @@ export function isCaretWrappedTitle(title: any) {
 
 // A board is visible to users only when it is a real `'board'` and its title is
 // not caret-wrapped.
-export function isUserVisibleBoard(board: BoardLike | null | undefined) {
+export function isUserVisibleBoard(board: BoardLike | string | null | undefined): board is BoardLike {
   if (!board || typeof board !== 'object') {
     return false;
   }
@@ -34,7 +34,7 @@ export function isUserVisibleBoard(board: BoardLike | null | undefined) {
 }
 
 // Filter an array of boards down to the user-visible ones.
-export function filterUserBoards(boards: Array<BoardLike | null | undefined>) {
+export function filterUserBoards(boards: Array<BoardLike | null | undefined> | null | undefined) {
   if (!Array.isArray(boards)) {
     return [];
   }
@@ -42,6 +42,7 @@ export function filterUserBoards(boards: Array<BoardLike | null | undefined>) {
 }
 
 interface BoardLike {
+  _id?: string;
   type?: string;
   title?: string;
 }

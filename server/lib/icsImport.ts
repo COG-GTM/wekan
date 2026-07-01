@@ -25,7 +25,7 @@
  * @param {string} icsText raw .ics text
  * @returns {string[]} array of logical (unfolded) lines
  */
-function unfoldLines(icsText: string) {
+function unfoldLines(icsText: string | null | undefined) {
   if (typeof icsText !== 'string' || icsText.length === 0) {
     return [];
   }
@@ -188,7 +188,7 @@ function parseIcsDate(value: string) {
  * @param {string} icsText raw .ics file contents
  * @returns {Array<{ summary: string, description: string, start: Date|null, end: Date|null, uid: string }>}
  */
-export function parseIcs(icsText: string) {
+export function parseIcs(icsText: string | null | undefined) {
   const lines = unfoldLines(icsText);
   if (lines.length === 0) {
     return [];
@@ -260,7 +260,7 @@ export function parseIcs(icsText: string) {
  * @returns {{ title: string, description: string, startAt: Date|null, dueAt: Date|null, boardId: (string|undefined), listId: (string|undefined), swimlaneId: (string|undefined) }}
  */
 export function icsEventToCard(
-  event: IcsEvent | null | undefined,
+  event: Partial<IcsEvent> | null | undefined,
   { boardId, listId, swimlaneId }: IcsCardOpts = {},
 ) {
   const safeEvent: Partial<IcsEvent> = event || {};
@@ -283,7 +283,7 @@ export function icsEventToCard(
  * @param {Object} [opts] passed through to icsEventToCard ({ boardId, listId, swimlaneId })
  * @returns {Array<Object>} array of card-shaped objects
  */
-export function icsToCards(icsText: string, opts?: IcsCardOpts) {
+export function icsToCards(icsText: string | null | undefined, opts?: IcsCardOpts) {
   return parseIcs(icsText).map(event => icsEventToCard(event, opts));
 }
 

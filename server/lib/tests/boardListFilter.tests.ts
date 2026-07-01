@@ -79,7 +79,8 @@ describe('#5582 boardListFilter', function () {
     it('returns an empty array for non-array input', function () {
       expect(filterUserBoards(null)).to.deep.equal([]);
       expect(filterUserBoards(undefined)).to.deep.equal([]);
-      expect(filterUserBoards({})).to.deep.equal([]);
+      // Deliberately non-array input to exercise the Array.isArray guard.
+      expect(filterUserBoards({} as Parameters<typeof filterUserBoards>[0])).to.deep.equal([]);
     });
   });
 });

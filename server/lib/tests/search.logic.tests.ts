@@ -13,7 +13,7 @@ describe('search logic', function() {
   // --- Text matching helper (used by board search filter) ---
 
   describe('card title text matching', function() {
-    function titleMatches(cardTitle, query) {
+    function titleMatches(cardTitle: string, query: string) {
       return cardTitle.toLowerCase().includes(query.toLowerCase());
     }
 
@@ -45,7 +45,7 @@ describe('search logic', function() {
   // --- Board membership access control (affects search scope) ---
 
   describe('search scope: board membership', function() {
-    function userCanSeeBoard(userId, boardMembers) {
+    function userCanSeeBoard(userId: string, boardMembers: SearchBoardMember[]) {
       return boardMembers.some(m => m.userId === userId && m.isActive);
     }
 
@@ -79,7 +79,7 @@ describe('search logic', function() {
   // --- Filter: archived cards should not appear in search results ---
 
   describe('search filter: archived cards', function() {
-    function filterCards(cards, { includeArchived = false } = {}) {
+    function filterCards(cards: SearchCard[], { includeArchived = false } = {}) {
       return cards.filter(c => includeArchived || !c.archived);
     }
 
@@ -103,7 +103,7 @@ describe('search logic', function() {
   // --- Global search: relevance (all matching, none non-matching) ---
 
   describe('global search: result relevance', function() {
-    function globalSearch(cards, query) {
+    function globalSearch(cards: SearchCard[], query: string) {
       const q = query.toLowerCase();
       return cards.filter(c => c.title.toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q));
     }
@@ -136,3 +136,18 @@ describe('search logic', function() {
     });
   });
 });
+
+// A board member as seen by the search-scope visibility check.
+interface SearchBoardMember {
+  userId: string;
+  isActive: boolean;
+  isAdmin?: boolean;
+}
+
+// A card fixture used by the archived-card and global-search filters.
+interface SearchCard {
+  _id: string;
+  title: string;
+  archived?: boolean;
+  description?: string;
+}

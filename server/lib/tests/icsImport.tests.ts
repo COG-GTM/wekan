@@ -4,7 +4,7 @@ import { parseIcs, icsEventToCard, icsToCards } from '../icsImport';
 
 // Small helpers for building .ics fixtures. Lines are joined with CRLF, which
 // is what real-world .ics files (including Google Calendar exports) use.
-function ics(...lines) {
+function ics(...lines: string[]) {
   return lines.join('\r\n');
 }
 
@@ -31,8 +31,8 @@ describe('icsImport', function() {
       expect(ev.summary).to.equal('Team meeting');
       expect(ev.description).to.equal('Discuss roadmap');
       expect(ev.start).to.be.instanceOf(Date);
-      expect(ev.start.toISOString()).to.equal('2026-01-01T09:00:00.000Z');
-      expect(ev.end.toISOString()).to.equal('2026-01-01T10:00:00.000Z');
+      expect(ev.start!.toISOString()).to.equal('2026-01-01T09:00:00.000Z');
+      expect(ev.end!.toISOString()).to.equal('2026-01-01T10:00:00.000Z');
     });
 
     it('parses multiple events', function() {
@@ -66,8 +66,8 @@ describe('icsImport', function() {
 
       const events = parseIcs(text);
       expect(events).to.have.lengthOf(1);
-      expect(events[0].start.toISOString()).to.equal('2026-12-25T00:00:00.000Z');
-      expect(events[0].end.toISOString()).to.equal('2026-12-26T00:00:00.000Z');
+      expect(events[0].start!.toISOString()).to.equal('2026-12-25T00:00:00.000Z');
+      expect(events[0].end!.toISOString()).to.equal('2026-12-26T00:00:00.000Z');
     });
 
     it('distinguishes date vs date-time (Z) forms', function() {
@@ -79,8 +79,8 @@ describe('icsImport', function() {
       );
 
       const events = parseIcs(text);
-      expect(events[0].start.toISOString()).to.equal('2026-03-01T00:00:00.000Z');
-      expect(events[0].end.toISOString()).to.equal('2026-03-01T13:30:00.000Z');
+      expect(events[0].start!.toISOString()).to.equal('2026-03-01T00:00:00.000Z');
+      expect(events[0].end!.toISOString()).to.equal('2026-03-01T13:30:00.000Z');
     });
 
     it('unfolds RFC5545 folded lines (leading space or tab)', function() {
@@ -214,7 +214,7 @@ describe('icsImport', function() {
       // No DTEND -> dueAt falls back to start.
       expect(cards[0].dueAt).to.deep.equal(cards[0].startAt);
       expect(cards[1].title).to.equal('Card B');
-      expect(cards[1].dueAt.toISOString()).to.equal('2026-02-02T10:00:00.000Z');
+      expect(cards[1].dueAt!.toISOString()).to.equal('2026-02-02T10:00:00.000Z');
       expect(cards[1].boardId).to.equal('b1');
     });
 

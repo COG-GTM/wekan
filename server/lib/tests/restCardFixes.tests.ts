@@ -98,13 +98,13 @@ describe('REST card fixes helpers', function() {
     it('parses an ISO 8601 string into a Date', function() {
       const d = parseCardDate('2026-06-20T12:00:00.000Z');
       expect(d).to.be.an.instanceof(Date);
-      expect(d.toISOString()).to.equal('2026-06-20T12:00:00.000Z');
+      expect(d!.toISOString()).to.equal('2026-06-20T12:00:00.000Z');
     });
 
     it('parses a date-only ISO string', function() {
       const d = parseCardDate('2026-06-20');
       expect(d).to.be.an.instanceof(Date);
-      expect(Number.isNaN(d.getTime())).to.equal(false);
+      expect(Number.isNaN(d!.getTime())).to.equal(false);
     });
 
     it('returns a Date unchanged', function() {
@@ -114,8 +114,8 @@ describe('REST card fixes helpers', function() {
 
     it('parses a numeric epoch (number and numeric string)', function() {
       const ms = Date.UTC(2026, 0, 1);
-      expect(parseCardDate(ms).getTime()).to.equal(ms);
-      expect(parseCardDate(String(ms)).getTime()).to.equal(ms);
+      expect(parseCardDate(ms)!.getTime()).to.equal(ms);
+      expect(parseCardDate(String(ms))!.getTime()).to.equal(ms);
     });
 
     it('returns null for empty / clear-style values', function() {
