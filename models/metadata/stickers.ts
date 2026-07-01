@@ -48,7 +48,7 @@ const STICKER_ICONS = [
 
 // Trello built-in sticker name => Font Awesome (v4) icon name. Unknown Trello
 // stickers fall back to a generic note sticker.
-const TRELLO_STICKER_TO_FA = {
+const TRELLO_STICKER_TO_FA: Record<string, string> = {
   thumbsup: 'thumbs-up',
   thumbsdown: 'thumbs-down',
   heart: 'heart',
@@ -78,7 +78,7 @@ const TRELLO_STICKER_PACK_HIGHLIGHT = { taco: 'underline', pete: 'round' };
 // Highlight style for an imported sticker icon, derived from its Trello pack
 // name (taco => 'underline', pete => 'round'), or undefined for stickers that
 // belong to no named pack.
-function trelloStickerHighlight(name) {
+function trelloStickerHighlight(name?: string) {
   if (!name) return undefined;
   const n = String(name).toLowerCase();
   if (n.includes('taco')) return TRELLO_STICKER_PACK_HIGHLIGHT.taco;
@@ -132,7 +132,7 @@ const STICKER_KEYWORD_TO_FA = [
 // Map a Trello sticker name (sticker.image) to a similar Font Awesome icon:
 // exact built-in name first, then a keyword/substring match for the named
 // premium packs, then a generic note sticker for custom (image-only) stickers.
-function trelloStickerToFa(name) {
+function trelloStickerToFa(name?: string) {
   if (!name) return DEFAULT_STICKER_ICON;
   const n = String(name).toLowerCase();
   if (TRELLO_STICKER_TO_FA[n]) return TRELLO_STICKER_TO_FA[n];

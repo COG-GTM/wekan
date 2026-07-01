@@ -39,23 +39,23 @@ import {
 
 // provider -> { storage, bucketName, read, write } where `storage` is the
 // adapter instance (it exposes the same methods the Storage wrapper would).
-const adapters = {};
+const adapters: Record<string, CloudAdapter> = {};
 
 // The exported adapter class name per provider, used after require().
-const ADAPTER_CLASS_NAME = {
+const ADAPTER_CLASS_NAME: Record<string, string> = {
   [STORAGE_NAME_S3]: 'AdapterAmazonS3',
   [STORAGE_NAME_AZURE]: 'AdapterAzureBlob',
   [STORAGE_NAME_GCS]: 'AdapterGoogleCloud',
 };
 
 // Cache of loaded adapter classes (null = tried and unavailable).
-const adapterClassCache = {};
+const adapterClassCache: Record<string, StorageAdapterConstructor | null> = {};
 
 /**
  * Load a provider's adapter class. Uses a literal-string require per provider
  * so the bundler includes the package (no dynamic-expression require).
  */
-function loadAdapterClass(provider) {
+function loadAdapterClass(provider: string) {
   if (Object.prototype.hasOwnProperty.call(adapterClassCache, provider)) {
     return adapterClassCache[provider];
   }
@@ -95,7 +95,7 @@ function loadAdapterClass(provider) {
  *
  * Note: the field is `type` (storage-abstraction v2.x), not `provider`.
  */
-function buildProviderConfig(provider, cfg) {
+function buildProviderConfig(provider: string, cfg?: CloudProviderConfig | null) {
   if (!cfg) {
     return null;
   }
@@ -104,7 +104,7 @@ function buildProviderConfig(provider, cfg) {
     if (!cfg.bucket || !cfg.accessKeyId || !cfg.secretAccessKey) {
       return null;
     }
-    const config = {
+    const config: Record<string, any> = {
       type: 's3',
       bucketName: cfg.bucket,
       accessKeyId: cfg.accessKeyId,
@@ -146,7 +146,7 @@ function buildProviderConfig(provider, cfg) {
     if (!cfg.bucket) {
       return null;
     }
-    const config = {
+    const config: Record<string, any> = {
       type: 'gcs',
       bucketName: cfg.bucket,
     };
@@ -179,7 +179,7 @@ function buildProviderConfig(provider, cfg) {
  * Catch obviously-wrong cloud config before the adapter turns it into a cryptic
  * "Invalid URL". Returns a human-friendly error string, or null when it looks OK.
  */
-function validateCloudConfig(provider, cfg) {
+function validateCloudConfig(provider: string, cfg?: CloudProviderConfig | null) {
   if (!cfg) {
     return 'Configuration is empty';
   }
@@ -209,7 +209,7 @@ function validateCloudConfig(provider, cfg) {
 }
 
 /** Construct a provider adapter instance from its WeKan config, or null. */
-function createAdapterInstance(provider, cfg) {
+function createAdapterInstance(provider: string, cfg?: CloudProviderConfig | null) {
   const AdapterClass = loadAdapterClass(provider);
   if (!AdapterClass) {
     return null;
@@ -232,7 +232,7 @@ function createAdapterInstance(provider, cfg) {
   }
 }
 
-function buildAdapter(provider, cfg) {
+function buildAdapter(provider: string, cfg: CloudProviderConfig) {
   const instance = createAdapterInstance(provider, cfg);
   if (!instance) {
     return null;
@@ -276,17 +276,17 @@ export async function refreshCloudStorageFromSettings() {
 }
 
 /** Returns the cached adapter ({ storage, bucketName, read, write }) or null. */
-export function getCloudAdapter(provider) {
+export function getCloudAdapter(provider: string): CloudAdapter | null {
   return adapters[provider] || null;
 }
 
 /** True when the given provider has a usable, configured adapter. */
-export function isCloudConfigured(provider) {
+export function isCloudConfigured(provider: string) {
   return !!adapters[provider];
 }
 
 /** True for any storage name backed by the cloud abstraction. */
-export function isCloudStorageName(storageName) {
+export function isCloudStorageName(storageName: string) {
   return CLOUD_STORAGE_NAMES.includes(storageName);
 }
 
@@ -294,7 +294,7 @@ export function isCloudStorageName(storageName) {
  * Try to reach a provider with the given (possibly unsaved) config by listing
  * its bucket. Returns { ok, error }. Used by the "Test connection" button.
  */
-export async function testCloudConnection(provider, cfg) {
+export async function testCloudConnection(provider: string, cfg: CloudProviderConfig) {
   // Build the instance step by step so the actual reason is reported to the
   // admin instead of a single generic message.
   const AdapterClass = loadAdapterClass(provider);
@@ -309,7 +309,7 @@ export async function testCloudConnection(provider, cfg) {
   if (!config) {
     return { ok: false, error: 'Incomplete configuration: required fields are missing' };
   }
-  let instance;
+  let instance: StorageAdapterInstance;
   try {
     instance = new AdapterClass(config);
   } catch (error) {
@@ -333,4 +333,52 @@ export async function testCloudConnection(provider, cfg) {
   } catch (error) {
     return { ok: false, error: error.message || 'Connection failed' };
   }
+}
+
+// WeKan's persisted per-provider storage settings (storageConfig.<provider>).
+interface CloudProviderConfig {
+  bucket?: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
+  region?: string;
+  endpoint?: string;
+  forcePathStyle?: boolean;
+  connectionString?: string;
+  accountName?: string;
+  accountKey?: string;
+  projectId?: string;
+  keyFilename?: string;
+  credentials?: string | Record<string, any>;
+  read?: boolean;
+  write?: boolean;
+  enabled?: boolean;
+}
+
+interface CloudStreamResult {
+  value?: import('stream').Readable;
+  error?: string;
+}
+
+interface CloudWriteResult {
+  error?: string;
+}
+
+// The @tweedegolf/storage-abstraction adapter surface WeKan relies on.
+interface StorageAdapterInstance {
+  configError?: string;
+  getFileAsStream(bucketName: string | undefined, key: string): Promise<CloudStreamResult>;
+  addFileFromBuffer(params: { buffer: Buffer; bucketName?: string; targetPath: string | null }): Promise<CloudWriteResult>;
+  addFileFromStream(params: { stream: import('stream').Readable; bucketName?: string; targetPath: string }): Promise<CloudWriteResult>;
+  removeFile(bucketName: string | undefined, key: string): Promise<CloudWriteResult>;
+  listFiles(bucketName?: string): Promise<CloudWriteResult>;
+}
+
+type StorageAdapterConstructor = new (config: Record<string, any>) => StorageAdapterInstance;
+
+// Cached, ready-to-use adapter: the instance plus its bucket and access flags.
+interface CloudAdapter {
+  storage: StorageAdapterInstance;
+  bucketName?: string;
+  read: boolean;
+  write: boolean;
 }

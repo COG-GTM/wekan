@@ -10,12 +10,12 @@ import Attachments from '../attachments';
  */
 
 // Old CollectionFS collections
-const OldAttachmentsFiles = new Mongo.Collection('cfs_gridfs.attachments.files');
-const OldAttachmentsFileRecord = new Mongo.Collection('cfs.attachments.filerecord');
-const OldAvatarsFiles = new Mongo.Collection('cfs_gridfs.avatars.files');
-const OldAvatarsFileRecord = new Mongo.Collection('cfs.avatars.filerecord');
+const OldAttachmentsFiles = new Mongo.Collection<import('mongodb').Document>('cfs_gridfs.attachments.files');
+const OldAttachmentsFileRecord = new Mongo.Collection<import('mongodb').Document>('cfs.attachments.filerecord');
+const OldAvatarsFiles = new Mongo.Collection<import('mongodb').Document>('cfs_gridfs.avatars.files');
+const OldAvatarsFileRecord = new Mongo.Collection<import('mongodb').Document>('cfs.avatars.filerecord');
 
-function oldCollections(coll) {
+function oldCollections(coll: string) {
   return coll === 'avatars'
     ? { FileRecord: OldAvatarsFileRecord, Files: OldAvatarsFiles }
     : { FileRecord: OldAttachmentsFileRecord, Files: OldAttachmentsFiles };
@@ -23,11 +23,11 @@ function oldCollections(coll) {
 
 // The GridFS binary is keyed by copies.<coll>.key (an ObjectId hex), NOT by the
 // filerecord _id. Resolve it safely to an ObjectId.
-function gridFsObjectIdFromRecord(coll, fileRecord) {
+function gridFsObjectIdFromRecord(coll: string, fileRecord?: import('mongodb').Document | null) {
   const key = fileRecord && fileRecord.copies && fileRecord.copies[coll] && fileRecord.copies[coll].key;
   if (!key) return null;
   try {
-    return new MongoInternals.NpmModule.ObjectId(String(key));
+    return new (MongoInternals as WekanMongoInternals).NpmModule.ObjectId(String(key));
   } catch (error) {
     return null;
   }
@@ -38,7 +38,7 @@ function gridFsObjectIdFromRecord(coll, fileRecord) {
  * @param {string} attachmentId - The attachment ID to check
  * @returns {Promise<boolean>} - True if exists in new structure
  */
-export async function isNewAttachmentStructure(attachmentId) {
+export async function isNewAttachmentStructure(attachmentId: string) {
   if (Meteor.isServer) {
     if (Attachments && Attachments.collection) {
       const cursor = Attachments.collection;
@@ -53,7 +53,7 @@ export async function isNewAttachmentStructure(attachmentId) {
  * @param {string} attachmentId - The attachment ID
  * @returns {Promise<Object|null>} - Attachment data in new format or null if not found
  */
-export async function getOldAttachmentData(attachmentId, coll = 'attachments') {
+export async function getOldAttachmentData(attachmentId: string, coll = 'attachments') {
   if (Meteor.isServer) {
     try {
       const { FileRecord, Files } = oldCollections(coll);
@@ -66,7 +66,7 @@ export async function getOldAttachmentData(attachmentId, coll = 'attachments') {
       // The binary lives in the cfs_gridfs.<coll> bucket keyed by
       // copies.<coll>.key (an ObjectId), NOT by the filerecord _id.
       const gridFsId = gridFsObjectIdFromRecord(coll, fileRecord);
-      let fileData = null;
+      let fileData: import('mongodb').Document | null | undefined = null;
       if (gridFsId) {
         fileData = await Files.findOneAsync({ _id: gridFsId });
       }
@@ -136,7 +136,7 @@ export async function getOldAttachmentData(attachmentId, coll = 'attachments') {
  * @param {string} filename - The filename
  * @returns {string} - File extension without dot
  */
-function getFileExtension(filename) {
+function getFileExtension(filename: string) {
   if (!filename) return '';
   const lastDot = filename.lastIndexOf('.');
   if (lastDot === -1) return '';
@@ -148,7 +148,7 @@ function getFileExtension(filename) {
  * @param {string} filename - The filename
  * @returns {string} - File extension with dot
  */
-function getFileExtensionWithDot(filename) {
+function getFileExtensionWithDot(filename: string) {
   const ext = getFileExtension(filename);
   return ext ? `.${ext}` : '';
 }
@@ -158,7 +158,7 @@ function getFileExtensionWithDot(filename) {
  * @param {string} mimeType - MIME type
  * @returns {boolean} - True if image
  */
-function isImageFile(mimeType) {
+function isImageFile(mimeType: string) {
   return mimeType && mimeType.startsWith('image/');
 }
 
@@ -167,7 +167,7 @@ function isImageFile(mimeType) {
  * @param {string} mimeType - MIME type
  * @returns {boolean} - True if video
  */
-function isVideoFile(mimeType) {
+function isVideoFile(mimeType: string) {
   return mimeType && mimeType.startsWith('video/');
 }
 
@@ -176,7 +176,7 @@ function isVideoFile(mimeType) {
  * @param {string} mimeType - MIME type
  * @returns {boolean} - True if audio
  */
-function isAudioFile(mimeType) {
+function isAudioFile(mimeType: string) {
   return mimeType && mimeType.startsWith('audio/');
 }
 
@@ -185,7 +185,7 @@ function isAudioFile(mimeType) {
  * @param {string} mimeType - MIME type
  * @returns {boolean} - True if text
  */
-function isTextFile(mimeType) {
+function isTextFile(mimeType: string) {
   return mimeType && mimeType.startsWith('text/');
 }
 
@@ -194,7 +194,7 @@ function isTextFile(mimeType) {
  * @param {string} mimeType - MIME type
  * @returns {boolean} - True if JSON
  */
-function isJSONFile(mimeType) {
+function isJSONFile(mimeType: string) {
   return mimeType === 'application/json';
 }
 
@@ -203,7 +203,7 @@ function isJSONFile(mimeType) {
  * @param {string} mimeType - MIME type
  * @returns {boolean} - True if PDF
  */
-function isPDFFile(mimeType) {
+function isPDFFile(mimeType: string) {
   return mimeType === 'application/pdf';
 }
 
@@ -212,7 +212,7 @@ function isPDFFile(mimeType) {
  * @param {string} attachmentId - The attachment ID
  * @returns {Promise<Object|null>} - Attachment data or null if not found
  */
-export async function getAttachmentWithBackwardCompatibility(attachmentId) {
+export async function getAttachmentWithBackwardCompatibility(attachmentId: string) {
   // First try new structure
   if (Meteor.isServer) {
     if (Attachments && Attachments.collection) {
@@ -234,7 +234,7 @@ export async function getAttachmentWithBackwardCompatibility(attachmentId) {
  * @param {Object} query - Query object
  * @returns {Promise<Array>} - Array of attachments
  */
-export async function getAttachmentsWithBackwardCompatibility(query) {
+export async function getAttachmentsWithBackwardCompatibility(query: Record<string, any>) {
   let newAttachments = [];
 
   // Get new attachments
@@ -280,7 +280,7 @@ export async function getAttachmentsWithBackwardCompatibility(query) {
  * @param {string} attachmentId - The attachment ID
  * @returns {Object|null} - GridFS file stream or null if not found
  */
-export async function getOldAttachmentStream(attachmentId, coll = 'attachments') {
+export async function getOldAttachmentStream(attachmentId: string, coll = 'attachments') {
   if (Meteor.isServer) {
     try {
       const { FileRecord } = oldCollections(coll);
@@ -290,7 +290,7 @@ export async function getOldAttachmentStream(attachmentId, coll = 'attachments')
         return null;
       }
       const db = MongoInternals.defaultRemoteCollectionDriver().mongo.db;
-      const bucket = new MongoInternals.NpmModule.GridFSBucket(db, {
+      const bucket = new (MongoInternals as WekanMongoInternals).NpmModule.GridFSBucket(db, {
         bucketName: `cfs_gridfs.${coll}`,
       });
       // The binary is addressed by the GridFS file ObjectId, not the filename.
@@ -308,7 +308,7 @@ export async function getOldAttachmentStream(attachmentId, coll = 'attachments')
  * @param {string} attachmentId - The attachment ID
  * @returns {Buffer|null} - File data buffer or null if not found
  */
-export async function getOldAttachmentDataBuffer(attachmentId, coll = 'attachments') {
+export async function getOldAttachmentDataBuffer(attachmentId: string, coll = 'attachments') {
   if (Meteor.isServer) {
     try {
       const { FileRecord } = oldCollections(coll);
@@ -318,12 +318,12 @@ export async function getOldAttachmentDataBuffer(attachmentId, coll = 'attachmen
         return null;
       }
       const db = MongoInternals.defaultRemoteCollectionDriver().mongo.db;
-      const bucket = new MongoInternals.NpmModule.GridFSBucket(db, {
+      const bucket = new (MongoInternals as WekanMongoInternals).NpmModule.GridFSBucket(db, {
         bucketName: `cfs_gridfs.${coll}`,
       });
 
-      return await new Promise((resolve, reject) => {
-        const chunks = [];
+      return await new Promise<Buffer>((resolve, reject) => {
+        const chunks: Buffer[] = [];
         // The binary is addressed by the GridFS file ObjectId, not the filename.
         const downloadStream = bucket.openDownloadStream(gridFsId);
 

@@ -1,7 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 
-let dnsPromises;
-let netModule;
+let dnsPromises: typeof import('dns').promises | undefined;
+let netModule: typeof import('net') | undefined;
 
 if (Meteor.isServer) {
   dnsPromises = require('dns').promises;
@@ -33,11 +33,13 @@ const IPV4_RANGES = [
   ['224.0.0.0', '239.255.255.255'],
   ['240.0.0.0', '255.255.255.255'],
 ].map(([start, end]) => ({
-  start: ipv4ToInt(start),
-  end: ipv4ToInt(end),
+  // The ranges above are hard-coded valid IPv4 addresses, so ipv4ToInt never
+  // returns null here.
+  start: ipv4ToInt(start)!,
+  end: ipv4ToInt(end)!,
 }));
 
-function ipv4ToInt(ip) {
+function ipv4ToInt(ip: string) {
   const parts = ip.split('.').map(part => parseInt(part, 10));
   if (parts.length !== 4 || parts.some(part => Number.isNaN(part))) {
     return null;
@@ -45,7 +47,7 @@ function ipv4ToInt(ip) {
   return parts.reduce((acc, part) => (acc << 8) + part, 0) >>> 0;
 }
 
-function isIpv4Blocked(ip) {
+function isIpv4Blocked(ip: string) {
   const value = ipv4ToInt(ip);
   if (value === null) {
     return true;
@@ -53,7 +55,7 @@ function isIpv4Blocked(ip) {
   return IPV4_RANGES.some(range => value >= range.start && value <= range.end);
 }
 
-function isIpv6Blocked(ip) {
+function isIpv6Blocked(ip: string) {
   const normalized = ip.split('%')[0].toLowerCase();
   if (normalized === '::' || normalized === '::1' || /^0(:0){1,7}$/.test(normalized)) {
     return true;
@@ -83,7 +85,7 @@ function isIpv6Blocked(ip) {
   return false;
 }
 
-function isIpBlocked(ip) {
+function isIpBlocked(ip: string) {
   if (!netModule) {
     return false;
   }
@@ -97,12 +99,16 @@ function isIpBlocked(ip) {
   return true;
 }
 
-async function resolveHostname(hostname) {
+async function resolveHostname(hostname: string) {
   if (!dnsPromises) {
     return [];
   }
   try {
-    const results = await dnsPromises.lookup(hostname, { all: true });
+    // `{ all: true }` statically resolves to an array, but this stays defensive
+    // about the single-address shape older dns typings/runtimes can return, so
+    // the awaited value is widened to the union before the runtime checks below.
+    const results = (await dnsPromises.lookup(hostname, { all: true })) as
+      import('dns').LookupAddress[] | import('dns').LookupAddress;
     if (Array.isArray(results)) {
       return results.map(result => result.address);
     }
@@ -115,12 +121,12 @@ async function resolveHostname(hostname) {
   }
 }
 
-export async function validateAttachmentUrl(urlString) {
+export async function validateAttachmentUrl(urlString: string) {
   if (!urlString || typeof urlString !== 'string') {
     return { valid: false, reason: 'Empty URL' };
   }
 
-  let parsed;
+  let parsed: URL;
   try {
     parsed = new URL(urlString);
   } catch (error) {

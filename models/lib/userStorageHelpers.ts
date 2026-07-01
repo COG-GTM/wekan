@@ -6,7 +6,7 @@
 /**
  * Validate that a value is a valid positive number
  */
-export function isValidNumber(value, min = 0, max = 10000) {
+export function isValidNumber(value: number, min = 0, max = 10000) {
   if (typeof value !== 'number') return false;
   if (isNaN(value)) return false;
   if (!isFinite(value)) return false;
@@ -17,14 +17,21 @@ export function isValidNumber(value, min = 0, max = 10000) {
 /**
  * Validate that a value is a valid boolean
  */
-export function isValidBoolean(value) {
+export function isValidBoolean(value: boolean) {
   return typeof value === 'boolean';
 }
 
 /**
  * Get validated number from localStorage with bounds checking
  */
-export function getValidatedNumber(key, boardId, itemId, defaultValue, min, max) {
+export function getValidatedNumber(
+  key: string,
+  boardId: string,
+  itemId: string,
+  defaultValue: number,
+  min: number,
+  max: number,
+): number {
   if (typeof localStorage === 'undefined') return defaultValue;
 
   try {
@@ -48,7 +55,14 @@ export function getValidatedNumber(key, boardId, itemId, defaultValue, min, max)
 /**
  * Set validated number to localStorage with bounds checking
  */
-export function setValidatedNumber(key, boardId, itemId, value, min, max) {
+export function setValidatedNumber(
+  key: string,
+  boardId: string,
+  itemId: string,
+  value: number,
+  min: number,
+  max: number,
+) {
   if (typeof localStorage === 'undefined') return false;
 
   // Validate value
@@ -77,7 +91,12 @@ export function setValidatedNumber(key, boardId, itemId, value, min, max) {
 /**
  * Get validated boolean from localStorage
  */
-export function getValidatedBoolean(key, boardId, itemId, defaultValue) {
+export function getValidatedBoolean(
+  key: string,
+  boardId: string,
+  itemId: string,
+  defaultValue: boolean,
+): boolean {
   if (typeof localStorage === 'undefined') return defaultValue;
 
   try {
@@ -98,7 +117,12 @@ export function getValidatedBoolean(key, boardId, itemId, defaultValue) {
 /**
  * Set validated boolean to localStorage
  */
-export function setValidatedBoolean(key, boardId, itemId, value) {
+export function setValidatedBoolean(
+  key: string,
+  boardId: string,
+  itemId: string,
+  value: boolean,
+) {
   if (typeof localStorage === 'undefined') return false;
 
   // Validate value

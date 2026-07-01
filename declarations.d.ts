@@ -34,6 +34,113 @@ type WekanRouteTrigger = (
 ) => void;
 
 // ---------------------------------------------------------------------------
+// Meteor core augmentations for gaps in @types/meteor used by models/lib.
+// ---------------------------------------------------------------------------
+
+/** Signature of the (non-standard) Meteor.connect hook patched by models/lib. */
+type MeteorConnectFn = (url: string, options?: object) => any;
+
+declare module 'meteor/meteor' {
+  namespace Meteor {
+    let connect: MeteorConnectFn;
+  }
+}
+
+// @types/meteor bundles its own (older) `mongodb`, so the Db type behind
+// `defaultRemoteCollectionDriver().mongo.db` differs from the app's root
+// `mongodb`. Source the Db type from Meteor's own accessor so every GridFS call
+// site stays consistent with the value Meteor actually hands back.
+type MeteorMongoDb = ReturnType<
+  typeof MongoInternals.defaultRemoteCollectionDriver
+>['mongo']['db'];
+
+// Shape of the singular `MongoInternals.NpmModule` accessor. Meteor exposes it
+// at runtime as the whole `mongodb` npm module, but @types/meteor only models
+// the plural `NpmModules`, so consumers reach it via a cast to this interface.
+// GridFSBucket returns the hand-rolled WekanGridFsBucket so the Db type from
+// @types/meteor's bundled mongodb doesn't clash with the app's root mongodb.
+interface WekanMongoNpmModule {
+  GridFSBucket: new (
+    db: MeteorMongoDb,
+    options?: { bucketName?: string },
+  ) => WekanGridFsBucket;
+  ObjectId: typeof import('mongodb').ObjectId;
+}
+
+// The `MongoInternals` value narrowed to include the singular NpmModule accessor.
+type WekanMongoInternals = typeof import('meteor/mongo').MongoInternals & {
+  NpmModule: WekanMongoNpmModule;
+};
+
+// ---------------------------------------------------------------------------
+// Wekan attachment/file-storage shapes and globals used by models/lib.
+// ---------------------------------------------------------------------------
+
+interface WekanFileVersion {
+  path?: string;
+  storage?: string;
+  meta: Record<string, any>;
+}
+
+interface WekanFileObj {
+  _id: string;
+  name: string;
+  type?: string;
+  userId?: string;
+  fileSize?: number;
+  collectionName?: string;
+  meta: Record<string, any>;
+  versions: Record<string, WekanFileVersion>;
+}
+
+// The Meteor-Files collection surface (Attachments / Avatars) touched by the
+// storage strategies.
+interface WekanFilesCollection {
+  updateAsync(selector: object, modifier: object): Promise<number>;
+  addFile(
+    path: string,
+    config: object,
+    callback?: (error: Error | null, fileRef: WekanFileObj) => void,
+    proceedAfterUpload?: boolean,
+  ): void;
+}
+
+interface WekanGridFsUploadStream extends NodeJS.WritableStream {
+  id: import('mongodb').ObjectId;
+  gridFSFile?: { _id?: import('mongodb').ObjectId } | null;
+}
+
+interface WekanGridFsBucket {
+  openDownloadStream(id: import('mongodb').ObjectId): import('stream').Readable;
+  openUploadStream(
+    filename: string,
+    options?: { contentType?: string; metadata?: Record<string, any> },
+  ): WekanGridFsUploadStream;
+  delete(id: import('mongodb').ObjectId, callback?: (error?: Error | null) => void): void;
+}
+
+interface WekanCardDoc {
+  _id?: string;
+  boardId?: string;
+  listId?: string;
+  swimlaneId?: string;
+}
+
+interface WekanReactiveCache {
+  getCard(id: string): WekanCardDoc;
+}
+
+declare const Attachments: WekanFilesCollection;
+declare const ReactiveCache: WekanReactiveCache;
+declare const Random: { id(n?: number): string };
+
+// Meteor injects its runtime config onto the browser window; only the ROOT_URL
+// prefix is read by the client-side URL helpers.
+interface Window {
+  __meteor_runtime_config__?: { ROOT_URL?: string };
+}
+
+// ---------------------------------------------------------------------------
 // Community Meteor packages not covered by @types/meteor.
 // ---------------------------------------------------------------------------
 

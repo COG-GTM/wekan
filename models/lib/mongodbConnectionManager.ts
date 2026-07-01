@@ -15,6 +15,11 @@ import { mongodbDriverManager } from './mongodbDriverManager';
  */
 
 class MongoDBConnectionManager {
+  connections: Map<string, StoredConnection>;
+  connectionConfigs: Map<string, object>;
+  retryAttempts: number;
+  retryDelay: number;
+
   constructor() {
     this.connections = new Map();
     this.connectionConfigs = new Map();
@@ -28,12 +33,12 @@ class MongoDBConnectionManager {
    * @param {Object} options - Connection options
    * @returns {Promise<Object>} - MongoDB connection object
    */
-  async createConnection(connectionString, options = {}) {
+  async createConnection(connectionString: string, options: object = {}) {
     const connectionId = this.generateConnectionId(connectionString);
 
     // Check if we already have a working connection
     if (this.connections.has(connectionId)) {
-      const existingConnection = this.connections.get(connectionId);
+      const existingConnection = this.connections.get(connectionId)!;
       if (existingConnection.status === 'connected') {
         return existingConnection;
       }
@@ -50,9 +55,9 @@ class MongoDBConnectionManager {
    * @param {string} connectionId - Connection identifier
    * @returns {Promise<Object>} - MongoDB connection object
    */
-  async connectWithDriverSelection(connectionString, options, connectionId) {
-    let lastError = null;
-    let currentDriver = null;
+  async connectWithDriverSelection(connectionString: string, options: object, connectionId: string) {
+    let lastError: Error | null = null;
+    let currentDriver: string | null = null;
 
     // First, try with the default driver (if we have a detected version)
     if (mongodbDriverManager.detectedVersion) {
@@ -137,7 +142,7 @@ class MongoDBConnectionManager {
    * @param {Object} options - Connection options
    * @returns {Promise<Object>} - MongoDB connection object
    */
-  async connectWithDriver(driverName, connectionString, options) {
+  async connectWithDriver(driverName: string, connectionString: string, options: object) {
     try {
       // Dynamically import the driver
       const driver = await import(driverName);
@@ -172,7 +177,7 @@ class MongoDBConnectionManager {
    * @param {string} connectionId - Connection identifier
    * @returns {Object|null} - Connection object or null
    */
-  getConnection(connectionId) {
+  getConnection(connectionId: string) {
     return this.connections.get(connectionId) || null;
   }
 
@@ -181,7 +186,7 @@ class MongoDBConnectionManager {
    * @param {string} connectionId - Connection identifier
    * @returns {Promise<boolean>} - Whether connection was closed successfully
    */
-  async closeConnection(connectionId) {
+  async closeConnection(connectionId: string) {
     const connection = this.connections.get(connectionId);
     if (connection && connection.connection) {
       try {
@@ -243,7 +248,7 @@ class MongoDBConnectionManager {
    * @param {string} connectionString - MongoDB connection string
    * @returns {string} - Unique connection ID
    */
-  generateConnectionId(connectionString) {
+  generateConnectionId(connectionString: string) {
     // Create a hash of the connection string for unique ID
     let hash = 0;
     for (let i = 0; i < connectionString.length; i++) {
@@ -259,7 +264,7 @@ class MongoDBConnectionManager {
    * @param {Object} connection - Connection object
    * @returns {string} - Connection ID
    */
-  getConnectionIdFromConnection(connection) {
+  getConnectionIdFromConnection(connection: StoredConnection) {
     return this.generateConnectionId(connection.connectionString);
   }
 
@@ -268,8 +273,8 @@ class MongoDBConnectionManager {
    * @param {number} ms - Milliseconds to delay
    * @returns {Promise} - Promise that resolves after delay
    */
-  delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  delay(ms: number) {
+    return new Promise<void>(resolve => setTimeout(resolve, ms));
   }
 
   /**
@@ -280,6 +285,23 @@ class MongoDBConnectionManager {
     this.connectionConfigs.clear();
     mongodbDriverManager.reset();
   }
+}
+
+// A dynamically-imported mongodb driver client. Only the members used by this
+// manager are declared; the driver package itself ships no types at this import
+// boundary.
+interface MongoClientLike {
+  close(): Promise<void>;
+}
+
+interface StoredConnection {
+  connection?: MongoClientLike;
+  driver: string;
+  version: string;
+  status: string;
+  connectionString: string;
+  options: object;
+  createdAt: Date;
 }
 
 // Create singleton instance

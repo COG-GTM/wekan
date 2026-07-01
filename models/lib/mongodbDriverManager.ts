@@ -14,7 +14,7 @@ import { Meteor } from 'meteor/meteor';
  */
 
 // MongoDB driver compatibility matrix
-const DRIVER_COMPATIBILITY = {
+const DRIVER_COMPATIBILITY: Record<string, DriverInfo> = {
   '3.0': { driver: 'mongodb3legacy', version: '3.7.4', minServer: '3.0', maxServer: '3.6' },
   '3.2': { driver: 'mongodb3legacy', version: '3.7.4', minServer: '3.0', maxServer: '3.6' },
   '3.4': { driver: 'mongodb3legacy', version: '3.7.4', minServer: '3.0', maxServer: '3.6' },
@@ -95,6 +95,11 @@ const GENERIC_VERSION_ERRORS = [
 ];
 
 class MongoDBDriverManager {
+  detectedVersion: string | null;
+  selectedDriver: string | null;
+  connectionAttempts: ConnectionAttempt[];
+  fallbackDrivers: string[];
+
   constructor() {
     this.detectedVersion = null;
     this.selectedDriver = null;
@@ -107,7 +112,7 @@ class MongoDBDriverManager {
    * @param {Error} error - The connection error
    * @returns {string|null} - Detected MongoDB version or null
    */
-  detectVersionFromError(error) {
+  detectVersionFromError(error: Error | null) {
     if (!error || !error.message) {
       return null;
     }
@@ -140,7 +145,7 @@ class MongoDBDriverManager {
    * @param {string} version - MongoDB version
    * @returns {string} - Driver package name
    */
-  getDriverForVersion(version) {
+  getDriverForVersion(version: string) {
     if (DRIVER_COMPATIBILITY[version]) {
       return DRIVER_COMPATIBILITY[version].driver;
     }
@@ -174,7 +179,7 @@ class MongoDBDriverManager {
    * @returns {string|null} - Next fallback driver or null if none left
    */
   getNextFallbackDriver() {
-    const currentIndex = this.fallbackDrivers.indexOf(this.selectedDriver);
+    const currentIndex = this.fallbackDrivers.indexOf(this.selectedDriver as string);
     if (currentIndex >= 0 && currentIndex < this.fallbackDrivers.length - 1) {
       return this.fallbackDrivers[currentIndex + 1];
     }
@@ -188,7 +193,7 @@ class MongoDBDriverManager {
    * @param {boolean} success - Whether connection was successful
    * @param {Error} error - Error if connection failed
    */
-  recordConnectionAttempt(driver, version, success, error = null) {
+  recordConnectionAttempt(driver: string, version: string, success: boolean, error: Error | null = null) {
     this.connectionAttempts.push({
       driver,
       version,
@@ -237,10 +242,10 @@ class MongoDBDriverManager {
    * @param {string} driver - Driver package name
    * @returns {Object} - Driver information
    */
-  getDriverInfo(driver) {
-    for (const [version, info] of Object.entries(DRIVER_COMPATIBILITY)) {
+  getDriverInfo(driver: string) {
+    for (const info of Object.values(DRIVER_COMPATIBILITY)) {
       if (info.driver === driver) {
-        return { version, ...info };
+        return { ...info };
       }
     }
     return null;
@@ -259,9 +264,24 @@ class MongoDBDriverManager {
    * @param {string} version - MongoDB version to check
    * @returns {boolean} - Whether version is supported
    */
-  isVersionSupported(version) {
+  isVersionSupported(version: string) {
     return version in DRIVER_COMPATIBILITY;
   }
+}
+
+interface DriverInfo {
+  driver: string;
+  version: string;
+  minServer: string;
+  maxServer: string;
+}
+
+interface ConnectionAttempt {
+  driver: string;
+  version: string;
+  success: boolean;
+  error: string | null;
+  timestamp: Date;
 }
 
 // Create singleton instance

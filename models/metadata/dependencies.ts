@@ -49,7 +49,7 @@ export const DEPENDENCY_TYPE_INVERSE = {
   'is-fixed-by': 'fixes',
 };
 
-export function dependencyTypeMeta(typeId) {
+export function dependencyTypeMeta(typeId: string) {
   return (
     DEPENDENCY_TYPES.find(t => t.id === typeId) ||
     DEPENDENCY_TYPES.find(t => t.id === DEFAULT_DEPENDENCY_TYPE)
@@ -60,7 +60,9 @@ export function dependencyTypeMeta(typeId) {
 // icon } object. Accepts a legacy bare-string card id, a partial object, or a
 // full object, so older data and external imports stay valid. Returns null for
 // entries that have no target card id.
-export function normalizeDependency(dep) {
+export function normalizeDependency(
+  dep: string | DependencyInput | null | undefined,
+): Dependency | null {
   if (!dep) return null;
   if (typeof dep === 'string') {
     return {
@@ -73,7 +75,7 @@ export function normalizeDependency(dep) {
   if (!dep.cardId) return null;
   return {
     cardId: dep.cardId,
-    type: DEPENDENCY_TYPE_IDS.includes(dep.type)
+    type: dep.type !== undefined && DEPENDENCY_TYPE_IDS.includes(dep.type)
       ? dep.type
       : DEFAULT_DEPENDENCY_TYPE,
     color: dep.color || DEFAULT_DEPENDENCY_COLOR,
@@ -81,6 +83,25 @@ export function normalizeDependency(dep) {
   };
 }
 
-export function normalizeDependencies(deps) {
+export function normalizeDependencies(
+  deps: Array<string | DependencyInput | null | undefined> | null | undefined,
+) {
   return (deps || []).map(normalizeDependency).filter(Boolean);
+}
+
+// A stored/normalized card-to-card dependency (see the module header).
+interface Dependency {
+  cardId: string;
+  type: string;
+  color: string;
+  icon: string;
+}
+
+// A dependency entry as it may arrive from older data or an external import:
+// every field optional so partial and full objects are both accepted.
+interface DependencyInput {
+  cardId?: string;
+  type?: string;
+  color?: string;
+  icon?: string;
 }

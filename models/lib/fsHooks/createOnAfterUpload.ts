@@ -1,8 +1,8 @@
 import { Meteor } from 'meteor/meteor';
 import fs from 'fs';
 
-export const createOnAfterUpload = bucket =>
-  function onAfterUpload(file) {
+export const createOnAfterUpload = (bucket: WekanGridFsBucket) =>
+  function onAfterUpload(this: FilesCollectionContext, file: UploadedFile) {
     const self = this;
 
     // here you could manipulate your file
@@ -51,3 +51,26 @@ export const createOnAfterUpload = bucket =>
         );
     });
   };
+
+interface UploadedFileVersion {
+  path: string;
+}
+
+interface UploadedFile {
+  _id: string;
+  name: string;
+  type?: string;
+  // Meteor-Files stores arbitrary caller-supplied metadata here (boardId,
+  // cardId, source, ...), so the key set is dynamic.
+  meta: Record<string, any>;
+  versions: Record<string, UploadedFileVersion>;
+}
+
+// The FilesCollection instance bound as `this` when Meteor-Files invokes the
+// onAfterUpload hook.
+interface FilesCollectionContext {
+  unlink(fileRef: UploadedFile, versionName?: string): void;
+  collection: {
+    updateAsync(selector: string, modifier: object): Promise<number>;
+  };
+}

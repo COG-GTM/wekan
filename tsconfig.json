@@ -12,6 +12,7 @@
   // `.js` file has been migrated to TypeScript.
   "compilerOptions": {
     "target": "ES2022",
+    "module": "esnext",
     "moduleResolution": "node",
     "moduleDetection": "force",
     "strict": true,

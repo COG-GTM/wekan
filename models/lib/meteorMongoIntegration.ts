@@ -19,6 +19,12 @@ import { mongodbDriverManager } from './mongodbDriverManager';
  */
 
 class MeteorMongoIntegration {
+  originalMongoConnect: MeteorConnectFn | null;
+  originalMongoCollection: typeof Mongo.Collection | null;
+  isInitialized: boolean;
+  connectionString: string | null;
+  customConnection: import('mongodb').MongoClient | null;
+
   constructor() {
     this.originalMongoConnect = null;
     this.originalMongoCollection = null;
@@ -31,7 +37,7 @@ class MeteorMongoIntegration {
    * Initialize the integration
    * @param {string} connectionString - MongoDB connection string
    */
-  initialize(connectionString) {
+  initialize(connectionString: string) {
     if (this.isInitialized) {
       console.log('Meteor MongoDB Integration already initialized');
       return;
@@ -68,7 +74,7 @@ class MeteorMongoIntegration {
           return await self.createCustomConnection(url, options);
         } catch (error) {
           console.error('Custom connection failed, falling back to original method:', error.message);
-          return self.originalMongoConnect.call(this, url, options);
+          return self.originalMongoConnect!.call(this, url, options);
         }
       };
     }
@@ -81,21 +87,26 @@ class MeteorMongoIntegration {
     const self = this;
     const originalCollection = Mongo.Collection;
 
-    // Override Mongo.Collection constructor
-    Mongo.Collection = function(name, options = {}) {
+    // Override Mongo.Collection constructor. The runtime replaces the class
+    // with a factory function; Meteor's types model Collection as a construct
+    // signature only, so the assignment needs an assertion.
+    Mongo.Collection = function(name: string | null, options: PatchedCollectionOptions = {}) {
       // If we have a custom connection, use it
       if (self.customConnection) {
         options.connection = self.customConnection;
       }
 
       // Create the collection with original constructor
-      const collection = new originalCollection(name, options);
+      const collection = new originalCollection(
+        name,
+        options as { connection?: import('meteor/ddp').DDP.DDPStatic | null | undefined },
+      );
 
       // Add our custom methods
-      self.enhanceCollection(collection);
+      self.enhanceCollection(collection as unknown as EnhanceableCollection);
 
       return collection;
-    };
+    } as unknown as typeof Mongo.Collection;
 
     // Copy static methods from original constructor
     Object.setPrototypeOf(Mongo.Collection, originalCollection);
@@ -108,7 +119,7 @@ class MeteorMongoIntegration {
    * @param {Object} options - Connection options
    * @returns {Promise<Object>} - MongoDB connection object
    */
-  async createCustomConnection(url, options = {}) {
+  async createCustomConnection(url: string, options: object = {}) {
     try {
       console.log('Creating custom MongoDB connection...');
 
@@ -135,7 +146,7 @@ class MeteorMongoIntegration {
    * @param {Object} connection - MongoDB connection object
    * @returns {Object} - Meteor-compatible connection
    */
-  createMeteorCompatibleConnection(connection) {
+  createMeteorCompatibleConnection(connection: import('mongodb').MongoClient) {
     const self = this;
 
     return {
@@ -144,7 +155,7 @@ class MeteorMongoIntegration {
       _name: 'custom-mongodb-connection',
 
       // Collection creation method
-      createCollection: function(name, options = {}) {
+      createCollection: function(name: string, options = {}) {
         const db = connection.db();
         return db.collection(name);
       },
@@ -183,7 +194,7 @@ class MeteorMongoIntegration {
    * Enhance a collection with additional methods
    * @param {Object} collection - Mongo.Collection instance
    */
-  enhanceCollection(collection) {
+  enhanceCollection(collection: EnhanceableCollection) {
     const self = this;
 
     // Add connection info method
@@ -287,6 +298,18 @@ class MeteorMongoIntegration {
       };
     }
   }
+}
+
+// A Mongo.Collection instance decorated with this integration's helper methods.
+interface EnhanceableCollection {
+  getConnectionInfo?: () => object;
+  detectMongoDBVersion?: () => Promise<string | null>;
+}
+
+// Meteor's Collection options (all optional) plus the raw mongodb driver
+// connection this integration injects, which Meteor's public types omit.
+interface PatchedCollectionOptions {
+  connection?: import('meteor/ddp').DDP.DDPStatic | import('mongodb').MongoClient | null;
 }
 
 // Create singleton instance

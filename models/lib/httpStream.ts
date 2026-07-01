@@ -1,4 +1,20 @@
-export const httpStreamOutput = function(readStream, name, http, downloadFlag, cacheControl) {
+import { Readable } from 'stream';
+import { ServerResponse } from 'http';
+
+// The Meteor-Files download context passed to interceptDownload handlers: it
+// carries the Node response and the parsed request query.
+export interface HttpStreamContext {
+  response: ServerResponse;
+  params?: { query?: { download?: string } };
+}
+
+export const httpStreamOutput = function(
+  readStream: Readable,
+  name: string,
+  http: HttpStreamContext,
+  downloadFlag?: string,
+  cacheControl?: string,
+) {
     readStream.on('data', data => {
       http.response.write(data);
     });
@@ -32,7 +48,7 @@ export const httpStreamOutput = function(readStream, name, http, downloadFlag, c
   };
 
 /** will initiate download, if links are called with ?download="true" queryparam */
-const getContentDisposition = (name, downloadFlag) => {
+const getContentDisposition = (name: string, downloadFlag?: string) => {
   // Force attachment disposition for SVG files to prevent XSS attacks
   const isSvgFile = name && name.toLowerCase().endsWith('.svg');
   const forceAttachment = isSvgFile || downloadFlag === 'true';

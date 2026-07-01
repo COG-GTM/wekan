@@ -4,16 +4,16 @@ import { ReactiveCache } from '/imports/reactiveCache';
 // per-format formatter emits the target platform's JSON shape. This mirrors the
 // generalized import (externalParsers.js): one collector + a map of formatters.
 
-async function collect(boardId) {
-  const board = await ReactiveCache.getBoard(boardId);
-  const lists = await ReactiveCache.getLists({ boardId, archived: false }, { sort: { sort: 1 } });
-  const swimlanes = await ReactiveCache.getSwimlanes({ boardId, archived: false }, { sort: { sort: 1 } });
-  const cards = await ReactiveCache.getCards({ boardId, archived: false }, { sort: { sort: 1 } });
-  const listById = {};
+async function collect(boardId: string) {
+  const board: WekanExportBoard = await ReactiveCache.getBoard(boardId);
+  const lists: WekanExportList[] = await ReactiveCache.getLists({ boardId, archived: false }, { sort: { sort: 1 } });
+  const swimlanes: WekanExportSwimlane[] = await ReactiveCache.getSwimlanes({ boardId, archived: false }, { sort: { sort: 1 } });
+  const cards: WekanExportCard[] = await ReactiveCache.getCards({ boardId, archived: false }, { sort: { sort: 1 } });
+  const listById: Record<string, string> = {};
   lists.forEach(l => { listById[l._id] = l.title; });
-  const swById = {};
+  const swById: Record<string, string> = {};
   swimlanes.forEach(s => { swById[s._id] = s.title; });
-  const labelById = {};
+  const labelById: Record<string, string> = {};
   (board.labels || []).forEach(l => { labelById[l._id] = l.name; });
   const items = cards.map(c => ({
     cardId: c._id,
@@ -30,11 +30,11 @@ async function collect(boardId) {
 }
 
 // A WeKan list maps to a "closed" issue state when its name looks terminal.
-function isClosed(listTitle) {
+function isClosed(listTitle: string) {
   return /done|closed|complete|archiv|finished/i.test(listTitle || '');
 }
 
-const githubLike = ({ items }) =>
+const githubLike = ({ items }: CollectedBoard) =>
   items.map(i => ({
     title: i.title,
     body: i.description,
@@ -43,7 +43,7 @@ const githubLike = ({ items }) =>
     due_date: i.dueAt,
   }));
 
-const formatters = {
+const formatters: Record<string, (data: CollectedBoard) => object> = {
   // NextCloud Deck: board with stacks, each stack carrying its cards.
   deck: ({ board, lists, items }) => ({
     title: board.title,
@@ -144,8 +144,44 @@ const formatters = {
 
 export const EXTERNAL_EXPORT_FORMATS = Object.keys(formatters);
 
-export async function buildExternalExport(boardId, format) {
+export async function buildExternalExport(boardId: string, format: string) {
   const formatter = formatters[format];
   if (!formatter) return null;
   return formatter(await collect(boardId));
+}
+
+// The neutral intermediate a formatter receives: a WeKan board collected into
+// lists/swimlanes plus flattened card items.
+type CollectedBoard = Awaited<ReturnType<typeof collect>>;
+
+// The subset of WeKan model fields the collector reads off each document.
+interface WekanExportLabel {
+  _id: string;
+  name: string;
+  color?: string;
+}
+
+interface WekanExportBoard {
+  title: string;
+  labels?: WekanExportLabel[];
+}
+
+interface WekanExportList {
+  _id: string;
+  title: string;
+}
+
+interface WekanExportSwimlane {
+  _id: string;
+  title: string;
+}
+
+interface WekanExportCard {
+  _id: string;
+  listId: string;
+  swimlaneId: string;
+  title: string;
+  description?: string;
+  dueAt?: string | number | Date;
+  labelIds?: string[];
 }
