@@ -1,3 +1,6 @@
+import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
 
@@ -22,7 +25,9 @@ const supportHelpers = {
 };
 
 // Main support page component
-Template.support.onCreated(function () {
+// this: any — the error/loading reactive vars set here are only consumed by the
+// .jade template, so no typed instance shape is needed.
+Template.support.onCreated(function (this: any) {
   this.error = new ReactiveVar('');
   this.loading = new ReactiveVar(false);
 

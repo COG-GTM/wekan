@@ -1,3 +1,4 @@
+import { Blaze } from 'meteor/blaze';
 import { CSSEvents } from '/client/lib/cssEvents';
 import { isMobileViewportNow } from '/client/lib/responsiveUtils';
 
@@ -8,7 +9,8 @@ Popup.template.events({
   'click .js-close-pop-over'() {
     Popup.close();
   },
-  'click .js-confirm'() {
+  // this: any — confirm popups store the action on their dynamic data context.
+  'click .js-confirm'(this: any) {
     this.__afterConfirmAction.call(this);
   },
   // #5942: On mobile/touch, tapping inside the card-detail sub-popups (assign
@@ -20,7 +22,7 @@ Popup.template.events({
   // originate inside the popup from bubbling to that document handler so the
   // popup stays open and usable on mobile. Scoped to mobile viewports so the
   // desktop click-outside-to-close behaviour is untouched.
-  'touchstart .pop-over, pointerdown .pop-over'(evt) {
+  'touchstart .pop-over, pointerdown .pop-over'(evt: JQuery.TriggeredEvent) {
     if (isMobileViewportNow()) {
       evt.stopPropagation();
     }
@@ -35,24 +37,25 @@ Popup.template.events({
   // in moving the whole popup container outside of the popup wrapper. To
   // disable this behavior we have to manually reset the scrollLeft position
   // whenever it is modified.
-  'scroll .content-wrapper'(evt) {
-    evt.currentTarget.scrollLeft = 0;
+  'scroll .content-wrapper'(evt: JQuery.TriggeredEvent) {
+    (evt.currentTarget as HTMLElement).scrollLeft = 0;
   },
 });
 
 // When a popup content is removed (ie, when the user press the "back" button),
 // we need to wait for the container translation to end before removing the
 // actual DOM element. For that purpose we use the undocumented `_uihooks` API.
-Popup.template.onRendered(function () {
+Popup.template.onRendered(function (this: Blaze.TemplateInstance) {
   const container = this.find('.content-container');
   if (!container) {
     return;
   }
-  container._uihooks = {
-    removeElement(node) {
+  // _uihooks is Blaze's undocumented per-element lifecycle hook API.
+  (container as any)._uihooks = {
+    removeElement(node: HTMLElement) {
       $(node).addClass('no-height');
-      $(container).one(CSSEvents.transitionend, () => {
-        node.parentNode.removeChild(node);
+      $(container).one(CSSEvents.transitionend as string, () => {
+        node.parentNode!.removeChild(node);
       });
     },
   };

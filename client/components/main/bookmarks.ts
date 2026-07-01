@@ -1,3 +1,4 @@
+import { Template } from 'meteor/templating';
 import Boards from '/models/boards';
 
 Template.bookmarks.helpers({
@@ -17,7 +18,8 @@ Template.bookmarks.helpers({
 });
 
 Template.bookmarks.events({
-  async 'click .js-toggle-star'(e) {
+  // this: any — the click handler's data context is the starred board doc.
+  async 'click .js-toggle-star'(this: any, e: JQuery.TriggeredEvent) {
     e.preventDefault();
     const boardId = this._id;
     const user = ReactiveCache.getCurrentUser();
@@ -44,7 +46,8 @@ Template.bookmarksPopup.helpers({
 });
 
 Template.bookmarksPopup.events({
-  async 'click .js-toggle-star'(e) {
+  // this: any — the click handler's data context is the starred board doc.
+  async 'click .js-toggle-star'(this: any, e: JQuery.TriggeredEvent) {
     e.preventDefault();
     const boardId = this._id;
     const user = ReactiveCache.getCurrentUser();

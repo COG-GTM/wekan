@@ -10,7 +10,7 @@ const FAR_FUTURE = new Date('2100-12-31').getTime();
 
 // Normalize a dueAt value (Date | string | null | undefined) to a comparable
 // millisecond timestamp. Invalid / empty values sort last.
-export function dueAtToTime(value, farFuture = FAR_FUTURE) {
+export function dueAtToTime(value: Date | string | null | undefined, farFuture: number = FAR_FUTURE) {
   if (value === null || value === undefined || value === '') return farFuture;
   if (value instanceof Date) return value.getTime();
   const t = new Date(value);
@@ -20,7 +20,7 @@ export function dueAtToTime(value, farFuture = FAR_FUTURE) {
 
 // Decide whether a card belongs to the current user (member, assignee or
 // author). Used when the view is "me" rather than "all".
-export function cardMatchesUser(card, userId) {
+export function cardMatchesUser(card: DueCardLike | null | undefined, userId: string | null | undefined) {
   if (!card || !userId) return false;
   const isMember = Array.isArray(card.members) && card.members.includes(userId);
   const isAssignee =
@@ -32,15 +32,18 @@ export function cardMatchesUser(card, userId) {
 // Filter (by user, unless allUsers) and sort (ascending by due date) a list of
 // due cards. Returns a new array; does not mutate the input. Importantly this
 // imposes NO cap on the number of results (issue #5999 / #5930).
-export function filterAndSortDueCards(cards, { allUsers = false, userId = null } = {}) {
+export function filterAndSortDueCards(
+  cards: DueCardLike[] | null | undefined,
+  { allUsers = false, userId = null }: { allUsers?: boolean; userId?: string | null } = {},
+) {
   const list = Array.isArray(cards) ? cards.slice() : [];
 
   const filtered =
     allUsers || !userId
       ? list
-      : list.filter(card => cardMatchesUser(card, userId));
+      : list.filter((card: DueCardLike) => cardMatchesUser(card, userId));
 
-  filtered.sort((a, b) => {
+  filtered.sort((a: DueCardLike, b: DueCardLike) => {
     const x = dueAtToTime(a.dueAt);
     const y = dueAtToTime(b.dueAt);
     if (x > y) return 1;
@@ -49,4 +52,13 @@ export function filterAndSortDueCards(cards, { allUsers = false, userId = null }
   });
 
   return filtered;
+}
+
+// Minimal shape of a due card as read by these pure helpers (members/assignees/
+// author for the "me" filter, dueAt for sorting).
+interface DueCardLike {
+  members?: string[];
+  assignees?: string[];
+  userId?: string;
+  dueAt?: Date | string | null;
 }
