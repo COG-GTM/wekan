@@ -1,3 +1,6 @@
+import { Blaze } from 'meteor/blaze';
+import { Meteor } from 'meteor/meteor';
+import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
 import Cards from '../../models/cards';
@@ -8,22 +11,48 @@ import {OPERATOR_DEBUG} from "../../config/search-const";
 // Plain helper class for search pages with pagination.
 // Not a BlazeComponent; instantiated in each template's onCreated.
 export class CardSearchPaged {
-  constructor(templateInstance) {
+  tpl: Blaze.TemplateInstance;
+  searching: ReactiveVar<boolean>;
+  hasResults: ReactiveVar<boolean>;
+  hasQueryErrors: ReactiveVar<boolean>;
+  query: ReactiveVar<string>;
+  resultsHeading: ReactiveVar<string>;
+  searchLink: ReactiveVar<string | null>;
+  results: ReactiveVar<any[] | null>; // matched card documents (untyped Mongo docs)
+  hasNextPage: ReactiveVar<boolean>;
+  hasPreviousPage: ReactiveVar<boolean>;
+  resultsCount: number;
+  totalHits: number;
+  queryErrors: any; // list of query error entries from the server, or null
+  resultsPerPage: number;
+  sessionId: string;
+  subscriptionHandle: Meteor.SubscriptionHandle | null;
+  serverError: ReactiveVar<boolean>;
+  sessionData: any; // globalSearch session document (untyped), or null
+  debug: ReactiveVar<QueryDebug>;
+  subscriptionCallbacks: { onReady(): void; onError(error: any): void };
+  resultsStart!: number;
+  resultsEnd!: number;
+  searchRetryCount?: number;
+  maxRetries?: number;
+  performSearch?: () => void;
+  constructor(templateInstance: Blaze.TemplateInstance) {
     this.tpl = templateInstance;
     this.searching = new ReactiveVar(false);
     this.hasResults = new ReactiveVar(false);
     this.hasQueryErrors = new ReactiveVar(false);
     this.query = new ReactiveVar('');
     this.resultsHeading = new ReactiveVar('');
-    this.searchLink = new ReactiveVar(null);
-    this.results = new ReactiveVar([]);
+    this.searchLink = new ReactiveVar<string | null>(null);
+    this.results = new ReactiveVar<any[] | null>([]);
     this.hasNextPage = new ReactiveVar(false);
     this.hasPreviousPage = new ReactiveVar(false);
     this.resultsCount = 0;
     this.totalHits = 0;
     this.queryErrors = null;
     this.resultsPerPage = 25;
-    this.sessionId = SessionData.getSessionId();
+    // getSessionId is attached to the model at runtime, not on the base Collection.
+    this.sessionId = (SessionData as any).getSessionId();
     this.subscriptionHandle = null;
     this.serverError = new ReactiveVar(false);
     this.sessionData = null;
@@ -46,7 +75,7 @@ export class CardSearchPaged {
             const results = that.getResults();
 
             // If no results and this is a due cards search, try to retry
-            if ((!results || results.length === 0) && that.searchRetryCount !== undefined && that.searchRetryCount < that.maxRetries) {
+            if ((!results || results.length === 0) && that.searchRetryCount !== undefined && that.searchRetryCount < that.maxRetries!) {
               that.searchRetryCount++;
               Meteor.setTimeout(() => {
                 if (that.performSearch) {
@@ -86,7 +115,7 @@ export class CardSearchPaged {
         // Start waiting for session data
         Meteor.setTimeout(waitForSessionData, 100);
       },
-      onError(error) {
+      onError(error: any) {
         that.searching.set(false);
         that.hasResults.set(false);
         that.serverError.set(true);
@@ -107,8 +136,9 @@ export class CardSearchPaged {
     this.debug.set(new QueryDebug());
   }
 
-  getSessionData(sessionId) {
-    const sessionIdToUse = sessionId || SessionData.getSessionId();
+  getSessionData(sessionId?: string) {
+    // getSessionId is attached to the model at runtime, not on the base Collection.
+    const sessionIdToUse = sessionId || (SessionData as any).getSessionId();
 
     // Use SessionData.findOne() directly - it's synchronous on the client
     const sessionData = SessionData.findOne({
@@ -121,7 +151,7 @@ export class CardSearchPaged {
 
   getResults() {
     this.sessionData = this.getSessionData();
-    const cards = [];
+    const cards: any[] = []; // matched card documents (untyped Mongo docs)
 
     if (this.sessionData && this.sessionData.cards && this.sessionData.cards.length > 0) {
       Cards.find({ _id: { $in: this.sessionData.cards } }).forEach(card => {
@@ -175,7 +205,7 @@ export class CardSearchPaged {
     }
   }
 
-  getSubscription(queryParams) {
+  getSubscription(queryParams: QueryParams) {
     // Subscribe to globalSearch which includes sessionData as the 11th cursor
     const globalSearchHandle = Meteor.subscribe(
       'globalSearch',
@@ -188,7 +218,7 @@ export class CardSearchPaged {
     return globalSearchHandle;
   }
 
-  runGlobalSearch(queryParams) {
+  runGlobalSearch(queryParams: QueryParams) {
     this.searching.set(true);
     this.debug.set(new QueryDebug());
     this.stopSubscription();
@@ -196,9 +226,9 @@ export class CardSearchPaged {
   }
 
   queryErrorMessages() {
-    const messages = [];
+    const messages: string[] = [];
 
-    this.queryErrors.forEach(err => {
+    this.queryErrors.forEach((err: any) => {
       let value = err.color ? TAPi18n.__(`color-${err.value}`) : err.value;
       if (!value) {
         value = err.value;
@@ -249,4 +279,9 @@ export class CardSearchPaged {
     const baseUrl = window.location.href.replace(/([?#].*$|\s*$)/, '');
     return `${baseUrl}?q=${encodeURIComponent(this.query.get())}`;
   }
+}
+
+interface QueryParams {
+  params: any; // parsed search operator params (dynamic shape from query-classes)
+  text: any; // raw/normalized search text payload
 }

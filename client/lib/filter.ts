@@ -23,12 +23,12 @@ import {
 } from '/imports/lib/dateUtils';
 // Sidebar is imported late to avoid circular dependency (sidebar.js needs its
 // jade template loaded first, but router.js → filter.js would load it too early)
-let _Sidebar;
+let _Sidebar: (() => any) | undefined;
 function getSidebar() {
   if (!_Sidebar) {
     _Sidebar = require('/client/features/sidebar/service').getSidebarInstance;
   }
-  return _Sidebar();
+  return _Sidebar!();
 }
 
 // Filtered view manager
@@ -41,6 +41,10 @@ function showFilterSidebar() {
 }
 
 class DateFilter {
+  _dep: Tracker.Dependency;
+  subField: string;
+  _filter: any; // mongo date selector object (e.g. { $lte: Date }) or null
+  _filterState: string | null;
   constructor() {
     this._dep = new Tracker.Dependency();
     this.subField = ''; // Prevent name mangling in Filter
@@ -48,7 +52,7 @@ class DateFilter {
     this._filterState = null;
   }
 
-  _updateState(state) {
+  _updateState(state: string | null) {
     this._filterState = state;
     showFilterSidebar();
     this._dep.changed();
@@ -96,7 +100,7 @@ class DateFilter {
 
   // relativeDay builds a filter starting from now and including all
   // days up to today +/- offset.
-  relativeDay(offset) {
+  relativeDay(offset: number) {
     if (this._filterState == 'day') {
       this.reset();
       return;
@@ -118,7 +122,7 @@ class DateFilter {
   // or 7 days after (for next week) and including all
   // weeks up to today +/- offset. This considers the user's preferred
   // start of week day (as defined by Meteor).
-  relativeWeek(offset, week) {
+  relativeWeek(offset: number, week: string) {
     if (this._filterState == 'thisweek') {
       this.reset();
       return;
@@ -136,16 +140,18 @@ class DateFilter {
     const currentUser = ReactiveCache.getCurrentUser();
     const weekStartDay = currentUser ? currentUser.getStartDayOfWeek() : 1;
 
+    let WeekStart!: Date;
+    let WeekEnd!: Date;
     if (week === 'this') {
       // Create week start and end dates
-      var WeekStart = startOf(add(startOf(now(), 'week'), weekStartDay, 'days'), 'day');
-      var WeekEnd = endOf(add(WeekStart, 6, 'days'), 'day');
+      WeekStart = startOf(add(startOf(now(), 'week'), weekStartDay, 'days'), 'day');
+      WeekEnd = endOf(add(WeekStart, 6, 'days'), 'day');
 
       this._updateState('thisweek');
     } else if (week === 'next') {
       // Create next week start and end dates
-      var WeekStart = startOf(add(startOf(now(), 'week'), weekStartDay + 7, 'days'), 'day');
-      var WeekEnd = endOf(add(WeekStart, 6, 'days'), 'day');
+      WeekStart = startOf(add(startOf(now(), 'week'), weekStartDay + 7, 'days'), 'day');
+      WeekEnd = endOf(add(WeekStart, 6, 'days'), 'day');
 
      this._updateState('nextweek');
     }
@@ -176,7 +182,7 @@ class DateFilter {
     this._dep.changed();
   }
 
-  isSelected(val) {
+  isSelected(val: string) {
     this._dep.depend();
     return this._filterState == val;
   }
@@ -198,13 +204,16 @@ class DateFilter {
 }
 
 class StringFilter {
+  _dep: Tracker.Dependency;
+  subField: string;
+  _filter: string;
   constructor() {
     this._dep = new Tracker.Dependency();
     this.subField = ''; // Prevent name mangling in Filter
     this._filter = '';
   }
 
-  set(str) {
+  set(str: string) {
     this._filter = str;
     this._dep.changed();
   }
@@ -235,25 +244,28 @@ class StringFilter {
 // use "subField" for searching inside object Fields.
 // For instance '{ 'customFields._id': ['field1','field2']} (subField would be: _id)
 class SetFilter {
-  constructor(subField = '') {
+  _dep: Tracker.Dependency;
+  _selectedElements: any[]; // filter values (ids/strings); may include undefined for empty
+  subField: string;
+  constructor(subField: string = '') {
     this._dep = new Tracker.Dependency();
     this._selectedElements = [];
     this.subField = subField;
   }
 
-  isSelected(val) {
+  isSelected(val: any) {
     this._dep.depend();
     return this._selectedElements.indexOf(val) > -1;
   }
 
-  add(val) {
+  add(val: any) {
     if (this._indexOfVal(val) === -1) {
       this._selectedElements.push(val);
       this._dep.changed();
     }
   }
 
-  remove(val) {
+  remove(val: any) {
     const indexOfVal = this._indexOfVal(val);
     if (this._indexOfVal(val) !== -1) {
       this._selectedElements.splice(indexOfVal, 1);
@@ -261,7 +273,7 @@ class SetFilter {
     }
   }
 
-  toggle(val) {
+  toggle(val: any) {
     if (this._indexOfVal(val) === -1) {
       this.add(val);
     } else {
@@ -274,7 +286,7 @@ class SetFilter {
     this._dep.changed();
   }
 
-  _indexOfVal(val) {
+  _indexOfVal(val: any) {
     return this._selectedElements.indexOf(val);
   }
 
@@ -293,7 +305,7 @@ class SetFilter {
   _getEmptySelector() {
     this._dep.depend();
     let includeEmpty = false;
-    this._selectedElements.forEach(el => {
+    this._selectedElements.forEach((el: any) => {
       if (el === undefined) {
         includeEmpty = true;
       }
@@ -309,13 +321,16 @@ class SetFilter {
 // Advanced filter forms a MongoSelector from a users String.
 // Build by: Ignatz 19.05.2018 (github feuerball11)
 class AdvancedFilter {
+  _dep: Tracker.Dependency;
+  _filter: string;
+  _lastValide: any; // last valid mongo selector produced from the filter string
   constructor() {
     this._dep = new Tracker.Dependency();
     this._filter = '';
     this._lastValide = {};
   }
 
-  set(str) {
+  set(str: string) {
     this._filter = str;
     this._dep.changed();
   }
@@ -383,14 +398,14 @@ class AdvancedFilter {
     return commands;
   }
 
-  _fieldNameToId(field) {
+  _fieldNameToId(field: string) {
     const found = ReactiveCache.getCustomField({
       name: field,
     });
     return found._id;
   }
 
-  _fieldValueToId(field, value) {
+  _fieldValueToId(field: string, value: any) {
     const found = ReactiveCache.getCustomField({
       name: field,
     });
@@ -407,7 +422,8 @@ class AdvancedFilter {
     return value;
   }
 
-  _arrayToSelector(commands) {
+  // `commands` is the parsed token list, progressively mutated into mongo sub-selectors, hence `any[]`.
+  _arrayToSelector(commands: any[]) {
     try {
       //let changed = false;
       this._processSubCommands(commands);
@@ -422,7 +438,7 @@ class AdvancedFilter {
     };
   }
 
-  _processSubCommands(commands) {
+  _processSubCommands(commands: any[]) {
     const subcommands = [];
     let level = 0;
     let start = -1;
@@ -460,7 +476,7 @@ class AdvancedFilter {
     this._processLogicalOperators(commands);
   }
 
-  _processConditions(commands) {
+  _processConditions(commands: any[]) {
     for (let i = 0; i < commands.length; i++) {
       if (!commands[i].string && commands[i].cmd) {
         switch (commands[i].cmd) {
@@ -602,7 +618,7 @@ class AdvancedFilter {
     }
   }
 
-  _processLogicalOperators(commands) {
+  _processLogicalOperators(commands: any[]) {
     for (let i = 0; i < commands.length; i++) {
       if (!commands[i].string && commands[i].cmd) {
         switch (commands[i].cmd) {
@@ -675,7 +691,7 @@ class AdvancedFilter {
 // XXX It would be possible to re-write this object more elegantly, and removing
 // the need to provide a list of `_fields`. We also should move methods into the
 // object prototype.
-export const Filter = {
+export const Filter: FilterType = {
   // XXX I would like to rename this field into `labels` to be consistent with
   // the rest of the schema, but we need to set some migrations architecture
   // before changing the schema.
@@ -723,8 +739,8 @@ export const Filter = {
   _getMongoSelector() {
     if (!this.isActive()) return {};
 
-    const filterSelector = {};
-    const emptySelector = {};
+    const filterSelector: Record<string, any> = {};
+    const emptySelector: Record<string, any> = {};
     let includeEmptySelectors = false;
     let isFilterActive = false; // we don't want there is only Filter.lists
     this._fields.forEach(fieldName => {
@@ -752,7 +768,7 @@ export const Filter = {
     };
     this._exceptionsDep.depend();
 
-    const selectors = [exceptionsSelector];
+    const selectors: any[] = [exceptionsSelector];
 
     if (
       this._fields.some(fieldName => {
@@ -780,7 +796,7 @@ export const Filter = {
     }
   },
 
-  mongoSelector(additionalSelector) {
+  mongoSelector(additionalSelector?: any) {
     const filterSelector = this._getMongoSelector();
     if (additionalSelector === undefined) return filterSelector;
     else
@@ -799,7 +815,7 @@ export const Filter = {
     this.resetExceptions();
   },
 
-  addException(_id) {
+  addException(_id: string) {
     if (this.isActive()) {
       this._exceptions.push(_id);
       this._exceptionsDep.changed();
@@ -814,3 +830,30 @@ export const Filter = {
 };
 
 Blaze.registerHelper('Filter', Filter);
+
+// The global Filter aggregates per-field sub-filters plus reactive exception
+// bookkeeping. The string index signature covers dynamic `this[fieldName]`
+// access driven by the `_fields` list.
+interface FilterType {
+  labelIds: SetFilter;
+  members: SetFilter;
+  assignees: SetFilter;
+  archive: SetFilter;
+  hideEmpty: SetFilter;
+  dueAt: DateFilter;
+  title: StringFilter;
+  customFields: SetFilter;
+  cardDependencies: SetFilter;
+  advanced: AdvancedFilter;
+  lists: AdvancedFilter;
+  _fields: string[];
+  _exceptions: string[];
+  _exceptionsDep: Tracker.Dependency;
+  isActive(): boolean;
+  _getMongoSelector(): any;
+  mongoSelector(additionalSelector?: any): any;
+  reset(): void;
+  addException(_id: string): void;
+  resetExceptions(): void;
+  [key: string]: any;
+}
