@@ -8,7 +8,7 @@ import { EscapeActions } from '/client/lib/escapeActions';
 import { Filter } from '/client/lib/filter';
 import { Utils } from '/client/lib/utils';
 
-let previousPath;
+let previousPath: string | undefined;
 
 FlowRouter.triggers.exit([
   ({ path }) => {
@@ -20,7 +20,7 @@ FlowRouter.triggers.exit([
 // addressable via their own URL suffixes (#5850) so they can be linked and
 // redirected to; the chosen view is passed to boardList through the
 // `boardListMenu` Session value.
-function renderBoardList(ctx, menu) {
+function renderBoardList(ctx: WekanRouteContext, menu: string) {
   // Redirect to sign-in immediately if user is not logged in
   if (!Meteor.userId()) {
     FlowRouter.go('atSignIn');

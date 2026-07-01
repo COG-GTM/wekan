@@ -15,38 +15,38 @@ let oauthServerUrl = "home";
 let oauthDashboardUrl = "";
 let oauthLogoutUrl = "";
 
-Meteor.call('isOidcRedirectionEnabled', (_, result) => {
+Meteor.call('isOidcRedirectionEnabled', (_: Meteor.Error | undefined, result: boolean) => {
   if(result)
   {
     oidcRedirectionEnabled = true;
   }
 });
 
-Meteor.call('getOauthLogoutUrl', (_, result) => {
+Meteor.call('getOauthLogoutUrl', (_: Meteor.Error | undefined, result: string) => {
   if (result) {
     oauthLogoutUrl = result;
   }
 });
 
-Meteor.call('isPasswordLoginEnabled', (_, result) => {
+Meteor.call('isPasswordLoginEnabled', (_: Meteor.Error | undefined, result: boolean) => {
   if (result) {
     passwordLoginEnabled = true;
   }
 });
 
-Meteor.call('getOauthServerUrl', (_, result) => {
+Meteor.call('getOauthServerUrl', (_: Meteor.Error | undefined, result: string) => {
   if (result) {
     oauthServerUrl = result;
   }
 });
 
-Meteor.call('getOauthDashboardUrl', (_, result) => {
+Meteor.call('getOauthDashboardUrl', (_: Meteor.Error | undefined, result: string) => {
   if (result) {
     oauthDashboardUrl = result;
   }
 });
 
-Meteor.call('isDisableRegistration', (_, result) => {
+Meteor.call('isDisableRegistration', (_: Meteor.Error | undefined, result: boolean) => {
   if (result) {
     disableRegistration = true;
     // Note: AccountsTemplates.configure() cannot be called here because
@@ -55,7 +55,7 @@ Meteor.call('isDisableRegistration', (_, result) => {
   }
 });
 
-Meteor.call('isDisableForgotPassword', (_, result) => {
+Meteor.call('isDisableForgotPassword', (_: Meteor.Error | undefined, result: boolean) => {
   if (result) {
     disableForgotPassword = true;
   }
@@ -112,7 +112,7 @@ AccountsTemplates.configure({
         let errorMessage = error.reason || error.message || 'Registration failed. Please try again.';
         // If there are validation details, show them
         if (error.details && typeof error.details === 'object') {
-          const detailMessages = [];
+          const detailMessages: string[] = [];
           for (let field in error.details) {
             const errorMsg = error.details[field];
             if (errorMsg) {
@@ -136,11 +136,11 @@ AccountsTemplates.configure({
       // come back to Wekan via post_logout_redirect_uri. Without this, autologin
       // would silently sign the user back in, or the provider would land them on
       // its own home page (which errors for non-admin users). See issue #6158.
-      window.location = oauthLogoutUrl;
+      window.location = oauthLogoutUrl as string & Location;
     }
     else if(oidcRedirectionEnabled)
     {
-      window.location = oauthServerUrl + oauthDashboardUrl;
+      window.location = (oauthServerUrl + oauthDashboardUrl) as string & Location;
     }
     else
     {
@@ -210,10 +210,13 @@ if (Meteor.isServer) {
     'enrollAccount-text',
   ].forEach(str => {
     const [templateName, field] = str.split('-');
-    Accounts.emailTemplates[templateName][field] = (user, url) =>
+    (Accounts.emailTemplates as object as WekanEmailTemplates)[templateName][
+      field
+    ] = (user, url) =>
       buildEmailTemplateField(
         str,
-        (key, params, language) => TAPi18n.__(key, params, language),
+        (key: string, params: Record<string, string>, language: string) =>
+          TAPi18n.__(key, params, language),
         Accounts.emailTemplates.siteName,
         user,
         url,
@@ -226,8 +229,25 @@ if (Meteor.isServer) {
   // Wrap the reset-password email send so the failure surfaces as a clean,
   // actionable `Meteor.Error('email-fail', ...)` instead, matching how the rest of
   // Wekan reports email failures (see server/models/users.js, settings.js).
-  Accounts.sendResetPasswordEmail = wrapSendResetPasswordEmail(
+  (Accounts as {
+    sendResetPasswordEmail: ResetPasswordEmailSender;
+  }).sendResetPasswordEmail = wrapSendResetPasswordEmail(
     Accounts.sendResetPasswordEmail,
-    (code, message) => new Meteor.Error(code, message),
+    (code: string, message: string) => new Meteor.Error(code, message),
   );
 }
+
+// Shape of Meteor's `Accounts.emailTemplates` when treated as a dynamic map of
+// template name -> field -> builder function (indexed by runtime strings).
+type EmailTemplateBuilder = (user: Meteor.User, url: string) => string;
+interface WekanEmailTemplates {
+  [templateName: string]: { [field: string]: EmailTemplateBuilder };
+}
+
+// Signature of the reset-password email sender we wrap on the server.
+type ResetPasswordEmailSender = (
+  userId: string,
+  email?: string,
+  extraTokenData?: Record<string, string>,
+  extraParams?: Record<string, string>,
+) => void;

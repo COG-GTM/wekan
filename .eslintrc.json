@@ -16,6 +16,16 @@
     "ecmaVersion": 2018,
     "sourceType": "module"
   },
+  "overrides": [
+    {
+      "files": ["*.ts", "*.tsx"],
+      "parser": "@typescript-eslint/parser",
+      "parserOptions": {
+        "ecmaVersion": 2022,
+        "sourceType": "module"
+      }
+    }
+  ],
   "rules": {
     "strict": 0,
     "no-undef": 0,
@@ -97,7 +107,9 @@
       "meteor": {
         "extensions": [
           ".js",
-          ".jsx"
+          ".jsx",
+          ".ts",
+          ".tsx"
         ]
       }
     }

@@ -1,0 +1,54 @@
+{
+  // NOTE: This is the SHARED root TypeScript config for the incremental
+  // JavaScript -> TypeScript migration of the Wekan Meteor app.
+  //
+  // `allowJs` / `checkJs` below are INTENTIONALLY INTERMEDIATE settings. The
+  // Wekan root app has dense cross-module imports (including Meteor-style
+  // absolute imports with a leading slash) and import cycles, so a migrated
+  // `.ts` file frequently imports not-yet-migrated `.js` siblings. With
+  // `"allowJs": true, "checkJs": false`, those remaining `.js` files resolve as
+  // imports but are NOT type-checked; only `.ts`/`.tsx` files are type-checked.
+  // The FINAL validation session will flip `"allowJs": false` once every source
+  // `.js` file has been migrated to TypeScript.
+  "compilerOptions": {
+    "target": "ES2022",
+    "moduleResolution": "node",
+    "moduleDetection": "force",
+    "strict": true,
+    "noImplicitAny": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": false,
+    "forceConsistentCasingInFileNames": true,
+    "useUnknownInCatchVariables": false,
+    "jsx": "preserve",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "baseUrl": ".",
+    "paths": {
+      "/*": ["./*"]
+    }
+  },
+  "include": [
+    "config/**/*.ts",
+    "config/**/*.tsx",
+    "models/**/*.ts",
+    "imports/**/*.ts",
+    "server/**/*.ts",
+    "client/**/*.ts",
+    "client/**/*.tsx",
+    "*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".meteor",
+    "packages",
+    "npm-packages",
+    "tests",
+    "public",
+    "docs"
+  ]
+}

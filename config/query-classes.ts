@@ -74,9 +74,9 @@ import {
 import Boards from '../models/boards';
 
 export class QueryDebug {
-  predicate = null;
+  predicate: string | null = null;
 
-  constructor(predicate) {
+  constructor(predicate?: string | null) {
     if (predicate) {
       this.set(predicate)
     }
@@ -86,9 +86,9 @@ export class QueryDebug {
     return this.predicate;
   }
 
-  set(predicate) {
+  set(predicate: string | null) {
     if ([PREDICATE_ALL, PREDICATE_SELECTOR, PREDICATE_PROJECTION].includes(
-      predicate
+      predicate as string
     )) {
       this.predicate = predicate;
     } else {
@@ -114,36 +114,37 @@ export class QueryDebug {
 }
 
 export class QueryParams {
+  params: QueryParamsMap;
   text = '';
 
-  constructor(params = {}, text = '') {
+  constructor(params: QueryParamsMap = {}, text = '') {
     this.params = params;
     this.text = text;
   }
 
-  hasOperator(operator) {
+  hasOperator(operator: string) {
+    const value = this.params[operator] as { length?: number } | undefined;
     return (
-      this.params[operator] !== undefined &&
-      (this.params[operator].length === undefined ||
-        this.params[operator].length > 0)
+      value !== undefined &&
+      (value.length === undefined || value.length > 0)
     );
   }
 
-  addPredicate(operator, predicate) {
+  addPredicate(operator: string, predicate: QueryPredicateValue) {
     if (!this.hasOperator(operator)) {
       this.params[operator] = [];
     }
-    this.params[operator].push(predicate);
+    (this.params[operator] as QueryPredicateValue[]).push(predicate);
   }
 
-  setPredicate(operator, predicate) {
+  setPredicate(operator: string, predicate: QueryPredicateValue) {
     this.params[operator] = predicate;
   }
 
-  getPredicate(operator) {
+  getPredicate(operator: string) {
     if (this.hasOperator(operator)){
       if (typeof this.params[operator] === 'object') {
-        return this.params[operator][0];
+        return (this.params[operator] as QueryPredicateValue[])[0];
       } else {
         return this.params[operator];
       }
@@ -151,7 +152,7 @@ export class QueryParams {
     return null;
   }
 
-  getPredicates(operator) {
+  getPredicates(operator: string) {
     return this.params[operator];
   }
 
@@ -161,13 +162,13 @@ export class QueryParams {
 }
 
 export class QueryErrors {
-  operatorTagMap = [
+  operatorTagMap: OperatorTagMapEntry[] = [
     [OPERATOR_BOARD, 'board-title-not-found'],
     [OPERATOR_SWIMLANE, 'swimlane-title-not-found'],
     [
       OPERATOR_LABEL,
       label => {
-        if (Boards.labelColors().includes(label)) {
+        if ((Boards as object as WekanBoardsModel).labelColors().includes(label)) {
           return {
             tag: 'label-color-not-found',
             value: label,
@@ -192,6 +193,10 @@ export class QueryErrors {
     [OPERATOR_TEAM, 'team-name-not-found'],
   ];
 
+  _errors: Record<string, QueryError[]>;
+  operatorTags: Record<string, string | OperatorTagResolver>;
+  colorMap: Record<string, string>;
+
   constructor() {
     this._errors = {};
 
@@ -200,21 +205,22 @@ export class QueryErrors {
       this.operatorTags[operator] = tag;
     });
 
-    this.colorMap = Boards.colorMap();
+    this.colorMap = (Boards as object as WekanBoardsModel).colorMap();
   }
 
-  addError(operator, error) {
+  addError(operator: string, error: QueryError) {
     if (!this._errors[operator]) {
       this._errors[operator] = [];
     }
     this._errors[operator].push(error);
   }
 
-  addNotFound(operator, value) {
-    if (typeof this.operatorTags[operator] === 'function') {
-      this.addError(operator, this.operatorTags[operator](value));
+  addNotFound(operator: string, value: string) {
+    const operatorTag = this.operatorTags[operator];
+    if (typeof operatorTag === 'function') {
+      this.addError(operator, operatorTag(value));
     } else {
-      this.addError(operator, { tag: this.operatorTags[operator], value });
+      this.addError(operator, { tag: operatorTag, value });
     }
   }
 
@@ -223,7 +229,7 @@ export class QueryErrors {
   }
 
   errors() {
-    const errs = [];
+    const errs: QueryError[] = [];
     // eslint-disable-next-line no-unused-vars
     Object.entries(this._errors).forEach(([, errors]) => {
       errors.forEach(err => {
@@ -234,7 +240,7 @@ export class QueryErrors {
   }
 
   errorMessages() {
-    const messages = [];
+    const messages: string[] = [];
     // eslint-disable-next-line no-unused-vars
     Object.entries(this._errors).forEach(([, errors]) => {
       errors.forEach(err => {
@@ -246,13 +252,17 @@ export class QueryErrors {
 }
 
 export class Query {
-  selector = {};
-  projection = {};
+  selector: MongoSelector = {};
+  projection: MongoSelector = {};
 
-  constructor(selector, projection) {
+  _errors: QueryErrors;
+  queryParams: QueryParams;
+  colorMap: Record<string, string>;
+
+  constructor(selector?: MongoSelector, projection?: MongoSelector) {
     this._errors = new QueryErrors();
     this.queryParams = new QueryParams();
-    this.colorMap = Boards.colorMap();
+    this.colorMap = (Boards as object as WekanBoardsModel).colorMap();
 
     if (selector) {
       this.selector = selector;
@@ -271,7 +281,7 @@ export class Query {
     return this._errors.errors();
   }
 
-  addError(operator, error) {
+  addError(operator: string, error: QueryError) {
     this._errors.addError(operator, error)
   }
 
@@ -283,15 +293,15 @@ export class Query {
     return this.queryParams;
   }
 
-  setQueryParams(queryParams) {
+  setQueryParams(queryParams: QueryParams) {
     this.queryParams = queryParams;
   }
 
-  addPredicate(operator, predicate) {
+  addPredicate(operator: string, predicate: QueryPredicateValue) {
     this.queryParams.addPredicate(operator, predicate);
   }
 
-  buildParams(queryText) {
+  buildParams(queryText: string) {
     this.queryParams = new QueryParams();
 
     queryText = queryText.trim();
@@ -317,7 +327,7 @@ export class Query {
     );
     const reNegatedOperator = new RegExp('^-(?<operator>.*)$');
 
-    const operators = {
+    const operators: Record<string, string> = {
       'operator-board': OPERATOR_BOARD,
       'operator-board-abbrev': OPERATOR_BOARD,
       'operator-swimlane': OPERATOR_SWIMLANE,
@@ -351,7 +361,7 @@ export class Query {
       'operator-checklist-text': OPERATOR_CHECKLIST_TEXT,
     };
 
-    const predicates = {
+    const predicates: Record<string, Record<string, string>> = {
       durations: {
         'predicate-week': PREDICATE_WEEK,
         'predicate-month': PREDICATE_MONTH,
@@ -391,7 +401,7 @@ export class Query {
       'predicate-projection': PREDICATE_PROJECTION,
     };
 
-    const predicateTranslations = {};
+    const predicateTranslations: Record<string, Record<string, string>> = {};
     Object.entries(predicates).forEach(([category, catPreds]) => {
       predicateTranslations[category] = {};
       Object.entries(catPreds).forEach(([tag, value]) => {
@@ -401,7 +411,7 @@ export class Query {
     // eslint-disable-next-line no-console
     // console.log('predicateTranslations:', predicateTranslations);
 
-    const operatorMap = {};
+    const operatorMap: Record<string, string> = {};
     Object.entries(operators).forEach(([key, value]) => {
       operatorMap[TAPi18n.__(key).toLowerCase()] = value;
     });
@@ -421,18 +431,18 @@ export class Query {
       }
       if (m) {
         let op;
-        if (m.groups.operator) {
-          op = m.groups.operator.toLowerCase();
+        if (m.groups!.operator) {
+          op = m.groups!.operator.toLowerCase();
         } else {
-          op = m.groups.abbrev.toLowerCase();
+          op = m.groups!.abbrev.toLowerCase();
         }
         // eslint-disable-next-line no-prototype-builtins
         if (operatorMap.hasOwnProperty(op)) {
           const operator = operatorMap[op];
-          let value = m.groups.value;
+          let value: QueryPredicateValue = m.groups!.value;
           if (operator === OPERATOR_LABEL) {
-            if (value in this.colorMap) {
-              value = this.colorMap[value];
+            if ((value as string) in this.colorMap) {
+              value = this.colorMap[value as string];
               // console.log('found color:', value);
             }
           } else if (
@@ -440,13 +450,13 @@ export class Query {
               operator,
             )
           ) {
-            const days = parseInt(value, 10);
-            let duration = null;
+            const days = parseInt(value as string, 10);
+            let duration: string | null = null;
             if (isNaN(days)) {
               // duration was specified as text
-              if (predicateTranslations.durations[value]) {
-                duration = predicateTranslations.durations[value];
-                let date = null;
+              if (predicateTranslations.durations[value as string]) {
+                duration = predicateTranslations.durations[value as string];
+                let date: Date | null = null;
                 switch (duration) {
                   case PREDICATE_WEEK:
                     // eslint-disable-next-line no-case-declarations
@@ -501,7 +511,7 @@ export class Query {
               } else {
                 this.addError(OPERATOR_DUE, {
                   tag: 'operator-number-expected',
-                  value: { operator: op, value },
+                  value: { operator: op, value: value as string },
                 });
                 continue;
               }
@@ -518,58 +528,58 @@ export class Query {
             }
           } else if (operator === OPERATOR_SORT) {
             let negated = false;
-            const m = value.match(reNegatedOperator);
+            const m = (value as string).match(reNegatedOperator);
             if (m) {
-              value = m.groups.operator;
+              value = m.groups!.operator;
               negated = true;
             }
-            if (!predicateTranslations[OPERATOR_SORT][value]) {
+            if (!predicateTranslations[OPERATOR_SORT][value as string]) {
               this.addError(OPERATOR_SORT, {
                 tag: 'operator-sort-invalid',
-                value,
+                value: value as string,
               });
               continue;
             } else {
               value = {
-                name: predicateTranslations[OPERATOR_SORT][value],
+                name: predicateTranslations[OPERATOR_SORT][value as string],
                 order: negated ? ORDER_DESCENDING : ORDER_ASCENDING,
               };
             }
           } else if (operator === OPERATOR_STATUS) {
-            if (!predicateTranslations[OPERATOR_STATUS][value]) {
+            if (!predicateTranslations[OPERATOR_STATUS][value as string]) {
               this.addError(OPERATOR_STATUS, {
                 tag: 'operator-status-invalid',
-                value,
+                value: value as string,
               });
               continue;
             } else {
-              value = predicateTranslations[OPERATOR_STATUS][value];
+              value = predicateTranslations[OPERATOR_STATUS][value as string];
             }
           } else if (operator === OPERATOR_HAS) {
             let negated = false;
-            const m = value.match(reNegatedOperator);
+            const m = (value as string).match(reNegatedOperator);
             if (m) {
-              value = m.groups.operator;
+              value = m.groups!.operator;
               negated = true;
             }
-            if (!predicateTranslations[OPERATOR_HAS][value]) {
+            if (!predicateTranslations[OPERATOR_HAS][value as string]) {
               this.addError(OPERATOR_HAS, {
                 tag: 'operator-has-invalid',
-                value,
+                value: value as string,
               });
               continue;
             } else {
               value = {
-                field: predicateTranslations[OPERATOR_HAS][value],
+                field: predicateTranslations[OPERATOR_HAS][value as string],
                 exists: !negated,
               };
             }
           } else if (operator === OPERATOR_LIMIT) {
-            const limit = parseInt(value, 10);
+            const limit = parseInt(value as string, 10);
             if (isNaN(limit) || limit < 0) {
               this.addError(OPERATOR_LIMIT, {
                 tag: 'operator-limit-invalid',
-                value,
+                value: value as string,
               });
               continue;
             } else if (limit == 0) {
@@ -579,14 +589,14 @@ export class Query {
               value = limit;
             }
           } else if (operator === OPERATOR_DEBUG) {
-            if (!predicateTranslations[OPERATOR_DEBUG][value]) {
+            if (!predicateTranslations[OPERATOR_DEBUG][value as string]) {
               this.addError(OPERATOR_DEBUG, {
                 tag: 'operator-debug-invalid',
-                value,
+                value: value as string,
               });
               continue;
             } else {
-              value = predicateTranslations[OPERATOR_DEBUG][value];
+              value = predicateTranslations[OPERATOR_DEBUG][value as string];
             }
           }
 
@@ -610,7 +620,7 @@ export class Query {
         queryText = queryText.replace(reQuotedText, '');
       }
       if (m) {
-        text += (text ? ' ' : '') + m.groups.text;
+        text += (text ? ' ' : '') + m.groups!.text;
       }
     }
 
@@ -623,4 +633,60 @@ export class Query {
       console.log('queryParams:', this.queryParams);
     }
   }
+}
+
+// A single parsed predicate value produced by the query parser. It starts as a
+// raw string token and may be narrowed/transformed into a structured predicate
+// (date range, sort spec, existence check) or a numeric limit.
+type QueryPredicateValue =
+  | string
+  | number
+  | { operator: string; value: string }
+  | { name: string; order: string }
+  | { field: string; exists: boolean };
+
+// Map of search operator -> the predicate(s) recorded for it. A given operator
+// may hold either a list of predicates (the common case) or a single scalar
+// predicate set via setPredicate.
+interface QueryParamsMap {
+  [operator: string]: QueryPredicateValue[] | QueryPredicateValue;
+}
+
+// The `value` payload attached to a query error, either a raw token or an
+// operator/value pair describing the offending input.
+type QueryErrorValue = string | { operator: string; value: string };
+
+// A single query parse error, translated to a user-facing message via TAPi18n.
+interface QueryError {
+  tag: string;
+  value?: QueryErrorValue;
+  color?: boolean;
+}
+
+// Resolver used for operators (e.g. label) whose error tag depends on the value.
+type OperatorTagResolver = (label: string) => QueryError;
+
+// Entry in the operator -> error-tag map: either a static tag or a resolver.
+type OperatorTagMapEntry = [string, string | OperatorTagResolver];
+
+// A MongoDB selector/projection object passed into a Query. Kept intentionally
+// permissive (recursive record) since selectors are built dynamically.
+// Wekan augments the Boards Mongo.Collection with helper methods that are not
+// part of the base collection type; narrow to them where needed.
+interface WekanBoardsModel {
+  labelColors(): string[];
+  colorMap(): Record<string, string>;
+}
+
+interface MongoSelector {
+  [key: string]:
+    | string
+    | number
+    | boolean
+    | Date
+    | RegExp
+    | MongoSelector
+    | MongoSelector[]
+    | null
+    | undefined;
 }
