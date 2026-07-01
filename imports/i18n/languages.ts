@@ -1,4 +1,4 @@
-export default {
+const languages: Record<string, LanguageEntry> = {
   "ace": {
     code: "ace",
     tag: "ace",
@@ -994,3 +994,26 @@ export default {
     rtl: false,
   }
 };
+
+export default languages;
+export type { LanguageEntry, LanguageModule, TranslationMap };
+
+// A loaded translation bundle: a flat map of translation key -> string. A
+// dynamic `import()` of a JSON module can resolve either to the bare object or
+// to an ES-module namespace ({ default: {...} }), so both shapes are modelled.
+type TranslationMap = { [key: string]: string };
+
+interface LanguageModule {
+  __esModule?: boolean;
+  [Symbol.toStringTag]?: string;
+  default?: TranslationMap;
+  [key: string]: string | boolean | TranslationMap | undefined;
+}
+
+interface LanguageEntry {
+  code: string;
+  tag: string;
+  name: string;
+  load: () => Promise<LanguageModule>;
+  rtl: boolean;
+}

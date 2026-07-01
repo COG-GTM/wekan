@@ -1,22 +1,27 @@
 import { Meteor } from 'meteor/meteor';
 import { Tracker } from 'meteor/tracker';
 
-class ReactiveValueCache {
-  constructor(compare, shouldStop) {
+class ReactiveValueCache<V> {
+  private shouldStop: ShouldStopFn;
+  private compare: CompareFn<V>;
+  private values: Record<string, V>;
+  private deps: Record<string, Tracker.Dependency>;
+
+  constructor(compare?: CompareFn<V>, shouldStop?: ShouldStopFn) {
     this.shouldStop = shouldStop || (() => true);
     this.compare = compare || ((a, b) => a === b);
     this.values = {};
     this.deps = {};
   }
 
-  ensureDependency(key) {
+  ensureDependency(key: string) {
     if (!this.deps[key]) {
       this.deps[key] = new Tracker.Dependency();
     }
     return this.deps[key];
   }
 
-  checkDeletion(key) {
+  private checkDeletion(key: string) {
     const dep = this.ensureDependency(key);
     if (dep.hasDependents()) {
       return false;
@@ -26,7 +31,7 @@ class ReactiveValueCache {
     return true;
   }
 
-  del(key) {
+  del(key: string) {
     const dep = this.ensureDependency(key);
     delete this.values[key];
     if (this.checkDeletion(key)) {
@@ -35,7 +40,7 @@ class ReactiveValueCache {
     dep.changed();
   }
 
-  set(key, data, bypassCompare) {
+  set(key: string, data: V, bypassCompare?: boolean) {
     const dep = this.ensureDependency(key);
     const current = this.values[key];
     this.values[key] = data;
@@ -44,7 +49,7 @@ class ReactiveValueCache {
     }
   }
 
-  get(key) {
+  get(key: string) {
     const data = this.values[key];
     if (Tracker.currentComputation) {
       const dep = this.ensureDependency(key);
@@ -60,19 +65,28 @@ class ReactiveValueCache {
   }
 }
 
-class DataCache {
-  constructor(getData, options) {
+class DataCache<V> {
+  private options: { timeout: number; compare?: CompareFn<V> };
+  private getData: (key: string) => V;
+  private cache: ReactiveValueCache<V>;
+  private timeouts: Record<string, ReturnType<typeof setTimeout>>;
+  private computations: Record<string, Tracker.Computation>;
+
+  constructor(
+    getData: (key: string) => V,
+    options?: CompareFn<V> | DataCacheOptions<V>,
+  ) {
     this.options = {
       timeout: 60 * 1000,
       ...(typeof options === 'function' ? { compare: options } : options),
     };
     this.getData = getData;
-    this.cache = new ReactiveValueCache(this.options.compare, () => false);
+    this.cache = new ReactiveValueCache<V>(this.options.compare, () => false);
     this.timeouts = {};
     this.computations = {};
   }
 
-  ensureComputation(key) {
+  private ensureComputation(key: string) {
     if (this.timeouts[key]) {
       clearTimeout(this.timeouts[key]);
       delete this.timeouts[key];
@@ -89,7 +103,7 @@ class DataCache {
     this.computations[key].onInvalidate(() => this.checkStop(key));
   }
 
-  checkStop(key) {
+  private checkStop(key: string) {
     if (this.cache.ensureDependency(key).hasDependents()) {
       return;
     }
@@ -115,22 +129,34 @@ class DataCache {
     }, this.options.timeout);
   }
 
-  get(key) {
+  get(key?: string) {
+    // Some callers use DataCache as a single-value (keyless) cache and invoke
+    // get() with no key; the legacy runtime coerces the absent key to the
+    // "undefined" string when indexing, which this cast preserves.
+    const cacheKey = key as string;
     if (!Tracker.currentComputation) {
-      let data = this.cache.get(key);
+      let data = this.cache.get(cacheKey);
       if (data == null) {
-        data = this.getData(key);
-        this.cache.set(key, data);
-        this.checkStop(key);
+        data = this.getData(cacheKey);
+        this.cache.set(cacheKey, data);
+        this.checkStop(cacheKey);
       }
       return data;
     }
 
-    this.ensureComputation(key);
-    const data = this.cache.get(key);
-    Tracker.currentComputation.onStop(() => this.checkStop(key));
+    this.ensureComputation(cacheKey);
+    const data = this.cache.get(cacheKey);
+    Tracker.currentComputation.onStop(() => this.checkStop(cacheKey));
     return data;
   }
+}
+
+type CompareFn<V> = (a: V, b: V) => boolean;
+type ShouldStopFn = (key: string) => boolean;
+
+interface DataCacheOptions<V> {
+  timeout?: number;
+  compare?: CompareFn<V>;
 }
 
 export { DataCache };

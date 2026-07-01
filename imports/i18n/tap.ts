@@ -27,13 +27,13 @@ const getTranslationCollection = () => require('/models/translation').default;
 // supported languages, not just the plain lowercase ones (de, fr, …).
 
 // Carefully reproduced tap:i18n API
-export const TAPi18n = {
+export const TAPi18n: TAPi18nApi = {
   i18n: null,
   current: new ReactiveVar(DEFAULT_LANGUAGE),
   ready: new ReactiveVar(false),
   // Normalise a Wekan language tag to the code i18next stores/looks up under.
   // See the comment above for why both transforms are needed (#5756).
-  toI18nCode(language) {
+  toI18nCode(language: string) {
     if (!language) return language;
     const hyphenated = String(language).replace(/_/g, '-');
     const utils = this.i18n && this.i18n.services && this.i18n.services.languageUtils;
@@ -70,7 +70,7 @@ export const TAPi18n = {
     await TAPi18n.loadLanguage(DEFAULT_LANGUAGE);
     this.ready.set(true);
   },
-  isLanguageSupported(language) {
+  isLanguageSupported(language: string) {
     return Object.values(languages).some(({ tag }) => tag === language);
   },
   getSupportedLanguages() {
@@ -82,22 +82,22 @@ export const TAPi18n = {
   // Whether the given language (default: the current one) is written
   // right-to-left, from the `rtl` flag in languages.js. Reactive on the current
   // language so callers re-run when the user switches languages.
-  isRTL(language = this.current.get()) {
+  isRTL(this: TAPi18nApi, language: string = this.current.get()) {
     return Boolean(languages[language] && languages[language].rtl);
   },
   // 'rtl' or 'ltr' for the given/current language, suitable for the HTML `dir`
   // attribute.
-  getLanguageDirection(language) {
+  getLanguageDirection(language: string) {
     return this.isRTL(language) ? 'rtl' : 'ltr';
   },
-  loadTranslation(language) {
-    return new Promise((resolve, reject) => {
+  loadTranslation(language: string) {
+    return new Promise<Meteor.SubscriptionHandle | void>((resolve, reject) => {
       if (Meteor.isClient) {
         const translationSubscription = Meteor.subscribe('translation', {language: language},  0, {
           onReady() {
             resolve(translationSubscription);
           },
-          onError(error) {
+          onError(error: Meteor.Error) {
             reject(error);
           }
         });
@@ -106,7 +106,7 @@ export const TAPi18n = {
       }
     });
   },
-  async loadLanguage(language) {
+  async loadLanguage(language: string) {
     if (language in languages && 'load' in languages[language]) {
       let data = await languages[language].load();
       // Dynamic `import()` of a JSON module can resolve to an ES-module
@@ -126,10 +126,10 @@ export const TAPi18n = {
         data.default &&
         typeof data.default === 'object';
       if (isModuleNamespace) {
-        data = data.default;
+        data = data.default!;
       }
 
-      let custom_translations = [];
+      let custom_translations: TranslationDoc[] = [];
       await this.loadTranslation(language);
       const Translation = getTranslationCollection();
       const cursor = Translation.find(
@@ -161,7 +161,7 @@ export const TAPi18n = {
       throw new Error(`Language ${language} is not supported`);
     }
   },
-  async setLanguage(language) {
+  async setLanguage(language: string) {
     await this.loadLanguage(language);
     // Switch i18next using the same normalised code the bundle is stored under.
     await this.i18n.changeLanguage(this.toI18nCode(language));
@@ -173,14 +173,14 @@ export const TAPi18n = {
   // synchronous __() call. On the server only the default (English) bundle is
   // loaded at startup, so translating to a user's language (e.g. notification
   // emails) otherwise silently fell back to English. See #5875.
-  async ensureLanguageLoaded(language) {
+  async ensureLanguageLoaded(language?: string | null) {
     if (!language || !this.i18n) return;
     if (!this.isLanguageSupported(language)) return;
     if (this.i18n.hasResourceBundle(this.toI18nCode(language), DEFAULT_NAMESPACE)) return;
     await this.loadLanguage(language);
   },
   // Return translation by key
-  __(key, options, language) {
+  __(key: string, options?: string | object | null, language?: string) {
     this.current.dep.depend();
 
     // The global sprintf post-processor (`postProcess: ["sprintf"]`) throws when
@@ -188,11 +188,11 @@ export const TAPi18n = {
     // literal "%{value}" used in some help texts. That would crash the caller
     // (the global Blaze '_' helper). Retry without sprintf so such strings
     // render literally instead of throwing.
-    const translate = (lng, extra = {}) => {
+    const translate = (lng?: string, extra: object = {}) => {
       // Look the key up under the same normalised code the bundle is stored
       // under. `lng === undefined` means "use i18next's current language",
       // which setLanguage() already set to the normalised code.
-      const opts = { ...options, ...extra, lng: lng === undefined ? undefined : this.toI18nCode(lng) };
+      const opts = { ...(options as object), ...extra, lng: lng === undefined ? undefined : this.toI18nCode(lng) };
       try {
         return this.i18n.t(key, opts);
       } catch (e) {
@@ -218,3 +218,34 @@ export const TAPi18n = {
     return translation;
   }
 };
+
+interface TAPi18nApi {
+  // The i18next instance created in init(). Typed as `any` because the i18next
+  // instance surface is large and dynamic and the test suite swaps its methods
+  // out for stubs; every access here is interop with that untyped instance.
+  i18n: any;
+  current: ReactiveVar<string>;
+  ready: ReactiveVar<boolean>;
+  toI18nCode(language: string): string;
+  init(): Promise<void>;
+  isLanguageSupported(language: string): boolean;
+  getSupportedLanguages(): Array<{
+    name: string;
+    code: string;
+    tag: string;
+    rtl: boolean;
+  }>;
+  getLanguage(): string;
+  isRTL(language?: string): boolean;
+  getLanguageDirection(language?: string): string;
+  loadTranslation(language: string): Promise<Meteor.SubscriptionHandle | void>;
+  loadLanguage(language: string): Promise<void>;
+  setLanguage(language: string): Promise<void>;
+  ensureLanguageLoaded(language?: string | null): Promise<void>;
+  __(key: string, options?: string | object | null, language?: string): string;
+}
+
+interface TranslationDoc {
+  text?: string;
+  translationText?: string;
+}

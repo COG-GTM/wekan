@@ -46,6 +46,15 @@ declare module 'meteor/meteor' {
   }
 }
 
+// @types/meteor's ReactiveVar omits the underlying Tracker dependency that
+// Meteor exposes at runtime as `.dep`; the i18n layer depends on it directly to
+// re-run reactive translation lookups.
+declare module 'meteor/reactive-var' {
+  interface ReactiveVar<T> {
+    dep: Tracker.Dependency;
+  }
+}
+
 // @types/meteor bundles its own (older) `mongodb`, so the Db type behind
 // `defaultRemoteCollectionDriver().mongo.db` differs from the app's root
 // `mongodb`. Source the Db type from Meteor's own accessor so every GridFS call
@@ -170,6 +179,49 @@ declare module 'meteor/ostrio:flow-router-extra' {
 
   const FlowRouter: FlowRouterStatic;
   export { FlowRouter };
+}
+
+// communitypackages:core (useraccounts) — the T9n translation registry used by
+// the i18n/accounts layer to localise the login/account templates.
+declare module 'meteor/communitypackages:core' {
+  interface T9nStatic {
+    setTracker(options: { Tracker: object }): void;
+    map(language: string, translations: Record<string, string>): void;
+    setLanguage(language: string): void;
+  }
+
+  const T9n: T9nStatic;
+  export { T9n };
+}
+
+// i18next post-processor plugin shipped without type definitions; the i18n layer
+// only ever passes it straight to `i18next.use()`.
+declare module 'i18next-sprintf-postprocessor';
+
+// Spacebars appends a trailing keyword-arguments object (carrying `.hash`) to
+// every Blaze helper call; the leading positional arguments are the translation
+// key and its interpolation values.
+interface BlazeSpacebarsKeywords {
+  hash?: Record<string, string>;
+}
+
+type BlazeHelperArg =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | BlazeSpacebarsKeywords;
+
+// meteor/blaze exposes global template helpers via Blaze.registerHelper at
+// runtime, but @types/meteor only declares registerHelper on Template.
+declare module 'meteor/blaze' {
+  namespace Blaze {
+    function registerHelper(
+      name: string,
+      helper: (...args: BlazeHelperArg[]) => string,
+    ): void;
+  }
 }
 
 // ---------------------------------------------------------------------------

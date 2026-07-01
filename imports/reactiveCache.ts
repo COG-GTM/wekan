@@ -3,7 +3,7 @@ import { EJSON } from 'meteor/ejson';
 import { DataCache } from '/imports/lib/dataCache';
 import { groupBy, indexBy } from '/imports/lib/collectionHelpers';
 
-function lazyCollectionProxy(loadCollection) {
+function lazyCollectionProxy(loadCollection: () => WekanCollection): WekanCollection {
   return new Proxy(
     {},
     {
@@ -194,7 +194,7 @@ const ReactiveCacheServer = {
     }
     return ret;
   },
-  async getAttachments(selector = {}, options = {}, getQuery = false) {
+  async getAttachments(selector: MongoSelector = {}, options = {}, getQuery = false) {
     // Try new structure first
     let ret = Attachments.find(selector, options);
     if (getQuery !== true) {
@@ -363,12 +363,12 @@ const ReactiveCacheServer = {
 // only the Client is reactive
 // saving the result has a big advantage if the query is big and often searched for the same data again and again
 // if the data is changed in the client, the data is saved to the server and depending code is reactive called again
-const ReactiveCacheClient = {
+const ReactiveCacheClient: ReactiveCacheClientApi = {
   getBoard(idOrFirstObjectSelector = {}, options = {}) {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__board) {
       this.__board = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = Boards.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -383,7 +383,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__boards) {
       this.__boards = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = Boards.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -398,7 +398,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__list) {
       this.__list = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = Lists.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -413,7 +413,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__lists) {
       this.__lists = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = Lists.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -428,7 +428,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__swimlane) {
       this.__swimlane = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = Swimlanes.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -443,7 +443,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__swimlanes) {
       this.__swimlanes = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = Swimlanes.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -458,7 +458,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__checklist) {
       this.__checklist = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = Checklists.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -473,7 +473,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__checklists) {
       this.__checklists = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = Checklists.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -488,7 +488,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__checklistItem) {
       this.__checklistItem = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = ChecklistItems.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -505,7 +505,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__checklistItems) {
       this.__checklistItems = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = ChecklistItems.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -527,7 +527,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__card) {
       this.__card = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = Cards.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -542,7 +542,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__cards) {
       this.__cards = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = Cards.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -557,7 +557,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__cardComment) {
       this.__cardComment = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = CardComments.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -572,7 +572,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__cardComments) {
       this.__cardComments = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = CardComments.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -587,7 +587,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__cardCommentReaction) {
       this.__cardCommentReaction = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = CardCommentReactions.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -604,7 +604,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__cardCommentReactions) {
       this.__cardCommentReactions = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = CardCommentReactions.find(
           __select.selector,
           __select.options,
@@ -622,7 +622,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__customField) {
       this.__customField = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = CustomFields.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -637,7 +637,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__customFields) {
       this.__customFields = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = CustomFields.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -652,7 +652,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__attachment) {
       this.__attachment = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         // Try new structure first
         let _ret = Attachments.findOne(
           __select.idOrFirstObjectSelector,
@@ -674,7 +674,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__attachments) {
       this.__attachments = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         // Try new structure first
         let _ret = Attachments.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
@@ -704,7 +704,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__avatar) {
       this.__avatar = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = Avatars.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -719,7 +719,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__avatars) {
       this.__avatars = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = Avatars.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -734,7 +734,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__user) {
       this.__user = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = Users.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -749,7 +749,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__users) {
       this.__users = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = Users.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -764,7 +764,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__org) {
       this.__org = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = Org.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -779,7 +779,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__orgs) {
       this.__orgs = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = Org.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -794,7 +794,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__team) {
       this.__team = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = Team.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -809,7 +809,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__teams) {
       this.__teams = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = Team.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -824,7 +824,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__activity) {
       this.__activity = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = Activities.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -839,7 +839,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__activities) {
       this.__activities = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = Activities.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -854,7 +854,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__rule) {
       this.__rule = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = Rules.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -869,7 +869,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__rules) {
       this.__rules = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = Rules.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -884,7 +884,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__action) {
       this.__action = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = Actions.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -899,7 +899,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__actions) {
       this.__actions = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = Actions.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -914,7 +914,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__trigger) {
       this.__trigger = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = Triggers.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -929,7 +929,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__triggers) {
       this.__triggers = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = Triggers.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -944,7 +944,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__impersonatedUser) {
       this.__impersonatedUser = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = ImpersonatedUsers.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -961,7 +961,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__impersonatedUsers) {
       this.__impersonatedUsers = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = ImpersonatedUsers.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -976,7 +976,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__integration) {
       this.__integration = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = Integrations.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -991,7 +991,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__integrations) {
       this.__integrations = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = Integrations.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -1006,7 +1006,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__invitationCode) {
       this.__invitationCode = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = InvitationCodes.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -1023,7 +1023,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__invitationCodes) {
       this.__invitationCodes = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = InvitationCodes.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -1058,7 +1058,7 @@ const ReactiveCacheClient = {
     const idOrFirstObjectSelect = { idOrFirstObjectSelector, options };
     if (!this.__translation) {
       this.__translation = new DataCache((_idOrFirstObjectSelect) => {
-        const __select = EJSON.parse(_idOrFirstObjectSelect);
+        const __select = EJSON.parse(_idOrFirstObjectSelect) as ParsedCacheKey;
         const _ret = Translation.findOne(
           __select.idOrFirstObjectSelector,
           __select.options,
@@ -1073,7 +1073,7 @@ const ReactiveCacheClient = {
     const select = { selector, options, getQuery };
     if (!this.__translations) {
       this.__translations = new DataCache((_select) => {
-        const __select = EJSON.parse(_select);
+        const __select = EJSON.parse(_select) as ParsedCacheKey;
         let _ret = Translation.find(__select.selector, __select.options);
         if (__select.getQuery !== true) {
           _ret = _ret.fetch();
@@ -1497,7 +1497,7 @@ const ReactiveCache = {
 };
 
 // Server isn't reactive, so search for the data always.
-const ReactiveMiniMongoIndexServer = {
+const ReactiveMiniMongoIndexServer: ReactiveMiniMongoIndexApi = {
   async getSubTasksWithParentId(parentId, addSelect = {}, options = {}) {
     let ret = [];
     if (parentId) {
@@ -1542,14 +1542,14 @@ const ReactiveMiniMongoIndexServer = {
 };
 
 // Client side little MiniMongo DB "Index"
-const ReactiveMiniMongoIndexClient = {
+const ReactiveMiniMongoIndexClient: ReactiveMiniMongoIndexClientApi = {
   getSubTasksWithParentId(parentId, addSelect = {}, options = {}) {
     let ret = [];
     if (parentId) {
       const select = { addSelect, options };
       if (!this.__subTasksWithId) {
         this.__subTasksWithId = new DataCache((_select) => {
-          const __select = EJSON.parse(_select);
+          const __select = EJSON.parse(_select) as ParsedCacheKey;
           const _subTasks = ReactiveCache.getCards(
             { parentId: { $exists: true }, ...__select.addSelect },
             __select.options,
@@ -1571,7 +1571,7 @@ const ReactiveMiniMongoIndexClient = {
       const select = { addSelect, options };
       if (!this.__checklistsWithId) {
         this.__checklistsWithId = new DataCache((_select) => {
-          const __select = EJSON.parse(_select);
+          const __select = EJSON.parse(_select) as ParsedCacheKey;
           const _checklists = ReactiveCache.getChecklists(
             { cardId: { $exists: true }, ...__select.addSelect },
             __select.options,
@@ -1593,7 +1593,7 @@ const ReactiveMiniMongoIndexClient = {
       const select = { addSelect, options };
       if (!this.__checklistItemsWithId) {
         this.__checklistItemsWithId = new DataCache((_select) => {
-          const __select = EJSON.parse(_select);
+          const __select = EJSON.parse(_select) as ParsedCacheKey;
           const _checklistItems = ReactiveCache.getChecklistItems(
             { checklistId: { $exists: true }, ...__select.addSelect },
             __select.options,
@@ -1615,7 +1615,7 @@ const ReactiveMiniMongoIndexClient = {
       const select = { addSelect, options };
       if (!this.__cardCommentsWithId) {
         this.__cardCommentsWithId = new DataCache((_select) => {
-          const __select = EJSON.parse(_select);
+          const __select = EJSON.parse(_select) as ParsedCacheKey;
           const _cardComments = ReactiveCache.getCardComments(
             { cardId: { $exists: true }, ...__select.addSelect },
             __select.options,
@@ -1637,7 +1637,7 @@ const ReactiveMiniMongoIndexClient = {
       const select = { addSelect, options };
       if (!this.__activityWithId) {
         this.__activityWithId = new DataCache((_select) => {
-          const __select = EJSON.parse(_select);
+          const __select = EJSON.parse(_select) as ParsedCacheKey;
           const _activities = ReactiveCache.getActivities(
             { _id: { $exists: true }, ...__select.addSelect },
             __select.options,
@@ -1661,7 +1661,7 @@ const ReactiveMiniMongoIndexClient = {
 // having this class here has several advantages:
 // - The Programmer hasn't to care about in which context he call's this class
 // - having all queries together in 1 class to make it possible to see which queries in Wekan happens, e.g. with console.log
-const ReactiveMiniMongoIndex = {
+const ReactiveMiniMongoIndex: ReactiveMiniMongoIndexApi = {
   getSubTasksWithParentId(parentId, addSelect = {}, options = {}) {
     let ret;
     if (Meteor.isServer) {
@@ -1748,5 +1748,125 @@ const ReactiveMiniMongoIndex = {
     return ret;
   },
 };
+
+// ---------------------------------------------------------------------------
+// Type definitions
+// ---------------------------------------------------------------------------
+
+// Values crossing the untyped MiniMongo/Meteor collection boundary (cursors,
+// documents and fetch results) have no public type surface in the legacy .js
+// models, so they are modelled with this documented interop alias.
+type WekanQueryResult = any;
+
+// Mongo query selectors are dynamic dictionaries with runtime-determined keys.
+type MongoSelector = Record<string, any>;
+
+// A lazily-resolved Meteor/MiniMongo collection. The underlying models are
+// untyped legacy .js; members (find/findOne/findOneAsync/… and the documents
+// they return) are forwarded through the proxy as WekanQueryResult.
+interface WekanCollection {
+  [member: string]: WekanQueryResult;
+  [member: symbol]: WekanQueryResult;
+}
+
+// The query descriptor each cache method serialises into its DataCache key via
+// EJSON; only the fields read back out after parsing are modelled.
+interface ParsedCacheKey {
+  // The serialised key is a dynamic EJSON document; only the fields consumed
+  // after parsing are named, the rest stay accessible via the index signature.
+  [field: string]: WekanQueryResult;
+  idOrFirstObjectSelector?: MongoSelector | string | null;
+  selector: MongoSelector;
+  options?: object;
+  getQuery?: boolean;
+  addSelect?: object;
+}
+
+type GetOneMethod = (
+  idOrFirstObjectSelector?: MongoSelector | string | null,
+  options?: object,
+) => WekanQueryResult;
+
+type GetManyMethod = (
+  selector?: MongoSelector,
+  options?: object,
+  getQuery?: boolean,
+) => WekanQueryResult;
+
+type GetCurrentMethod = () => WekanQueryResult;
+
+// Client-side reactive cache. Each method memoises its query in a per-key
+// DataCache lazily stored on `this` under a `__`-prefixed slot; the cached value
+// type varies per query, so the slots are generic.
+interface ReactiveCacheClientApi {
+  [cacheSlot: `__${string}`]: DataCache<any>;
+  getBoard: GetOneMethod;
+  getBoards: GetManyMethod;
+  getList: GetOneMethod;
+  getLists: GetManyMethod;
+  getSwimlane: GetOneMethod;
+  getSwimlanes: GetManyMethod;
+  getChecklist: GetOneMethod;
+  getChecklists: GetManyMethod;
+  getChecklistItem: GetOneMethod;
+  getChecklistItems: GetManyMethod;
+  getCard: GetOneMethod;
+  getCards: GetManyMethod;
+  getCardComment: GetOneMethod;
+  getCardComments: GetManyMethod;
+  getCardCommentReaction: GetOneMethod;
+  getCardCommentReactions: GetManyMethod;
+  getCustomField: GetOneMethod;
+  getCustomFields: GetManyMethod;
+  getAttachment: GetOneMethod;
+  getAttachments: GetManyMethod;
+  getAvatar: GetOneMethod;
+  getAvatars: GetManyMethod;
+  getUser: GetOneMethod;
+  getUsers: GetManyMethod;
+  getOrg: GetOneMethod;
+  getOrgs: GetManyMethod;
+  getTeam: GetOneMethod;
+  getTeams: GetManyMethod;
+  getActivity: GetOneMethod;
+  getActivities: GetManyMethod;
+  getRule: GetOneMethod;
+  getRules: GetManyMethod;
+  getAction: GetOneMethod;
+  getActions: GetManyMethod;
+  getTrigger: GetOneMethod;
+  getTriggers: GetManyMethod;
+  getImpersonatedUser: GetOneMethod;
+  getImpersonatedUsers: GetManyMethod;
+  getIntegration: GetOneMethod;
+  getIntegrations: GetManyMethod;
+  getInvitationCode: GetOneMethod;
+  getInvitationCodes: GetManyMethod;
+  getCurrentSetting: GetCurrentMethod;
+  getCurrentUser: GetCurrentMethod;
+  getTranslation: GetOneMethod;
+  getTranslations: GetManyMethod;
+}
+
+type MiniMongoIndexMethod = (
+  id: string,
+  addSelect?: MongoSelector,
+  options?: object,
+) => WekanQueryResult;
+
+// Reactive MiniMongo "index" cache dispatchers. Server and client share the
+// method shape; the client variant additionally memoises grouped results on
+// `this` under `__`-prefixed slots.
+interface ReactiveMiniMongoIndexApi {
+  getSubTasksWithParentId: MiniMongoIndexMethod;
+  getChecklistsWithCardId: MiniMongoIndexMethod;
+  getChecklistItemsWithChecklistId: MiniMongoIndexMethod;
+  getCardCommentsWithCardId: MiniMongoIndexMethod;
+  getActivityWithId: MiniMongoIndexMethod;
+}
+
+interface ReactiveMiniMongoIndexClientApi extends ReactiveMiniMongoIndexApi {
+  [cacheSlot: `__${string}`]: DataCache<any>;
+}
 
 export { ReactiveCache, ReactiveMiniMongoIndex };

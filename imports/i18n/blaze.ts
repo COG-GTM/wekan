@@ -1,9 +1,9 @@
 import { Blaze } from 'meteor/blaze';
 import { TAPi18n } from './tap';
 
-Blaze.registerHelper('_', (...args) => {
+Blaze.registerHelper('_', (...args: BlazeHelperArg[]) => {
   const lastArg = args.pop() || {};
-  const { hash = {} } = lastArg;
+  const { hash = {} } = lastArg as BlazeSpacebarsKeywords;
   const [key] = args.splice(0, 1);
 
   if (!key) {
@@ -16,9 +16,9 @@ Blaze.registerHelper('_', (...args) => {
 
   // If TAPi18n is not initialized yet, return the key as fallback
   if (!TAPi18n.i18n || !TAPi18n.ready.get()) {
-    return key;
+    return key as string;
   }
 
-  const translation = TAPi18n.__(key, { ...hash, sprintf: args });
+  const translation = TAPi18n.__(key as string, { ...hash, sprintf: args });
   return translation;
 });

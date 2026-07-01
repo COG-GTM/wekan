@@ -31,7 +31,11 @@
  *                                      included — both are handled).
  * @returns {boolean} true if the assignment would create a cycle.
  */
-export function wouldCreateCycle(cardId, newParentId, ancestorIds = []) {
+export function wouldCreateCycle(
+  cardId: string,
+  newParentId: string | null | undefined,
+  ancestorIds: string[] = [],
+) {
   if (!newParentId) {
     // Clearing the parent (top-level card) can never create a cycle.
     return false;
@@ -60,13 +64,19 @@ export function wouldCreateCycle(cardId, newParentId, ancestorIds = []) {
  *        The custom field definitions of the destination (subtasks) board.
  * @returns {Array<{_id:string, value:null}>}
  */
-export function subtaskCustomFields(boardCustomFields) {
+export function subtaskCustomFields(boardCustomFields: BoardCustomField[]) {
   const fields = Array.isArray(boardCustomFields) ? boardCustomFields : [];
-  const result = [];
+  const result: Array<{ _id: string; value: null }> = [];
   for (const field of fields) {
     if (field && (field.automaticallyOnCard || field.alwaysOnCard)) {
       result.push({ _id: field._id, value: null });
     }
   }
   return result;
+}
+
+interface BoardCustomField {
+  _id: string;
+  automaticallyOnCard?: boolean;
+  alwaysOnCard?: boolean;
 }

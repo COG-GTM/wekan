@@ -8,22 +8,22 @@ export { CronJobStatus };
 export const cronMigrationProgress = new ReactiveVar(0);
 export const cronMigrationStatus = new ReactiveVar('');
 export const cronMigrationCurrentStep = new ReactiveVar('');
-export const cronMigrationSteps = new ReactiveVar([]);
+export const cronMigrationSteps = new ReactiveVar<CronMigrationStep[]>([]);
 export const cronIsMigrating = new ReactiveVar(false);
-export const cronJobs = new ReactiveVar([]);
+export const cronJobs = new ReactiveVar<CronJobDoc[]>([]);
 export const cronMigrationCurrentStepNum = new ReactiveVar(0);
 export const cronMigrationTotalSteps = new ReactiveVar(0);
 export const cronMigrationCurrentAction = new ReactiveVar('');
 export const cronMigrationJobProgress = new ReactiveVar(0);
 export const cronMigrationJobStepNum = new ReactiveVar(0);
 export const cronMigrationJobTotalSteps = new ReactiveVar(0);
-export const cronMigrationEtaSeconds = new ReactiveVar(null);
-export const cronMigrationElapsedSeconds = new ReactiveVar(null);
-export const cronMigrationCurrentNumber = new ReactiveVar(null);
+export const cronMigrationEtaSeconds = new ReactiveVar<number | null>(null);
+export const cronMigrationElapsedSeconds = new ReactiveVar<number | null>(null);
+export const cronMigrationCurrentNumber = new ReactiveVar<number | null>(null);
 export const cronMigrationCurrentName = new ReactiveVar('');
 
 function fetchProgress() {
-  Meteor.call('cron.getMigrationProgress', (err, res) => {
+  Meteor.call('cron.getMigrationProgress', (err: Meteor.Error | undefined, res: CronMigrationProgress | undefined) => {
     if (err) return;
     if (!res) return;
     cronMigrationProgress.set(res.progress || 0);
@@ -123,6 +123,48 @@ if (Meteor.isClient) {
   Meteor.setInterval(() => {
     fetchProgress();
   }, 10000);
+}
+
+// One migration/cron entry as returned in the progress payload's `steps` array.
+interface CronMigrationStep {
+  id: string;
+  name: string;
+  description?: string;
+  weight?: number;
+  completed?: boolean;
+  progress?: number;
+  cronName?: string;
+  schedule?: string;
+  status?: string;
+}
+
+// A CronJobStatus document as published to the client. The collection is an
+// untyped legacy Meteor model, so its documents arrive as dynamic Mongo records.
+interface CronJobDoc {
+  _id?: string;
+  [field: string]: any;
+}
+
+// Payload returned by the `cron.getMigrationProgress` method. Every field is
+// optional because the client reads them defensively with `||`/`??` fallbacks.
+interface CronMigrationProgress {
+  progress?: number;
+  status?: string;
+  currentStep?: string;
+  steps?: CronMigrationStep[];
+  isMigrating?: boolean;
+  currentStepNum?: number;
+  totalSteps?: number;
+  currentAction?: string;
+  jobProgress?: number;
+  jobStepNum?: number;
+  jobTotalSteps?: number;
+  etaSeconds?: number | null;
+  elapsedSeconds?: number | null;
+  migrationNumber?: number | null;
+  migrationName?: string;
+  migrationStepsLoaded?: number;
+  migrationStepsTotal?: number;
 }
 
 export default {

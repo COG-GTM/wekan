@@ -20,7 +20,7 @@ describe('TAPi18n', () => {
     it('extra languages are not loaded initially', () => {
       // Using function here to prevent Meteor from including the file
       // during building time
-      function path(language) {
+      function path(language: string) {
         return `./data/${language}.i18n.json`;
       }
       expect(() => require(path('de'))).to.throw('Cannot find module');
@@ -54,7 +54,7 @@ describe('TAPi18n', () => {
   describe('.getLanguage', () => {
 
     it('is reactive', async () => {
-      const tracked = [];
+      const tracked: string[] = [];
       Tracker.autorun(() => {
         tracked.push(TAPi18n.getLanguage());
       });
