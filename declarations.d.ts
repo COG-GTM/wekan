@@ -16,6 +16,12 @@ declare module 'meteor/meteor' {
         [name: string]: (this: { userId?: string | null }, ...args: any[]) => any;
       };
     };
+    // wekan stores a site-admin flag on the user document; @types/meteor's
+    // `User` omits it. Declared optional so server code can gate admin-only
+    // permissions/methods off `user.isAdmin`.
+    interface User {
+      isAdmin?: boolean;
+    }
   }
 }
 
@@ -138,8 +144,30 @@ declare module 'meteor/mongo' {
       // collection-hooks `.direct` exposes the underlying mutation methods that
       // bypass the registered hooks; its shape mirrors the collection, so `any`.
       direct: any;
+      // wekan runs on Meteor 3, whose allow/deny security callbacks may be async
+      // and return any truthy/falsy value (Meteor coerces the result). The
+      // @types/meteor signature only accepts the synchronous boolean form, so
+      // the real Meteor 3 signature is declared here as an extra overload.
+      allow(options: CollectionAllowDenyModifier): boolean;
+      deny(options: CollectionAllowDenyModifier): boolean;
     }
   }
+}
+
+// A Meteor allow/deny callback result: Meteor only checks its truthiness, so the
+// security rules may return a boolean, a string id comparison, or null/undefined
+// (and, when async, a Promise of any of those).
+type AllowDenyResult = boolean | string | null | undefined;
+
+// Real Meteor 3 allow/deny option bag (see the Mongo.Collection augmentation
+// above). The mutated document is a dynamic per-collection Mongo shape, hence
+// `any`.
+interface CollectionAllowDenyModifier {
+  insert?: (userId: string, doc: any) => AllowDenyResult | Promise<AllowDenyResult>;
+  update?: (userId: string, doc: any, fieldNames: string[], modifier: any) => AllowDenyResult | Promise<AllowDenyResult>;
+  remove?: (userId: string, doc: any) => AllowDenyResult | Promise<AllowDenyResult>;
+  fetch?: string[];
+  transform?: (doc: any) => any;
 }
 
 // matb33:collection-hooks: registers callbacks around collection mutations. The

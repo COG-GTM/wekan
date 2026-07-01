@@ -1,6 +1,8 @@
 import UnsavedEditCollection from '/models/unsavedEdits';
 
-function isAuthor(userId, doc, fieldNames = []) {
+// `doc` is the raw UnsavedEdit Mongo document (dynamic per-collection shape),
+// hence `any`.
+function isAuthor(userId: string, doc: any, fieldNames: string[] = []) {
   return userId === doc.userId && fieldNames.indexOf('userId') === -1;
 }
 

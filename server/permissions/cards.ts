@@ -1,10 +1,11 @@
 import Cards from '/models/cards';
 import Boards from '/models/boards';
-import { allowIsBoardMemberWithWriteAccess, denyCrossBoardMove } from '/server/lib/utils';
+import { allowIsBoardMemberWithWriteAccess, denyCrossBoardMove, BoardAccess } from '/server/lib/utils';
 
 // Centralized update policy for Cards
 // Security: deny any direct client updates to 'vote' fields; require write access otherwise
-export const canUpdateCard = async function(userId, doc, fields) {
+// `doc` is the raw Cards Mongo document (dynamic shape), hence `any`.
+export const canUpdateCard = async function(userId: string | null, doc: any, fields: string[]) {
   if (!userId) return false;
   const fieldNames = fields || [];
   // Block direct updates to voting fields; voting must go through Meteor method 'cards.vote'
@@ -16,20 +17,20 @@ export const canUpdateCard = async function(userId, doc, fields) {
     return false;
   }
   // ReadOnly users cannot edit cards
-  return allowIsBoardMemberWithWriteAccess(userId, await Boards.findOneAsync(doc.boardId));
+  return allowIsBoardMemberWithWriteAccess(userId, (await Boards.findOneAsync(doc.boardId)) as BoardAccess | undefined);
 };
 
 Cards.allow({
   async insert(userId, doc) {
     // ReadOnly users cannot create cards
-    return allowIsBoardMemberWithWriteAccess(userId, await Boards.findOneAsync(doc.boardId));
+    return allowIsBoardMemberWithWriteAccess(userId, (await Boards.findOneAsync(doc.boardId)) as BoardAccess | undefined);
   },
   async update(userId, doc, fields) {
     return await canUpdateCard(userId, doc, fields);
   },
   async remove(userId, doc) {
     // ReadOnly users cannot delete cards
-    return allowIsBoardMemberWithWriteAccess(userId, await Boards.findOneAsync(doc.boardId));
+    return allowIsBoardMemberWithWriteAccess(userId, (await Boards.findOneAsync(doc.boardId)) as BoardAccess | undefined);
   },
   fetch: ['boardId'],
 });

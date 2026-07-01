@@ -1,6 +1,7 @@
-import AccountSettings from '/models/accountSettings';
+import { Meteor } from 'meteor/meteor';
+import LockoutSettings from '/models/lockoutSettings';
 
-AccountSettings.allow({
+LockoutSettings.allow({
   async update(userId) {
     const user = await Meteor.users.findOneAsync(userId);
     return user && user.isAdmin;

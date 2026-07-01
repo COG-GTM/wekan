@@ -232,7 +232,7 @@ interface BoardMemberEntry {
   isReadAssignedOnly?: boolean;
 }
 
-interface BoardAccess {
+export interface BoardAccess {
   hasAdmin(memberId: string): boolean;
   hasMember(memberId: string): boolean;
   hasReadOnly(memberId: string): boolean;

@@ -1,3 +1,4 @@
+import { Meteor } from 'meteor/meteor';
 import InviteToBoardRolesSettings from '/models/inviteToBoardRolesSettings';
 
 // Only global site admins (Admin Panel users) may change which board roles are

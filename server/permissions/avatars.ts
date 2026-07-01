@@ -1,7 +1,8 @@
 import Avatars from '/models/avatars';
 import AttachmentStorageSettings from '/models/attachmentStorageSettings';
 
-function isOwner(userId, doc) {
+// `doc` is the raw Avatars file document (dynamic shape), hence `any`.
+function isOwner(userId: string, doc: any) {
   return userId && userId === doc.userId;
 }
 
@@ -22,7 +23,8 @@ async function avatarUploadsBlocked() {
 }
 
 Avatars.allow({
-  async insert(userId, doc) {
+  // `doc` is the raw Avatars file document (dynamic shape), hence `any`.
+  async insert(userId: string, doc: any) {
     if (await avatarUploadsBlocked()) {
       return false;
     }

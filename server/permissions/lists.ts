@@ -1,19 +1,19 @@
 import Boards from '/models/boards';
 import Lists from '/models/lists';
-import { allowIsBoardMemberWithWriteAccess, denyCrossBoardMove } from '/server/lib/utils';
+import { allowIsBoardMemberWithWriteAccess, denyCrossBoardMove, BoardAccess } from '/server/lib/utils';
 
 Lists.allow({
   async insert(userId, doc) {
     // ReadOnly and CommentOnly users cannot create lists
-    return allowIsBoardMemberWithWriteAccess(userId, await Boards.findOneAsync(doc.boardId));
+    return allowIsBoardMemberWithWriteAccess(userId, (await Boards.findOneAsync(doc.boardId)) as BoardAccess | undefined);
   },
   async update(userId, doc) {
     // ReadOnly and CommentOnly users cannot edit lists
-    return allowIsBoardMemberWithWriteAccess(userId, await Boards.findOneAsync(doc.boardId));
+    return allowIsBoardMemberWithWriteAccess(userId, (await Boards.findOneAsync(doc.boardId)) as BoardAccess | undefined);
   },
   async remove(userId, doc) {
     // ReadOnly and CommentOnly users cannot delete lists
-    return allowIsBoardMemberWithWriteAccess(userId, await Boards.findOneAsync(doc.boardId));
+    return allowIsBoardMemberWithWriteAccess(userId, (await Boards.findOneAsync(doc.boardId)) as BoardAccess | undefined);
   },
   fetch: ['boardId'],
 });

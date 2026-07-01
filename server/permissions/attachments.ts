@@ -1,9 +1,11 @@
 import Attachments from '/models/attachments';
 import Boards from '/models/boards';
 import AttachmentStorageSettings from '/models/attachmentStorageSettings';
-import { allowIsBoardMemberWithWriteAccess } from '/server/lib/utils';
+import { allowIsBoardMemberWithWriteAccess, BoardAccess } from '/server/lib/utils';
 
-function hasUnsafeClientVersionFields(fileObj) {
+// `fileObj` is the raw Meteor-Files (ostrio:files) file object; that library is
+// untyped, so `any`.
+function hasUnsafeClientVersionFields(fileObj: any) {
   const versions = fileObj?.versions;
   if (!versions || typeof versions !== 'object') {
     return false;
@@ -21,7 +23,8 @@ function hasUnsafeClientVersionFields(fileObj) {
 }
 
 Attachments.allow({
-  async insert(userId, fileObj) {
+  // `fileObj` is the raw untyped Meteor-Files file object, hence `any`.
+  async insert(userId: string, fileObj: any) {
     // Block attempts to inject server-managed storage metadata.
     if (hasUnsafeClientVersionFields(fileObj)) {
       if (process.env.DEBUG === 'true') {
@@ -43,9 +46,10 @@ Attachments.allow({
     }
 
     // ReadOnly users cannot upload attachments
-    return allowIsBoardMemberWithWriteAccess(userId, await Boards.findOneAsync(fileObj.meta?.boardId));
+    return allowIsBoardMemberWithWriteAccess(userId, (await Boards.findOneAsync(fileObj.meta?.boardId)) as BoardAccess | undefined);
   },
-  async update(userId, fileObj, fields) {
+  // `fileObj` is the raw untyped Meteor-Files file object, hence `any`.
+  async update(userId: string, fileObj: any, fields: string[]) {
     // SECURITY: The 'name' field is sanitized in onBeforeUpload and server-side methods,
     // but we block direct client-side $set operations on 'versions.*.path' to prevent
     // path traversal attacks via storage migration exploits.
@@ -75,9 +79,10 @@ Attachments.allow({
     }
 
     // ReadOnly users cannot update attachments
-    return allowIsBoardMemberWithWriteAccess(userId, await Boards.findOneAsync(fileObj.meta?.boardId));
+    return allowIsBoardMemberWithWriteAccess(userId, (await Boards.findOneAsync(fileObj.meta?.boardId)) as BoardAccess | undefined);
   },
-  async remove(userId, fileObj) {
+  // `fileObj` is the raw untyped Meteor-Files file object, hence `any`.
+  async remove(userId: string, fileObj: any) {
     // Additional security check: ensure the file belongs to the board the user has access to
     if (!fileObj || !fileObj.meta?.boardId) {
       if (process.env.DEBUG === 'true') {
@@ -86,7 +91,7 @@ Attachments.allow({
       return false;
     }
 
-    const board = await Boards.findOneAsync(fileObj.meta?.boardId);
+    const board = (await Boards.findOneAsync(fileObj.meta?.boardId)) as BoardAccess | undefined;
     if (!board) {
       if (process.env.DEBUG === 'true') {
         console.warn('Blocked attachment removal: board not found');

@@ -1,6 +1,7 @@
-import Translation from '/models/translation';
+import { Meteor } from 'meteor/meteor';
+import Team from '/models/team';
 
-Translation.allow({
+Team.allow({
   async insert(userId, doc) {
     const user = await Meteor.users.findOneAsync(userId);
     if (user?.isAdmin)

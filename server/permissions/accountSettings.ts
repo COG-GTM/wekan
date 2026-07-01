@@ -1,6 +1,7 @@
-import TableVisibilityModeSettings from '/models/tableVisibilityModeSettings';
+import { Meteor } from 'meteor/meteor';
+import AccountSettings from '/models/accountSettings';
 
-TableVisibilityModeSettings.allow({
+AccountSettings.allow({
   async update(userId) {
     const user = await Meteor.users.findOneAsync(userId);
     return user && user.isAdmin;

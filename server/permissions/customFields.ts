@@ -1,6 +1,6 @@
 import Boards from '/models/boards';
 import CustomFields from '/models/customFields';
-import { allowIsAnyBoardMemberWithWriteAccess } from '/server/lib/utils';
+import { allowIsAnyBoardMemberWithWriteAccess, BoardAccess } from '/server/lib/utils';
 
 // ReadOnly / CommentOnly / Worker members must not be able to create, modify or
 // delete Custom Fields (which define board-wide schema). Use the write-access
@@ -10,25 +10,25 @@ CustomFields.allow({
   async insert(userId, doc) {
     return allowIsAnyBoardMemberWithWriteAccess(
       userId,
-      await Boards.find({
+      (await Boards.find({
         _id: { $in: doc.boardIds },
-      }).fetchAsync(),
+      }).fetchAsync()) as BoardAccess[],
     );
   },
   async update(userId, doc) {
     return allowIsAnyBoardMemberWithWriteAccess(
       userId,
-      await Boards.find({
+      (await Boards.find({
         _id: { $in: doc.boardIds },
-      }).fetchAsync(),
+      }).fetchAsync()) as BoardAccess[],
     );
   },
   async remove(userId, doc) {
     return allowIsAnyBoardMemberWithWriteAccess(
       userId,
-      await Boards.find({
+      (await Boards.find({
         _id: { $in: doc.boardIds },
-      }).fetchAsync(),
+      }).fetchAsync()) as BoardAccess[],
     );
   },
   fetch: ['userId', 'boardIds'],

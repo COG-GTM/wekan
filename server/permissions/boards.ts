@@ -1,7 +1,7 @@
 import Boards from '/models/boards';
 import TableVisibilityModeSettings from '/models/tableVisibilityModeSettings';
 import { findWhere, where } from '/imports/lib/collectionHelpers';
-import { allowIsBoardAdmin, canUpdateBoardSort } from '/server/lib/utils';
+import { allowIsBoardAdmin, canUpdateBoardSort, BoardAccess } from '/server/lib/utils';
 
 Boards.allow({
   async insert(userId, doc) {
@@ -23,7 +23,7 @@ Boards.allow({
 
 // All logged in users are allowed to reorder boards by dragging at All Boards page and Public Boards page.
 Boards.allow({
-  update(userId, board, fieldNames) {
+  update(userId: string, board: BoardAccess, fieldNames: string[]) {
     return canUpdateBoardSort(userId, board, fieldNames);
   },
   // Need members to verify membership in policy

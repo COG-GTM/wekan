@@ -1,19 +1,19 @@
 import Boards from '/models/boards';
 import Swimlanes from '/models/swimlanes';
-import { allowIsBoardMemberWithWriteAccess, denyCrossBoardMove } from '/server/lib/utils';
+import { allowIsBoardMemberWithWriteAccess, denyCrossBoardMove, BoardAccess } from '/server/lib/utils';
 
 Swimlanes.allow({
   async insert(userId, doc) {
     // ReadOnly and CommentOnly users cannot create swimlanes
-    return allowIsBoardMemberWithWriteAccess(userId, await Boards.findOneAsync(doc.boardId));
+    return allowIsBoardMemberWithWriteAccess(userId, (await Boards.findOneAsync(doc.boardId)) as BoardAccess | undefined);
   },
   async update(userId, doc) {
     // ReadOnly and CommentOnly users cannot edit swimlanes
-    return allowIsBoardMemberWithWriteAccess(userId, await Boards.findOneAsync(doc.boardId));
+    return allowIsBoardMemberWithWriteAccess(userId, (await Boards.findOneAsync(doc.boardId)) as BoardAccess | undefined);
   },
   async remove(userId, doc) {
     // ReadOnly and CommentOnly users cannot delete swimlanes
-    return allowIsBoardMemberWithWriteAccess(userId, await Boards.findOneAsync(doc.boardId));
+    return allowIsBoardMemberWithWriteAccess(userId, (await Boards.findOneAsync(doc.boardId)) as BoardAccess | undefined);
   },
   fetch: ['boardId'],
 });
