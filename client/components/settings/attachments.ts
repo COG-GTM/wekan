@@ -1,9 +1,12 @@
 import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 import AttachmentBulkMoveStatus from '/models/attachmentBulkMoveStatus';
 import { TAPi18n } from '/imports/i18n';
 
 // DOM field ids per cloud provider, used to read the admin form on save/test.
-const CLOUD_FIELD_IDS = {
+const CLOUD_FIELD_IDS: Record<string, Record<string, string>> = {
   s3: {
     enabled: '#s3-enabled',
     read: '#s3-read',
@@ -34,9 +37,10 @@ const CLOUD_FIELD_IDS = {
 
 const CLOUD_PROVIDERS = ['s3', 'azure', 'gcs'];
 
-function gatherCloudConfig(tpl, provider) {
+function gatherCloudConfig(tpl: AttachmentsInstance, provider: any) {
   const ids = CLOUD_FIELD_IDS[provider] || {};
-  const cfg = {};
+  // cfg: any — dynamically-keyed provider config read from the form.
+  const cfg: Record<string, any> = {};
   Object.keys(ids).forEach(field => {
     const el = tpl.$(ids[field]);
     if (!el || !el.length) return;
@@ -52,13 +56,13 @@ function gatherCloudConfig(tpl, provider) {
   return cfg;
 }
 
-function cloudConfigFromSettings(tpl, provider) {
+function cloudConfigFromSettings(tpl: AttachmentsInstance, provider: any) {
   const settings = tpl.attachmentStorageSettings.get();
   return (settings && settings.storageConfig && settings.storageConfig[provider]) || {};
 }
 const { filesize } = require('filesize');
 
-const LIMIT_UNIT_FACTORS = {
+const LIMIT_UNIT_FACTORS: Record<string, number> = {
   bytes: 1,
   mb: 1024 * 1024,
   gb: 1024 * 1024 * 1024,
@@ -70,7 +74,7 @@ const LIMIT_MODES = {
   BLOCKED: 'blocked',
 };
 
-const LIMIT_BLOCKED_FIELDS = {
+const LIMIT_BLOCKED_FIELDS: Record<string, string> = {
   attachmentsUploadMaxBytes: 'attachmentsUploadBlocked',
   attachmentsDownloadMaxBytes: 'attachmentsDownloadBlocked',
   apiUploadMaxBytes: 'apiUploadBlocked',
@@ -85,7 +89,7 @@ const DEFAULT_LIMIT_SETTINGS = {
   avatarsUploadBlocked: false,
 };
 
-function toNonNegativeInteger(value, fallback = 0) {
+function toNonNegativeInteger(value: any, fallback = 0) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed < 0) {
     return fallback;
@@ -93,7 +97,7 @@ function toNonNegativeInteger(value, fallback = 0) {
   return parsed;
 }
 
-function normalizeLimitSettings(settingsDoc) {
+function normalizeLimitSettings(settingsDoc: any): Record<string, any> {
   const fromDoc = settingsDoc?.limitSettings || {};
   const legacyUpload = settingsDoc?.uploadSettings?.maxFileSize;
 
@@ -122,11 +126,11 @@ function normalizeLimitSettings(settingsDoc) {
   };
 }
 
-function getBlockedFieldName(fieldName) {
+function getBlockedFieldName(fieldName: any) {
   return LIMIT_BLOCKED_FIELDS[fieldName] || null;
 }
 
-function pickModeForLimit(fieldName, normalizedLimits) {
+function pickModeForLimit(fieldName: any, normalizedLimits: any) {
   const blockedField = getBlockedFieldName(fieldName);
   if (blockedField && normalizedLimits[blockedField] === true) {
     return LIMIT_MODES.BLOCKED;
@@ -134,7 +138,7 @@ function pickModeForLimit(fieldName, normalizedLimits) {
   return normalizedLimits[fieldName] > 0 ? LIMIT_MODES.MAX_SIZE : LIMIT_MODES.UNLIMITED;
 }
 
-function pickUnitForBytes(bytes) {
+function pickUnitForBytes(bytes: any) {
   const safeBytes = toNonNegativeInteger(bytes, 0);
   if (safeBytes > 0 && safeBytes % LIMIT_UNIT_FACTORS.gb === 0) {
     return 'gb';
@@ -145,13 +149,13 @@ function pickUnitForBytes(bytes) {
   return 'bytes';
 }
 
-function toDisplayValue(bytes, unit) {
+function toDisplayValue(bytes: any, unit: any) {
   const safeBytes = toNonNegativeInteger(bytes, 0);
   const factor = LIMIT_UNIT_FACTORS[unit] || LIMIT_UNIT_FACTORS.bytes;
   return safeBytes / factor;
 }
 
-function toBytes(value, unit) {
+function toBytes(value: any, unit: any) {
   const numericValue = Number.parseFloat(value);
   if (!Number.isFinite(numericValue) || numericValue < 0) {
     return null;
@@ -160,7 +164,7 @@ function toBytes(value, unit) {
   return Math.round(numericValue * factor);
 }
 
-function getLimitUnitOptions(selectedUnit) {
+function getLimitUnitOptions(selectedUnit: any) {
   return [
     { value: 'gb', labelKey: 'attachment-limit-unit-gb', selected: selectedUnit === 'gb' },
     { value: 'mb', labelKey: 'attachment-limit-unit-mb', selected: selectedUnit === 'mb' },
@@ -168,7 +172,7 @@ function getLimitUnitOptions(selectedUnit) {
   ];
 }
 
-function getLimitModeOptions(selectedMode) {
+function getLimitModeOptions(selectedMode: any) {
   return [
     { value: LIMIT_MODES.UNLIMITED, labelKey: 'attachment-limit-mode-unlimited', selected: selectedMode === LIMIT_MODES.UNLIMITED },
     { value: LIMIT_MODES.MAX_SIZE, labelKey: 'attachment-limit-mode-max-size', selected: selectedMode === LIMIT_MODES.MAX_SIZE },
@@ -176,7 +180,7 @@ function getLimitModeOptions(selectedMode) {
   ];
 }
 
-function updateStorageConfigField(tpl, storageName, field, value, checkboxEl) {
+function updateStorageConfigField(tpl: AttachmentsInstance, storageName: any, field: any, value: any, checkboxEl: any) {
   const currentSettings = tpl.attachmentStorageSettings.get();
   if (!currentSettings) return;
   const nextSettings = {
@@ -189,7 +193,8 @@ function updateStorageConfigField(tpl, storageName, field, value, checkboxEl) {
       },
     },
   };
-  Meteor.call('updateAttachmentStorageSettings', nextSettings, (error) => {
+    // error: any — untyped Meteor method callback.
+  Meteor.call('updateAttachmentStorageSettings', nextSettings, (error: any) => {
     if (error) {
       alert(`${TAPi18n.__('attachment-transfer-limits-save-failed')}: ${error.reason || error.message}`);
       if (checkboxEl) checkboxEl.checked = !value;
@@ -199,8 +204,9 @@ function updateStorageConfigField(tpl, storageName, field, value, checkboxEl) {
   });
 }
 
-function refreshAttachmentStorageSettings(tpl) {
-  Meteor.call('getAttachmentStorageSettings', (error, settings) => {
+function refreshAttachmentStorageSettings(tpl: AttachmentsInstance) {
+  // error/settings: any — untyped Meteor method callback.
+  Meteor.call('getAttachmentStorageSettings', (error: any, settings: any) => {
     if (error || !settings) {
       if (process.env.DEBUG === 'true') {
         console.warn('Failed to load attachment storage settings:', error);
@@ -230,7 +236,7 @@ function refreshAttachmentStorageSettings(tpl) {
   });
 }
 
-Template.attachments.onCreated(function () {
+Template.attachments.onCreated(function (this: AttachmentsInstance) {
   this.activeSection = new ReactiveVar('move');
   this.storageSettingsSubscription = Meteor.subscribe('attachmentStorageSettings');
   this.attachmentStorageSettings = new ReactiveVar(null);
@@ -281,29 +287,29 @@ Template.attachments.onCreated(function () {
 
 Template.attachments.helpers({
   loading() {
-    return Template.instance().loading;
+    return (Template.instance() as AttachmentsInstance).loading;
   },
   isLimitsActive() {
-    return Template.instance().activeSection.get() === 'limits';
+    return (Template.instance() as AttachmentsInstance).activeSection.get() === 'limits';
   },
   isMoveActive() {
-    return Template.instance().activeSection.get() === 'move';
+    return (Template.instance() as AttachmentsInstance).activeSection.get() === 'move';
   },
   isDefaultStorageActive() {
-    return Template.instance().activeSection.get() === 'default-save-storage';
+    return (Template.instance() as AttachmentsInstance).activeSection.get() === 'default-save-storage';
   },
   isAzureActive() {
-    return Template.instance().activeSection.get() === 'azure';
+    return (Template.instance() as AttachmentsInstance).activeSection.get() === 'azure';
   },
   isGcsActive() {
-    return Template.instance().activeSection.get() === 'gcs';
+    return (Template.instance() as AttachmentsInstance).activeSection.get() === 'gcs';
   },
   avatarsUploadBlocked() {
-    const settings = Template.instance().attachmentStorageSettings.get();
+    const settings = (Template.instance() as AttachmentsInstance).attachmentStorageSettings.get();
     return settings?.limitSettings?.avatarsUploadBlocked === true;
   },
   defaultStorageOptions() {
-    const settings = Template.instance().attachmentStorageSettings.get();
+    const settings = (Template.instance() as AttachmentsInstance).attachmentStorageSettings.get();
     const selected = settings?.defaultStorage || 'fs';
     const sc = settings?.storageConfig || {};
     const options = [
@@ -320,19 +326,19 @@ Template.attachments.helpers({
     }));
   },
   cloudEnabled() {
-    const tpl = Template.instance();
-    const out = {};
+    const tpl = Template.instance() as AttachmentsInstance;
+    const out: Record<string, any> = {};
     CLOUD_PROVIDERS.forEach(p => { out[p] = cloudConfigFromSettings(tpl, p).enabled === true; });
     return out;
   },
   cloudRead() {
-    const tpl = Template.instance();
-    const out = {};
+    const tpl = Template.instance() as AttachmentsInstance;
+    const out: Record<string, any> = {};
     CLOUD_PROVIDERS.forEach(p => { out[p] = cloudConfigFromSettings(tpl, p).read !== false; });
     return out;
   },
   cloudValue() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as AttachmentsInstance;
     const s3 = cloudConfigFromSettings(tpl, 's3');
     const azure = cloudConfigFromSettings(tpl, 'azure');
     const gcs = cloudConfigFromSettings(tpl, 'gcs');
@@ -356,8 +362,8 @@ Template.attachments.helpers({
     };
   },
   cloudSecretPlaceholder() {
-    const tpl = Template.instance();
-    const ph = (cfg, field) => (cfg[`${field}Set`]
+    const tpl = Template.instance() as AttachmentsInstance;
+    const ph = (cfg: any, field: any) => (cfg[`${field}Set`]
       ? TAPi18n.__('cloud-secret-set')
       : TAPi18n.__('cloud-secret-none'));
     const s3 = cloudConfigFromSettings(tpl, 's3');
@@ -370,19 +376,19 @@ Template.attachments.helpers({
     };
   },
   cloudTestResult() {
-    return Template.instance().cloudTestResults.get();
+    return (Template.instance() as AttachmentsInstance).cloudTestResults.get();
   },
   cloudTestError() {
-    return Template.instance().cloudTestErrors.get();
+    return (Template.instance() as AttachmentsInstance).cloudTestErrors.get();
   },
   isGridFsActive() {
-    return Template.instance().activeSection.get() === 'gridfs';
+    return (Template.instance() as AttachmentsInstance).activeSection.get() === 'gridfs';
   },
   isFilesystemActive() {
-    return Template.instance().activeSection.get() === 'filesystem';
+    return (Template.instance() as AttachmentsInstance).activeSection.get() === 'filesystem';
   },
   isS3Active() {
-    return Template.instance().activeSection.get() === 's3';
+    return (Template.instance() as AttachmentsInstance).activeSection.get() === 's3';
   },
   filesystemPath() {
     return process.env.WRITABLE_PATH || '/data';
@@ -396,7 +402,7 @@ Template.attachments.helpers({
     return `${writablePath}/avatars`;
   },
   filesystemEnabled() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as AttachmentsInstance;
     const settings = tpl.attachmentStorageSettings.get();
     if (settings?.storageConfig?.filesystem) {
       return settings.storageConfig.filesystem.enabled !== false;
@@ -404,11 +410,11 @@ Template.attachments.helpers({
     return true;
   },
   filesystemRead() {
-    const settings = Template.instance().attachmentStorageSettings.get();
+    const settings = (Template.instance() as AttachmentsInstance).attachmentStorageSettings.get();
     return settings?.storageConfig?.filesystem?.read !== false;
   },
   gridfsEnabled() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as AttachmentsInstance;
     const settings = tpl.attachmentStorageSettings.get();
     if (settings?.storageConfig?.gridfs) {
       return settings.storageConfig.gridfs.enabled !== false;
@@ -416,25 +422,26 @@ Template.attachments.helpers({
     return process.env.GRIDFS_ENABLED === 'true';
   },
   gridfsRead() {
-    const settings = Template.instance().attachmentStorageSettings.get();
+    const settings = (Template.instance() as AttachmentsInstance).attachmentStorageSettings.get();
     return settings?.storageConfig?.gridfs?.read !== false;
   },
   s3Read() {
     return process.env.S3_ENABLED === 'true';
   },
   compactLoading() {
-    return Template.instance().compactLoading.get();
+    return (Template.instance() as AttachmentsInstance).compactLoading.get();
   },
   compactResult() {
-    return Template.instance().compactResult.get();
+    return (Template.instance() as AttachmentsInstance).compactResult.get();
   },
   compactError() {
-    return Template.instance().compactError.get();
+    return (Template.instance() as AttachmentsInstance).compactError.get();
   },
   compactResultItems() {
-    const result = Template.instance().compactResult.get();
+    const result = (Template.instance() as AttachmentsInstance).compactResult.get();
     if (!result) return [];
-    const items = [];
+    // items: any[] — flattened { name, status } rows for display.
+    const items: any[] = [];
     for (const [node, nodeData] of Object.entries(result)) {
       if (nodeData && typeof nodeData === 'object') {
         for (const [collName, status] of Object.entries(nodeData)) {
@@ -447,64 +454,64 @@ Template.attachments.helpers({
     return items;
   },
   hasGridFsStats() {
-    return !!Template.instance().gridFsStats.get();
+    return !!(Template.instance() as AttachmentsInstance).gridFsStats.get();
   },
   gridFsStats() {
-    return Template.instance().gridFsStats.get();
+    return (Template.instance() as AttachmentsInstance).gridFsStats.get();
   },
   gridFsStatsLoading() {
-    return Template.instance().gridFsStatsLoading.get();
+    return (Template.instance() as AttachmentsInstance).gridFsStatsLoading.get();
   },
   gridFsStatsError() {
-    return Template.instance().gridFsStatsError.get();
+    return (Template.instance() as AttachmentsInstance).gridFsStatsError.get();
   },
   hasFilesystemStats() {
-    return !!Template.instance().filesystemStats.get();
+    return !!(Template.instance() as AttachmentsInstance).filesystemStats.get();
   },
   filesystemStats() {
-    return Template.instance().filesystemStats.get();
+    return (Template.instance() as AttachmentsInstance).filesystemStats.get();
   },
   filesystemStatsLoading() {
-    return Template.instance().filesystemStatsLoading.get();
+    return (Template.instance() as AttachmentsInstance).filesystemStatsLoading.get();
   },
   filesystemStatsError() {
-    return Template.instance().filesystemStatsError.get();
+    return (Template.instance() as AttachmentsInstance).filesystemStatsError.get();
   },
   hasS3Stats() {
-    return !!Template.instance().s3Stats.get();
+    return !!(Template.instance() as AttachmentsInstance).s3Stats.get();
   },
   s3Stats() {
-    return Template.instance().s3Stats.get();
+    return (Template.instance() as AttachmentsInstance).s3Stats.get();
   },
   s3StatsLoading() {
-    return Template.instance().s3StatsLoading.get();
+    return (Template.instance() as AttachmentsInstance).s3StatsLoading.get();
   },
   s3StatsError() {
-    return Template.instance().s3StatsError.get();
+    return (Template.instance() as AttachmentsInstance).s3StatsError.get();
   },
   hasAzureStats() {
-    return !!Template.instance().azureStats.get();
+    return !!(Template.instance() as AttachmentsInstance).azureStats.get();
   },
   azureStats() {
-    return Template.instance().azureStats.get();
+    return (Template.instance() as AttachmentsInstance).azureStats.get();
   },
   azureStatsLoading() {
-    return Template.instance().azureStatsLoading.get();
+    return (Template.instance() as AttachmentsInstance).azureStatsLoading.get();
   },
   azureStatsError() {
-    return Template.instance().azureStatsError.get();
+    return (Template.instance() as AttachmentsInstance).azureStatsError.get();
   },
   hasGcsStats() {
-    return !!Template.instance().gcsStats.get();
+    return !!(Template.instance() as AttachmentsInstance).gcsStats.get();
   },
   gcsStats() {
-    return Template.instance().gcsStats.get();
+    return (Template.instance() as AttachmentsInstance).gcsStats.get();
   },
   gcsStatsLoading() {
-    return Template.instance().gcsStatsLoading.get();
+    return (Template.instance() as AttachmentsInstance).gcsStatsLoading.get();
   },
   gcsStatsError() {
-    return Template.instance().gcsStatsError.get();
+    return (Template.instance() as AttachmentsInstance).gcsStatsError.get();
   },
   s3Enabled() {
     return process.env.S3_ENABLED === 'true';
@@ -524,34 +531,34 @@ Template.attachments.helpers({
   s3Port() {
     return process.env.S3_PORT || 443;
   },
-  attachmentTransferLimitValue(fieldName) {
-    const tpl = Template.instance();
+  attachmentTransferLimitValue(fieldName: any) {
+    const tpl = Template.instance() as AttachmentsInstance;
     const settingsDoc = tpl.attachmentStorageSettings.get();
     const units = tpl.attachmentLimitUnits.get() || {};
     const limits = normalizeLimitSettings(settingsDoc);
     const unit = units[fieldName] || 'bytes';
     return toDisplayValue(limits[fieldName], unit);
   },
-  attachmentTransferLimitUnitOptions(fieldName) {
-    const tpl = Template.instance();
+  attachmentTransferLimitUnitOptions(fieldName: any) {
+    const tpl = Template.instance() as AttachmentsInstance;
     const units = tpl.attachmentLimitUnits.get() || {};
     const selectedUnit = units[fieldName] || 'bytes';
     return getLimitUnitOptions(selectedUnit);
   },
-  attachmentTransferLimitModeOptions(fieldName) {
-    const tpl = Template.instance();
+  attachmentTransferLimitModeOptions(fieldName: any) {
+    const tpl = Template.instance() as AttachmentsInstance;
     const modeMap = tpl.attachmentLimitModes.get() || {};
     return getLimitModeOptions(modeMap[fieldName] || LIMIT_MODES.UNLIMITED);
   },
-  isAttachmentLimitMode(fieldName, expectedMode) {
-    const tpl = Template.instance();
+  isAttachmentLimitMode(fieldName: any, expectedMode: any) {
+    const tpl = Template.instance() as AttachmentsInstance;
     const modeMap = tpl.attachmentLimitModes.get() || {};
     return modeMap[fieldName] === expectedMode;
   },
 });
 
 Template.attachments.events({
-  'click a.js-attachments-menu'(event, tpl) {
+  'click a.js-attachments-menu'(event: JQuery.TriggeredEvent, tpl: AttachmentsInstance) {
     event.preventDefault();
     const target = $(event.currentTarget);
     const targetID = target.data('id');
@@ -561,9 +568,10 @@ Template.attachments.events({
 
     tpl.activeSection.set(targetID);
   },
-  'change select.js-attachment-limit-unit'(event, tpl) {
-    const fieldName = event.currentTarget.dataset.field;
-    const selectedUnit = event.currentTarget.value;
+  'change select.js-attachment-limit-unit'(event: JQuery.TriggeredEvent, tpl: AttachmentsInstance) {
+    const currentTarget = event.currentTarget as HTMLSelectElement;
+    const fieldName = currentTarget.dataset.field;
+    const selectedUnit = currentTarget.value;
     if (!fieldName || !selectedUnit) {
       return;
     }
@@ -574,9 +582,10 @@ Template.attachments.events({
       [fieldName]: selectedUnit,
     });
   },
-  'change select.js-attachment-limit-mode'(event, tpl) {
-    const fieldName = event.currentTarget.dataset.field;
-    const selectedMode = event.currentTarget.value;
+  'change select.js-attachment-limit-mode'(event: JQuery.TriggeredEvent, tpl: AttachmentsInstance) {
+    const currentTarget = event.currentTarget as HTMLSelectElement;
+    const fieldName = currentTarget.dataset.field;
+    const selectedMode = currentTarget.value;
     if (!fieldName) {
       return;
     }
@@ -587,7 +596,7 @@ Template.attachments.events({
       [fieldName]: selectedMode,
     });
   },
-  'click button.js-save-attachment-transfer-limits'(event, tpl) {
+  'click button.js-save-attachment-transfer-limits'(event: JQuery.TriggeredEvent, tpl: AttachmentsInstance) {
     event.preventDefault();
 
     const currentSettings = tpl.attachmentStorageSettings.get();
@@ -605,7 +614,8 @@ Template.attachments.events({
       { fieldName: 'apiDownloadMaxBytes', inputId: '#api-download-limit-value' },
     ];
 
-    const nextLimitSettings = {};
+    // nextLimitSettings: any — dynamically-keyed byte limits + blocked flags.
+    const nextLimitSettings: Record<string, any> = {};
     for (const field of fieldConfig) {
       const selectedMode = modeMap[field.fieldName] || LIMIT_MODES.UNLIMITED;
       const blockedFieldName = getBlockedFieldName(field.fieldName);
@@ -653,7 +663,8 @@ Template.attachments.events({
       },
     };
 
-    Meteor.call('updateAttachmentStorageSettings', nextSettings, (error) => {
+    // error: any — untyped Meteor method callback.
+    Meteor.call('updateAttachmentStorageSettings', nextSettings, (error: any) => {
       if (error) {
         alert(`${TAPi18n.__('attachment-transfer-limits-save-failed')}: ${error.reason || error.message}`);
         return;
@@ -663,17 +674,20 @@ Template.attachments.events({
       refreshAttachmentStorageSettings(tpl);
     });
   },
-  'change input.js-toggle-filesystem-read'(event, tpl) {
-    updateStorageConfigField(tpl, 'filesystem', 'read', event.currentTarget.checked, event.currentTarget);
+  'change input.js-toggle-filesystem-read'(event: JQuery.TriggeredEvent, tpl: AttachmentsInstance) {
+    const currentTarget = event.currentTarget as HTMLInputElement;
+    updateStorageConfigField(tpl, 'filesystem', 'read', currentTarget.checked, currentTarget);
   },
-  'change input.js-toggle-gridfs-read'(event, tpl) {
-    updateStorageConfigField(tpl, 'gridfs', 'read', event.currentTarget.checked, event.currentTarget);
+  'change input.js-toggle-gridfs-read'(event: JQuery.TriggeredEvent, tpl: AttachmentsInstance) {
+    const currentTarget = event.currentTarget as HTMLInputElement;
+    updateStorageConfigField(tpl, 'gridfs', 'read', currentTarget.checked, currentTarget);
   },
-  'click button.js-save-default-storage'(event, tpl) {
+  'click button.js-save-default-storage'(event: JQuery.TriggeredEvent, tpl: AttachmentsInstance) {
     event.preventDefault();
     const storageName = tpl.$('.js-default-save-storage').val();
     if (!storageName) return;
-    Meteor.call('setDefaultAttachmentStorage', storageName, (error) => {
+    // error: any — untyped Meteor method callback.
+    Meteor.call('setDefaultAttachmentStorage', storageName, (error: any) => {
       if (error) {
         alert(`${TAPi18n.__('default-save-storage-save-failed')}: ${error.reason || error.message}`);
         return;
@@ -682,15 +696,16 @@ Template.attachments.events({
       refreshAttachmentStorageSettings(tpl);
     });
   },
-  'click button.js-save-cloud-settings'(event, tpl) {
+  'click button.js-save-cloud-settings'(event: JQuery.TriggeredEvent, tpl: AttachmentsInstance) {
     event.preventDefault();
-    const provider = event.currentTarget.dataset.provider;
+    const provider = (event.currentTarget as HTMLElement).dataset.provider;
     if (!provider) return;
     const cfg = gatherCloudConfig(tpl, provider);
     // Send only this provider's config; the server merges it over the stored
     // settings and preserves secrets left blank as well as the other providers.
     const nextSettings = { storageConfig: { [provider]: cfg } };
-    Meteor.call('updateAttachmentStorageSettings', nextSettings, (error) => {
+    // error: any — untyped Meteor method callback.
+    Meteor.call('updateAttachmentStorageSettings', nextSettings, (error: any) => {
       if (error) {
         alert(`${TAPi18n.__('cloud-settings-save-failed')}: ${error.reason || error.message}`);
         return;
@@ -699,12 +714,13 @@ Template.attachments.events({
       refreshAttachmentStorageSettings(tpl);
     });
   },
-  'click button.js-test-cloud-connection'(event, tpl) {
+  'click button.js-test-cloud-connection'(event: JQuery.TriggeredEvent, tpl: AttachmentsInstance) {
     event.preventDefault();
-    const provider = event.currentTarget.dataset.provider;
+    const provider = (event.currentTarget as HTMLElement).dataset.provider;
     if (!provider) return;
     const cfg = gatherCloudConfig(tpl, provider);
-    Meteor.call('testAttachmentCloudConnection', provider, cfg, (error, result) => {
+    // error/result: any — untyped Meteor method callback.
+    Meteor.call('testAttachmentCloudConnection', provider, cfg, (error: any, result: any) => {
       const results = { ...tpl.cloudTestResults.get() };
       const errors = { ...tpl.cloudTestErrors.get() };
       if (error) {
@@ -721,11 +737,11 @@ Template.attachments.events({
       tpl.cloudTestErrors.set(errors);
     });
   },
-  'click button.js-calculate-gridfs-stats'(event, tpl) {
+  'click button.js-calculate-gridfs-stats'(event: JQuery.TriggeredEvent, tpl: AttachmentsInstance) {
     event.preventDefault();
     tpl.gridFsStatsLoading.set(true);
     tpl.gridFsStatsError.set('');
-    Meteor.call('getGridFsStorageStats', (error, result) => {
+    Meteor.call('getGridFsStorageStats', (error: any, result: any) => {
       tpl.gridFsStatsLoading.set(false);
       if (error) {
         tpl.gridFsStats.set(null);
@@ -735,11 +751,11 @@ Template.attachments.events({
       tpl.gridFsStats.set(result || null);
     });
   },
-  'click button.js-calculate-filesystem-stats'(event, tpl) {
+  'click button.js-calculate-filesystem-stats'(event: JQuery.TriggeredEvent, tpl: AttachmentsInstance) {
     event.preventDefault();
     tpl.filesystemStatsLoading.set(true);
     tpl.filesystemStatsError.set('');
-    Meteor.call('getFilesystemStorageStats', (error, result) => {
+    Meteor.call('getFilesystemStorageStats', (error: any, result: any) => {
       tpl.filesystemStatsLoading.set(false);
       if (error) {
         tpl.filesystemStats.set(null);
@@ -749,11 +765,11 @@ Template.attachments.events({
       tpl.filesystemStats.set(result || null);
     });
   },
-  'click button.js-calculate-s3-stats'(event, tpl) {
+  'click button.js-calculate-s3-stats'(event: JQuery.TriggeredEvent, tpl: AttachmentsInstance) {
     event.preventDefault();
     tpl.s3StatsLoading.set(true);
     tpl.s3StatsError.set('');
-    Meteor.call('getS3StorageStats', (error, result) => {
+    Meteor.call('getS3StorageStats', (error: any, result: any) => {
       tpl.s3StatsLoading.set(false);
       if (error) {
         tpl.s3Stats.set(null);
@@ -763,11 +779,11 @@ Template.attachments.events({
       tpl.s3Stats.set(result || null);
     });
   },
-  'click button.js-calculate-azure-stats'(event, tpl) {
+  'click button.js-calculate-azure-stats'(event: JQuery.TriggeredEvent, tpl: AttachmentsInstance) {
     event.preventDefault();
     tpl.azureStatsLoading.set(true);
     tpl.azureStatsError.set('');
-    Meteor.call('getAzureStorageStats', (error, result) => {
+    Meteor.call('getAzureStorageStats', (error: any, result: any) => {
       tpl.azureStatsLoading.set(false);
       if (error) {
         tpl.azureStats.set(null);
@@ -777,11 +793,11 @@ Template.attachments.events({
       tpl.azureStats.set(result || null);
     });
   },
-  'click button.js-calculate-gcs-stats'(event, tpl) {
+  'click button.js-calculate-gcs-stats'(event: JQuery.TriggeredEvent, tpl: AttachmentsInstance) {
     event.preventDefault();
     tpl.gcsStatsLoading.set(true);
     tpl.gcsStatsError.set('');
-    Meteor.call('getGcsStorageStats', (error, result) => {
+    Meteor.call('getGcsStorageStats', (error: any, result: any) => {
       tpl.gcsStatsLoading.set(false);
       if (error) {
         tpl.gcsStats.set(null);
@@ -791,13 +807,13 @@ Template.attachments.events({
       tpl.gcsStats.set(result || null);
     });
   },
-  'click button.js-compact-mongodb-gridfs'(event, tpl) {
+  'click button.js-compact-mongodb-gridfs'(event: JQuery.TriggeredEvent, tpl: AttachmentsInstance) {
     event.preventDefault();
     runCompact(tpl.compactLoading, tpl.compactResult, tpl.compactError);
   },
 });
 
-Template.moveAttachments.onCreated(function () {
+Template.moveAttachments.onCreated(function (this: MoveAttachmentsInstance) {
   // The bulk move runs as a server-side background job; subscribe to its
   // persisted progress so it keeps running (and stays visible) even if the
   // admin navigates away from or closes this page.
@@ -819,20 +835,20 @@ function getLastMove() {
   return doc.lastMove;
 }
 
-function storageLabel(value) {
+function storageLabel(value: any) {
   return value ? TAPi18n.__(`move-storage-${value}`) : '';
 }
 
-function scopeLabel(value) {
+function scopeLabel(value: any) {
   return value ? TAPi18n.__(`move-scope-${value}`) : '';
 }
 
 // Format a Date (or value) as YYYY-MM-DD HH:MM:SS in local time.
-function formatDateTime(value) {
+function formatDateTime(value: any) {
   if (!value) return '';
   const date = value instanceof Date ? value : new Date(value);
   if (isNaN(date.getTime())) return '';
-  const p = n => String(n).padStart(2, '0');
+  const p = (n: any) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ` +
     `${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
 }
@@ -864,21 +880,22 @@ Template.moveAttachments.helpers({
       `(${scopeLabel(lm.scope)}) ${formatDateTime(lm.at)}${cancelled}`;
   },
   repairLoading() {
-    return Template.instance().repairLoading.get();
+    return (Template.instance() as MoveAttachmentsInstance).repairLoading.get();
   },
   repairResult() {
-    return Template.instance().repairResult.get();
+    return (Template.instance() as MoveAttachmentsInstance).repairResult.get();
   },
   repairError() {
-    return Template.instance().repairError.get();
+    return (Template.instance() as MoveAttachmentsInstance).repairError.get();
   },
 });
 
-function runCompact(loadingVar, resultVar, errorVar) {
+function runCompact(loadingVar: any, resultVar: any, errorVar: any) {
   loadingVar.set(true);
   resultVar.set(null);
   errorVar.set('');
-  Meteor.call('compactMongoGridFs', (error, result) => {
+  // error/result: any — untyped Meteor method callback.
+  Meteor.call('compactMongoGridFs', (error: any, result: any) => {
     loadingVar.set(false);
     if (error) {
       errorVar.set(error.reason || error.message || 'Compact failed');
@@ -889,7 +906,7 @@ function runCompact(loadingVar, resultVar, errorVar) {
 }
 
 Template.moveAttachments.events({
-  'click button.js-move-all-attachments'(event, tpl) {
+  'click button.js-move-all-attachments'(event: JQuery.TriggeredEvent, tpl: MoveAttachmentsInstance) {
     if (getBulkMoveProgress()) return;
     const scope = tpl.$('.js-move-scope').val() || 'attachments';
     const source = tpl.$('.js-move-source-storage').val();
@@ -899,7 +916,7 @@ Template.moveAttachments.events({
     if (!source || !dest || (source !== 'all' && source === dest)) return;
     // Hand the whole job to the server so the transfer keeps running as a
     // background process even if this page is left or closed.
-    Meteor.call('startBulkAttachmentMove', source, dest, scope, (error, result) => {
+    Meteor.call('startBulkAttachmentMove', source, dest, scope, (error: any, result: any) => {
       if (error) {
         if (error.error !== 'bulk-move-already-running') {
           alert(error.reason || error.message);
@@ -913,12 +930,12 @@ Template.moveAttachments.events({
       }
     });
   },
-  'click button.js-repair-attachment-locations'(event, tpl) {
+  'click button.js-repair-attachment-locations'(event: JQuery.TriggeredEvent, tpl: MoveAttachmentsInstance) {
     if (tpl.repairLoading.get()) return;
     tpl.repairLoading.set(true);
     tpl.repairResult.set(null);
     tpl.repairError.set('');
-    Meteor.call('repairAttachmentStorageLocations', (error, result) => {
+    Meteor.call('repairAttachmentStorageLocations', (error: any, result: any) => {
       tpl.repairLoading.set(false);
       if (error) {
         tpl.repairError.set(error.reason || error.message || 'Repair failed');
@@ -937,3 +954,44 @@ Template.moveAttachments.events({
     Meteor.call('cancelBulkAttachmentMove');
   },
 });
+
+// attachments admin panel instance: active section plus per-storage reactive
+// state (settings, limits, per-provider stats and test results).
+interface AttachmentsInstance extends Blaze.TemplateInstance {
+  activeSection: ReactiveVar<any>;
+  // storageSettingsSubscription: any — Meteor subscription handle.
+  storageSettingsSubscription: any;
+  attachmentStorageSettings: ReactiveVar<any>;
+  attachmentLimitUnits: ReactiveVar<any>;
+  attachmentLimitModes: ReactiveVar<any>;
+  gridFsStats: ReactiveVar<any>;
+  gridFsStatsLoading: ReactiveVar<any>;
+  gridFsStatsError: ReactiveVar<any>;
+  filesystemStats: ReactiveVar<any>;
+  filesystemStatsLoading: ReactiveVar<any>;
+  filesystemStatsError: ReactiveVar<any>;
+  s3Stats: ReactiveVar<any>;
+  s3StatsLoading: ReactiveVar<any>;
+  s3StatsError: ReactiveVar<any>;
+  azureStats: ReactiveVar<any>;
+  azureStatsLoading: ReactiveVar<any>;
+  azureStatsError: ReactiveVar<any>;
+  gcsStats: ReactiveVar<any>;
+  gcsStatsLoading: ReactiveVar<any>;
+  gcsStatsError: ReactiveVar<any>;
+  compactLoading: ReactiveVar<any>;
+  compactResult: ReactiveVar<any>;
+  compactError: ReactiveVar<any>;
+  cloudTestResults: ReactiveVar<any>;
+  cloudTestErrors: ReactiveVar<any>;
+  loading: ReactiveVar<any>;
+}
+
+// moveAttachments panel instance: bulk-move subscription plus repair state.
+interface MoveAttachmentsInstance extends Blaze.TemplateInstance {
+  // bulkMoveSubscription: any — Meteor subscription handle.
+  bulkMoveSubscription: any;
+  repairLoading: ReactiveVar<any>;
+  repairResult: ReactiveVar<any>;
+  repairError: ReactiveVar<any>;
+}
