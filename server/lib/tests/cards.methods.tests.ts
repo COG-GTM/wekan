@@ -14,7 +14,7 @@ const origGetCard = ReactiveCache.getCard;
 const origGetBoard = ReactiveCache.getBoard;
 
 describe('cards methods security', function() {
-  let updateStub;
+  let updateStub: sinon.SinonStub;
 
   beforeEach(function() {
     // Stub collection update to capture modifiers
@@ -31,7 +31,7 @@ describe('cards methods security', function() {
     it('denies non-member when allowNonBoardMembers=false', function() {
       const cardId = 'card1';
       const callerId = 'user-nonmember';
-      const board = { hasMember: id => id === 'someone-else' };
+      const board = { hasMember: (id: string) => id === 'someone-else' };
       const card = { _id: cardId, boardId: 'board1', vote: { allowNonBoardMembers: false } };
 
       ReactiveCache.getCard = () => card;
@@ -45,7 +45,7 @@ describe('cards methods security', function() {
     it('allows non-member only for own userId when allowNonBoardMembers=true', function() {
       const cardId = 'card2';
       const callerId = 'user-guest';
-      const board = { hasMember: id => id === 'someone-else' };
+      const board = { hasMember: (id: string) => id === 'someone-else' };
       const card = { _id: cardId, boardId: 'board2', vote: { allowNonBoardMembers: true } };
 
       ReactiveCache.getCard = () => card;
@@ -65,7 +65,7 @@ describe('cards methods security', function() {
       const cardId = 'card3';
       const callerId = 'member1';
       const otherId = 'member2';
-      const board = { hasMember: id => (id === callerId || id === otherId) };
+      const board = { hasMember: (id: string) => (id === callerId || id === otherId) };
       const card = { _id: cardId, boardId: 'board3', vote: { allowNonBoardMembers: false } };
 
       ReactiveCache.getCard = () => card;
@@ -85,7 +85,7 @@ describe('cards methods security', function() {
     it('denies non-member when allowNonBoardMembers=false', function() {
       const cardId = 'card4';
       const callerId = 'nm';
-      const board = { hasMember: id => id === 'someone-else' };
+      const board = { hasMember: (id: string) => id === 'someone-else' };
       const card = { _id: cardId, boardId: 'board4', poker: { allowNonBoardMembers: false } };
 
       ReactiveCache.getCard = () => card;
@@ -99,7 +99,7 @@ describe('cards methods security', function() {
     it('allows non-member only for own userId when allowNonBoardMembers=true', function() {
       const cardId = 'card5';
       const callerId = 'guest';
-      const board = { hasMember: id => id === 'someone-else' };
+      const board = { hasMember: (id: string) => id === 'someone-else' };
       const card = { _id: cardId, boardId: 'board5', poker: { allowNonBoardMembers: true } };
 
       ReactiveCache.getCard = () => card;

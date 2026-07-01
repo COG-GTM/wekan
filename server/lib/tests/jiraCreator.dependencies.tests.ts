@@ -10,7 +10,7 @@ import { JiraCreator } from '/models/jiraCreator';
 // Links to issues not in the import (or self-links) are skipped.
 
 describe('JiraCreator dependency mapping (#3392)', function () {
-  let updateStub;
+  let updateStub: sinon.SinonStub;
 
   beforeEach(function () {
     updateStub = sinon.stub(Cards.direct, 'updateAsync').resolves(1);
@@ -20,7 +20,7 @@ describe('JiraCreator dependency mapping (#3392)', function () {
     updateStub.restore();
   });
 
-  function runWith(issuelinks, key = 'PROJ-1') {
+  function runWith(issuelinks: JiraIssueLink[], key = 'PROJ-1') {
     const creator = new JiraCreator({});
     creator.cardsByKey = { 'PROJ-1': 'idA', 'PROJ-2': 'idB', 'PROJ-3': 'idC' };
     const data = { issues: [{ key, fields: { issuelinks } }] };
@@ -71,3 +71,10 @@ describe('JiraCreator dependency mapping (#3392)', function () {
     expect(updateStub.called).to.equal(false);
   });
 });
+
+// A single Jira `issuelinks` entry as consumed by JiraCreator.createDependencies.
+interface JiraIssueLink {
+  type: { name: string };
+  outwardIssue?: { key: string };
+  inwardIssue?: { key: string };
+}

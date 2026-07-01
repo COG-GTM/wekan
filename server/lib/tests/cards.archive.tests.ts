@@ -1,6 +1,7 @@
 /* eslint-env mocha */
 import { expect } from 'chai';
 import sinon from 'sinon';
+import { Meteor } from 'meteor/meteor';
 import Cards from '/models/cards';
 import { ReactiveCache } from '/imports/reactiveCache';
 
@@ -13,7 +14,7 @@ const origGetCard = ReactiveCache.getCard;
 const origGetBoard = ReactiveCache.getBoard;
 
 describe('cards archive / unarchive', function() {
-  let updateStub;
+  let updateStub: sinon.SinonStub;
 
   beforeEach(function() {
     updateStub = sinon.stub(Cards, 'update').returns(1);
@@ -29,7 +30,7 @@ describe('cards archive / unarchive', function() {
     it('sets archived=true on the target card', function() {
       const cardId = 'archCard1';
       const userId = 'user-admin';
-      const board = { hasMember: id => id === userId, hasAdmin: id => id === userId };
+      const board = { hasMember: (id: string) => id === userId, hasAdmin: (id: string) => id === userId };
       const card = { _id: cardId, boardId: 'board1', archived: false };
 
       ReactiveCache.getCard = () => card;
@@ -58,7 +59,7 @@ describe('cards archive / unarchive', function() {
     it('is idempotent when the card is already archived', function() {
       const cardId = 'archCard3';
       const userId = 'user-member';
-      const board = { hasMember: id => id === userId, hasAdmin: () => false };
+      const board = { hasMember: (id: string) => id === userId, hasAdmin: () => false };
       const card = { _id: cardId, boardId: 'board3', archived: true };
 
       ReactiveCache.getCard = () => card;
@@ -77,7 +78,7 @@ describe('cards archive / unarchive', function() {
     it('sets archived=false on an archived card', function() {
       const cardId = 'unarchCard1';
       const userId = 'user-member';
-      const board = { hasMember: id => id === userId, hasAdmin: () => false };
+      const board = { hasMember: (id: string) => id === userId, hasAdmin: () => false };
       const card = { _id: cardId, boardId: 'board4', archived: true };
 
       ReactiveCache.getCard = () => card;

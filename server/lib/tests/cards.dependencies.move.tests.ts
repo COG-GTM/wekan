@@ -1,6 +1,7 @@
 /* eslint-env mocha */
 import { expect } from 'chai';
 import sinon from 'sinon';
+import { Meteor } from 'meteor/meteor';
 import Cards from '/models/cards';
 import Attachments from '/models/attachments';
 import { ReactiveCache } from '/imports/reactiveCache';
@@ -16,7 +17,7 @@ const origGetBoard = ReactiveCache.getBoard;
 
 // Build a card document with the model helpers attached (the collection shim's
 // transform makes helpers like move()/mapCustomFieldsToBoard available).
-function makeCard(props) {
+function makeCard(props: CardProps) {
   const card = Cards._transform(
     Object.assign(
       { members: [], watchers: [], customFields: [], labelIds: [], cardDependencies: [] },
@@ -29,9 +30,9 @@ function makeCard(props) {
 }
 
 describe('cards move: dependency cleanup (#3392)', function () {
-  let updateStub;
-  let userIdStub;
-  let attachStub;
+  let updateStub: sinon.SinonStub;
+  let userIdStub: sinon.SinonStub;
+  let attachStub: sinon.SinonStub | null;
 
   beforeEach(function () {
     updateStub = sinon.stub(Cards, 'updateAsync').resolves(1);
@@ -56,7 +57,7 @@ describe('cards move: dependency cleanup (#3392)', function () {
   it('clears the moved card deps and pulls inbound refs on a cross-board move', async function () {
     const oldBoardId = 'b-old';
     const newBoardId = 'b-new';
-    ReactiveCache.getBoard = id => {
+    ReactiveCache.getBoard = (id: string) => {
       if (id === newBoardId) {
         return { _id: newBoardId, members: [], labels: [], getNextCardNumber: async () => 7 };
       }
@@ -74,19 +75,19 @@ describe('cards move: dependency cleanup (#3392)', function () {
     await card.move(newBoardId, 's2', 'l2');
 
     // Main update on the moved card clears its dependencies and moves the board.
-    const mainCall = updateStub.getCalls().find(c => c.args[0] === 'cardA');
+    const mainCall = updateStub.getCalls().find((c: sinon.SinonSpyCall) => c.args[0] === 'cardA');
     expect(mainCall, 'main update by _id').to.exist;
-    expect(mainCall.args[1].$set.cardDependencies).to.deep.equal([]);
-    expect(mainCall.args[1].$set.boardId).to.equal(newBoardId);
+    expect(mainCall!.args[1].$set.cardDependencies).to.deep.equal([]);
+    expect(mainCall!.args[1].$set.boardId).to.equal(newBoardId);
 
     // A multi-update pulls inbound references to the moved card from the old board.
     const cleanupCall = updateStub
       .getCalls()
-      .find(c => c.args[0] && c.args[0]['cardDependencies.cardId'] === 'cardA');
+      .find((c: sinon.SinonSpyCall) => c.args[0] && c.args[0]['cardDependencies.cardId'] === 'cardA');
     expect(cleanupCall, 'inbound cleanup update').to.exist;
-    expect(cleanupCall.args[0].boardId).to.equal(oldBoardId);
-    expect(cleanupCall.args[1].$pull.cardDependencies).to.deep.equal({ cardId: 'cardA' });
-    expect(cleanupCall.args[2]).to.deep.equal({ multi: true });
+    expect(cleanupCall!.args[0].boardId).to.equal(oldBoardId);
+    expect(cleanupCall!.args[1].$pull.cardDependencies).to.deep.equal({ cardId: 'cardA' });
+    expect(cleanupCall!.args[2]).to.deep.equal({ multi: true });
   });
 
   it('does not touch dependencies on a same-board move', async function () {
@@ -111,11 +112,17 @@ describe('cards move: dependency cleanup (#3392)', function () {
     // No inbound-cleanup update, and the main update does not clear deps.
     const cleanupCall = updateStub
       .getCalls()
-      .find(c => c.args[0] && c.args[0]['cardDependencies.cardId']);
+      .find((c: sinon.SinonSpyCall) => c.args[0] && c.args[0]['cardDependencies.cardId']);
     expect(cleanupCall, 'no inbound cleanup on same-board move').to.not.exist;
 
-    const mainCall = updateStub.getCalls().find(c => c.args[0] === 'cardA');
+    const mainCall = updateStub.getCalls().find((c: sinon.SinonSpyCall) => c.args[0] === 'cardA');
     expect(mainCall, 'main update by _id').to.exist;
-    expect(mainCall.args[1].$set).to.not.have.property('cardDependencies');
+    expect(mainCall!.args[1].$set).to.not.have.property('cardDependencies');
   });
 });
+
+// A partial raw card document merged into the transform input. Fields are
+// arbitrary card columns, so the values are `any` (dynamic Mongo document shape).
+interface CardProps {
+  [key: string]: any;
+}

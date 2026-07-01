@@ -1,6 +1,7 @@
 /* eslint-env mocha */
 import { expect } from 'chai';
 import sinon from 'sinon';
+import { Meteor } from 'meteor/meteor';
 import Cards from '/models/cards';
 import { ReactiveCache } from '/imports/reactiveCache';
 
@@ -11,7 +12,7 @@ const origGetBoard = ReactiveCache.getBoard;
 const origGetList = ReactiveCache.getList;
 
 describe('cards.move', function() {
-  let updateStub;
+  let updateStub: sinon.SinonStub;
 
   beforeEach(function() {
     updateStub = sinon.stub(Cards, 'update').returns(1);
@@ -32,7 +33,7 @@ describe('cards.move', function() {
     const targetListId = 'listTarget';
     const targetSwimlaneId = 'swimTarget';
 
-    const board = { _id: sourceBoardId, hasMember: id => id === userId };
+    const board = { _id: sourceBoardId, hasMember: (id: string) => id === userId };
     const card = { _id: cardId, boardId: sourceBoardId, listId: 'listSrc', swimlaneId: 'swimSrc' };
 
     ReactiveCache.getCard = () => card;
@@ -64,7 +65,7 @@ describe('cards.move', function() {
   it('moving a card does not duplicate it (update is called once)', function() {
     const cardId = 'moveCard3';
     const userId = 'user-member';
-    const board = { _id: 'boardY', hasMember: id => id === userId };
+    const board = { _id: 'boardY', hasMember: (id: string) => id === userId };
     const card = { _id: cardId, boardId: 'boardY', listId: 'listA' };
 
     ReactiveCache.getCard = () => card;
@@ -79,7 +80,7 @@ describe('cards.move', function() {
   it('modifiedAt and dateLastActivity are set on move', function() {
     const cardId = 'moveCard4';
     const userId = 'user-member';
-    const board = { _id: 'boardZ', hasMember: id => id === userId };
+    const board = { _id: 'boardZ', hasMember: (id: string) => id === userId };
     const card = { _id: cardId, boardId: 'boardZ', listId: 'listA' };
 
     ReactiveCache.getCard = () => card;

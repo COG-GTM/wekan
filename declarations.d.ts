@@ -4,6 +4,33 @@
 // auto-included and must be referenced explicitly here.
 /// <reference types="mocha" />
 
+// Augment @types/meteor with the internal DDP server surface the server-side
+// test suites rely on. `Meteor.server.method_handlers` maps a registered method
+// name to its handler function; tests look a handler up by name and invoke it
+// directly (e.g. `handler.call({ userId }, ...args)`). Handler signatures are
+// heterogeneous, so the args/return are `any` (documented external boundary).
+declare module 'meteor/meteor' {
+  namespace Meteor {
+    const server: {
+      method_handlers: {
+        [name: string]: (this: { userId?: string }, ...args: any[]) => any;
+      };
+    };
+  }
+}
+
+// Expose the Meteor-internal `Collection._transform` used by the model tests: it
+// applies the collection's `transform` to a raw document, returning the document
+// with its model helper methods attached. Return type is `any` because the
+// attached helpers differ per collection (Cards gains move(), etc.).
+declare module 'meteor/mongo' {
+  namespace Mongo {
+    interface Collection<T, U = T> {
+      _transform(doc: any): any;
+    }
+  }
+}
+
 // Ambient module and global declarations for the wekan root application.
 //
 // These cover Meteor packages and app-wide globals that are NOT typed by
