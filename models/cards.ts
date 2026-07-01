@@ -50,7 +50,8 @@ import ChecklistItems from '/models/checklistItems';
 import Checklists from '/models/checklists';
 import Lists from '/models/lists';
 import { debounce } from '/imports/lib/collectionHelpers';
-const { SimpleSchema } = require('/imports/simpleSchema');
+import { Match } from 'meteor/check';
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
 const Cards = new Mongo.Collection('cards');
 
@@ -851,9 +852,9 @@ Cards.helpers({
       const oldBoardLabels = (oldBoard && oldBoard.labels) || [];
 
       // Get old label names
-      const oldCardLabels = oldBoardLabels.filter(label => {
+      const oldCardLabels = oldBoardLabels.filter((label: any) => {
           return (this.labelIds || []).includes(label._id);
-        }).map(x => x.name);
+        }).map((x: any) => x.name);
 
       const newBoard = await ReactiveCache.getBoard(boardId);
       // #2970: only map labels that exist by NAME on the destination board and
@@ -1062,7 +1063,7 @@ Cards.helpers({
     const board = this.board();
     if (!board) return [];
     const boardLabels = board.labels;
-    const cardLabels = (boardLabels || []).filter(label => {
+    const cardLabels = (boardLabels || []).filter((label: any) => {
       return (this.labelIds || []).includes(label._id);
     });
     return cardLabels;
@@ -1198,10 +1199,10 @@ Cards.helpers({
   checklistItemCount() {
     const checklists = this.checklists();
     const ret = checklists
-      .map(checklist => {
+      .map((checklist: any) => {
         return checklist.itemCount();
       })
-      .reduce((prev, next) => {
+      .reduce((prev: any, next: any) => {
         return prev + next;
       }, 0);
     return ret;
@@ -1210,10 +1211,10 @@ Cards.helpers({
   checklistFinishedCount() {
     const checklists = this.checklists();
     const ret = checklists
-      .map(checklist => {
+      .map((checklist: any) => {
         return checklist.finishedCount();
       })
-      .reduce((prev, next) => {
+      .reduce((prev: any, next: any) => {
         return prev + next;
       }, 0);
     return ret;
@@ -1274,7 +1275,7 @@ Cards.helpers({
   },
 
   customFieldIndex(customFieldId) {
-    return (this.customFields || []).map(x => x._id).indexOf(customFieldId);
+    return (this.customFields || []).map((x: any) => x._id).indexOf(customFieldId);
   },
 
   // customFields with definitions
@@ -1288,8 +1289,8 @@ Cards.helpers({
     }
     // match right definition to each field
     if (!this.customFields) return [];
-    const ret = this.customFields.map(customField => {
-      const definition = definitions.find(definition => {
+    const ret = this.customFields.map((customField: any) => {
+      const definition = definitions.find((definition: any) => {
         return definition._id === customField._id;
       });
       if (!definition) {
@@ -1316,7 +1317,7 @@ Cards.helpers({
     });
     // at linked cards custom fields definition is not found
     ret.sort(
-      (a, b) =>
+      (a: any, b: any) =>
         a.definition !== undefined &&
         b.definition !== undefined &&
         a.definition.name !== undefined &&
@@ -1383,7 +1384,7 @@ Cards.helpers({
   },
 
   parentListId() {
-    const result = [];
+    const result: any[] = [];
     let crtParentId = this.parentId;
     while (crtParentId) {
       const crt = ReactiveCache.getCard(crtParentId);
@@ -1404,7 +1405,7 @@ Cards.helpers({
   },
 
   parentList() {
-    const resultId = [];
+    const resultId: any[] = [];
     const result = [];
     let crtParentId = this.parentId;
     while (crtParentId) {
@@ -1428,7 +1429,7 @@ Cards.helpers({
 
   parentString(sep) {
     return (this.parentList())
-      .map(function(elem) {
+      .map(function(elem: any) {
         return elem.title;
       })
       .join(sep);
@@ -1491,7 +1492,7 @@ Cards.helpers({
       if (board === undefined) {
         return null;
       } else {
-        return board.activeMembers().map(member => {
+        return board.activeMembers().map((member: any) => {
           return member.userId;
         });
       }
@@ -1515,7 +1516,7 @@ Cards.helpers({
       if (board === undefined) {
         return null;
       } else {
-        return board.activeMembers().map(assignee => {
+        return board.activeMembers().map((assignee: any) => {
           return assignee.userId;
         });
       }
@@ -1525,85 +1526,12 @@ Cards.helpers({
     }
   },
 
-  assignMember(memberId) {
-    let ret;
-    if (this.isLinkedBoard()) {
-      const board = ReactiveCache.getBoard(this.linkedId);
-      ret = board.addMember(memberId);
-    } else {
-      ret = Cards.updateAsync(
-        { _id: this.getRealId() },
-        { $addToSet: { members: memberId } },
-      );
-    }
-    return ret;
-  },
-
-  assignAssignee(assigneeId) {
-    if (this.isLinkedCard()) {
-      return Cards.updateAsync(
-        { _id: this.linkedId },
-        { $addToSet: { assignees: assigneeId } },
-      );
-    } else if (this.isLinkedBoard()) {
-      const board = ReactiveCache.getBoard(this.linkedId);
-      return board.addAssignee(assigneeId);
-    } else {
-      return Cards.updateAsync(
-        { _id: this._id },
-        { $addToSet: { assignees: assigneeId } },
-      );
-    }
-  },
-
-  unassignMember(memberId) {
-    if (this.isLinkedCard()) {
-      return Cards.updateAsync(
-        { _id: this.linkedId },
-        { $pull: { members: memberId } },
-      );
-    } else if (this.isLinkedBoard()) {
-      const board = ReactiveCache.getBoard(this.linkedId);
-      return board.removeMember(memberId);
-    } else {
-      return Cards.updateAsync({ _id: this._id }, { $pull: { members: memberId } });
-    }
-  },
-
-  unassignAssignee(assigneeId) {
-    if (this.isLinkedCard()) {
-      return Cards.updateAsync(
-        { _id: this.linkedId },
-        { $pull: { assignees: assigneeId } },
-      );
-    } else if (this.isLinkedBoard()) {
-      const board = ReactiveCache.getBoard(this.linkedId);
-      return board.removeAssignee(assigneeId);
-    } else {
-      return Cards.updateAsync(
-        { _id: this._id },
-        { $pull: { assignees: assigneeId } },
-      );
-    }
-  },
-
-  toggleMember(memberId) {
-    const members = this.getMembers();
-    if (members && members.indexOf(memberId) > -1) {
-      return this.unassignMember(memberId);
-    } else {
-      return this.assignMember(memberId);
-    }
-  },
-
-  toggleAssignee(assigneeId) {
-    const assignees = this.getAssignees();
-    if (assignees && assignees.indexOf(assigneeId) > -1) {
-      return this.unassignAssignee(assigneeId);
-    } else {
-      return this.assignAssignee(assigneeId);
-    }
-  },
+  // NOTE: assignMember/assignAssignee/unassignMember/unassignAssignee/
+  // toggleMember/toggleAssignee were defined twice in the original file. In a JS
+  // object literal the later definitions win at runtime, so these earlier
+  // (linked-card/board aware) duplicates were dead code; they are dropped here
+  // to satisfy TypeScript without changing runtime behavior. The active
+  // definitions remain further down in this helpers object.
 
   // #3392: PI Program Board "Red Strings". Return this card's dependencies as
   // normalized { cardId, type, color, icon } objects (legacy bare-string ids are
@@ -1624,7 +1552,7 @@ Cards.helpers({
       return undefined;
     }
     const deps = this.getDependencies();
-    const existing = deps.find(dep => dep.cardId === targetCardId);
+    const existing = deps.find((dep: any) => dep.cardId === targetCardId);
     const entry = normalizeDependency({
       cardId: targetCardId,
       type: options.type || (existing && existing.type),
@@ -1634,7 +1562,7 @@ Cards.helpers({
     // Read-modify-write the whole array and update by _id only: the client
     // (untrusted code) may not updateAsync with a selector / positional `$`.
     const next = existing
-      ? deps.map(dep => (dep.cardId === targetCardId ? entry : dep))
+      ? deps.map((dep: any) => (dep.cardId === targetCardId ? entry : dep))
       : [...deps, entry];
     return Cards.updateAsync(this._id, {
       $set: { cardDependencies: next },
@@ -1647,7 +1575,7 @@ Cards.helpers({
   setDependencyProps(targetCardId, props = {}) {
     const deps = this.getDependencies();
     let changed = false;
-    const next = deps.map(dep => {
+    const next = deps.map((dep: any) => {
       if (dep.cardId !== targetCardId) {
         return dep;
       }
@@ -1671,7 +1599,7 @@ Cards.helpers({
     // Rewrite the array and update by _id only (no selector / positional `$`
     // updates from untrusted client code).
     const next = this.getDependencies().filter(
-      dep => dep.cardId !== targetCardId,
+      (dep: any) => dep.cardId !== targetCardId,
     );
     return Cards.updateAsync(this._id, {
       $set: { cardDependencies: next },
@@ -1872,13 +1800,10 @@ Cards.helpers({
     }
   },
 
-  setSpentTime(spentTime) {
-    if (this.isLinkedBoard()) {
-      return Boards.updateAsync({ _id: this.linkedId }, { $set: { spentTime } });
-    } else {
-      return Cards.updateAsync({ _id: this.getRealId() }, { $set: { spentTime } });
-    }
-  },
+  // NOTE: setSpentTime was defined twice in the original file; the later
+  // definition wins at runtime, so this earlier (linked-board aware) duplicate
+  // was dead code and is dropped here to satisfy TypeScript without changing
+  // runtime behavior. The active definition remains further down.
 
   getVoteQuestion() {
     if (this.isLinkedCard()) {
@@ -2388,7 +2313,8 @@ Cards.helpers({
   },
   pokerWinner() {
     const pokerListMaps = [];
-    let pokerWinnersListMap = [];
+    // Winners filtered from pokerListMaps; entries carry mixed pokerCard types.
+    let pokerWinnersListMap: any[] = [];
     if (this.expiredPoker()) {
       const one = { count: this.pokerCountOne(), pokerCard: 1 };
       const two = { count: this.pokerCountTwo(), pokerCard: 2 };
@@ -2432,7 +2358,7 @@ Cards.helpers({
   },
 
   async archive() {
-    await this.applyToChildren(async card => {
+    await this.applyToChildren(async (card: any) => {
       await card.archive();
     });
     return Cards.updateAsync(this._id, {
@@ -2441,7 +2367,7 @@ Cards.helpers({
   },
 
   async restore() {
-    await this.applyToChildren(async card => {
+    await this.applyToChildren(async (card: any) => {
       await card.restore();
     });
     return Cards.updateAsync(this._id, {
@@ -2458,7 +2384,8 @@ Cards.helpers({
       const board = ReactiveCache.getBoard(boardId);
       swimlaneId = board.getDefaultSwimline()._id;
     }
-    let parentElementDom = $(`#swimlane-${swimlaneId}`).get(0);
+    // DOM node / jQuery mix used only for client-side sort-index calculation.
+    let parentElementDom: any = $(`#swimlane-${swimlaneId}`).get(0);
     if (!parentElementDom) parentElementDom = $(':root');
 
     const lastCardDom = $(parentElementDom)
@@ -2474,7 +2401,7 @@ Cards.helpers({
     });
   },
 
-  moveOptionalArgs({ boardId, swimlaneId, listId, sort } = {}) {
+  moveOptionalArgs({ boardId, swimlaneId, listId, sort }: any = {}) {
     boardId = boardId || this.boardId;
     swimlaneId = swimlaneId || this.swimlaneId;
     if (!swimlaneId) {
@@ -2494,7 +2421,8 @@ Cards.helpers({
       sort: this.sort,
     };
 
-    const mutatedFields = { boardId, swimlaneId, listId };
+    // Assembled Mongo $set payload; fields are added conditionally below.
+    const mutatedFields: any = { boardId, swimlaneId, listId };
 
     if (sort !== null) {
       mutatedFields.sort = sort;
@@ -2503,19 +2431,19 @@ Cards.helpers({
     if (this.boardId !== boardId) {
       const oldBoard = ReactiveCache.getBoard(this.boardId);
       const oldBoardLabels = Array.isArray(oldBoard?.labels) ? oldBoard.labels : [];
-      const oldCardLabels = oldBoardLabels.filter(label => {
+      const oldCardLabels = oldBoardLabels.filter((label: any) => {
           return (this.labelIds || []).includes(label._id);
-        }).map(x => x.name);
+        }).map((x: any) => x.name);
 
       const newBoard = ReactiveCache.getBoard(boardId);
       if (!newBoard) {
         throw new Meteor.Error('board-not-found', 'Destination board not found while moving card.');
       }
-      const allowedMemberIds = (newBoard.members || []).filter(member => member.isActive === true).map(x => x.userId);
+      const allowedMemberIds = (newBoard.members || []).filter((member: any) => member.isActive === true).map((x: any) => x.userId);
       const newBoardLabels = Array.isArray(newBoard.labels) ? newBoard.labels : [];
-      const newCardLabelIds = newBoardLabels.filter(label => {
+      const newCardLabelIds = newBoardLabels.filter((label: any) => {
           return label.name && oldCardLabels.includes(label.name);
-        }).map(x => x._id);
+        }).map((x: any) => x._id);
 
       const newCardNumber = await newBoard.getNextCardNumber();
 
@@ -2532,14 +2460,14 @@ Cards.helpers({
       }
 
       const currentMembers = Array.isArray(this.members) ? this.members : [];
-      const filteredMembers = currentMembers.filter(memberId => allowedMemberIds.includes(memberId));
-      if (currentMembers.filter(x => !filteredMembers.includes(x)).length > 0) {
+      const filteredMembers = currentMembers.filter((memberId: any) => allowedMemberIds.includes(memberId));
+      if (currentMembers.filter((x: any) => !filteredMembers.includes(x)).length > 0) {
         mutatedFields.members = filteredMembers;
       }
 
       const currentWatchers = Array.isArray(this.watchers) ? this.watchers : [];
-      const filteredWatchers = currentWatchers.filter(watcherId => allowedMemberIds.includes(watcherId));
-      if (currentWatchers.filter(x => !filteredWatchers.includes(x)).length > 0) {
+      const filteredWatchers = currentWatchers.filter((watcherId: any) => allowedMemberIds.includes(watcherId));
+      if (currentWatchers.filter((x: any) => !filteredWatchers.includes(x)).length > 0) {
         mutatedFields.watchers = filteredWatchers;
       }
 
@@ -2582,7 +2510,8 @@ Cards.helpers({
     }
 
     if (Meteor.isServer) {
-      const updateMeta = {};
+      // Dot-notated Mongo update for attachment metadata.
+      const updateMeta: any = {};
       if (mutatedFields.boardId !== undefined) updateMeta['meta.boardId'] = mutatedFields.boardId;
       if (mutatedFields.listId !== undefined) updateMeta['meta.listId'] = mutatedFields.listId;
       if (mutatedFields.swimlaneId !== undefined) updateMeta['meta.swimlaneId'] = mutatedFields.swimlaneId;
@@ -2607,7 +2536,7 @@ Cards.helpers({
   },
 
   removeLabel(labelId) {
-    this.labelIds = (this.labelIds || []).filter(x => x !== labelId);
+    this.labelIds = (this.labelIds || []).filter((x: any) => x !== labelId);
     return Cards.updateAsync(this._id, { $pull: { labelIds: labelId } });
   },
 
@@ -2624,13 +2553,14 @@ Cards.helpers({
   // icon can exist as a plain, mascot or computer sticker.
   hasSticker(icon, highlight) {
     const h = highlight || '';
-    return (this.stickers || []).some(s => s.icon === icon && (s.highlight || '') === h);
+    return (this.stickers || []).some((s: any) => s.icon === icon && (s.highlight || '') === h);
   },
 
   addSticker(icon, highlight, name) {
     if (!icon || this.hasSticker(icon, highlight)) return Promise.resolve();
     const position = (this.stickers || []).length;
-    const sticker = { icon, position };
+    // Sticker doc; highlight/name are set conditionally below.
+    const sticker: any = { icon, position };
     if (highlight) sticker.highlight = highlight;
     if (name) sticker.name = name;
     return Cards.updateAsync(
@@ -2643,7 +2573,7 @@ Cards.helpers({
     const h = highlight || '';
     const stickers = (this.stickers || []).slice();
     const index = stickers.findIndex(
-      s => s.icon === icon && (s.highlight || '') === h,
+      (s: any) => s.icon === icon && (s.highlight || '') === h,
     );
     if (index === -1) return Promise.resolve();
     stickers.splice(index, 1);
@@ -2708,7 +2638,8 @@ Cards.helpers({
     ) {
       return Promise.resolve();
     }
-    const legacy = {
+    // Location doc; latitude/longitude are added conditionally below.
+    const legacy: any = {
       _id: Random.id(),
       name: this.locationName || '',
       address: this.locationAddress || '',
@@ -2727,7 +2658,8 @@ Cards.helpers({
 
   async addLocation({ name, address, latitude, longitude }) {
     await this._migrateLegacyLocation();
-    const location = {
+    // Location doc; latitude/longitude are added conditionally below.
+    const location: any = {
       _id: Random.id(),
       name: name || '',
       address: address || '',
@@ -2743,9 +2675,10 @@ Cards.helpers({
   async updateLocation(locationId, { name, address, latitude, longitude }) {
     await this._migrateLegacyLocation();
     const locations = (this.locations || []).slice();
-    const index = locations.findIndex(loc => loc._id === locationId);
+    const index = locations.findIndex((loc: any) => loc._id === locationId);
     if (index === -1) return Promise.resolve();
-    const updated = {
+    // Location doc; latitude/longitude are added conditionally below.
+    const updated: any = {
       _id: locationId,
       name: name || '',
       address: address || '',
@@ -2860,7 +2793,8 @@ Cards.helpers({
   setCustomField(customFieldId, value) {
     const index = this.customFieldIndex(customFieldId);
     if (index > -1) {
-      const update = { $set: {} };
+      // Dot-notated Mongo $set built dynamically for the target custom field.
+      const update: any = { $set: {} };
       update.$set[`customFields.${index}.value`] = value;
       return Cards.updateAsync(this._id, update);
     }
@@ -3025,7 +2959,8 @@ Cards.helpers({
 
   setPoker(userId, state) {
     const pokerFields = ['one', 'two', 'three', 'five', 'eight', 'thirteen', 'twenty', 'forty', 'oneHundred', 'unsure'];
-    const pullFields = {};
+    // Dot-notated Mongo $pull built dynamically per poker field.
+    const pullFields: any = {};
     pokerFields.forEach(f => { pullFields[`poker.${f}`] = userId; });
 
     if (pokerFields.includes(state)) {
@@ -3059,7 +2994,7 @@ Cards.helpers({
 
 //FUNCTIONS FOR creation of Activities
 
-async function updateActivities(doc, fieldNames, modifier) {
+async function updateActivities(doc: any, fieldNames: string[], modifier: any) {
   // Only react to a real board CHANGE. This is a before.update hook, so doc is
   // the pre-update card and modifier.$set.boardId is the new value. Card.move()
   // always re-sets boardId (even for a move within the same board), so checking
@@ -3098,12 +3033,12 @@ async function updateActivities(doc, fieldNames, modifier) {
 
 
 async function cardMove(
-  userId,
-  doc,
-  fieldNames,
-  oldListId,
-  oldSwimlaneId,
-  oldBoardId,
+  userId: string,
+  doc: any,
+  fieldNames: string[],
+  oldListId: string,
+  oldSwimlaneId: string,
+  oldBoardId: string,
 ) {
   if (fieldNames.includes('boardId') && doc.boardId !== oldBoardId) {
     const newBoard = await ReactiveCache.getBoard(doc.boardId);
@@ -3143,7 +3078,7 @@ async function cardMove(
   }
 }
 
-async function cardState(userId, doc, fieldNames) {
+async function cardState(userId: string, doc: any, fieldNames: string[]) {
   if (fieldNames.includes('archived')) {
     const list = await ReactiveCache.getList(doc.listId);
     if (doc.archived) {
@@ -3170,7 +3105,7 @@ async function cardState(userId, doc, fieldNames) {
   }
 }
 
-async function cardMembers(userId, doc, fieldNames, modifier) {
+async function cardMembers(userId: string, doc: any, fieldNames: string[], modifier: any) {
   if (!fieldNames.includes('members')) return;
   let memberId;
   // Say hello to the new member
@@ -3213,7 +3148,7 @@ async function cardMembers(userId, doc, fieldNames, modifier) {
   }
 }
 
-async function cardAssignees(userId, doc, fieldNames, modifier) {
+async function cardAssignees(userId: string, doc: any, fieldNames: string[], modifier: any) {
   if (!fieldNames.includes('assignees')) return;
   let assigneeId;
   // Say hello to the new assignee
@@ -3255,7 +3190,7 @@ async function cardAssignees(userId, doc, fieldNames, modifier) {
   }
 }
 
-async function cardLabels(userId, doc, fieldNames, modifier) {
+async function cardLabels(userId: string, doc: any, fieldNames: string[], modifier: any) {
   if (!fieldNames.includes('labelIds')) return;
   let labelId;
   // Say hello to the new label
@@ -3294,7 +3229,7 @@ async function cardLabels(userId, doc, fieldNames, modifier) {
   }
 }
 
-async function cardCustomFields(userId, doc, fieldNames, modifier) {
+async function cardCustomFields(userId: string, doc: any, fieldNames: string[], modifier: any) {
   if (!fieldNames.includes('customFields')) return;
 
   // Say hello to the new customField value
@@ -3345,7 +3280,7 @@ async function cardCustomFields(userId, doc, fieldNames, modifier) {
   }
 }
 
-async function cardCreation(userId, doc) {
+async function cardCreation(userId: string, doc: any) {
   const list = await ReactiveCache.getList(doc.listId);
   const swimlane = await ReactiveCache.getSwimlane(doc.swimlaneId);
   await Activities.insertAsync({
@@ -3361,7 +3296,7 @@ async function cardCreation(userId, doc) {
   });
 }
 
-async function cardRemover(userId, doc) {
+async function cardRemover(userId: string, doc: any) {
   // Performance (#3252 / #5322): when a whole card is permanently deleted, remove
   // its checklist items, checklists and comments with `.direct` so their
   // per-document before.remove hooks do NOT run. Those hooks only log/clean up
@@ -3386,8 +3321,8 @@ async function cardRemover(userId, doc) {
   await Attachments.removeAsync({ cardId: doc._id });
 }
 
-const findDueCards = async days => {
-  const seekDue = async ($from, $to, activityType) => {
+const findDueCards = async (days: any) => {
+  const seekDue = async ($from: Date, $to: Date, activityType: string) => {
     const cards = await ReactiveCache.getCards({
       archived: false,
       dueAt: { $gte: $from, $lt: $to },
@@ -3417,11 +3352,11 @@ const findDueCards = async days => {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const aday = 3600 * 24 * 1e3;
-  const then = day => new Date(startOfToday.getTime() + day * aday);
+  const then = (day: number) => new Date(startOfToday.getTime() + day * aday);
   if (!days) return;
   if (!days.map) days = [days];
   for (const day of days) {
-    let args = [];
+    let args: [Date, Date, string];
     if (day === 0) {
       args = [then(0), then(1), 'duenow'];
     } else if (day > 0) {
@@ -3452,7 +3387,7 @@ const addCronJob = debounce(
       .filter(v => v !== false);
     const notifyitvl = process.env.NOTIFY_DUE_AT_HOUR_OF_DAY; //passed in the itvl has to be a number standing for the hour of current time
     const defaultitvl = 8; // default every morning at 8am, if the passed env variable has parsing error use default
-    const itvl = parseInt(notifyitvl, 10) || defaultitvl;
+    const itvl = parseInt(notifyitvl ?? '', 10) || defaultitvl;
     const scheduler = (job => () => {
       const now = new Date();
       const hour = 3600 * 1e3;

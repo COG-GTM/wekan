@@ -318,3 +318,25 @@ declare const validators: {
   isValidNumber: (value: any, min?: number, max?: number) => boolean;
   isValidBoolean: (value: any) => boolean;
 };
+
+// The client-side Utils helper (client/lib/utils) is referenced as a global by
+// models/cards (only on the client, inside DOM sort-index math). Only the
+// method the model calls is typed; the rest of the object stays dynamic.
+interface WekanUtils {
+  calculateIndex(
+    prevCardDomElement: any,
+    nextCardDomElement: any,
+    nCards?: number,
+  ): { base: number; increment: number };
+  [key: string]: any;
+}
+declare const Utils: WekanUtils;
+
+// The UserPositionHistory model collection is referenced as an optional global
+// by models/cards (guarded by `typeof … !== 'undefined'`). Its API is dynamic
+// (legacy collection statics), so it is modelled with an index signature.
+interface WekanUserPositionHistory {
+  trackChange(change: any): any;
+  [key: string]: any;
+}
+declare const UserPositionHistory: WekanUserPositionHistory;

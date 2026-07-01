@@ -87,7 +87,9 @@ export function normalizeDependency(
 export function normalizeDependencies(
   deps: Array<string | Partial<Dependency>> | null | undefined,
 ) {
-  return (deps || []).map(normalizeDependency).filter(Boolean);
+  return (deps || [])
+    .map(normalizeDependency)
+    .filter((dep): dep is Dependency => dep !== null);
 }
 
 // A card-to-card dependency ("Red String"), stored on the source card.
