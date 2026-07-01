@@ -73,7 +73,7 @@ function getRawDb() {
 // Resolve a node-mongodb rawCollection from a Meteor Mongo.Collection, a
 // Meteor-Files FilesCollection (its Mongo.Collection is at `.collection`), or
 // anything that already exposes rawCollection().
-function getRawCollection(collection) {
+function getRawCollection(collection: RawCollectionSource | null | undefined) {
   if (!collection) return null;
   if (typeof collection.rawCollection === 'function') {
     return collection.rawCollection();
@@ -145,7 +145,11 @@ export async function waitForMongoReady() {
  * @param {Object} [options] passed straight through to createIndex (unique, etc.)
  * @returns {Promise<boolean>} true if an index was created, false if skipped
  */
-export async function ensureIndex(collection, keys, options = {}) {
+export async function ensureIndex(
+  collection: RawCollectionSource | null | undefined,
+  keys: Record<string, WekanDocumentField>,
+  options: Record<string, WekanDocumentField> = {},
+) {
   const raw = getRawCollection(collection);
   if (!raw) {
     console.error('WeKan ensureIndex: could not resolve rawCollection, skipping', keys);
@@ -153,7 +157,7 @@ export async function ensureIndex(collection, keys, options = {}) {
   }
   const wanted = JSON.stringify(keys);
   try {
-    let existing = [];
+    let existing: MongoIndexInfo[] = [];
     try {
       existing = await raw.indexes();
     } catch (e) {
@@ -174,4 +178,29 @@ export async function ensureIndex(collection, keys, options = {}) {
     );
     return false;
   }
+}
+
+// A raw node-mongodb collection, restricted to the members used here.
+interface RawMongoCollection {
+  indexes(): Promise<MongoIndexInfo[]>;
+  createIndex(
+    keys: Record<string, WekanDocumentField>,
+    options?: Record<string, WekanDocumentField>,
+  ): Promise<WekanDocumentField>;
+  collectionName: string;
+}
+
+// The shape returned per entry by rawCollection().indexes(). `key` is optional
+// because the node-mongodb driver types index documents as an open shape.
+interface MongoIndexInfo {
+  key?: Record<string, WekanDocumentField>;
+}
+
+// Anything ensureIndex can resolve a rawCollection() from: a Meteor
+// Mongo.Collection, a Meteor-Files FilesCollection (`.collection`), or an
+// object exposing rawCollection() directly or under `._collection`.
+interface RawCollectionSource {
+  rawCollection?: () => RawMongoCollection;
+  _collection?: { rawCollection?: () => RawMongoCollection };
+  collection?: { rawCollection?: () => RawMongoCollection };
 }

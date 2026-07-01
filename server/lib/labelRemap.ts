@@ -25,7 +25,11 @@
  *   mappedIds: destination label ids whose name matches a referenced source label
  *   missingNames: names of referenced source labels that have no match on dest
  */
-export function remapLabelIds(sourceLabels, sourceLabelIds, destLabels) {
+export function remapLabelIds(
+  sourceLabels: RemapLabel[],
+  sourceLabelIds: string[],
+  destLabels: RemapLabel[],
+) {
   const src = Array.isArray(sourceLabels) ? sourceLabels : [];
   const ids = Array.isArray(sourceLabelIds) ? sourceLabelIds : [];
   const dest = Array.isArray(destLabels) ? destLabels : [];
@@ -34,26 +38,34 @@ export function remapLabelIds(sourceLabels, sourceLabelIds, destLabels) {
   // label can never be matched by name and would otherwise wrongly select every
   // unnamed label on the destination board.
   const referencedNames = src
-    .filter(label => label && ids.includes(label._id) && label.name)
+    .filter((label): label is RemapLabel & { name: string } =>
+      !!(label && ids.includes(label._id) && label.name))
     .map(label => label.name);
 
   // Build a name -> destination id lookup (first match wins for duplicates).
-  const destByName = new Map();
+  const destByName = new Map<string, string>();
   for (const label of dest) {
     if (label && label.name && !destByName.has(label.name)) {
       destByName.set(label.name, label._id);
     }
   }
 
-  const mappedIds = [];
-  const missingNames = [];
+  const mappedIds: string[] = [];
+  const missingNames: string[] = [];
   for (const name of referencedNames) {
     if (destByName.has(name)) {
-      mappedIds.push(destByName.get(name));
+      // Guarded by has() above, so get() is guaranteed to be defined.
+      mappedIds.push(destByName.get(name)!);
     } else if (!missingNames.includes(name)) {
       missingNames.push(name);
     }
   }
 
   return { mappedIds, missingNames };
+}
+
+// A board-level label, matched across boards by (non-empty) name.
+interface RemapLabel {
+  _id: string;
+  name?: string;
 }

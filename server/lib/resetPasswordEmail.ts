@@ -18,7 +18,7 @@
 
 // Resolve the display name for a user without ever throwing.
 // Prefers the collection-helper getName(), then profile.fullname, then username.
-function safeUserName(user) {
+function safeUserName(user: ResetPasswordUser | null | undefined) {
   // Prefer the collection-helper getName(), but if it is missing or throws, fall
   // through to the raw profile/username so a registered user still gets a name.
   try {
@@ -37,7 +37,7 @@ function safeUserName(user) {
 }
 
 // Resolve the language for a user without ever throwing. Falls back to 'en'.
-function safeUserLanguage(user) {
+function safeUserLanguage(user: ResetPasswordUser | null | undefined) {
   // Prefer the collection-helper getLanguage(), but if it is missing or throws,
   // fall through to the raw profile language, defaulting to English.
   try {
@@ -59,7 +59,13 @@ function safeUserLanguage(user) {
 // key `str` (e.g. 'resetPassword-text'). `translate` is the TAPi18n.__-style
 // function (key, params, language) => string. Never throws: on any failure it
 // returns a minimal, safe fallback so the caller cannot produce an HTTP 500.
-function buildEmailTemplateField(str, translate, siteName, user, url) {
+function buildEmailTemplateField(
+  str: string,
+  translate: TranslateFn,
+  siteName: string,
+  user: ResetPasswordUser | null | undefined,
+  url: string,
+) {
   try {
     return translate(
       `email-${str}`,
@@ -80,11 +86,17 @@ function buildEmailTemplateField(str, translate, siteName, user, url) {
 // missing MAIL_URL/MAIL_FROM, mail server error) is converted via `makeError`
 // into a clean, catchable error instead of an unhandled exception (HTTP 500).
 // `makeError(code, message)` builds the thrown error (e.g. new Meteor.Error).
-function wrapSendResetPasswordEmail(originalSend, makeError) {
+function wrapSendResetPasswordEmail(
+  originalSend: SendResetPasswordEmail,
+  makeError: MakeError,
+) {
   if (typeof originalSend !== 'function') {
     return originalSend;
   }
-  return async function wrappedSendResetPasswordEmail(...args) {
+  return async function wrappedSendResetPasswordEmail(
+    this: WekanDocumentField,
+    ...args: WekanDocumentField[]
+  ) {
     try {
       return await originalSend.apply(this, args);
     } catch (e) {
@@ -96,9 +108,35 @@ function wrapSendResetPasswordEmail(originalSend, makeError) {
   };
 }
 
-module.exports = {
+export {
   safeUserName,
   safeUserLanguage,
   buildEmailTemplateField,
   wrapSendResetPasswordEmail,
 };
+
+// A Wekan user as seen by the accounts-password email callbacks: normally a
+// transformed user (with collection-helper getName()/getLanguage()), but every
+// member is optional so a partially-populated user can never throw a 500.
+interface ResetPasswordUser {
+  getName?: () => string;
+  getLanguage?: () => string;
+  profile?: { fullname?: string; language?: string };
+  username?: string;
+}
+
+// The TAPi18n.__-style translator: (i18n key, params, language) => string.
+type TranslateFn = (
+  key: string,
+  params: Record<string, WekanDocumentField>,
+  language: string,
+) => string;
+
+// The accounts-password reset-email sender being wrapped. Typed as the
+// documented dynamic alias because its exact arg list is owned by Meteor.
+type SendResetPasswordEmail = (
+  ...args: WekanDocumentField[]
+) => WekanDocumentField;
+
+// Builds the error thrown on send failure (e.g. new Meteor.Error(code, msg)).
+type MakeError = (code: string, message: string) => Error;

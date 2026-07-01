@@ -22,9 +22,11 @@
  * @param {*} value the raw REST body value for members / assignees
  * @return {string[]} a normalized array of id strings (possibly empty)
  */
-function coerceRestArrayParam(value) {
+export function coerceRestArrayParam(value: WekanDocumentField): string[] {
   if (Array.isArray(value)) {
-    return value.filter(v => typeof v === 'string' && v !== '');
+    return value.filter(
+      (v): v is string => typeof v === 'string' && v !== '',
+    );
   }
   if (typeof value === 'string') {
     return value === '' ? [] : [value];
@@ -32,5 +34,3 @@ function coerceRestArrayParam(value) {
   // null / undefined / number / object → treat as an explicit clear.
   return [];
 }
-
-module.exports = { coerceRestArrayParam };

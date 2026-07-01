@@ -12,7 +12,7 @@
 // When a field is null/undefined it is considered "not configured" and the
 // caller-supplied fallback value is used instead.
 
-function isConfigured(value) {
+function isConfigured(value: string | null | undefined) {
   return value !== null && value !== undefined && value !== '' && value !== 'null';
 }
 
@@ -25,9 +25,12 @@ function isConfigured(value) {
  *                          board has no configured value for a given field.
  * @returns {{boardId: *, listId: *, swimlaneId: *}}
  */
-export function resolveSubtaskLanding(board, fallback = {}) {
-  const b = board || {};
-  const fb = fallback || {};
+export function resolveSubtaskLanding(
+  board: SubtaskBoard | null | undefined,
+  fallback: SubtaskLanding = {},
+) {
+  const b: SubtaskBoard = board || {};
+  const fb: SubtaskLanding = fallback || {};
   return {
     boardId: isConfigured(b.subtasksDefaultBoardId)
       ? b.subtasksDefaultBoardId
@@ -50,8 +53,11 @@ export function resolveSubtaskLanding(board, fallback = {}) {
  * @param {*} listId
  * @returns {boolean}
  */
-export function isSelectedSubtaskList(board, listId) {
-  const b = board || {};
+export function isSelectedSubtaskList(
+  board: SubtaskBoard | null | undefined,
+  listId: string | null | undefined,
+) {
+  const b: SubtaskBoard = board || {};
   return isConfigured(b.subtasksDefaultListId) && b.subtasksDefaultListId === listId;
 }
 
@@ -62,7 +68,24 @@ export function isSelectedSubtaskList(board, listId) {
  * @param {*} boardId
  * @returns {boolean}
  */
-export function isSelectedSubtaskBoard(board, boardId) {
-  const b = board || {};
+export function isSelectedSubtaskBoard(
+  board: SubtaskBoard | null | undefined,
+  boardId: string | null | undefined,
+) {
+  const b: SubtaskBoard = board || {};
   return isConfigured(b.subtasksDefaultBoardId) && b.subtasksDefaultBoardId === boardId;
+}
+
+// The board fields that configure where new subtasks land.
+interface SubtaskBoard {
+  subtasksDefaultBoardId?: string | null;
+  subtasksDefaultListId?: string | null;
+  subtasksDefaultSwimlaneId?: string | null;
+}
+
+// The caller-supplied fallback landing target.
+interface SubtaskLanding {
+  boardId?: string | null;
+  listId?: string | null;
+  swimlaneId?: string | null;
 }

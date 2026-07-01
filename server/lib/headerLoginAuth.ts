@@ -1,7 +1,7 @@
 import { Meteor } from 'meteor/meteor';
 import { Accounts } from 'meteor/accounts-base';
 
-function normalizeHeaderValue(value) {
+function normalizeHeaderValue(value: string | string[] | null | undefined): string {
   if (Array.isArray(value)) {
     return normalizeHeaderValue(value[0]);
   }
@@ -11,7 +11,10 @@ function normalizeHeaderValue(value) {
   return value.trim();
 }
 
-function getHeaderByName(req, headerName) {
+function getHeaderByName(
+  req: HeaderLoginRequest | null | undefined,
+  headerName: string | undefined,
+) {
   if (!headerName || !req?.headers) {
     return '';
   }
@@ -23,7 +26,7 @@ function getHeaderByName(req, headerName) {
   return normalizeHeaderValue(lower);
 }
 
-function normalizeUsername(rawUsername) {
+function normalizeUsername(rawUsername: string) {
   const value = normalizeHeaderValue(rawUsername)
     .replace(/[\\/]/g, '-')
     .replace(/\s+/g, ' ')
@@ -31,7 +34,7 @@ function normalizeUsername(rawUsername) {
   return value.slice(0, 64);
 }
 
-function normalizeEmail(rawEmail) {
+function normalizeEmail(rawEmail: string) {
   const value = normalizeHeaderValue(rawEmail).toLowerCase();
   if (!value || !value.includes('@') || value.includes(' ')) {
     return '';
@@ -42,7 +45,7 @@ function normalizeEmail(rawEmail) {
 // Parse a comma-separated IP env var into a normalized list (trimmed, with
 // IPv4-mapped IPv6 collapsed to IPv4, e.g. "::ffff:10.0.0.1" -> "10.0.0.1", and
 // empties dropped) so values match operator-configured allowlist entries.
-function parseIpList(raw) {
+function parseIpList(raw: string | undefined) {
   return normalizeHeaderValue(raw || '')
     .split(',')
     .map(ip => ip.trim().replace(/^::ffff:/i, ''))
@@ -62,7 +65,7 @@ function parseIpList(raw) {
 // trusted proxy (the real client) — never the spoofable left-most value. A
 // direct attacker's socket peer is not a trusted proxy, so their X-Forwarded-For
 // is ignored entirely.
-function getRequestIp(req) {
+function getRequestIp(req: HeaderLoginRequest | null | undefined) {
   const socketIp = normalizeHeaderValue(
     req?.socket?.remoteAddress || req?.connection?.remoteAddress || '',
   ).replace(/^::ffff:/i, '');
@@ -88,7 +91,7 @@ function getRequestIp(req) {
   return socketIp;
 }
 
-function isTrustedHeaderLoginSource(req) {
+function isTrustedHeaderLoginSource(req: HeaderLoginRequest | null | undefined) {
   const trustedIps = parseIpList(
     process.env.HEADER_LOGIN_TRUSTED_IP || process.env.HEADER_LOGIN_TRUSTED_IPS,
   );
@@ -106,7 +109,7 @@ function isTrustedHeaderLoginSource(req) {
   return !!requestIp && trustedIps.includes(requestIp);
 }
 
-function hasMeteorLoginTokenCookie(req) {
+function hasMeteorLoginTokenCookie(req: HeaderLoginRequest | null | undefined) {
   const cookieHeader = normalizeHeaderValue(req?.headers?.cookie || '');
   if (!cookieHeader) {
     return false;
@@ -117,7 +120,9 @@ function hasMeteorLoginTokenCookie(req) {
   });
 }
 
-function shouldProcessHeaderLoginMiddlewareRequest(req) {
+function shouldProcessHeaderLoginMiddlewareRequest(
+  req: HeaderLoginRequest | null | undefined,
+) {
   if (req?.method !== 'GET') {
     return false;
   }
@@ -134,7 +139,9 @@ function shouldProcessHeaderLoginMiddlewareRequest(req) {
   return true;
 }
 
-async function findOrCreateHeaderLoginUser(req) {
+async function findOrCreateHeaderLoginUser(
+  req: HeaderLoginRequest | null | undefined,
+) {
   const isSandstorm = Meteor.settings?.public?.sandstorm === true;
   if (isSandstorm) {
     return null;
@@ -166,7 +173,7 @@ async function findOrCreateHeaderLoginUser(req) {
   }
 
   if (!user) {
-    const userDoc = {
+    const userDoc: HeaderLoginUserDoc = {
       username,
       authenticationMethod: 'header',
       profile: {
@@ -183,6 +190,23 @@ async function findOrCreateHeaderLoginUser(req) {
   }
 
   return user?._id || null;
+}
+
+// The subset of a Connect/http request the header-login flow reads.
+interface HeaderLoginRequest {
+  method?: string;
+  url?: string;
+  headers?: Record<string, string | string[] | undefined>;
+  socket?: { remoteAddress?: string };
+  connection?: { remoteAddress?: string };
+}
+
+// The user document built when header-login provisions a brand-new account.
+interface HeaderLoginUserDoc {
+  username: string;
+  authenticationMethod: string;
+  profile: { fullname: string };
+  emails?: Array<{ address: string; verified: boolean }>;
 }
 
 export {

@@ -17,7 +17,7 @@ const EmailLocalization = {
    * @param {String} options.language - Language code to use (if not provided, will try to detect)
    * @param {String} options.userId - User ID to determine language (if not provided with language)
    */
-  async sendEmail(options) {
+  async sendEmail(options: LocalizedEmailOptions) {
     // Determine the language to use
     let lang = options.language;
 
@@ -60,3 +60,16 @@ const EmailLocalization = {
 
 // Add module.exports to make it accessible from other files
 export default EmailLocalization;
+
+// Options accepted by sendEmail: standard email fields plus i18n keys/params
+// and the language-resolution hints (explicit language or a userId to look up).
+interface LocalizedEmailOptions {
+  to: string;
+  from?: string;
+  subject: string;
+  text: string;
+  params?: Record<string, string>;
+  language?: string;
+  userId?: string;
+  html?: string;
+}

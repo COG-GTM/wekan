@@ -12,13 +12,13 @@
 // server REST endpoints.
 
 // True when the title is wrapped in carets, e.g. `^Subtasks^`.
-export function isCaretWrappedTitle(title) {
+export function isCaretWrappedTitle(title: string | null | undefined) {
   return typeof title === 'string' && /^\^.*\^$/.test(title.trim());
 }
 
 // A board is visible to users only when it is a real `'board'` and its title is
 // not caret-wrapped.
-export function isUserVisibleBoard(board) {
+export function isUserVisibleBoard(board: BoardListEntry | null | undefined) {
   if (!board || typeof board !== 'object') {
     return false;
   }
@@ -32,9 +32,15 @@ export function isUserVisibleBoard(board) {
 }
 
 // Filter an array of boards down to the user-visible ones.
-export function filterUserBoards(boards) {
+export function filterUserBoards(boards: BoardListEntry[]) {
   if (!Array.isArray(boards)) {
     return [];
   }
   return boards.filter(isUserVisibleBoard);
+}
+
+// The board fields inspected when deciding user visibility.
+interface BoardListEntry {
+  type?: string;
+  title?: string;
 }

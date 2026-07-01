@@ -25,7 +25,7 @@
  * @param {*} value
  * @returns {string}
  */
-export function extractErrorMessage(value) {
+export function extractErrorMessage(value: string | RestErrorLike | null | undefined) {
   if (value === null || value === undefined) {
     return String(value);
   }
@@ -54,12 +54,16 @@ export function extractErrorMessage(value) {
  * @param {(number|null)} [spacer] indentation passed through to JSON.stringify
  * @returns {string}
  */
-export function safeJsonStringify(data, spacer) {
+export function safeJsonStringify(data: WekanDocumentField, spacer?: number | null) {
   const space = spacer === undefined ? null : spacer;
   try {
-    return JSON.stringify(data, null, space);
+    return JSON.stringify(data, null, space ?? undefined);
   } catch (err) {
-    return JSON.stringify({ error: extractErrorMessage(data) }, null, space);
+    return JSON.stringify(
+      { error: extractErrorMessage(data) },
+      null,
+      space ?? undefined,
+    );
   }
 }
 
@@ -72,7 +76,7 @@ export function safeJsonStringify(data, spacer) {
  * @param {*} error
  * @returns {number}
  */
-export function httpStatusForError(error) {
+export function httpStatusForError(error: RestErrorLike | null | undefined) {
   if (error && typeof error.statusCode === 'number') {
     return error.statusCode;
   }
@@ -98,11 +102,29 @@ export function httpStatusForError(error) {
  * @param {object} body the request body
  * @returns {{ valid: boolean, comment?: string, error?: string }}
  */
-export function validateCommentBody(body) {
+export function validateCommentBody(body: CommentRequestBody | null | undefined) {
   const comment =
     body && typeof body.comment === 'string' ? body.comment.trim() : '';
   if (comment === '') {
     return { valid: false, error: 'Missing required parameter: comment' };
   }
   return { valid: true, comment };
+}
+
+// The shape of an error crossing the REST boundary: a thrown Error /
+// Meteor.Error / SimpleSchema validation error. Every field is optional because
+// the concrete class varies at runtime.
+interface RestErrorLike {
+  reason?: string;
+  message?: string;
+  error?: string;
+  errorType?: string;
+  name?: string;
+  statusCode?: number;
+}
+
+// The parsed body of a "create comment" REST request. `comment` is typed as the
+// documented dynamic-value alias because clients may send a non-string value.
+interface CommentRequestBody {
+  comment?: WekanDocumentField;
 }

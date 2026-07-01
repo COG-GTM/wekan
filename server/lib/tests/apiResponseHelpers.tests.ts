@@ -20,10 +20,10 @@ describe('REST API response helpers (#5804)', function() {
   // back to its schema, which points back to its contexts. This is the exact
   // shape that previously crashed JSON.stringify and surfaced as HTTP 500.
   function makeCircularValidationError() {
-    const schema = { name: 'SimpleSchema' };
-    const context = { name: 'SimpleSchemaValidationContext', _simpleSchema: schema };
+    const schema: ValidationSchema = { name: 'SimpleSchema' };
+    const context: ValidationContext = { name: 'SimpleSchemaValidationContext', _simpleSchema: schema };
     schema._validationContexts = { default: context };
-    const error = new Error('failed validation');
+    const error: ValidationError = new Error('failed validation');
     error.reason = 'Text is required';
     error._validationContexts = { default: context };
     return error;
@@ -39,7 +39,7 @@ describe('REST API response helpers (#5804)', function() {
     });
 
     it('prefers reason over message', function() {
-      const e = new Error('low level');
+      const e: ValidationError = new Error('low level');
       e.reason = 'friendly';
       expect(extractErrorMessage(e)).to.equal('friendly');
     });
@@ -69,7 +69,7 @@ describe('REST API response helpers (#5804)', function() {
     });
 
     it('does NOT throw on a circular structure (regression for the HTTP 500)', function() {
-      const circular = {};
+      const circular: Circular = {};
       circular.self = circular;
       expect(() => safeJsonStringify(circular)).to.not.throw();
     });
@@ -127,3 +127,28 @@ describe('REST API response helpers (#5804)', function() {
     });
   });
 });
+
+// The circular SimpleSchema shapes fabricated by makeCircularValidationError:
+// a validation context points back to its schema, which points back to its
+// contexts, reproducing the structure that used to crash JSON.stringify.
+interface ValidationSchema {
+  name: string;
+  _validationContexts?: { default: ValidationContext };
+}
+
+interface ValidationContext {
+  name: string;
+  _simpleSchema: ValidationSchema;
+}
+
+// A native Error decorated with the Meteor.Error `reason` and the circular
+// SimpleSchema `_validationContexts`, as SimpleSchema validation errors carry.
+interface ValidationError extends Error {
+  reason?: string;
+  _validationContexts?: { default: ValidationContext };
+}
+
+// A minimal self-referential object used to exercise circular serialization.
+interface Circular {
+  self?: Circular;
+}

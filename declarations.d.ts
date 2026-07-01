@@ -66,6 +66,18 @@ declare module 'meteor/meteor' {
   }
 }
 
+declare module 'meteor/accounts-base' {
+  namespace Accounts {
+    // Server-only low-level user provisioning helper used by the header-login
+    // flow to create a brand-new account. Not modelled by @types/meteor; it
+    // returns the new user's `_id`.
+    function insertUserDoc(
+      options: WekanDocumentField,
+      user: WekanDocumentField,
+    ): string;
+  }
+}
+
 // @types/meteor's ReactiveVar omits the underlying Tracker dependency that
 // Meteor exposes at runtime as `.dep`; the i18n layer depends on it directly to
 // re-run reactive translation lookups.

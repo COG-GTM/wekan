@@ -3,7 +3,7 @@ import { WebAppInternals } from 'meteor/webapp';
 import Settings from '/models/settings';
 
 // Cache the setting since the boilerplate callback is synchronous
-let cachedSetting = null;
+let cachedSetting: Awaited<ReturnType<typeof Settings.findOneAsync>> | null = null;
 
 Meteor.startup(async () => {
   // Load initial setting
@@ -17,7 +17,7 @@ Meteor.startup(async () => {
   });
 
   // Use Meteor's official API to modify the HTML boilerplate
-  WebAppInternals.registerBoilerplateDataCallback('wekan-custom-head', (request, data) => {
+  WebAppInternals.registerBoilerplateDataCallback('wekan-custom-head', (request: BoilerplateRequest, data: BoilerplateData) => {
     try {
       const setting = cachedSetting;
 
@@ -76,3 +76,15 @@ Meteor.startup(async () => {
     }
   });
 });
+
+// The mutable boilerplate data object passed by WebAppInternals; `head` is the
+// HTML string prepended into the document <head>.
+interface BoilerplateData {
+  head?: string;
+}
+
+// The incoming request handed to the boilerplate callback (unused here).
+interface BoilerplateRequest {
+  url?: string;
+  headers?: Record<string, string | string[] | undefined>;
+}

@@ -27,7 +27,12 @@
  *   - getFirstListId(boardId) => Promise<string|undefined>
  * @return {Promise<object>} the patch applied to modifier.$set (empty if none)
  */
-async function applyCardBoardConsistency(doc, fieldNames, modifier, deps) {
+async function applyCardBoardConsistency(
+  doc: ConsistencyCard | null | undefined,
+  fieldNames: string[],
+  modifier: ConsistencyModifier | null | undefined,
+  deps: ConsistencyDeps,
+) {
   if (!doc || !modifier || !modifier.$set) return {};
   if (!Array.isArray(fieldNames) || !fieldNames.includes('boardId')) return {};
 
@@ -43,7 +48,7 @@ async function applyCardBoardConsistency(doc, fieldNames, modifier, deps) {
     !!newSwimlaneId && !!(await deps.swimlaneBelongs(newSwimlaneId, newBoardId));
   const listOk = !!newListId && !!(await deps.listBelongs(newListId, newBoardId));
 
-  const patch = {};
+  const patch: ConsistencyPatch = {};
   if (swimlaneOk && listOk) return patch;
 
   if (!swimlaneOk) {
@@ -59,4 +64,34 @@ async function applyCardBoardConsistency(doc, fieldNames, modifier, deps) {
   return patch;
 }
 
-module.exports = { applyCardBoardConsistency };
+export { applyCardBoardConsistency };
+
+// The pre-update card fields consulted for the board-consistency check.
+interface ConsistencyCard {
+  boardId?: string;
+  swimlaneId?: string;
+  listId?: string;
+}
+
+// The relevant slice of the Mongo update modifier (its $set placement fields).
+interface ConsistencyModifier {
+  $set?: {
+    boardId?: string;
+    swimlaneId?: string;
+    listId?: string;
+  };
+}
+
+// Async lookups injected by the caller, all keyed by the destination board.
+interface ConsistencyDeps {
+  swimlaneBelongs(swimlaneId: string, boardId: string): Promise<boolean>;
+  listBelongs(listId: string, boardId: string): Promise<boolean>;
+  getDefaultSwimlaneId(boardId: string): Promise<string | undefined>;
+  getFirstListId(boardId: string): Promise<string | undefined>;
+}
+
+// The corrective patch merged into modifier.$set (empty when no correction).
+interface ConsistencyPatch {
+  swimlaneId?: string;
+  listId?: string;
+}

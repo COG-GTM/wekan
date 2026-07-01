@@ -17,8 +17,8 @@ export function buildDeleteCardActivity({
   swimlaneId,
   userId,
   cardTitle,
-} = {}) {
-  const activity = {
+}: DeleteCardActivityArgs = {}) {
+  const activity: DeleteCardActivity = {
     userId,
     activityType: 'deleteCard',
     boardId,
@@ -32,7 +32,7 @@ export function buildDeleteCardActivity({
   return activity;
 }
 
-export function buildDeleteBoardActivity({ boardId, userId } = {}) {
+export function buildDeleteBoardActivity({ boardId, userId }: DeleteBoardActivityArgs = {}) {
   return {
     userId,
     type: 'board',
@@ -40,4 +40,31 @@ export function buildDeleteBoardActivity({ boardId, userId } = {}) {
     activityTypeId: boardId,
     boardId,
   };
+}
+
+// Fields accepted when building a "delete card" activity.
+interface DeleteCardActivityArgs {
+  cardId?: string;
+  boardId?: string;
+  listId?: string;
+  swimlaneId?: string;
+  userId?: string;
+  cardTitle?: string;
+}
+
+// Fields accepted when building a "delete board" activity.
+interface DeleteBoardActivityArgs {
+  boardId?: string;
+  userId?: string;
+}
+
+// The Activity document shape produced for a permanently-removed card.
+interface DeleteCardActivity {
+  userId?: string;
+  activityType: string;
+  boardId?: string;
+  listId?: string;
+  cardId?: string;
+  swimlaneId?: string;
+  cardTitle?: string;
 }

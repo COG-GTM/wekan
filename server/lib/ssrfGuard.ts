@@ -35,7 +35,7 @@ const dnsPromises = dns.promises;
  * @param {string} addr  Dotted-decimal IPv4 string, e.g. "192.168.1.1"
  * @returns {boolean}
  */
-export function isBlockedIPv4(addr) {
+export function isBlockedIPv4(addr: string) {
   const blockedPatterns = [
     /^127\./,                       // 127.0.0.0/8  — loopback
     /^10\./,                        // 10.0.0.0/8   — private (RFC 1918)
@@ -61,7 +61,7 @@ export function isBlockedIPv4(addr) {
  * @param {string} addr  IPv6 string without surrounding brackets
  * @returns {boolean}
  */
-export function isBlockedIPv6(addr) {
+export function isBlockedIPv6(addr: string) {
   const lower = addr.toLowerCase();
   const blockedPatterns = [
     /^::1$/,          // ::1/128 — loopback
@@ -89,7 +89,7 @@ export function isBlockedIPv6(addr) {
  * @param {string} hostname
  * @returns {Promise<string>}  The pinned IPv4 address to dial
  */
-async function resolveAndPin(hostname) {
+async function resolveAndPin(hostname: string) {
   if (net.isIPv4(hostname)) {
     if (isBlockedIPv4(hostname)) {
       throw new Error(`SSRF_GUARD: Blocked IPv4 in URL: ${hostname}`);
@@ -107,7 +107,7 @@ async function resolveAndPin(hostname) {
   }
 
   // Perform a single DNS A-record lookup and check every returned address.
-  let addresses;
+  let addresses: string[];
   try {
     addresses = await dnsPromises.resolve4(hostname);
   } catch (e) {
@@ -144,9 +144,9 @@ async function resolveAndPin(hostname) {
  * @param {RequestInit} [options]   Standard fetch options (method, headers, body…)
  * @returns {Promise<Response>}
  */
-export async function fetchSafe(rawUrl, options = {}) {
+export async function fetchSafe(rawUrl: string, options: FetchSafeOptions = {}) {
   // Step 1 — parse and protocol allowlist
-  let parsed;
+  let parsed: URL;
   try {
     parsed = new URL(rawUrl);
   } catch {
@@ -200,14 +200,14 @@ export async function fetchSafe(rawUrl, options = {}) {
   // no second DNS lookup can ever occur (rebinding window = 0).
   // The original hostname is preserved in the Host header and as the TLS
   // servername (SNI) so virtual-hosting and certificate validation work.
-  return new Promise((resolve, reject) => {
+  return new Promise<FetchSafeResponse>((resolve, reject) => {
     const isHttps = parsed.protocol === 'https:';
     const transport = isHttps ? https : http;
     const port = parsed.port
       ? parseInt(parsed.port, 10)
       : (isHttps ? 443 : 80);
 
-    const reqOptions = {
+    const reqOptions: https.RequestOptions = {
       method:   options.method   || 'GET',
       hostname: resolvedIp,                   // dial the pinned IP — no DNS
       port,
@@ -224,13 +224,13 @@ export async function fetchSafe(rawUrl, options = {}) {
 
     const req = transport.request(reqOptions, (res) => {
       // Block all redirects — they could silently point to internal IPs
-      if (res.statusCode >= 300 && res.statusCode < 400) {
+      if ((res.statusCode as number) >= 300 && (res.statusCode as number) < 400) {
         res.destroy();
         reject(new Error('SSRF_GUARD: Redirects are not allowed'));
         return;
       }
 
-      const chunks = [];
+      const chunks: Buffer[] = [];
       res.on('data', (chunk) => chunks.push(chunk));
       res.on('end', () => {
         const body = Buffer.concat(chunks);
@@ -257,4 +257,19 @@ export async function fetchSafe(rawUrl, options = {}) {
     }
     req.end();
   });
+}
+
+// Standard fetch-like request options accepted by fetchSafe.
+interface FetchSafeOptions {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string | Buffer;
+}
+
+// The minimal fetch-like Response returned by fetchSafe.
+interface FetchSafeResponse {
+  status: number | undefined;
+  headers: http.IncomingHttpHeaders;
+  json: () => Promise<WekanDocumentField>;
+  text: () => Promise<string>;
 }
