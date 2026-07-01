@@ -1,3 +1,6 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 import { TAPi18n } from '/imports/i18n';
 import { ReactiveCache } from '/imports/reactiveCache';
 import {
@@ -32,7 +35,7 @@ import { dueDateClass } from '/client/lib/dueDateColor';
 // --- DatePicker popups (edit date forms) ---
 
 // editCardReceivedDatePopup
-Template.editCardReceivedDatePopup.onCreated(function () {
+Template.editCardReceivedDatePopup.onCreated(function (this: EditCardDatePopupInstance) {
   const card = Template.currentData();
   setupDatePicker(this, {
     defaultTime: formatDateTime(now()),
@@ -40,23 +43,23 @@ Template.editCardReceivedDatePopup.onCreated(function () {
   });
 });
 
-Template.editCardReceivedDatePopup.onRendered(function () {
+Template.editCardReceivedDatePopup.onRendered(function (this: EditCardDatePopupInstance) {
   datePickerRendered(this);
 });
 
 Template.editCardReceivedDatePopup.helpers(datePickerHelpers());
 
 Template.editCardReceivedDatePopup.events(datePickerEvents({
-  storeDate(date) {
+  storeDate(this: any, date: Date) {
     this.datePicker.card.setReceived(date);
   },
-  deleteDate() {
+  deleteDate(this: any) {
     this.datePicker.card.unsetReceived();
   },
 }));
 
 // editCardStartDatePopup
-Template.editCardStartDatePopup.onCreated(function () {
+Template.editCardStartDatePopup.onCreated(function (this: EditCardDatePopupInstance) {
   const card = Template.currentData();
   setupDatePicker(this, {
     defaultTime: formatDateTime(now()),
@@ -64,23 +67,23 @@ Template.editCardStartDatePopup.onCreated(function () {
   });
 });
 
-Template.editCardStartDatePopup.onRendered(function () {
+Template.editCardStartDatePopup.onRendered(function (this: EditCardDatePopupInstance) {
   datePickerRendered(this);
 });
 
 Template.editCardStartDatePopup.helpers(datePickerHelpers());
 
 Template.editCardStartDatePopup.events(datePickerEvents({
-  storeDate(date) {
+  storeDate(this: any, date: Date) {
     this.datePicker.card.setStart(date);
   },
-  deleteDate() {
+  deleteDate(this: any) {
     this.datePicker.card.unsetStart();
   },
 }));
 
 // editCardDueDatePopup
-Template.editCardDueDatePopup.onCreated(function () {
+Template.editCardDueDatePopup.onCreated(function (this: EditCardDatePopupInstance) {
   const card = Template.currentData();
   setupDatePicker(this, {
     defaultTime: '1970-01-01 17:00:00',
@@ -88,23 +91,23 @@ Template.editCardDueDatePopup.onCreated(function () {
   });
 });
 
-Template.editCardDueDatePopup.onRendered(function () {
+Template.editCardDueDatePopup.onRendered(function (this: EditCardDatePopupInstance) {
   datePickerRendered(this);
 });
 
 Template.editCardDueDatePopup.helpers(datePickerHelpers());
 
 Template.editCardDueDatePopup.events(datePickerEvents({
-  storeDate(date) {
+  storeDate(this: any, date: Date) {
     this.datePicker.card.setDue(date);
   },
-  deleteDate() {
+  deleteDate(this: any) {
     this.datePicker.card.unsetDue();
   },
 }));
 
 // editCardEndDatePopup
-Template.editCardEndDatePopup.onCreated(function () {
+Template.editCardEndDatePopup.onCreated(function (this: EditCardDatePopupInstance) {
   const card = Template.currentData();
   setupDatePicker(this, {
     defaultTime: formatDateTime(now()),
@@ -112,17 +115,17 @@ Template.editCardEndDatePopup.onCreated(function () {
   });
 });
 
-Template.editCardEndDatePopup.onRendered(function () {
+Template.editCardEndDatePopup.onRendered(function (this: EditCardDatePopupInstance) {
   datePickerRendered(this);
 });
 
 Template.editCardEndDatePopup.helpers(datePickerHelpers());
 
 Template.editCardEndDatePopup.events(datePickerEvents({
-  storeDate(date) {
+  storeDate(this: any, date: Date) {
     this.datePicker.card.setEnd(date);
   },
-  deleteDate() {
+  deleteDate(this: any) {
     this.datePicker.card.unsetEnd();
   },
 }));
@@ -130,8 +133,8 @@ Template.editCardEndDatePopup.events(datePickerEvents({
 // --- Card date badge display helpers ---
 
 // Shared onCreated logic for card date badge templates
-function cardDateOnCreated(tpl) {
-  tpl.date = new ReactiveVar();
+function cardDateOnCreated(tpl: CardDateInstance) {
+  tpl.date = new ReactiveVar<Date | undefined>(undefined);
   tpl.now = new ReactiveVar(now());
   window.setInterval(() => {
     tpl.now.set(now());
@@ -139,10 +142,10 @@ function cardDateOnCreated(tpl) {
 }
 
 // Shared helpers for card date badge templates
-function cardDateHelpers(extraHelpers) {
+function cardDateHelpers(extraHelpers: Record<string, (...args: any[]) => any>) {
   const base = {
     showWeek() {
-      return getISOWeek(Template.instance().date.get()).toString();
+      return getISOWeek((Template.instance() as CardDateInstance).date.get()!).toString();
     },
     showWeekOfYear() {
       const user = ReactiveCache.getCurrentUser();
@@ -152,17 +155,17 @@ function cardDateHelpers(extraHelpers) {
     showDate() {
       const currentUser = ReactiveCache.getCurrentUser();
       const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-      return formatDateByUserPreference(Template.instance().date.get(), dateFormat, true);
+      return formatDateByUserPreference((Template.instance() as CardDateInstance).date.get()!, dateFormat, true);
     },
     showISODate() {
-      return Template.instance().date.get().toISOString();
+      return (Template.instance() as CardDateInstance).date.get()!.toISOString();
     },
   };
   return Object.assign(base, extraHelpers);
 }
 
 // cardReceivedDate
-Template.cardReceivedDate.onCreated(function () {
+Template.cardReceivedDate.onCreated(function (this: CardDateInstance) {
   cardDateOnCreated(this);
   const self = this;
   self.autorun(() => {
@@ -172,13 +175,13 @@ Template.cardReceivedDate.onCreated(function () {
 
 Template.cardReceivedDate.helpers(cardDateHelpers({
   classes() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     let classes = 'received-date ';
     const data = Template.currentData();
     const dueAt = data.getDue();
     const endAt = data.getEnd();
     const startAt = data.getStart();
-    const theDate = tpl.date.get();
+    const theDate = tpl.date.get()!;
 
     if (
       (startAt && isAfter(theDate, startAt)) ||
@@ -192,10 +195,10 @@ Template.cardReceivedDate.helpers(cardDateHelpers({
     return classes;
   },
   showTitle() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     const currentUser = ReactiveCache.getCurrentUser();
     const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-    const formattedDate = formatDateByUserPreference(tpl.date.get(), dateFormat, true);
+    const formattedDate = formatDateByUserPreference(tpl.date.get()!, dateFormat, true);
     return `${TAPi18n.__('card-received-on')} ${formattedDate}`;
   },
 }));
@@ -205,7 +208,7 @@ Template.cardReceivedDate.events({
 });
 
 // cardStartDate
-Template.cardStartDate.onCreated(function () {
+Template.cardStartDate.onCreated(function (this: CardDateInstance) {
   cardDateOnCreated(this);
   const self = this;
   self.autorun(() => {
@@ -215,12 +218,12 @@ Template.cardStartDate.onCreated(function () {
 
 Template.cardStartDate.helpers(cardDateHelpers({
   classes() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     let classes = 'start-date ';
     const data = Template.currentData();
     const dueAt = data.getDue();
     const endAt = data.getEnd();
-    const theDate = tpl.date.get();
+    const theDate = tpl.date.get()!;
     const nowVal = tpl.now.get();
 
     if ((endAt && isAfter(theDate, endAt)) || (dueAt && isAfter(theDate, dueAt))) {
@@ -233,10 +236,10 @@ Template.cardStartDate.helpers(cardDateHelpers({
     return classes;
   },
   showTitle() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     const currentUser = ReactiveCache.getCurrentUser();
     const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-    const formattedDate = formatDateByUserPreference(tpl.date.get(), dateFormat, true);
+    const formattedDate = formatDateByUserPreference(tpl.date.get()!, dateFormat, true);
     return `${TAPi18n.__('card-start-on')} ${formattedDate}`;
   },
 }));
@@ -246,7 +249,7 @@ Template.cardStartDate.events({
 });
 
 // cardDueDate
-Template.cardDueDate.onCreated(function () {
+Template.cardDueDate.onCreated(function (this: CardDateInstance) {
   cardDateOnCreated(this);
   const self = this;
   self.autorun(() => {
@@ -256,19 +259,19 @@ Template.cardDueDate.onCreated(function () {
 
 Template.cardDueDate.helpers(cardDateHelpers({
   classes() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     const data = Template.currentData();
     const endAt = data.getEnd();
-    const theDate = tpl.date.get();
+    const theDate = tpl.date.get()!;
     const nowVal = tpl.now.get();
 
     return `due-date ${dueDateClass(theDate, nowVal, endAt)}`;
   },
   showTitle() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     const currentUser = ReactiveCache.getCurrentUser();
     const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-    const formattedDate = formatDateByUserPreference(tpl.date.get(), dateFormat, true);
+    const formattedDate = formatDateByUserPreference(tpl.date.get()!, dateFormat, true);
     return `${TAPi18n.__('card-due-on')} ${formattedDate}`;
   },
 }));
@@ -278,7 +281,7 @@ Template.cardDueDate.events({
 });
 
 // cardEndDate
-Template.cardEndDate.onCreated(function () {
+Template.cardEndDate.onCreated(function (this: CardDateInstance) {
   cardDateOnCreated(this);
   const self = this;
   self.autorun(() => {
@@ -288,11 +291,11 @@ Template.cardEndDate.onCreated(function () {
 
 Template.cardEndDate.helpers(cardDateHelpers({
   classes() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     let classes = 'end-date ';
     const data = Template.currentData();
     const dueAt = data.getDue();
-    const theDate = tpl.date.get();
+    const theDate = tpl.date.get()!;
 
     if (!dueAt) {
       classes += 'completed';
@@ -306,8 +309,8 @@ Template.cardEndDate.helpers(cardDateHelpers({
     return classes;
   },
   showTitle() {
-    const tpl = Template.instance();
-    return `${TAPi18n.__('card-end-on')} ${format(tpl.date.get(), 'LLLL')}`;
+    const tpl = Template.instance() as CardDateInstance;
+    return `${TAPi18n.__('card-end-on')} ${format(tpl.date.get()!, 'LLLL')}`;
   },
 }));
 
@@ -316,7 +319,7 @@ Template.cardEndDate.events({
 });
 
 // cardCustomFieldDate
-Template.cardCustomFieldDate.onCreated(function () {
+Template.cardCustomFieldDate.onCreated(function (this: CardDateInstance) {
   cardDateOnCreated(this);
   const self = this;
   self.autorun(() => {
@@ -326,19 +329,20 @@ Template.cardCustomFieldDate.onCreated(function () {
 
 Template.cardCustomFieldDate.helpers(cardDateHelpers({
   showDate() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     // this will start working once mquandalle:moment
     // is updated to at least moment.js 2.10.5
     // until then, the date is displayed in the "L" format
-    return tpl.date.get().calendar(null, {
+    // date.get() is a plain Date; .calendar() is the moment API expected here.
+    return (tpl.date.get() as any).calendar(null, {
       sameElse: 'llll',
     });
   },
   showTitle() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     const currentUser = ReactiveCache.getCurrentUser();
     const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-    const formattedDate = formatDateByUserPreference(tpl.date.get(), dateFormat, true);
+    const formattedDate = formatDateByUserPreference(tpl.date.get()!, dateFormat, true);
     return `${formattedDate}`;
   },
   classes() {
@@ -349,7 +353,7 @@ Template.cardCustomFieldDate.helpers(cardDateHelpers({
 // --- Minicard date templates ---
 
 // minicardReceivedDate
-Template.minicardReceivedDate.onCreated(function () {
+Template.minicardReceivedDate.onCreated(function (this: CardDateInstance) {
   cardDateOnCreated(this);
   const self = this;
   self.autorun(() => {
@@ -359,13 +363,13 @@ Template.minicardReceivedDate.onCreated(function () {
 
 Template.minicardReceivedDate.helpers(cardDateHelpers({
   classes() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     let classes = 'received-date ';
     const data = Template.currentData();
     const dueAt = data.getDue();
     const endAt = data.getEnd();
     const startAt = data.getStart();
-    const theDate = tpl.date.get();
+    const theDate = tpl.date.get()!;
 
     if (
       (startAt && isAfter(theDate, startAt)) ||
@@ -379,16 +383,16 @@ Template.minicardReceivedDate.helpers(cardDateHelpers({
     return classes;
   },
   showTitle() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     const currentUser = ReactiveCache.getCurrentUser();
     const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-    const formattedDate = formatDateByUserPreference(tpl.date.get(), dateFormat, true);
+    const formattedDate = formatDateByUserPreference(tpl.date.get()!, dateFormat, true);
     return `${TAPi18n.__('card-received-on')} ${formattedDate}`;
   },
   showDate() {
     const currentUser = ReactiveCache.getCurrentUser();
     const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-    return formatDateByUserPreference(Template.instance().date.get(), dateFormat, true);
+    return formatDateByUserPreference((Template.instance() as CardDateInstance).date.get()!, dateFormat, true);
   },
 }));
 
@@ -397,7 +401,7 @@ Template.minicardReceivedDate.events({
 });
 
 // minicardStartDate
-Template.minicardStartDate.onCreated(function () {
+Template.minicardStartDate.onCreated(function (this: CardDateInstance) {
   cardDateOnCreated(this);
   const self = this;
   self.autorun(() => {
@@ -407,12 +411,12 @@ Template.minicardStartDate.onCreated(function () {
 
 Template.minicardStartDate.helpers(cardDateHelpers({
   classes() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     let classes = 'start-date ';
     const data = Template.currentData();
     const dueAt = data.getDue();
     const endAt = data.getEnd();
-    const theDate = tpl.date.get();
+    const theDate = tpl.date.get()!;
     const nowVal = tpl.now.get();
 
     if ((endAt && isAfter(theDate, endAt)) || (dueAt && isAfter(theDate, dueAt))) {
@@ -425,16 +429,16 @@ Template.minicardStartDate.helpers(cardDateHelpers({
     return classes;
   },
   showTitle() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     const currentUser = ReactiveCache.getCurrentUser();
     const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-    const formattedDate = formatDateByUserPreference(tpl.date.get(), dateFormat, true);
+    const formattedDate = formatDateByUserPreference(tpl.date.get()!, dateFormat, true);
     return `${TAPi18n.__('card-start-on')} ${formattedDate}`;
   },
   showDate() {
     const currentUser = ReactiveCache.getCurrentUser();
     const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-    return formatDateByUserPreference(Template.instance().date.get(), dateFormat, true);
+    return formatDateByUserPreference((Template.instance() as CardDateInstance).date.get()!, dateFormat, true);
   },
 }));
 
@@ -443,7 +447,7 @@ Template.minicardStartDate.events({
 });
 
 // minicardDueDate
-Template.minicardDueDate.onCreated(function () {
+Template.minicardDueDate.onCreated(function (this: CardDateInstance) {
   cardDateOnCreated(this);
   const self = this;
   self.autorun(() => {
@@ -453,25 +457,25 @@ Template.minicardDueDate.onCreated(function () {
 
 Template.minicardDueDate.helpers(cardDateHelpers({
   classes() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     const data = Template.currentData();
     const endAt = data.getEnd();
-    const theDate = tpl.date.get();
+    const theDate = tpl.date.get()!;
     const nowVal = tpl.now.get();
 
     return `due-date ${dueDateClass(theDate, nowVal, endAt)}`;
   },
   showTitle() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     const currentUser = ReactiveCache.getCurrentUser();
     const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-    const formattedDate = formatDateByUserPreference(tpl.date.get(), dateFormat, true);
+    const formattedDate = formatDateByUserPreference(tpl.date.get()!, dateFormat, true);
     return `${TAPi18n.__('card-due-on')} ${formattedDate}`;
   },
   showDate() {
     const currentUser = ReactiveCache.getCurrentUser();
     const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-    return formatDateByUserPreference(Template.instance().date.get(), dateFormat, true);
+    return formatDateByUserPreference((Template.instance() as CardDateInstance).date.get()!, dateFormat, true);
   },
 }));
 
@@ -480,7 +484,7 @@ Template.minicardDueDate.events({
 });
 
 // minicardEndDate
-Template.minicardEndDate.onCreated(function () {
+Template.minicardEndDate.onCreated(function (this: CardDateInstance) {
   cardDateOnCreated(this);
   const self = this;
   self.autorun(() => {
@@ -490,11 +494,11 @@ Template.minicardEndDate.onCreated(function () {
 
 Template.minicardEndDate.helpers(cardDateHelpers({
   classes() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     let classes = 'end-date ';
     const data = Template.currentData();
     const dueAt = data.getDue();
-    const theDate = tpl.date.get();
+    const theDate = tpl.date.get()!;
 
     if (!dueAt) {
       classes += 'completed';
@@ -508,13 +512,13 @@ Template.minicardEndDate.helpers(cardDateHelpers({
     return classes;
   },
   showTitle() {
-    const tpl = Template.instance();
-    return `${TAPi18n.__('card-end-on')} ${format(tpl.date.get(), 'LLLL')}`;
+    const tpl = Template.instance() as CardDateInstance;
+    return `${TAPi18n.__('card-end-on')} ${format(tpl.date.get()!, 'LLLL')}`;
   },
   showDate() {
     const currentUser = ReactiveCache.getCurrentUser();
     const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-    return formatDateByUserPreference(Template.instance().date.get(), dateFormat, true);
+    return formatDateByUserPreference((Template.instance() as CardDateInstance).date.get()!, dateFormat, true);
   },
 }));
 
@@ -523,7 +527,7 @@ Template.minicardEndDate.events({
 });
 
 // minicardCustomFieldDate
-Template.minicardCustomFieldDate.onCreated(function () {
+Template.minicardCustomFieldDate.onCreated(function (this: CardDateInstance) {
   cardDateOnCreated(this);
   const self = this;
   self.autorun(() => {
@@ -535,13 +539,13 @@ Template.minicardCustomFieldDate.helpers(cardDateHelpers({
   showDate() {
     const currentUser = ReactiveCache.getCurrentUser();
     const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-    return formatDateByUserPreference(Template.instance().date.get(), dateFormat, true);
+    return formatDateByUserPreference((Template.instance() as CardDateInstance).date.get()!, dateFormat, true);
   },
   showTitle() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as CardDateInstance;
     const currentUser = ReactiveCache.getCurrentUser();
     const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-    const formattedDate = formatDateByUserPreference(tpl.date.get(), dateFormat, true);
+    const formattedDate = formatDateByUserPreference(tpl.date.get()!, dateFormat, true);
     return `${formattedDate}`;
   },
   classes() {
@@ -552,7 +556,7 @@ Template.minicardCustomFieldDate.helpers(cardDateHelpers({
 // --- Vote and Poker end date badge templates ---
 
 // voteEndDate
-Template.voteEndDate.onCreated(function () {
+Template.voteEndDate.onCreated(function (this: CardDateInstance) {
   cardDateOnCreated(this);
   const self = this;
   self.autorun(() => {
@@ -567,11 +571,11 @@ Template.voteEndDate.helpers(cardDateHelpers({
   showDate() {
     const currentUser = ReactiveCache.getCurrentUser();
     const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-    return formatDateByUserPreference(Template.instance().date.get(), dateFormat, true);
+    return formatDateByUserPreference((Template.instance() as CardDateInstance).date.get()!, dateFormat, true);
   },
   showTitle() {
-    const tpl = Template.instance();
-    return `${TAPi18n.__('card-end-on')} ${tpl.date.get().toLocaleString()}`;
+    const tpl = Template.instance() as CardDateInstance;
+    return `${TAPi18n.__('card-end-on')} ${tpl.date.get()!.toLocaleString()}`;
   },
 }));
 
@@ -580,7 +584,7 @@ Template.voteEndDate.events({
 });
 
 // pokerEndDate
-Template.pokerEndDate.onCreated(function () {
+Template.pokerEndDate.onCreated(function (this: CardDateInstance) {
   cardDateOnCreated(this);
   const self = this;
   self.autorun(() => {
@@ -595,14 +599,28 @@ Template.pokerEndDate.helpers(cardDateHelpers({
   showDate() {
     const currentUser = ReactiveCache.getCurrentUser();
     const dateFormat = currentUser ? currentUser.getDateFormat() : (window.localStorage.getItem('dateFormat') || 'YYYY-MM-DD');
-    return formatDateByUserPreference(Template.instance().date.get(), dateFormat, true);
+    return formatDateByUserPreference((Template.instance() as CardDateInstance).date.get()!, dateFormat, true);
   },
   showTitle() {
-    const tpl = Template.instance();
-    return `${TAPi18n.__('card-end-on')} ${format(tpl.date.get(), 'LLLL')}`;
+    const tpl = Template.instance() as CardDateInstance;
+    return `${TAPi18n.__('card-end-on')} ${format(tpl.date.get()!, 'LLLL')}`;
   },
 }));
 
 Template.pokerEndDate.events({
   'click .js-edit-date': Popup.open('editPokerEndDate'),
 });
+
+// Card date badge templates cache the displayed date and a ticking "now" in
+// reactive vars (see cardDateOnCreated). `date` is undefined until the autorun
+// first resolves the card's stored date.
+interface CardDateInstance extends Blaze.TemplateInstance {
+  date: ReactiveVar<Date | undefined>;
+  now: ReactiveVar<Date>;
+}
+
+// The edit-date popups delegate their reactive state to the shared datepicker
+// (see setupDatePicker); `datePicker` holds the picker state plus the card.
+interface EditCardDatePopupInstance extends Blaze.TemplateInstance {
+  datePicker: any;
+}
