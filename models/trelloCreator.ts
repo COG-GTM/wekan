@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor';
+import { check, Match } from 'meteor/check';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
 import Activities from '/models/activities';
@@ -38,13 +39,30 @@ import {
 import getSlug from 'limax';
 import { validateAttachmentUrl } from './lib/attachmentUrlValidation';
 
-const DateString = Match.Where(function(dateAsString) {
+const DateString = Match.Where(function(dateAsString: any) {
   check(dateAsString, String);
   return isValidDate(new Date(dateAsString));
 });
 
 export class TrelloCreator {
-  constructor(data) {
+  _nowDate: Date;
+  // Object creation dates/creators, keyed by Trello id (dynamic), hence `any`.
+  createdAt: { board: any; cards: { [key: string]: any }; lists: { [key: string]: any } };
+  createdBy: { cards: { [key: string]: any } };
+  labels: { [key: string]: any };
+  // Default swimlane id created during import, or null before creation.
+  swimlane: any;
+  lists: { [key: string]: any };
+  cards: { [key: string]: any };
+  attachmentIds: { [key: string]: any };
+  checklists: { [key: string]: any };
+  comments: { [key: string]: any };
+  members: { [key: string]: any };
+  attachments: { [key: string]: any };
+  customFields: { [key: string]: any };
+
+  // `data` is the parsed Trello export payload (dynamic shape), hence `any`.
+  constructor(data: any) {
     // we log current date, to use the same timestamp for all our actions.
     // this helps to retrieve all elements performed by the same import.
     this._nowDate = new Date();
@@ -93,7 +111,9 @@ export class TrelloCreator {
    *
    * @param {String} dateString a properly formatted Date
    */
-  _now(dateString) {
+  // `dateString` is a dynamic timestamp from Trello actions (string/Date/null),
+  // hence `any`.
+  _now(dateString?: any) {
     if (dateString) {
       return new Date(dateString);
     }
@@ -110,14 +130,14 @@ export class TrelloCreator {
    * @param trelloUserId
    * @private
    */
-  _user(trelloUserId) {
+  _user(trelloUserId?: string) {
     if (trelloUserId && this.members[trelloUserId]) {
       return this.members[trelloUserId];
     }
     return Meteor.userId();
   }
 
-  checkActions(trelloActions) {
+  checkActions(trelloActions: any) {
     check(trelloActions, [
       Match.ObjectIncluding({
         data: Object,
@@ -128,7 +148,7 @@ export class TrelloCreator {
     // XXX we could perform more thorough checks based on action type
   }
 
-  checkBoard(trelloBoard) {
+  checkBoard(trelloBoard: any) {
     check(
       trelloBoard,
       Match.ObjectIncluding({
@@ -138,7 +158,7 @@ export class TrelloCreator {
           // XXX refine control by validating 'background' against a list of
           // allowed values (is it worth the maintenance?)
           background: String,
-          permissionLevel: Match.Where(value => {
+          permissionLevel: Match.Where((value: any) => {
             return ['org', 'private', 'public'].indexOf(value) >= 0;
           }),
         }),
@@ -146,7 +166,7 @@ export class TrelloCreator {
     );
   }
 
-  checkCards(trelloCards) {
+  checkCards(trelloCards: any) {
     check(trelloCards, [
       Match.ObjectIncluding({
         closed: Boolean,
@@ -160,7 +180,7 @@ export class TrelloCreator {
     ]);
   }
 
-  checkLabels(trelloLabels) {
+  checkLabels(trelloLabels: any) {
     check(trelloLabels, [
       Match.ObjectIncluding({
         // XXX refine control by validating 'color' against a list of allowed
@@ -170,7 +190,7 @@ export class TrelloCreator {
     ]);
   }
 
-  checkLists(trelloLists) {
+  checkLists(trelloLists: any) {
     check(trelloLists, [
       Match.ObjectIncluding({
         closed: Boolean,
@@ -179,7 +199,7 @@ export class TrelloCreator {
     ]);
   }
 
-  checkChecklists(trelloChecklists) {
+  checkChecklists(trelloChecklists: any) {
     check(trelloChecklists, [
       Match.ObjectIncluding({
         idBoard: String,
@@ -196,13 +216,14 @@ export class TrelloCreator {
   }
 
   // You must call parseActions before calling this one.
-  async createBoardAndLabels(trelloBoard) {
+  async createBoardAndLabels(trelloBoard: any) {
     let color = 'blue';
     if (this.getColor(trelloBoard.prefs.background) !== undefined) {
       color = this.getColor(trelloBoard.prefs.background);
     }
 
-    const boardToCreate = {
+    // `boardToCreate` is a board document assembled incrementally, hence `any`.
+    const boardToCreate: { [key: string]: any } = {
       archived: trelloBoard.closed,
       color: color,
       // very old boards won't have a creation activity so no creation date
@@ -222,7 +243,8 @@ export class TrelloCreator {
       permission: this.getPermission(trelloBoard.prefs.permissionLevel),
       slug: getSlug(trelloBoard.name) || 'board',
       stars: 0,
-      title: await Boards.uniqueTitle(trelloBoard.name),
+      // `uniqueTitle` is a custom Boards static not on Mongo.Collection.
+      title: await (Boards as any).uniqueTitle(trelloBoard.name),
     };
     // Import the board background image. When Trello uses an image background,
     // prefs.backgroundImage is a public URL (and prefs.backgroundImageScaled
@@ -241,14 +263,14 @@ export class TrelloCreator {
     }
     // now add other members
     if (trelloBoard.memberships) {
-      trelloBoard.memberships.forEach(trelloMembership => {
+      trelloBoard.memberships.forEach((trelloMembership: any) => {
         const trelloId = trelloMembership.idMember;
         // do we have a mapping?
         if (this.members[trelloId]) {
           const wekanId = this.members[trelloId];
           // do we already have it in our list?
           const wekanMember = boardToCreate.members.find(
-            wekanMember => wekanMember.userId === wekanId,
+            (wekanMember: any) => wekanMember.userId === wekanId,
           );
           if (wekanMember) {
             // we're already mapped, but maybe with lower rights
@@ -269,7 +291,7 @@ export class TrelloCreator {
       });
     }
     if (trelloBoard.labels) {
-      trelloBoard.labels.forEach(label => {
+      trelloBoard.labels.forEach((label: any) => {
         const labelToCreate = {
           _id: Random.id(6),
           color: this.mapToWekanColor(label.color) || 'black',
@@ -299,7 +321,9 @@ export class TrelloCreator {
     });
     if (trelloBoard.customFields) {
       for (const field of trelloBoard.customFields) {
-        const fieldToCreate = {
+        // `fieldToCreate` is a custom-field document assembled incrementally,
+        // hence `any`.
+        const fieldToCreate: { [key: string]: any } = {
           // trelloId: field.id,
           name: field.name,
           showOnCard: field.display.cardFront,
@@ -314,7 +338,7 @@ export class TrelloCreator {
         if (field.type === 'list') {
           fieldToCreate.type = 'dropdown';
           fieldToCreate.settings = {
-            dropdownItems: field.options.map(opt => {
+            dropdownItems: field.options.map((opt: any) => {
               return {
                 _id: opt.id,
                 name: opt.value.text,
@@ -377,15 +401,16 @@ export class TrelloCreator {
    * @param boardId
    * @returns {Array}
    */
-  async createCards(trelloCards, boardId) {
-    const result = [];
+  async createCards(trelloCards: any, boardId: string) {
+    const result: any[] = [];
     // .direct.insertAsync below bypasses the before.insert hook that assigns
     // cardNumber, so handle it here. Prefer Trello's own short card number
     // (idShort, the #N shown in Trello), falling back to a freshly allocated
     // one. Without this every imported card defaults to #0.
     const boardObj = await ReactiveCache.getBoard(boardId);
     for (const card of trelloCards) {
-      const cardToCreate = {
+      // `cardToCreate` is a card document assembled incrementally, hence `any`.
+      const cardToCreate: { [key: string]: any } = {
         archived: card.closed,
         boardId,
         cardNumber: card.idShort || (await boardObj.getNextCardNumber()),
@@ -432,8 +457,9 @@ export class TrelloCreator {
       // sticker id (uploaded packs). Map to a similar Font Awesome icon, and
       // keep the original name for the tooltip.
       if (card.stickers && card.stickers.length > 0) {
-        cardToCreate.stickers = card.stickers.map((sticker, index) => {
-          const stickerData = {
+        cardToCreate.stickers = card.stickers.map((sticker: any, index: number) => {
+          // `stickerData` gains an optional `highlight` field below, hence `any`.
+          const stickerData: { [key: string]: any } = {
             icon: this.getStickerIcon(sticker.image),
             name: this.stickerLabel(sticker.image),
             position: typeof sticker.zIndex === 'number' ? sticker.zIndex : index,
@@ -445,15 +471,15 @@ export class TrelloCreator {
       }
       // add labels
       if (card.idLabels) {
-        cardToCreate.labelIds = card.idLabels.map(trelloId => {
+        cardToCreate.labelIds = card.idLabels.map((trelloId: any) => {
           return this.labels[trelloId];
         });
       }
       // add members {
       if (card.idMembers) {
-        const wekanMembers = [];
+        const wekanMembers: any[] = [];
         // we can't just map, as some members may not have been mapped
-        card.idMembers.forEach(trelloId => {
+        card.idMembers.forEach((trelloId: any) => {
           if (this.members[trelloId]) {
             const wekanId = this.members[trelloId];
             // we may map multiple Trello members to the same wekan user
@@ -471,8 +497,8 @@ export class TrelloCreator {
       // add vote
       if (card.idMembersVoted) {
         // Trello only know's positive votes
-        const positiveVotes = [];
-        card.idMembersVoted.forEach(trelloId => {
+        const positiveVotes: any[] = [];
+        card.idMembersVoted.forEach((trelloId: any) => {
           if (this.members[trelloId]) {
             const wekanId = this.members[trelloId];
             // we may map multiple Trello members to the same wekan user
@@ -494,8 +520,9 @@ export class TrelloCreator {
 
       if (card.customFieldItems) {
         cardToCreate.customFields = [];
-        card.customFieldItems.forEach(item => {
-          const custom = {
+        card.customFieldItems.forEach((item: any) => {
+          // `custom` gains a `value` field of varying type below, hence `any`.
+          const custom: { [key: string]: any } = {
             _id: this.customFields[item.idCustomField],
           };
           if (item.idValue) {
@@ -567,9 +594,9 @@ export class TrelloCreator {
       // newer Trello exports, de-duplicated by Trello attachment id. `file`
       // (base64) is injected client-side when a matching file was found in the
       // uploaded attachments ZIP (the offline TCAD download).
-      const mergedAttachments = [];
-      const attachmentsById = new Map();
-      const pushAttachment = raw => {
+      const mergedAttachments: any[] = [];
+      const attachmentsById = new Map<any, any>();
+      const pushAttachment = (raw: any) => {
         if (!raw) return;
         const id = raw.id || raw._id || `__noid_${mergedAttachments.length}`;
         const norm = {
@@ -603,7 +630,7 @@ export class TrelloCreator {
         // Trello "link attachments" (where the attachment name is the URL
         // itself) are not real files. Collect them here and append them to the
         // card description below, instead of trying to download them.
-        const links = [];
+        const links: any[] = [];
         for (const att of mergedAttachments) {
           // attached link, not a file
           if (att.name && att.name === att.url) {
@@ -611,7 +638,7 @@ export class TrelloCreator {
             continue;
           }
           const meta = { boardId, cardId, source: 'import' };
-          const setCover = async newId => {
+          const setCover = async (newId: any) => {
             if (!newId) return;
             this.attachmentIds[att.id] = newId;
             if (trelloCoverId && trelloCoverId === att.id) {
@@ -681,7 +708,7 @@ export class TrelloCreator {
             desc += '\n\n';
           }
           desc += `## ${TAPi18n.__('links-heading')}\n`;
-          links.forEach(link => {
+          links.forEach((link: any) => {
             desc += `* ${link}\n`;
           });
           await Cards.direct.updateAsync(cardId, {
@@ -697,8 +724,8 @@ export class TrelloCreator {
   }
 
   // Create labels if they do not exist and load this.labels.
-  createLabels(trelloLabels, board) {
-    trelloLabels.forEach(label => {
+  createLabels(trelloLabels: any, board: any) {
+    trelloLabels.forEach((label: any) => {
       const color = label.color;
       const name = label.name;
       const existingLabel = board.getLabel(name, color);
@@ -711,7 +738,7 @@ export class TrelloCreator {
     });
   }
 
-  async createLists(trelloLists, boardId) {
+  async createLists(trelloLists: any, boardId: string) {
     for (const list of trelloLists) {
       const listToCreate = {
         archived: list.closed,
@@ -749,7 +776,7 @@ export class TrelloCreator {
     }
   }
 
-  async createSwimlanes(boardId) {
+  async createSwimlanes(boardId: string) {
     const swimlaneToCreate = {
       archived: false,
       boardId,
@@ -766,7 +793,7 @@ export class TrelloCreator {
     this.swimlane = swimlaneId;
   }
 
-  async createChecklists(trelloChecklists, boardId) {
+  async createChecklists(trelloChecklists: any, boardId: string) {
     for (const checklist of trelloChecklists) {
       if (this.cards[checklist.idCard]) {
         // Create the checklist
@@ -801,11 +828,11 @@ export class TrelloCreator {
     }
   }
 
-  getAdmin(trelloMemberType) {
+  getAdmin(trelloMemberType: string) {
     return trelloMemberType === 'admin';
   }
 
-  getStickerIcon(trelloStickerName) {
+  getStickerIcon(trelloStickerName: any) {
     // Map a Trello sticker name to a similar WeKan card sticker icon (Font
     // Awesome v4 name, rendered as `i.fa.fa-<name>`). Handles built-in and
     // named premium packs via models/metadata/stickers.js.
@@ -815,7 +842,7 @@ export class TrelloCreator {
   // A readable tooltip for an imported sticker. For named stickers (taco-love,
   // globe, …) this humanises the name; custom uploaded stickers only have an
   // opaque id, so fall back to a generic label rather than showing the id.
-  stickerLabel(trelloStickerName) {
+  stickerLabel(trelloStickerName: any) {
     const raw = String(trelloStickerName || '').trim();
     if (!raw) return 'sticker';
     // Long hex/base-id strings (custom uploaded stickers) aren't descriptive.
@@ -837,15 +864,15 @@ export class TrelloCreator {
   // that WeKan also has (green, blue, red, …) plus `_light`/`_dark` variants
   // (e.g. `purple_light`) that WeKan does not, so strip the variant suffix.
   // Returns null when there is no valid mapping.
-  mapToWekanColor(trelloColor) {
+  mapToWekanColor(trelloColor: any) {
     if (!trelloColor) return null;
     const base = String(trelloColor).split('_')[0];
     return CARD_COLORS.includes(base) ? base : null;
   }
 
-  getColor(trelloColorCode) {
+  getColor(trelloColorCode: any) {
     // trello color name => wekan color
-    const mapColors = {
+    const mapColors: { [key: string]: string } = {
       blue: 'belize',
       orange: 'pumpkin',
       green: 'nephritis',
@@ -860,7 +887,7 @@ export class TrelloCreator {
     return wekanColor || BOARD_COLORS[0];
   }
 
-  getPermission(trelloPermissionCode) {
+  getPermission(trelloPermissionCode: string) {
     if (trelloPermissionCode === 'public') {
       return 'public';
     }
@@ -869,8 +896,8 @@ export class TrelloCreator {
     return 'private';
   }
 
-  parseActions(trelloActions) {
-    trelloActions.forEach(action => {
+  parseActions(trelloActions: any) {
+    trelloActions.forEach((action: any) => {
       if (action.type === 'addAttachmentToCard') {
         // We have to be cautious, because the attachment could have been removed later.
         // In that case Trello still reports its addition, but removes its 'url' field.
@@ -907,7 +934,7 @@ export class TrelloCreator {
     });
   }
 
-  async importActions(actions, boardId) {
+  async importActions(actions: any, boardId: string) {
     for (const action of actions) {
       switch (action.type) {
         // Board related actions
@@ -995,7 +1022,7 @@ export class TrelloCreator {
     }
   }
 
-  check(board) {
+  check(board: any) {
     try {
       // check(data, {
       //   membersMapping: Match.Optional(Object),
@@ -1011,7 +1038,7 @@ export class TrelloCreator {
     }
   }
 
-  async create(board, currentBoardId) {
+  async create(board: any, currentBoardId?: string | null) {
     // TODO : Make isSandstorm variable global
     const isSandstorm =
       Meteor.settings &&
@@ -1041,9 +1068,9 @@ export class TrelloCreator {
   // that user's importUsernames (so future imports auto-map); members that were
   // not mapped have their username stored on the board's importUsernames, where
   // an admin can later assign them to a real user via the People panel.
-  async recordImportedUsernames(board, boardId) {
+  async recordImportedUsernames(board: any, boardId: string) {
     if (!Meteor.isServer) return;
-    const unmapped = [];
+    const unmapped: any[] = [];
     for (const member of board.members || []) {
       if (!member.username) continue;
       const wekanId = this.members[member.id];
