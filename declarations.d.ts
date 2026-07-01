@@ -230,6 +230,18 @@ declare module 'meteor/webapp' {
   }
 }
 
+// meteor/ddp — `DDP._CurrentMethodInvocation` is the server-internal
+// environment variable holding the current method invocation. server/rulesHelper.ts
+// uses it to run rule actions under the triggering user's id. @types/meteor does
+// not expose it, so declare it here with the members the app uses.
+declare module 'meteor/ddp' {
+  namespace DDP {
+    const _CurrentMethodInvocation: {
+      withValue<T>(value: { userId?: string }, func: () => T): T;
+    };
+  }
+}
+
 // meteor/accounts-express — populates the connect request with an authenticated
 // `userId` from Meteor login tokens for HTTP routes (no bundled types). Returns
 // a connect middleware mounted via `WebApp.handlers.use('/api', …)`.

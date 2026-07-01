@@ -35,7 +35,7 @@ Meteor.methods({
         activityType: 'button',
         cardId,
         boardId: rule.boardId,
-        userId: this.userId,
+        userId: this.userId ?? undefined,
       },
       action,
     );

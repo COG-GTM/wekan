@@ -8,7 +8,7 @@ import ChecklistItems from '/models/checklistItems';
 import Checklists from '/models/checklists';
 import Swimlanes from '/models/swimlanes';
 
-async function withUserId(userId, fn) {
+async function withUserId(userId: string | undefined, fn: () => any) {
   if (userId && typeof DDP._CurrentMethodInvocation?.withValue === 'function') {
     return DDP._CurrentMethodInvocation.withValue({ userId }, fn);
   }
@@ -19,8 +19,8 @@ async function withUserId(userId, fn) {
 // rule context (card / board / list / swimlane / user / date), then substitute
 // `{name}` tokens in action text (email subject/body, created card/checklist
 // names, etc.). Unknown tokens are left untouched.
-async function buildRuleVars(activity, card) {
-  const vars = {};
+async function buildRuleVars(activity: RuleActivity, card: CardLike | undefined) {
+  const vars: RuleVars = {};
   const now = new Date();
   vars.date = now.toLocaleDateString();
   vars.time = now.toLocaleTimeString();
@@ -51,7 +51,7 @@ async function buildRuleVars(activity, card) {
   return vars;
 }
 
-function substituteVars(text, vars) {
+function substituteVars(text: string, vars: RuleVars) {
   if (typeof text !== 'string') return text;
   return text.replace(/\{(\w+)\}/g, (m, key) => {
     const v = vars[key.toLowerCase()];
@@ -60,7 +60,7 @@ function substituteVars(text, vars) {
 }
 
 export const RulesHelper = {
-  async executeRules(activity) {
+  async executeRules(activity: RuleActivity) {
     const matchingRules = await this.findMatchingRules(activity);
     for (let i = 0; i < matchingRules.length; i++) {
       const action = await matchingRules[i].getAction();
@@ -69,12 +69,13 @@ export const RulesHelper = {
       }
     }
   },
-  async findMatchingRules(activity) {
+  async findMatchingRules(activity: RuleActivity) {
     const activityType = activity.activityType;
-    if (TriggersDef[activityType] === undefined) {
+    const triggerDef = (TriggersDef as TriggersDefMap)[activityType];
+    if (triggerDef === undefined) {
       return [];
     }
-    const matchingFields = TriggersDef[activityType].matchingFields;
+    const matchingFields = triggerDef.matchingFields;
     const matchingMap = await this.buildMatchingFieldsMap(activity, matchingFields);
     const matchingTriggers = await ReactiveCache.getTriggers(matchingMap);
     const matchingRules = [];
@@ -88,8 +89,8 @@ export const RulesHelper = {
     }
     return matchingRules;
   },
-  async buildMatchingFieldsMap(activity, matchingFields) {
-    const matchingMap = { activityType: activity.activityType };
+  async buildMatchingFieldsMap(activity: RuleActivity, matchingFields: string[]) {
+    const matchingMap: { [key: string]: any } = { activityType: activity.activityType };
     for (const field of matchingFields) {
       // Creating a matching map with the actual field of the activity
       // and with the wildcard (for example: trigger when a card is added
@@ -116,7 +117,7 @@ export const RulesHelper = {
     }
     return matchingMap;
   },
-  async performAction(activity, action) {
+  async performAction(activity: RuleActivity, action: RuleAction) {
     const card = await ReactiveCache.getCard(activity.cardId);
     // Most actions operate on a card. Scheduled / button rules may run a
     // board-level action with no card context (e.g. create a card every Monday),
@@ -176,12 +177,12 @@ export const RulesHelper = {
 
       if (action.actionType === 'moveCardToTop') {
         const minOrder = Math.min(
-          ...(await list.cardsUnfiltered(swimlaneId)).map(c => c.sort),
+          ...(await list.cardsUnfiltered(swimlaneId)).map((c: CardLike) => c.sort),
         );
         await withUserId(activity.userId, () => card.move(action.boardId, swimlaneId, listId, minOrder - 1));
       } else {
         const maxOrder = Math.max(
-          ...(await list.cardsUnfiltered(swimlaneId)).map(c => c.sort),
+          ...(await list.cardsUnfiltered(swimlaneId)).map((c: CardLike) => c.sort),
         );
         await withUserId(activity.userId, () => card.move(action.boardId, swimlaneId, listId, maxOrder + 1));
       }
@@ -496,7 +497,7 @@ export const RulesHelper = {
       }
       if (list) {
         const cards = await list.cardsUnfiltered(card.swimlaneId);
-        const keyOf = c => {
+        const keyOf = (c: CardLike) => {
           switch (action.sortField) {
             case 'name': return (c.title || '').toLowerCase();
             case 'created': return c.createdAt ? new Date(c.createdAt).getTime() : 0;
@@ -525,3 +526,59 @@ export const RulesHelper = {
     }
   },
 };
+
+// The activity payload that triggers rules. Named fields are the ones read
+// directly; the index signature covers dynamic `activity[field]` lookups over
+// the trigger's matchingFields, which vary per activity type.
+interface RuleActivity {
+  activityType: string;
+  boardId?: string;
+  userId?: string;
+  cardId?: string;
+  oldListId?: string;
+  oldSwimlaneId?: string;
+  [key: string]: any;
+}
+
+// A rule action document. `actionType` selects the branch; the remaining fields
+// are schemaless per action type, hence the index signature.
+interface RuleAction {
+  actionType: string;
+  [key: string]: any;
+}
+
+// #2475 substitution variables. Named entries are the tokens buildRuleVars sets;
+// the index signature backs the case-insensitive `vars[key]` lookup.
+interface RuleVars {
+  date?: string;
+  time?: string;
+  datetime?: string;
+  cardname?: string;
+  cardtitle?: string;
+  cardnumber?: string;
+  description?: string;
+  duedate?: string;
+  listname?: string;
+  swimlanename?: string;
+  boardname?: string;
+  username?: string;
+  [key: string]: string | undefined;
+}
+
+// A card model instance as consumed here. Only the sort-key fields are named;
+// the index signature covers the untyped Wekan Card model's other members/methods.
+interface CardLike {
+  _id: string;
+  sort: number;
+  title?: string;
+  createdAt?: Date | string;
+  modifiedAt?: Date | string;
+  dueAt?: Date | string;
+  swimlaneId?: string;
+  [key: string]: any;
+}
+
+// The shape of the imported TriggersDef map, keyed by activity type.
+interface TriggersDefMap {
+  [key: string]: { matchingFields: string[] };
+}

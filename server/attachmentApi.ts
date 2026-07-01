@@ -16,12 +16,12 @@ const HARD_MAX_API_FILE_BYTES = 64 * 1024 * 1024;
 // no-comments, worker, or assigned-only — or a global site admin. Mirrors
 // Authentication.checkBoardWriteAccess. Read operations keep using
 // board.hasMember().
-async function userHasBoardWriteAccess(board, userId) {
+async function userHasBoardWriteAccess(board: BoardWriteDoc, userId: string) {
   if (!board || !userId || !Array.isArray(board.members)) {
     return false;
   }
   const writeAccess = board.members.some(
-    m =>
+    (m: BoardMemberEntry) =>
       m.userId === userId &&
       m.isActive &&
       !m.isNoComments &&
@@ -37,14 +37,16 @@ async function userHasBoardWriteAccess(board, userId) {
   return admin !== undefined;
 }
 
-function normalizeConfiguredLimit(configuredValue, fallbackValue = 0) {
-  if (Number.isFinite(configuredValue) && configuredValue >= 0) {
-    return configuredValue;
+function normalizeConfiguredLimit(configuredValue: number | null, fallbackValue = 0) {
+  // `configuredValue` is narrowed to a finite number by Number.isFinite (not a
+  // TS type guard), so cast for the numeric comparison/return.
+  if (Number.isFinite(configuredValue) && (configuredValue as number) >= 0) {
+    return configuredValue as number;
   }
   return Number.isFinite(fallbackValue) && fallbackValue >= 0 ? fallbackValue : 0;
 }
 
-function getEffectiveApiFileLimit(maxBytes) {
+function getEffectiveApiFileLimit(maxBytes: number) {
   if (Number.isFinite(maxBytes) && maxBytes > 0) {
     return Math.min(maxBytes, HARD_MAX_API_FILE_BYTES);
   }
@@ -52,13 +54,15 @@ function getEffectiveApiFileLimit(maxBytes) {
   return HARD_MAX_API_FILE_BYTES;
 }
 
-function maxBase64LengthForBytes(maxBytes) {
+function maxBase64LengthForBytes(maxBytes: number) {
   const safeBytes = Number.isFinite(maxBytes) && maxBytes > 0 ? maxBytes : HARD_MAX_API_FILE_BYTES;
   return Math.ceil((safeBytes * 4) / 3) + 4;
 }
 
-function parseNonNegativeInt(value, fallback = 0) {
-  const parsed = Number.parseInt(value, 10);
+function parseNonNegativeInt(value: string | undefined, fallback = 0) {
+  // `value` is an env var (string | undefined); parseInt(undefined) yields NaN,
+  // which the guard below maps to `fallback`, matching the prior behavior.
+  const parsed = Number.parseInt(value as string, 10);
   if (!Number.isFinite(parsed) || parsed < 0) {
     return fallback;
   }
@@ -280,12 +284,12 @@ Meteor.methods({
         }
 
         // Read file data
-        const chunks = [];
+        const chunks: Buffer[] = [];
         return new Promise((resolve, reject) => {
           let settled = false;
           let totalBytes = 0;
 
-          const fail = (error) => {
+          const fail = (error: Error) => {
             if (settled) {
               return;
             }
@@ -298,7 +302,7 @@ Meteor.methods({
             reject(error);
           };
 
-          readStream.on('data', (chunk) => {
+          readStream.on('data', (chunk: Buffer) => {
             totalBytes += chunk.length || 0;
             if (totalBytes > effectiveApiDownloadMaxBytes) {
               fail(new Meteor.Error('file-too-large', 'Attachment exceeds API download limit'));
@@ -326,7 +330,7 @@ Meteor.methods({
             });
           });
 
-          readStream.on('error', (error) => {
+          readStream.on('error', (error: Error) => {
             fail(new Meteor.Error('download-error', error.message));
           });
         });
@@ -472,17 +476,17 @@ Meteor.methods({
           throw new Meteor.Error('file-not-found', 'File not found in storage');
         }
 
-        const chunks = [];
+        const chunks: Buffer[] = [];
         return new Promise((resolve, reject) => {
           let settled = false;
           let totalBytes = 0;
-          const fail = (error) => {
+          const fail = (error: Error) => {
             if (settled) return;
             settled = true;
             try { readStream.destroy(); } catch (e) { /* ignore */ }
             reject(error);
           };
-          readStream.on('data', (chunk) => {
+          readStream.on('data', (chunk: Buffer) => {
             totalBytes += chunk.length || 0;
             if (totalBytes > effectiveApiDownloadMaxBytes) {
               fail(new Meteor.Error('file-too-large', 'Background exceeds API download limit'));
@@ -505,7 +509,7 @@ Meteor.methods({
               storageBackend: strategy.getStorageName(),
             });
           });
-          readStream.on('error', (error) => {
+          readStream.on('error', (error: Error) => {
             fail(new Meteor.Error('download-error', error.message));
           });
         });
@@ -528,7 +532,7 @@ Meteor.methods({
       }
 
       try {
-        let query = { 'meta.boardId': boardId };
+        const query: { [key: string]: string } = { 'meta.boardId': boardId };
 
         if (swimlaneId) {
           query['meta.swimlaneId'] = swimlaneId;
@@ -544,7 +548,10 @@ Meteor.methods({
 
         const attachments = await ReactiveCache.getAttachments(query);
         
-        const attachmentList = attachments.map(attachment => {
+        // `attachment` is an ostrio:files FileObj (untyped here) that also feeds
+        // fileStoreStrategyFactory.getFileStrategy; typed `any` as the models layer
+        // is not yet migrated.
+        const attachmentList = attachments.map((attachment: any) => {
           const strategy = fileStoreStrategyFactory.getFileStrategy(attachment, 'original');
           return {
             attachmentId: attachment._id,
@@ -620,9 +627,9 @@ Meteor.methods({
         }
 
         // Read source file data
-        const chunks = [];
+        const chunks: Buffer[] = [];
         return new Promise((resolve, reject) => {
-          readStream.on('data', (chunk) => {
+          readStream.on('data', (chunk: Buffer) => {
             chunks.push(chunk);
           });
 
@@ -673,7 +680,7 @@ Meteor.methods({
             }
           });
 
-          readStream.on('error', (error) => {
+          readStream.on('error', (error: Error) => {
             reject(new Meteor.Error('copy-error', error.message));
           });
         });
@@ -823,3 +830,22 @@ Meteor.methods({
       }
     }
   });
+
+// A board member entry as stored on board.members; only the access-control flags
+// userHasBoardWriteAccess reads are modelled.
+interface BoardMemberEntry {
+  userId: string;
+  isActive?: boolean;
+  isNoComments?: boolean;
+  isCommentOnly?: boolean;
+  isWorker?: boolean;
+  isReadOnly?: boolean;
+  isReadAssignedOnly?: boolean;
+}
+
+// The subset of a board document userHasBoardWriteAccess inspects.
+interface BoardWriteDoc {
+  members?: BoardMemberEntry[];
+}
+
+

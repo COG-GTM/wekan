@@ -10,11 +10,16 @@ import { cronJobStorage } from './cronJobStorage';
 import Boards from '/models/boards';
 
 // Reactive variables for board migration tracking
-export const unmigratedBoards = new ReactiveVar([]);
+export const unmigratedBoards = new ReactiveVar<BoardDoc[]>([]);
 export const migrationScanInProgress = new ReactiveVar(false);
-export const lastMigrationScan = new ReactiveVar(null);
+export const lastMigrationScan = new ReactiveVar<Date | null>(null);
 
 class BoardMigrationDetector {
+  scanInterval: number | null;
+  fullScanInterval?: number | null;
+  isScanning: boolean;
+  migrationCheckInterval: number;
+
   constructor() {
     this.scanInterval = null;
     this.isScanning = false;
@@ -122,8 +127,10 @@ class BoardMigrationDetector {
       // Scanning for unmigrated boards
 
       // Get all boards from the database
-      const boards = await this.getAllBoards();
-      const unmigrated = [];
+      // getAllBoards returns generic Mongo Documents; narrow to the BoardDoc
+      // shape this detector reads.
+      const boards = (await this.getAllBoards()) as BoardDoc[];
+      const unmigrated: BoardDoc[] = [];
 
       for (const board of boards) {
         if (await this.needsMigration(board)) {
@@ -167,7 +174,7 @@ class BoardMigrationDetector {
   /**
    * Check if a board needs migration
    */
-  async needsMigration(board) {
+  async needsMigration(board: BoardDoc) {
     try {
       // Check if board has been migrated by looking for migration markers
       const migrationMarkers = await this.getMigrationMarkers(board._id);
@@ -188,7 +195,7 @@ class BoardMigrationDetector {
   /**
    * Get migration markers for a board
    */
-  async getMigrationMarkers(boardId) {
+  async getMigrationMarkers(boardId: string) {
     try {
       // Check if board has migration metadata
       const board = await Boards.findOneAsync(boardId, { fields: { migrationMarkers: 1 } });
@@ -215,7 +222,7 @@ class BoardMigrationDetector {
   /**
    * Start migration for a specific board
    */
-  async startBoardMigration(boardId) {
+  async startBoardMigration(boardId: BoardDoc | string) {
     try {
       const board = await Boards.findOneAsync(boardId);
       if (!board) {
@@ -289,7 +296,7 @@ class BoardMigrationDetector {
   /**
    * Get detailed migration status for a specific board
    */
-  async getBoardMigrationStatus(boardId) {
+  async getBoardMigrationStatus(boardId: string) {
     const unmigrated = unmigratedBoards.get();
     const isUnmigrated = unmigrated.some(b => b._id === boardId);
 
@@ -312,10 +319,10 @@ class BoardMigrationDetector {
   /**
    * Mark a board as migrated
    */
-  async markBoardAsMigrated(boardId, migrationType) {
+  async markBoardAsMigrated(boardId: string, migrationType: string) {
     try {
       // Update migration markers and version
-      const updateQuery = {};
+      const updateQuery: { [key: string]: any } = {};
       updateQuery[`migrationMarkers.${migrationType}Migrated`] = true;
       updateQuery['migrationMarkers.lastMigration'] = new Date();
       updateQuery['migrationVersion'] = 1;  // Set migration version to prevent re-migration
@@ -333,6 +340,16 @@ class BoardMigrationDetector {
       console.error(`Error marking board ${boardId} as migrated:`, error);
     }
   }
+}
+
+// The subset of a board document this detector reads/tracks. Boards are
+// schemaless from this module's perspective, hence the index signature.
+interface BoardDoc {
+  _id: string;
+  title?: string;
+  migrationMarkers?: { [key: string]: any };
+  migrationVersion?: number;
+  [key: string]: any;
 }
 
 // Export singleton instance
