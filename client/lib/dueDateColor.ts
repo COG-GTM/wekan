@@ -20,7 +20,11 @@
  * @returns {string} One of 'overdue' | 'due-soon' | 'not-due' |
  *                   'completed-early' | 'completed'.
  */
-export function dueDateClass(dueDate, now, endDate) {
+export function dueDateClass(
+  dueDate: Date | string | number,
+  now: Date | string | number,
+  endDate?: Date | string | number,
+) {
   const due = new Date(dueDate);
   const nowVal = new Date(now);
 

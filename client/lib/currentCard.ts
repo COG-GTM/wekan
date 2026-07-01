@@ -2,7 +2,7 @@ import { Blaze } from 'meteor/blaze';
 import { Template } from 'meteor/templating';
 import Cards from '/models/cards';
 
-function getCardIdFromData(data) {
+function getCardIdFromData(data: CardContextData | null | undefined) {
   if (!data || !data._id) {
     return null;
   }
@@ -19,7 +19,7 @@ function getCardIdFromData(data) {
   return null;
 }
 
-function getCardIdFromElement(element) {
+function getCardIdFromElement(element: Element | null | undefined) {
   if (!element || typeof element.closest !== 'function') {
     return null;
   }
@@ -29,7 +29,7 @@ function getCardIdFromElement(element) {
     return null;
   }
 
-  return getCardIdFromData(Blaze.getData(cardDetails));
+  return getCardIdFromData(Blaze.getData(cardDetails as HTMLElement));
 }
 
 function getCardIdFromParentData(maxDepth = 8) {
@@ -55,7 +55,7 @@ function getPopupStack() {
   return null;
 }
 
-export function getCurrentCardIdFromContext({ ignorePopupCard = false } = {}) {
+export function getCurrentCardIdFromContext({ ignorePopupCard = false }: CurrentCardContextOptions = {}) {
   let cardId;
 
   try {
@@ -109,11 +109,26 @@ export function getCurrentCardIdFromContext({ ignorePopupCard = false } = {}) {
   return null;
 }
 
-export function getCurrentCardFromContext(options) {
+export function getCurrentCardFromContext(options?: CurrentCardContextOptions) {
   const cardId = getCurrentCardIdFromContext(options);
   if (!cardId) {
     return null;
   }
 
   return Cards.findOne(cardId);
+}
+
+// A Blaze data context that may (or may not) describe a card. Only the fields
+// used to recognise a real card document are modelled; `absoluteUrl`/`getTitle`
+// presence is probed via `typeof === 'function'`.
+interface CardContextData {
+  _id?: string;
+  boardId?: string;
+  listId?: string;
+  absoluteUrl?: (...args: any[]) => any;
+  getTitle?: (...args: any[]) => any;
+}
+
+interface CurrentCardContextOptions {
+  ignorePopupCard?: boolean;
 }

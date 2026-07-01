@@ -26,7 +26,10 @@
  * @param {{ contains?: function }} cardDetailsEl the `.js-card-details` element
  * @returns {boolean} true when the card must stay open (selection drag in progress)
  */
-export function isTextSelectionInsideCard(selection, cardDetailsEl) {
+export function isTextSelectionInsideCard(
+  selection: SelectionLike | null | undefined,
+  cardDetailsEl: CardDetailsElementLike | null | undefined,
+) {
   if (!selection || !cardDetailsEl) {
     return false;
   }
@@ -39,7 +42,7 @@ export function isTextSelectionInsideCard(selection, cardDetailsEl) {
   if (!text || text.trim() === '') {
     return false;
   }
-  const contains = node => {
+  const contains = (node: NodeLike | null | undefined) => {
     if (!node) {
       return false;
     }
@@ -53,4 +56,18 @@ export function isTextSelectionInsideCard(selection, cardDetailsEl) {
   };
   // Anchored inside the pane => the drag started on the card content.
   return contains(selection.anchorNode) || contains(selection.focusNode);
+}
+
+// DOM-light shapes so the guard can be unit-tested with plain objects; only the
+// members actually read here are modelled (a real `Node`/`Element` satisfies
+// them structurally).
+type NodeLike = object;
+interface SelectionLike {
+  isCollapsed?: boolean;
+  toString?: () => string;
+  anchorNode?: NodeLike | null;
+  focusNode?: NodeLike | null;
+}
+interface CardDetailsElementLike {
+  contains?: (node: NodeLike | null) => boolean;
 }

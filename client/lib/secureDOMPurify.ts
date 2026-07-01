@@ -1,4 +1,8 @@
 import DOMPurify from 'dompurify';
+import type {
+  UponSanitizeElementHookEvent,
+  UponSanitizeAttributeHookEvent,
+} from 'dompurify';
 
 // Centralized secure DOMPurify configuration to prevent XSS and CSS injection attacks
 export function getSecureDOMPurifyConfig() {
@@ -23,7 +27,7 @@ export function getSecureDOMPurifyConfig() {
     ALLOW_DATA_ATTR: false,
     // Custom hooks for additional security
     HOOKS: {
-      uponSanitizeElement: function(node, data) {
+      uponSanitizeElement: function(node: Element, data: UponSanitizeElementHookEvent) {
         // Block any remaining dangerous elements
         const dangerousTags = ['svg', 'style', 'script', 'link', 'meta', 'iframe', 'object', 'embed', 'applet'];
         if (node.tagName && dangerousTags.includes(node.tagName.toLowerCase())) {
@@ -80,7 +84,7 @@ export function getSecureDOMPurifyConfig() {
 
         return true;
       },
-      uponSanitizeAttribute: function(node, data) {
+      uponSanitizeAttribute: function(node: Element, data: UponSanitizeAttributeHookEvent) {
         // Block style attributes completely
         if (data.attrName === 'style') {
           if (process.env.DEBUG === 'true') {
@@ -125,12 +129,12 @@ export function getSecureDOMPurifyConfig() {
 }
 
 // Convenience function for secure sanitization
-export function sanitizeHTML(html) {
+export function sanitizeHTML(html: string) {
   return DOMPurify.sanitize(html, getSecureDOMPurifyConfig());
 }
 
 // Convenience function for sanitizing text (no HTML)
-export function sanitizeText(text) {
+export function sanitizeText(text: string) {
   return DOMPurify.sanitize(text, {
     ALLOWED_TAGS: [],
     ALLOWED_ATTR: [],

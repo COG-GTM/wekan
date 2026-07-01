@@ -3,8 +3,16 @@ import { expect } from 'chai';
 import {
   dueAtToTime,
   cardMatchesUser,
-  filterAndSortDueCards,
+  filterAndSortDueCards as filterAndSortDueCardsImpl,
 } from '/client/components/main/dueCardsLogic';
+
+// dueCardsLogic.js defaults `userId = null`, so TS infers the option's type as
+// `null` only, even though the helper compares it as a string owner id. Re-type
+// the imported helper with its real option signature for these tests.
+const filterAndSortDueCards = filterAndSortDueCardsImpl as (
+  cards: DueCardLike[] | undefined,
+  options?: { allUsers?: boolean; userId?: string | null },
+) => DueCardLike[];
 
 /**
  * Unit tests for the Due Cards view logic.
@@ -128,3 +136,12 @@ describe('dueCards logic', function() {
     });
   });
 });
+
+// Minimal card shape used by these due-cards tests.
+type DueCardLike = {
+  _id: string;
+  dueAt?: string | Date;
+  members?: string[];
+  assignees?: string[];
+  userId?: string;
+};

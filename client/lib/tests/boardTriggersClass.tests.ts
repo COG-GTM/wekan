@@ -36,7 +36,7 @@ const jsPath = path.join(
 );
 
 // Collect every distinct `js-add-<name>-trigger` token in a file.
-function triggerClasses(contents) {
+function triggerClasses(contents: string) {
   const re = /js-add-[a-z-]*?-trigger/g;
   return new Set(contents.match(re) || []);
 }

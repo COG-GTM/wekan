@@ -37,8 +37,11 @@ describe('boardOptionLabel (#6135)', function() {
 
     it('handles empty / nullish names safely', function() {
       expect(boardOptionLabel('', 0)).to.equal('');
-      expect(boardOptionLabel(null, 0)).to.equal('');
-      expect(boardOptionLabel(undefined, 0)).to.equal('');
+      // boardOptionLabel's JSDoc types `name` as string, but it is nullish-safe
+      // by design (`name == null ? '' : ...`); these `any` casts deliberately
+      // exercise that runtime contract.
+      expect(boardOptionLabel(null as any, 0)).to.equal('');
+      expect(boardOptionLabel(undefined as any, 0)).to.equal('');
     });
   });
 

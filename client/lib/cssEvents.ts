@@ -2,7 +2,7 @@
 
 function whichTransitionEvent() {
   const el = document.createElement('fakeelement');
-  const transitions = {
+  const transitions: Record<string, string> = {
     transition: 'transitionend',
     OTransition: 'oTransitionEnd',
     MSTransition: 'msTransitionEnd',
@@ -10,8 +10,9 @@ function whichTransitionEvent() {
     WebkitTransition: 'webkitTransitionEnd',
   };
 
+  const style = el.style as CSSStyleDeclaration & Record<string, string | undefined>;
   for (const t in transitions) {
-    if (el.style[t] !== undefined) {
+    if (style[t] !== undefined) {
       return transitions[t];
     }
   }
@@ -20,7 +21,7 @@ function whichTransitionEvent() {
 
 function whichAnimationEvent() {
   const el = document.createElement('fakeelement');
-  const transitions = {
+  const transitions: Record<string, string> = {
     animation: 'animationend',
     OAnimation: 'oAnimationEnd',
     MSTransition: 'msAnimationEnd',
@@ -28,8 +29,9 @@ function whichAnimationEvent() {
     WebkitAnimation: 'webkitAnimationEnd',
   };
 
+  const style = el.style as CSSStyleDeclaration & Record<string, string | undefined>;
   for (const t in transitions) {
-    if (el.style[t] !== undefined) {
+    if (style[t] !== undefined) {
       return transitions[t];
     }
   }

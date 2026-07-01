@@ -8,6 +8,10 @@
 // Returns true when an Enter keypress should be allowed to submit the form
 // (i.e. the autocomplete dropdown is NOT open), and false when Enter must be
 // captured by the autocomplete to pick the highlighted suggestion.
-export function shouldSubmitOnEnter({ autocompleteOpen } = {}) {
+export function shouldSubmitOnEnter({ autocompleteOpen }: ShouldSubmitOnEnterArgs = {}) {
   return !autocompleteOpen;
+}
+
+interface ShouldSubmitOnEnterArgs {
+  autocompleteOpen?: boolean;
 }

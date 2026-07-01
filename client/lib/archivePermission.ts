@@ -7,6 +7,14 @@
 // when the card can be modified.
 //
 // Kept free of Meteor imports so it can be unit tested in isolation.
-export function canArchiveCard({ canModifyCard } = {}) {
+export function canArchiveCard({ canModifyCard }: CanArchiveCardArgs = {}) {
   return !!canModifyCard;
+}
+
+interface CanArchiveCardArgs {
+  // Normally the boolean result of Utils.canModifyCard(), but the value is only
+  // ever read through `!!`, so any truthy value is accepted and coerced (see
+  // server/lib/tests/archivePermission.tests.ts, which passes `1`). `any` here
+  // documents that intentionally-coercive contract.
+  canModifyCard?: any;
 }

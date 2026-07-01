@@ -2,6 +2,7 @@
 // You should always use `createEscapeableTextComplete` or the jQuery extension
 // `escapeableTextComplete` instead of the vanilla textcomplete.
 import { Textcomplete } from '@textcomplete/core';
+import type { StrategyProps, TextcompleteOption } from '@textcomplete/core';
 import { TextareaEditor } from '@textcomplete/textarea';
 import { ContenteditableEditor } from '@textcomplete/contenteditable';
 import { EscapeActions } from '/client/lib/escapeActions';
@@ -16,15 +17,22 @@ let dropdownMenuIsOpened = false;
  * @param {Object} options - Additional options
  * @returns {Textcomplete} The textcomplete instance
  */
-export function createEscapeableTextComplete(element, strategies, options = {}) {
+export function createEscapeableTextComplete(
+  element: HTMLElement,
+  strategies: StrategyProps[],
+  options: TextcompleteOption = {},
+) {
   // Determine the appropriate editor based on element type
   const isContentEditable = element.isContentEditable || element.contentEditable === 'true';
   const Editor = isContentEditable ? ContenteditableEditor : TextareaEditor;
 
-  const editor = new Editor(element);
+  // `Editor` is one of two constructors picked at runtime; the element type is
+  // known-correct for the chosen branch but not statically, so widen it for the
+  // constructor call.
+  const editor = new Editor(element as HTMLTextAreaElement & HTMLElement);
 
   // Merge default options
-  const mergedOptions = {
+  const mergedOptions: TextcompleteOption = {
     dropdown: {
       className: 'textcomplete-dropdown',
       maxCount: 10,
@@ -84,7 +92,7 @@ export function createEscapeableTextComplete(element, strategies, options = {}) 
 }
 
 // jQuery extension for backward compatibility
-$.fn.escapeableTextComplete = function(strategies, options = {}) {
+$.fn.escapeableTextComplete = function(strategies: StrategyProps[], options: TextcompleteOption = {}) {
   return this.each(function() {
     createEscapeableTextComplete(this, strategies, options);
   });

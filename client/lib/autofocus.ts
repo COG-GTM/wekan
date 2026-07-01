@@ -10,13 +10,13 @@ Meteor.startup(() => {
     const elements = document.querySelectorAll('[autofocus]');
     if (elements.length > 0) {
       // Focus the last one (most recently added)
-      const el = elements[elements.length - 1];
+      const el = elements[elements.length - 1] as HTMLElement & Partial<HTMLInputElement>;
       if (el && typeof el.focus === 'function' && document.activeElement !== el) {
         setTimeout(() => {
           el.focus();
           // For textareas and text inputs, also select the content if it exists
           if ((el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && el.type === 'text')) && el.value) {
-            el.select();
+            el.select?.();
           }
         }, 50);
       }
@@ -29,10 +29,11 @@ Meteor.startup(() => {
     mutations.forEach((mutation) => {
       mutation.addedNodes.forEach((node) => {
         if (node.nodeType === 1) { // Element node
-          if (node.hasAttribute && node.hasAttribute('autofocus')) {
+          const element = node as Element;
+          if (element.hasAttribute && element.hasAttribute('autofocus')) {
             shouldFocus = true;
-          } else if (node.querySelector) {
-            const autofocusChild = node.querySelector('[autofocus]');
+          } else if (element.querySelector) {
+            const autofocusChild = element.querySelector('[autofocus]');
             if (autofocusChild) {
               shouldFocus = true;
             }

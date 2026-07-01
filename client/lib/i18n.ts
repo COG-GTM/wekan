@@ -37,7 +37,7 @@ Meteor.startup(async () => {
   let currentUser = ReactiveCache.getCurrentUser();
   // If we're still logging in, wait (#4967)
   if (!currentUser && Meteor.loggingIn()) {
-    await new Promise((resolve) => {
+    await new Promise<void>((resolve) => {
       Tracker.autorun(() => {
         if (!Meteor.loggingIn()) {
           resolve();

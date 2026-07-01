@@ -31,7 +31,7 @@ function makeSubtask({ withRealId = true } = {}) {
     boardId: subtaskBoard._id,
     swimlaneId: 'subtaskSwimlaneId',
     listId: 'subtaskListId',
-    board() {
+    board(): { _id: string; slug: string } | undefined {
       return subtaskBoard;
     },
     getRealId() {
@@ -42,27 +42,27 @@ function makeSubtask({ withRealId = true } = {}) {
 
 describe('subtaskNavTarget (#3743)', function() {
   it('targets the subtask\'s own board, not the parent card\'s board', function() {
-    const target = subtaskNavTarget(makeSubtask());
+    const target = subtaskNavTarget(makeSubtask())!;
     expect(target.boardId).to.equal('subtaskBoardId');
     expect(target.boardId).to.not.equal(parentCard.boardId);
   });
 
   it('targets the subtask card itself, not the parent card', function() {
-    const target = subtaskNavTarget(makeSubtask());
+    const target = subtaskNavTarget(makeSubtask())!;
     // Uses the subtask's real id and never the parent card id.
     expect(target.cardId).to.equal('subtaskRealId');
     expect(target.cardId).to.not.equal(parentCard._id);
   });
 
   it('uses the subtask board slug, swimlane and list', function() {
-    const target = subtaskNavTarget(makeSubtask());
+    const target = subtaskNavTarget(makeSubtask())!;
     expect(target.slug).to.equal('subtask-board-slug');
     expect(target.swimlaneId).to.equal('subtaskSwimlaneId');
     expect(target.listId).to.equal('subtaskListId');
   });
 
   it('falls back to subtask._id when getRealId yields nothing', function() {
-    const target = subtaskNavTarget(makeSubtask({ withRealId: false }));
+    const target = subtaskNavTarget(makeSubtask({ withRealId: false }))!;
     expect(target.cardId).to.equal('subtaskCardId');
     expect(target.cardId).to.not.equal(parentCard._id);
   });

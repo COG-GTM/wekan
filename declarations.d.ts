@@ -67,6 +67,30 @@ declare module 'meteor/mongo' {
 // `any` here because the value shape is inherently dynamic (defined by Mongo).
 type MongoQuery = { [key: string]: any };
 
+// Side-effect CSS imports (client/styles.ts eagerly loads every component's
+// stylesheet). The rspack `css-loader`/`style-loader` chain handles these at
+// build time; for the type-checker they carry no exported bindings.
+declare module '*.css';
+
+// @wekanteam/dragscroll — mouse drag-to-scroll library (no bundled types).
+// client/lib/pageDragscroll.ts only calls `reset()` to re-scan/re-bind after
+// toggling the `dragscroll` class on the page scroll containers.
+declare module '@wekanteam/dragscroll' {
+  const dragscroll: { reset(): void };
+  export default dragscroll;
+}
+
+// jQuery plugins registered by the client lib layer. `escapeableTextComplete`
+// (client/lib/textComplete.ts) wires @textcomplete strategies into the
+// EscapeActions system; the image readers (client/lib/dropImage.ts /
+// pasteImage.ts) are vendored drag/paste-to-upload helpers.
+interface JQuery {
+  escapeableTextComplete(
+    strategies: import('@textcomplete/core').StrategyProps[],
+    options?: import('@textcomplete/core').TextcompleteOption,
+  ): JQuery;
+}
+
 // ---------------------------------------------------------------------------
 // Untyped Meteor / npm packages imported by app code
 // ---------------------------------------------------------------------------
@@ -389,9 +413,21 @@ interface AccountsTemplatesStatic {
   ensureSignedIn: (context: object, redirect: (path: string) => void) => void;
 }
 
-// Modal manager (client), used by config/router.ts.
+// Modal manager (client), implemented in client/lib/modal.ts and used by
+// config/router.ts and various components. `open`/`openWide` take a template
+// name plus an options bag; the getters return the current modal's fields.
+interface ModalOpenOptions {
+  header?: string;
+  onCloseGoTo?: string;
+}
 interface ModalStatic {
-  open(template: string, options?: MongoQuery): void;
+  getHeaderName(): string | undefined;
+  getTemplateName(): string | null | undefined;
+  isOpen(): boolean;
+  isWide(): boolean;
+  close(): void;
+  openWide(template: string, options?: ModalOpenOptions): void;
+  open(template: string, options?: ModalOpenOptions): void;
 }
 
 declare const AccountsTemplates: AccountsTemplatesStatic;
@@ -546,9 +582,106 @@ declare module 'meteor/blaze' {
 
 // Meteor injects its runtime configuration (ROOT_URL, etc.) onto the browser
 // window as `__meteor_runtime_config__`; only the fields app code reads here.
+// The client also re-exposes a handful of Meteor-provided singletons and small
+// helpers on `window` (see client/00-startup.ts, client/lib/modal.ts,
+// client/lib/popup.ts, client/lib/utils.ts, ...) so the browser console / e2e
+// tests and non-module callers can reach them.
 interface Window {
   __meteor_runtime_config__?: { ROOT_URL?: string };
+  Meteor: typeof import('meteor/meteor').Meteor;
+  Modal: ModalStatic;
+  Popup: PopupStatic;
+  // Matomo/Piwik analytics command queue; each entry is a command array whose
+  // first element is the command name followed by its arguments (Matomo API).
+  _paq: Array<Array<string | number | boolean>>;
+  __wekanDragscrollTouch?: boolean;
+  isMobileViewport?: (width: number, breakpoint?: number) => boolean;
+  isMobileViewportNow?: (breakpoint?: number) => boolean;
+  fixDuplicateLists?: (boardId: string) => void;
+  subscribeToAttachmentMigrationStatus?: (boardId: string) => void;
+  // client/lib/exportHTML.ts installs an export-HTML factory that receives the
+  // Popup singleton and returns the popup event handler. `tpl` is the Blaze
+  // template instance (dynamic Blaze surface), hence `any`.
+  ExportHtml?: (popup: PopupStatic) => (evt: Event, tpl: any) => void;
 }
+
+// Firefox exposes non-standard scroll maxima used by client/lib/popup.ts to
+// clamp the restored scroll position; typed as optional so other browsers
+// (where they are undefined) still satisfy the interface.
+interface HTMLElement {
+  scrollTopMax?: number;
+  scrollLeftMax?: number;
+}
+
+// Legacy IE/Edge language property read as a fallback in client/lib/i18n.ts and
+// client/lib/popup.ts; not part of the standard lib.dom `Navigator`.
+interface Navigator {
+  userLanguage?: string;
+}
+
+// Rspack chunk public-path override written by client/00-startup.ts so
+// dynamic-import chunks resolve under a sub-path deployment (ROOT_URL pathname).
+declare let __webpack_public_path__: string;
+
+// ---------------------------------------------------------------------------
+// Meteor-provided client globals
+//
+// The rspack build (Meteor 3.5) provides these Meteor singletons as bare
+// identifiers in app code (the classic-Meteor global linker behaviour), so a
+// large amount of client code references them without an explicit import.
+// Declare them as ambient globals mapped to their @types/meteor module types so
+// that code type-checks without changing its runtime (mirroring the existing
+// `Random` / `ReactiveCache` declarations above).
+// ---------------------------------------------------------------------------
+declare const Meteor: typeof import('meteor/meteor').Meteor;
+declare const Session: typeof import('meteor/session').Session;
+declare const Tracker: typeof import('meteor/tracker').Tracker;
+declare const ReactiveVar: typeof import('meteor/reactive-var').ReactiveVar;
+declare const Blaze: typeof import('meteor/blaze').Blaze;
+
+// Meteor's htmljs `HTML` global (from the untyped htmljs package) exposes tag
+// builder functions (HTML.A, HTML.I, ...) that client/lib/accessibility.ts
+// overrides to inject accessibility attributes. Attribute bags and children are
+// htmljs renderables whose shapes are defined by htmljs, hence the `any`
+// boundary on the factory arguments/return.
+interface HTMLTagAttributes {
+  [name: string]: any;
+}
+type HTMLTagFactory = (
+  attributes: HTMLTagAttributes,
+  ...children: any[]
+) => any;
+declare const HTML: { [tag: string]: HTMLTagFactory };
+
+// The client Popup manager (client/lib/popup.ts) is referenced as a global by
+// several .ts files (currentCard, datepicker, exportHTML, config/accounts) and
+// by many untyped .js/.jade views. Only the members the typed code calls are
+// enumerated; the rest of its Blaze/DOM-driven surface (event maps, helpers,
+// per-popup reactive state accessed dynamically, e.g. `Popup[actionName]()`)
+// is covered by the index signature.
+interface PopupStackFrame {
+  popupName: string;
+  openerElement: Element;
+  hasPopupParent: boolean;
+  depth: number;
+  dataContext: any; // Blaze data context of the popup, dynamic per popup
+  scrollTop?: number;
+  [key: string]: any;
+}
+interface PopupStatic {
+  // Blaze template used to render popups, and the live Blaze view (or null).
+  template: any;
+  current: any;
+  open(name: string): (this: any, evt: Event, options?: { dataContextIfCurrentDataIsUndefined?: any }) => void;
+  afterConfirm(name: string, action: (...args: any[]) => void): (this: any, evt: Event, tpl?: any) => void;
+  isOpen(): boolean;
+  back(n?: number): void;
+  close(): void;
+  getOpenerComponent(n?: number): any;
+  _getTopStack(): PopupStackFrame | undefined;
+  [key: string]: any;
+}
+declare const Popup: PopupStatic;
 
 // Some legacy model files reference these values from Meteor's package scope
 // without an explicit import. Declare them as ambient globals with real types

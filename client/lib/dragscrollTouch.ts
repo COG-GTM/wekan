@@ -21,9 +21,9 @@
 
 const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
 
-let active = null;
+let active: ActiveScroll | null = null;
 
-function isExcluded(target) {
+function isExcluded(target: Element) {
   return !!(
     target.closest &&
     target.closest(
@@ -38,14 +38,14 @@ function isExcluded(target) {
   );
 }
 
-function canScroll(el) {
+function canScroll(el: Element) {
   return el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth;
 }
 
-function onTouchStart(e) {
+function onTouchStart(e: TouchEvent) {
   active = null;
   if (e.touches.length !== 1) return;
-  const target = e.target;
+  const target = e.target as Element;
   if (isExcluded(target)) return;
   const el = target.closest && target.closest('.dragscroll');
   if (!el || !canScroll(el)) return;
@@ -59,7 +59,7 @@ function onTouchStart(e) {
   };
 }
 
-function onTouchMove(e) {
+function onTouchMove(e: TouchEvent) {
   if (!active || e.touches.length !== 1) return;
   const touch = e.touches[0];
   const el = active.el;
@@ -72,6 +72,16 @@ function onTouchMove(e) {
 
 function onTouchEnd() {
   active = null;
+}
+
+// The `.dragscroll` container and the pointer/scroll offsets captured at the
+// start of a one-finger drag.
+interface ActiveScroll {
+  el: Element;
+  startX: number;
+  startY: number;
+  scrollLeft: number;
+  scrollTop: number;
 }
 
 // Guard so importing this module from more than one place (boardBody,

@@ -19,12 +19,12 @@ describe('isTextSelectionInsideCard (#5686)', function() {
   const insideNode = { id: 'inside' };
   const outsideNode = { id: 'outside' };
   const cardEl = {
-    contains(node) {
+    contains(node: object | null) {
       return node === insideNode;
     },
   };
 
-  function selection({ collapsed = false, text = 'selected text', anchor, focus }) {
+  function selection({ collapsed = false, text = 'selected text', anchor, focus }: SelectionArgs) {
     return {
       isCollapsed: collapsed,
       toString: () => text,
@@ -74,3 +74,12 @@ describe('isTextSelectionInsideCard (#5686)', function() {
     expect(isTextSelectionInsideCard(null, null)).to.be.a('boolean');
   });
 });
+
+// Arguments for the test's fake-selection factory; `anchor`/`focus` are plain
+// stand-in nodes (or the card element itself), hence `object`.
+type SelectionArgs = {
+  collapsed?: boolean;
+  text?: string;
+  anchor?: object | null;
+  focus?: object | null;
+};

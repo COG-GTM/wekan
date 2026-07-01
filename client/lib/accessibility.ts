@@ -6,7 +6,7 @@
 
 // Without an href, links are non-keyboard-focusable and are not presented on
 // blind screen readers. We default to the empty anchor `#` href.
-function enforceHref(attributes) {
+function enforceHref(attributes: HTMLTagAttributes) {
   if (!Object.hasOwn(attributes, 'href')) {
     attributes.href = '#';
   }
@@ -16,7 +16,7 @@ function enforceHref(attributes) {
 // `title` is inconsistently used on the web, and is thus inconsistently
 // presented by screen readers. `aria-label`, on the other hand, is specific to
 // accessibility and is presented in ways that title shouldn't be.
-function copyTitleInAriaLabel(attributes) {
+function copyTitleInAriaLabel(attributes: HTMLTagAttributes) {
   if (!Object.hasOwn(attributes, 'aria-label') && Object.hasOwn(attributes, 'title')) {
     attributes['aria-label'] = attributes.title;
   }

@@ -2,6 +2,11 @@
 import { expect } from 'chai';
 import { installGetBuiltinModuleShim } from '/client/lib/bsonBrowserShim';
 
+// Minimal shape of the global-like objects the shim inspects. `getBuiltinModule`
+// is `any`-returning here because it stands in for Node's untyped builtin module
+// loader (bson calls it as `getBuiltinModule('v8')`).
+type ShimGlobal = { process?: { getBuiltinModule?: (...args: any[]) => any } };
+
 /**
  * Unit tests for the bson browser shim.
  *
@@ -13,12 +18,12 @@ import { installGetBuiltinModuleShim } from '/client/lib/bsonBrowserShim';
  */
 describe('installGetBuiltinModuleShim (bson browser bootstrap)', function() {
   it('installs a no-op getBuiltinModule when process lacks it (the browser case)', function() {
-    const glob = { process: {} };
+    const glob: ShimGlobal = { process: {} };
     const installed = installGetBuiltinModuleShim(glob);
     expect(installed).to.equal(true);
-    expect(glob.process.getBuiltinModule).to.be.a('function');
+    expect(glob.process!.getBuiltinModule).to.be.a('function');
     // The shimmed call must not throw and must return undefined so `?? {}` wins.
-    expect(glob.process.getBuiltinModule('v8')).to.equal(undefined);
+    expect(glob.process!.getBuiltinModule!('v8')).to.equal(undefined);
   });
 
   it('does NOT overwrite a real getBuiltinModule (Node case)', function() {
@@ -30,7 +35,7 @@ describe('installGetBuiltinModuleShim (bson browser bootstrap)', function() {
   });
 
   it('is a no-op when there is no process object', function() {
-    const glob = {};
+    const glob: ShimGlobal = {};
     expect(installGetBuiltinModuleShim(glob)).to.equal(false);
     expect(glob.process).to.equal(undefined);
   });
@@ -47,12 +52,12 @@ describe('installGetBuiltinModuleShim (bson browser bootstrap)', function() {
   });
 
   it('makes the exact bson expression safe', function() {
-    const glob = { process: {} };
+    const glob: ShimGlobal = { process: {} };
     installGetBuiltinModuleShim(glob);
     // Mirror bson: `const { startupSnapshot } = g?.process?.getBuiltinModule('v8') ?? {}`
     let startupSnapshot;
     expect(() => {
-      ({ startupSnapshot } = glob.process.getBuiltinModule('v8') ?? {});
+      ({ startupSnapshot } = glob.process!.getBuiltinModule!('v8') ?? {});
     }).to.not.throw();
     expect(startupSnapshot).to.equal(undefined);
   });

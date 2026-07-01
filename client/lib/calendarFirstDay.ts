@@ -25,7 +25,13 @@
  * @returns {number} A FullCalendar `firstDay` integer in the range 0..6
  *   (0 = Sunday .. 6 = Saturday).
  */
-export function toFullCalendarFirstDay(startDayOfWeekSetting) {
+export function toFullCalendarFirstDay(
+  // Defensive normaliser for an untrusted user/DB setting: it is coerced via
+  // `Number(...)` and validated, so any value (number, numeric/day-name string,
+  // null/undefined, or even a stray object — see the unit tests) is accepted
+  // and falls back to Monday. `any` documents that garbage-tolerant contract.
+  startDayOfWeekSetting: any,
+) {
   const DEFAULT_FIRST_DAY = 1; // Monday, matching User.getStartDayOfWeek()
 
   // Already a usable number (including numeric strings like "0").

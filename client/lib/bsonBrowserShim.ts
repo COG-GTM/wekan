@@ -29,7 +29,7 @@
  * @param {*} glob a global-like object (e.g. globalThis)
  * @returns {boolean}
  */
-export function installGetBuiltinModuleShim(glob) {
+export function installGetBuiltinModuleShim(glob: GlobalLike | null | undefined) {
   if (
     glob &&
     glob.process &&
@@ -47,3 +47,11 @@ export function installGetBuiltinModuleShim(glob) {
 }
 
 installGetBuiltinModuleShim(typeof globalThis !== 'undefined' ? globalThis : undefined);
+
+// A global-like object that may carry a (possibly partial) `process` polyfill.
+interface GlobalLike {
+  process?: {
+    // bson calls this to reach V8 internals; the browser shim installs a no-op.
+    getBuiltinModule?: (...args: any[]) => any;
+  };
+}

@@ -21,11 +21,13 @@ const PEAK_ANTICIPATION = 200;
  *   });
  */
 export class InfiniteScrolling {
+  _nextPeak: number;
+
   constructor() {
     this._nextPeak = Infinity;
   }
 
-  setNextPeak(v) {
+  setNextPeak(v: number) {
     this._nextPeak = v;
   }
 
@@ -37,7 +39,7 @@ export class InfiniteScrolling {
     this._nextPeak = Infinity;
   }
 
-  checkScrollPosition(domElement, reachNextPeakCallback) {
+  checkScrollPosition(domElement: HTMLElement, reachNextPeakCallback: () => void) {
     let altitude = domElement.scrollTop + domElement.offsetHeight;
     altitude += PEAK_ANTICIPATION;
     if (altitude >= this._nextPeak) {

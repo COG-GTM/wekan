@@ -146,12 +146,14 @@ import { Filter } from '/client/lib/filter';
 import { MultiSelection } from '/client/lib/multiSelection';
 import { BoardMultiSelection } from '/client/lib/boardMultiSelection';
 
-let _Sidebar;
+// Lazily-required accessor for the sidebar service singleton; the sidebar
+// feature module is not yet typed, so its instance is `any` at this boundary.
+let _Sidebar: (() => any) | undefined;
 function getSidebar() {
   if (!_Sidebar) {
     _Sidebar = require('/client/features/sidebar/service').getSidebarInstance;
   }
-  return _Sidebar();
+  return _Sidebar!();
 }
 
 Blaze.registerHelper('Filter', () => Filter);

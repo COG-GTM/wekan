@@ -17,7 +17,10 @@ export const MOBILE_BREAKPOINT = 768;
  * @param {number} breakpoint width at/below which we consider it mobile
  * @returns {boolean} true when width is a valid number <= breakpoint
  */
-export function isMobileViewport(width, breakpoint = MOBILE_BREAKPOINT) {
+export function isMobileViewport(
+  width: number | string | null | undefined,
+  breakpoint = MOBILE_BREAKPOINT,
+) {
   if (typeof width !== 'number' || Number.isNaN(width)) {
     return false;
   }

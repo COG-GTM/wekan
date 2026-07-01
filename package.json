@@ -14,7 +14,7 @@
   "homepage": "https://wekan.fi",
   "meteor": {
     "mainModule": {
-      "client": "client/main.js",
+      "client": "client/main.ts",
       "server": "server/main.ts"
     },
     "modern": true
