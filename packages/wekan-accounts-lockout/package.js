@@ -11,8 +11,8 @@ Package.describe({
 Package.onUse((api) => {
   api.versionsFrom(['2.16', '3.0']);
   api.use([
-    'ecmascript',
+    'typescript',
     'accounts-password',
   ]);
-  api.mainModule('accounts-lockout.js');
+  api.mainModule('accounts-lockout.ts');
 });
