@@ -26,12 +26,14 @@ import {
 // exporter maybe is broken since Gridfs introduced, add fs and path
 
 class ExporterExcel {
-  constructor(boardId, userLanguage) {
+  _boardId: string;
+  userLanguage: string;
+  constructor(boardId: string, userLanguage: string) {
     this._boardId = boardId;
     this.userLanguage = userLanguage;
   }
 
-  async build(res) {
+  async build(res: any) {
     const fs = Npm.require('fs');
     const os = Npm.require('os');
     const path = Npm.require('path');
@@ -51,7 +53,9 @@ class ExporterExcel {
         boardId: 0,
       },
     };
-    const result = {
+    // Aggregated board export payload; many collections are attached dynamically
+    // below, so it is typed as `any`.
+    const result: any = {
       _format: 'wekan-board-1.0.0',
     };
     Object.assign(
@@ -77,7 +81,7 @@ class ExporterExcel {
         },
       },
     );
-    const cardIds = result.cards.map(card => card._id);
+    const cardIds = result.cards.map((card: any) => card._id);
     result.comments = await ReactiveCache.getCardComments(
       { cardId: { $in: cardIds } },
       noBoardId,
@@ -134,33 +138,33 @@ class ExporterExcel {
     // include id but we have to be careful:
     // 1- only exports users that are linked somehow to that board
     // 2- do not export any sensitive information
-    const users = {};
-    result.members.forEach((member) => {
+    const users: { [key: string]: any } = {};
+    result.members.forEach((member: any) => {
       users[member.userId] = true;
     });
-    result.lists.forEach((list) => {
+    result.lists.forEach((list: any) => {
       users[list.userId] = true;
     });
-    result.cards.forEach((card) => {
+    result.cards.forEach((card: any) => {
       users[card.userId] = true;
       if (card.members) {
-        card.members.forEach((memberId) => {
+        card.members.forEach((memberId: any) => {
           users[memberId] = true;
         });
       }
       if (card.assignees) {
-        card.assignees.forEach((memberId) => {
+        card.assignees.forEach((memberId: any) => {
           users[memberId] = true;
         });
       }
     });
-    result.comments.forEach((comment) => {
+    result.comments.forEach((comment: any) => {
       users[comment.userId] = true;
     });
-    result.activities.forEach((activity) => {
+    result.activities.forEach((activity: any) => {
       users[activity.userId] = true;
     });
-    result.checklists.forEach((checklist) => {
+    result.checklists.forEach((checklist: any) => {
       users[checklist.userId] = true;
     });
     const byUserIds = {
@@ -179,7 +183,7 @@ class ExporterExcel {
       },
     };
     result.users = (await ReactiveCache.getUsers(byUserIds, userFields))
-      .map((user) => {
+      .map((user: any) => {
         // user avatar is stored as a relative url, we export absolute
         if ((user.profile || {}).avatarUrl) {
           user.profile.avatarUrl = FlowRouter.url(user.profile.avatarUrl);
@@ -231,7 +235,9 @@ class ExporterExcel {
       },
     });
     //get worksheet
-    const ws = workbook.getWorksheet(worksheetTitle);
+    // exceljs getWorksheet may return undefined; the sheet was just created, so
+    // it is treated as `any` for the extensive dynamic styling below.
+    const ws: any = workbook.getWorksheet(worksheetTitle);
     ws.properties.defaultRowHeight = 20;
     //init columns
     //Excel font. Western: Arial. zh-CN: 宋体
@@ -369,8 +375,8 @@ class ExporterExcel {
     //get member and assignee info
     let jmem = '';
     let jassig = '';
-    const jmeml = {};
-    const jassigl = {};
+    const jmeml: { [key: string]: any } = {};
+    const jassigl: { [key: string]: any } = {};
     for (const i in result.users) {
       jmem = `${jmem + result.users[i].username},`;
       jmeml[result.users[i]._id] = result.users[i].username;
@@ -382,18 +388,18 @@ class ExporterExcel {
     }
     jassig = jassig.substr(0, jassig.length - 1);
     //get kanban list info
-    const jlist = {};
+    const jlist: { [key: string]: any } = {};
     for (const klist in result.lists) {
       jlist[result.lists[klist]._id] = result.lists[klist].title;
     }
     //get kanban swimlanes info
-    const jswimlane = {};
+    const jswimlane: { [key: string]: any } = {};
     for (const kswimlane in result.swimlanes) {
       jswimlane[result.swimlanes[kswimlane]._id] =
         result.swimlanes[kswimlane].title;
     }
     //get kanban label info
-    const jlabel = {};
+    const jlabel: { [key: string]: any } = {};
     var isFirst = 1;
     for (const klabel in result.labels) {
       // console.log(klabel);
@@ -405,7 +411,7 @@ class ExporterExcel {
       }
     }
     //add data +8 hours
-    function addTZhours(jdate) {
+    function addTZhours(jdate: any) {
       if (!jdate) { return ' '; }
       const curdate = new Date(jdate);
       const checkCorrectDate = new Date(curdate);
@@ -421,14 +427,14 @@ class ExporterExcel {
     }
 
     //cell center
-    function cellCenter(cellno) {
+    function cellCenter(cellno: any) {
       ws.getCell(cellno).alignment = {
         vertical: 'middle',
         horizontal: 'center',
         wrapText: true,
       };
     }
-    function cellLeft(cellno) {
+    function cellLeft(cellno: any) {
       ws.getCell(cellno).alignment = {
         vertical: 'middle',
         horizontal: 'left',
@@ -436,7 +442,7 @@ class ExporterExcel {
       };
     }
     // cell Card alignment
-    function cellCardAlignment(cellno) {
+    function cellCardAlignment(cellno: any) {
       ws.getCell(cellno).alignment = {
         vertical: 'top',
         horizontal: 'left',
@@ -444,7 +450,7 @@ class ExporterExcel {
       };
     }
     //all border
-    function allBorder(cellno) {
+    function allBorder(cellno: any) {
       ws.getCell(cellno).border = {
         top: {
           style: 'thin',
@@ -648,7 +654,7 @@ class ExporterExcel {
       //get parent name
       if (jcard.parentId) {
         const parentCard = result.cards.find(
-          (card) => card._id === jcard.parentId,
+          (card: any) => card._id === jcard.parentId,
         );
         jcard.parentCardTitle = parentCard ? parentCard.title : '';
       }
@@ -749,7 +755,9 @@ class ExporterExcel {
       },
     });
     //get worksheet
-    const ws2 = workbook.getWorksheet(TAPi18n.__('activity','',this.userLanguage));
+    // exceljs getWorksheet may return undefined; the sheet was just created, so
+    // it is treated as `any` for the extensive dynamic styling below.
+    const ws2: any = workbook.getWorksheet(TAPi18n.__('activity','',this.userLanguage));
     ws2.properties.defaultRowHeight = 20;
     //init columns
     ws2.columns = [
@@ -793,7 +801,7 @@ class ExporterExcel {
       },
     ];
     // cell Card alignment
-    function cellCardAlignmentWs2(cellno) {
+    function cellCardAlignmentWs2(cellno: any) {
       ws2.getCell(cellno).alignment = {
         vertical: 'top',
         horizontal: 'left',
@@ -801,7 +809,7 @@ class ExporterExcel {
       };
     }
     //all border
-    function allBorderWs2(cellno) {
+    function allBorderWs2(cellno: any) {
       ws2.getCell(cellno).border = {
         top: {
           style: 'thin',
@@ -870,7 +878,7 @@ class ExporterExcel {
       const jcomment = result.comments[i];
       //card title
       const parentCard = result.cards.find(
-        (card) => card._id === jcomment.cardId,
+        (card: any) => card._id === jcomment.cardId,
       );
       jcomment.cardTitle = parentCard ? parentCard.title : '';
       if (jcomment.cardTitle == '') {
@@ -914,7 +922,7 @@ class ExporterExcel {
     workbook.xlsx.write(res).then(function () {});
   }
 
-  async canExport(user) {
+  async canExport(user: any) {
     const board = await ReactiveCache.getBoard(this._boardId);
     return board && board.isVisibleBy(user);
   }

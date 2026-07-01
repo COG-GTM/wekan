@@ -1,7 +1,11 @@
 import { Meteor } from 'meteor/meteor';
+import Activities from '/models/activities';
 import Users from '../users';
+// WebApp.handlers is not typed by @types/meteor; require() yields `any`, matching
+// the sibling export.* models.
+const { WebApp } = require('meteor/webapp');
 
-function acceptedIpAddress(ipAddress) {
+function acceptedIpAddress(ipAddress: string) {
   const trustedIpAddress = process.env.METRICS_ACCEPTED_IP_ADDRESS;
   return (
     trustedIpAddress !== undefined &&
@@ -9,7 +13,7 @@ function acceptedIpAddress(ipAddress) {
   );
 }
 
-function accessToken(req) {
+function accessToken(req: any) {
   const valid_token = process.env.METRICS_ACCESS_TOKEN;
   let token;
   if (req.headers && req.headers.authorization) {
@@ -34,7 +38,7 @@ function accessToken(req) {
   );
 }
 
-const getBoardTitleWithMostActivities = async (dateWithXdaysAgo, nbLimit) => {
+const getBoardTitleWithMostActivities = async (dateWithXdaysAgo: Date, nbLimit: number) => {
   return await Activities.rawCollection()
     .aggregate([
       {
@@ -57,12 +61,12 @@ const getBoardTitleWithMostActivities = async (dateWithXdaysAgo, nbLimit) => {
     .toArray();
 };
 
-const getBoards = async (boardIds) => {
+const getBoards = async (boardIds: string[]) => {
   const ret = await ReactiveCache.getBoards({ _id: { $in: boardIds } });
   return ret;
 };
 Meteor.startup(() => {
-  WebApp.handlers.use('/metrics', async (req, res, next) => {
+  WebApp.handlers.use('/metrics', async (req: any, res: any, next: any) => {
     try {
       const ipAddress =
         req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -81,10 +85,11 @@ Meteor.startup(() => {
         metricsRes += '# Number of connected users\n';
 
         // Get number of connected user by using meteor socketJs
-        const allOpenedSockets = Meteor.server.stream_server.open_sockets;
+        // Meteor.server is not typed by @types/meteor; internal socket API.
+        const allOpenedSockets = (Meteor as any).server.stream_server.open_sockets;
         let connectedUserIds = [];
         allOpenedSockets.forEach(
-          (socket) =>
+          (socket: any) =>
             socket._meteorSession.userId !== null &&
             connectedUserIds.push(socket._meteorSession.userId),
         );
@@ -142,7 +147,7 @@ Meteor.startup(() => {
         // Get number of users with last connection dated 5 days ago
         let xdays = 5;
         let dateWithXdaysAgo = new Date(
-          new Date() - xdays * 24 * 60 * 60 * 1000,
+          new Date().getTime() - xdays * 24 * 60 * 60 * 1000,
         );
         resCount = (await ReactiveCache.getUsers({
           lastConnectionDate: { $gte: dateWithXdaysAgo },
@@ -156,7 +161,7 @@ Meteor.startup(() => {
 
         // Get number of users with last connection dated 10 days ago
         xdays = 10;
-        dateWithXdaysAgo = new Date(new Date() - xdays * 24 * 60 * 60 * 1000);
+        dateWithXdaysAgo = new Date(new Date().getTime() - xdays * 24 * 60 * 60 * 1000);
         resCount = (await ReactiveCache.getUsers({
           lastConnectionDate: { $gte: dateWithXdaysAgo },
         })).length; // KPI 5
@@ -169,7 +174,7 @@ Meteor.startup(() => {
 
         // Get number of users with last connection dated 20 days ago
         xdays = 20;
-        dateWithXdaysAgo = new Date(new Date() - xdays * 24 * 60 * 60 * 1000);
+        dateWithXdaysAgo = new Date(new Date().getTime() - xdays * 24 * 60 * 60 * 1000);
         resCount = (await ReactiveCache.getUsers({
           lastConnectionDate: { $gte: dateWithXdaysAgo },
         })).length; // KPI 5
@@ -182,7 +187,7 @@ Meteor.startup(() => {
 
         // Get number of users with last connection dated 20 days ago
         xdays = 30;
-        dateWithXdaysAgo = new Date(new Date() - xdays * 24 * 60 * 60 * 1000);
+        dateWithXdaysAgo = new Date(new Date().getTime() - xdays * 24 * 60 * 60 * 1000);
         resCount = (await ReactiveCache.getUsers({
           lastConnectionDate: { $gte: dateWithXdaysAgo },
         })).length; // KPI 5
@@ -202,10 +207,10 @@ Meteor.startup(() => {
         );
 
         const boardWithMostActivities = boardTitleWithMostActivities.map(
-          (board) => board.lookup[0].title,
+          (board: any) => board.lookup[0].title,
         );
 
-        boardWithMostActivities.forEach((title, index) => {
+        boardWithMostActivities.forEach((title: any, index: number) => {
           metricsRes +=
             `wekan_top10BoardsWithMostActivities{n="${title}"} ${
               index + 1
