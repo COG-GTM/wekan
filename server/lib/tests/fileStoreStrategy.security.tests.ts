@@ -6,19 +6,19 @@ import { expect } from 'chai';
 import { Random } from 'meteor/random';
 import { FileStoreStrategyFilesystem } from '/models/lib/fileStoreStrategy';
 
-function readStreamToString(stream) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    stream.on('data', (chunk) => chunks.push(chunk));
+function readStreamToString(stream: NodeJS.ReadableStream) {
+  return new Promise<string>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    stream.on('data', (chunk: Buffer) => chunks.push(chunk));
     stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     stream.on('error', reject);
   });
 }
 
 describe('fileStoreStrategy security', function() {
-  let tempRoot;
-  let storageRoot;
-  let originalWritablePath;
+  let tempRoot: string;
+  let storageRoot: string;
+  let originalWritablePath: string | undefined;
 
   beforeEach(function() {
     originalWritablePath = process.env.WRITABLE_PATH;
@@ -42,7 +42,7 @@ describe('fileStoreStrategy security', function() {
     }
   });
 
-  function createAttachmentFileObj(filePath) {
+  function createAttachmentFileObj(filePath: string) {
     return {
       _id: Random.id(),
       name: 'proof.txt',
@@ -87,7 +87,7 @@ describe('fileStoreStrategy security', function() {
     const stream = strategy.getReadStream();
     expect(stream).to.not.equal(undefined);
 
-    const content = await readStreamToString(stream);
+    const content = await readStreamToString(stream!);
     expect(content).to.equal('safe-data');
   });
 

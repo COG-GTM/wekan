@@ -10,7 +10,8 @@ import AttachmentStorageSettings from '/models/attachmentStorageSettings';
 import { fileStoreStrategyFactory } from '/models/attachments.server';
 
 describe('attachmentApi authentication', function() {
-  let findOneStub, hashStub;
+  let findOneStub: sinon.SinonStub;
+  let hashStub: sinon.SinonStub;
 
   beforeEach(function() {
     hashStub = sinon.stub(Accounts, '_hashLoginToken');
@@ -23,7 +24,7 @@ describe('attachmentApi authentication', function() {
   });
 
   // Mock request/response objects
-  function createMockReq(headers = {}) {
+  function createMockReq(headers: Record<string, string> = {}) {
     return {
       headers,
       on: sinon.stub(),
@@ -207,10 +208,10 @@ describe('attachmentApi authentication', function() {
   });
 
   describe('attachment API method limits', function() {
-    let getAttachmentStub;
-    let getBoardStub;
-    let findSettingsStub;
-    let getFileStrategyStub;
+    let getAttachmentStub: sinon.SinonStub | null;
+    let getBoardStub: sinon.SinonStub | null;
+    let findSettingsStub: sinon.SinonStub | null;
+    let getFileStrategyStub: sinon.SinonStub | null;
 
     afterEach(function() {
       if (getAttachmentStub) getAttachmentStub.restore();
@@ -299,9 +300,11 @@ describe('attachmentApi authentication', function() {
   });
 
   describe('attachment API write permissions', function() {
-    let stubs = [];
+    let stubs: sinon.SinonStub[] = [];
 
-    const stub = (obj, method, impl) => {
+    // Generic test-double helper: it stubs an arbitrary method on any object, so
+    // the target object and fake implementation are intentionally typed `any`.
+    const stub = (obj: any, method: string, impl: (...args: any[]) => any) => {
       const s = sinon.stub(obj, method).callsFake(impl);
       stubs.push(s);
       return s;
