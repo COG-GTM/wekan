@@ -1,3 +1,5 @@
+import { Template } from 'meteor/templating';
+import { Meteor } from 'meteor/meteor';
 import { ReactiveCache } from '/imports/reactiveCache';
 
 Template.resultCard.helpers({
@@ -50,7 +52,7 @@ Template.resultCard.helpers({
 });
 
 Template.resultCard.events({
-  'click .js-minicard'(event) {
+  'click .js-minicard'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     const cardId = Template.currentData()._id;
     const boardId = Template.currentData().boardId;

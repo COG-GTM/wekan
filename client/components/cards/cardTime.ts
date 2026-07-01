@@ -1,3 +1,6 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 import { TAPi18n } from '/imports/i18n';
 import Cards from '/models/cards';
 import { getCurrentCardIdFromContext } from '/client/lib/currentCard';
@@ -6,14 +9,14 @@ function getCardId() {
   return getCurrentCardIdFromContext();
 }
 
-Template.editCardSpentTimePopup.onCreated(function () {
+Template.editCardSpentTimePopup.onCreated(function (this: EditCardSpentTimePopupInstance) {
   this.error = new ReactiveVar('');
   this.card = Cards.findOne(getCardId());
 });
 
 Template.editCardSpentTimePopup.helpers({
   error() {
-    return Template.instance().error;
+    return (Template.instance() as EditCardSpentTimePopupInstance).error;
   },
   card() {
     return Cards.findOne(getCardId());
@@ -26,14 +29,15 @@ Template.editCardSpentTimePopup.helpers({
 
 Template.editCardSpentTimePopup.events({
   //TODO : need checking this portion
-  'submit .edit-time'(evt, tpl) {
+  'submit .edit-time'(evt: JQuery.TriggeredEvent, tpl: EditCardSpentTimePopupInstance) {
     evt.preventDefault();
     const card = Cards.findOne(getCardId());
     if (!card) return;
 
-    const spentTime = parseFloat(evt.target.time.value);
+    const form = evt.target as HTMLFormElement & { time: HTMLInputElement };
+    const spentTime = parseFloat(form.time.value);
     let isOvertime = false;
-    if ($('#overtime').attr('class').indexOf('is-checked') >= 0) {
+    if (($('#overtime').attr('class') as string).indexOf('is-checked') >= 0) {
       isOvertime = true;
     }
     if (spentTime >= 0) {
@@ -42,10 +46,10 @@ Template.editCardSpentTimePopup.events({
       Popup.back();
     } else {
       tpl.error.set('invalid-time');
-      evt.target.time.focus();
+      form.time.focus();
     }
   },
-  'click .js-delete-time'(evt) {
+  'click .js-delete-time'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     const card = Cards.findOne(getCardId());
     if (!card) return;
@@ -53,7 +57,7 @@ Template.editCardSpentTimePopup.events({
     card.setIsOvertime(false);
     Popup.back();
   },
-  'click a.js-toggle-overtime'(evt) {
+  'click a.js-toggle-overtime'(evt: JQuery.TriggeredEvent) {
     const card = Cards.findOne(getCardId());
     if (!card) return;
     card.setIsOvertime(!card.getIsOvertime());
@@ -63,7 +67,8 @@ Template.editCardSpentTimePopup.events({
 });
 
 Template.cardSpentTime.helpers({
-  showTitle() {
+  // `this` is the card data context (a Mongo card doc).
+  showTitle(this: any) {
     const card = Cards.findOne(this._id) || this;
     if (card.getIsOvertime && card.getIsOvertime()) {
       return `${TAPi18n.__(
@@ -76,11 +81,11 @@ Template.cardSpentTime.helpers({
     }
     return '';
   },
-  showTime() {
+  showTime(this: any) {
     const card = Cards.findOne(this._id) || this;
     return card.getSpentTime ? card.getSpentTime() : '';
   },
-  getIsOvertime() {
+  getIsOvertime(this: any) {
     const card = Cards.findOne(this._id) || this;
     return card.getIsOvertime ? card.getIsOvertime() : false;
   },
@@ -89,3 +94,10 @@ Template.cardSpentTime.helpers({
 Template.cardSpentTime.events({
   'click .js-edit-time': Popup.open('editCardSpentTime'),
 });
+
+// The edit-spent-time popup instance holds a validation error message and the
+// card being edited.
+interface EditCardSpentTimePopupInstance extends Blaze.TemplateInstance {
+  error: ReactiveVar<string>;
+  card?: ReturnType<typeof Cards.findOne>;
+}

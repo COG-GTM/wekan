@@ -6,7 +6,8 @@
 // board (e.g. board._id) throws and the navigation silently fails until a
 // reload populates the cache. Use this guard before navigating, mirroring the
 // existing `if (board)` check in the js-go-to-subtask-board handler.
-export function canNavigateToSubtaskBoard(board) {
+// `board` is a dynamic ReactiveCache board doc (or undefined when not loaded).
+export function canNavigateToSubtaskBoard(board: any) {
   return Boolean(board && board._id);
 }
 
@@ -18,7 +19,8 @@ export function canNavigateToSubtaskBoard(board) {
 //
 // Returns the FlowRouter 'card' route params taken from the subtask, or
 // undefined when the subtask's board is not loaded yet (see #4762 guard).
-export function subtaskNavTarget(subtask) {
+// `subtask` is a dynamic Mongo card doc exposing board()/getRealId() helpers.
+export function subtaskNavTarget(subtask: any) {
   if (!subtask) {
     return undefined;
   }

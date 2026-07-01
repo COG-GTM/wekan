@@ -89,6 +89,34 @@ interface JQuery {
     strategies: import('@textcomplete/core').StrategyProps[],
     options?: import('@textcomplete/core').TextcompleteOption,
   ): JQuery;
+  // jQuery UI sortable widget (loaded in client/lib/jquery-ui.ts). Only the
+  // option keys and the `ui` fields the app reads are enumerated; other widget
+  // options and the string-method form (e.g. sortable('refresh')) fall through
+  // the index signatures.
+  sortable(options?: JQueryUiSortableOptions): JQuery;
+  sortable(method: string, ...args: any[]): any;
+}
+
+// The `ui` object passed to jQuery UI sortable start/stop callbacks.
+interface JQueryUiSortableUi {
+  helper: JQuery;
+  placeholder: JQuery;
+  item: JQuery;
+  [key: string]: any;
+}
+
+interface JQueryUiSortableOptions {
+  connectWith?: string;
+  tolerance?: string;
+  appendTo?: string | Element;
+  helper?: string | ((event: any, element: JQuery) => JQuery | Element);
+  distance?: number;
+  items?: string;
+  placeholder?: string;
+  handle?: string;
+  start?: (this: any, event: any, ui: JQueryUiSortableUi) => void;
+  stop?: (this: any, event: any, ui: JQueryUiSortableUi) => void;
+  [key: string]: any;
 }
 
 // ---------------------------------------------------------------------------

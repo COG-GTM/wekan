@@ -22,7 +22,7 @@
  *   - a graceful fallback (whichever part is available) when one is missing,
  *   - empty string when nothing is known.
  */
-export function subtaskStatusLabel({ listTitle, boardTitle, sameBoard = true } = {}) {
+export function subtaskStatusLabel({ listTitle, boardTitle, sameBoard = true }: SubtaskStatusArgs = {}) {
   const list = (listTitle || '').trim();
   const board = (boardTitle || '').trim();
 
@@ -35,4 +35,10 @@ export function subtaskStatusLabel({ listTitle, boardTitle, sameBoard = true } =
     return `${board} / ${list}`;
   }
   return board || list;
+}
+
+interface SubtaskStatusArgs {
+  listTitle?: string;
+  boardTitle?: string;
+  sameBoard?: boolean;
 }

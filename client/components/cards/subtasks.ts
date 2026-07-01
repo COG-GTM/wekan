@@ -1,3 +1,7 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
+import { Meteor } from 'meteor/meteor';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
 import Cards from '/models/cards';
@@ -7,7 +11,7 @@ import { subtaskNavTarget } from './subtaskViewHelpers';
 import { Utils } from '/client/lib/utils';
 
 Template.subtasks.events({
-  'click .js-open-subtask-details-menu'(event) {
+  'click .js-open-subtask-details-menu'(this: any, event: JQuery.TriggeredEvent) {
     // Close any existing popup first to avoid accumulating content
     if (Popup.isOpen()) {
       Popup.close();
@@ -15,9 +19,9 @@ Template.subtasks.events({
     // Now open the popup for this specific subtask
     Popup.open('subtaskActions').call(this, event);
   },
-  async 'submit .js-add-subtask'(event, tpl) {
+  async 'submit .js-add-subtask'(event: JQuery.TriggeredEvent, tpl: SubtasksInstance) {
     event.preventDefault();
-    const textarea = tpl.find('textarea.js-add-subtask-item');
+    const textarea = tpl.find('textarea.js-add-subtask-item') as HTMLTextAreaElement;
     const title = textarea.value.trim();
     const cardId = Template.currentData().cardId;
 
@@ -48,9 +52,9 @@ Template.subtasks.events({
     textarea.value = '';
     textarea.focus();
   },
-  'submit .js-edit-subtask-title'(event, tpl) {
+  'submit .js-edit-subtask-title'(event: JQuery.TriggeredEvent, tpl: SubtasksInstance) {
     event.preventDefault();
-    const textarea = tpl.find('textarea.js-edit-subtask-item');
+    const textarea = tpl.find('textarea.js-edit-subtask-item') as HTMLTextAreaElement;
     const title = textarea.value.trim();
     const subtask = Template.currentData().subtask;
     subtask.setTitle(title);
@@ -61,7 +65,7 @@ Template.subtasks.events({
       await subtask.archive();
     }
   },
-  keydown(event) {
+  keydown(event: JQuery.TriggeredEvent) {
     //If user press enter key inside a form, submit it
     //Unless the user is also holding down the 'shift' key
     if (event.keyCode === 13 && !event.shiftKey) {
@@ -72,7 +76,7 @@ Template.subtasks.events({
   },
 });
 
-Template.subtasks.onCreated(function () {
+Template.subtasks.onCreated(function (this: SubtasksInstance) {
   this.toggleDeleteDialog = new ReactiveVar(false);
 });
 
@@ -81,7 +85,7 @@ Template.subtasks.helpers({
     return ReactiveCache.getCurrentUser()?.isBoardAdmin();
   },
   toggleDeleteDialog() {
-    return Template.instance().toggleDeleteDialog;
+    return (Template.instance() as SubtasksInstance).toggleDeleteDialog;
   },
 });
 
@@ -89,7 +93,7 @@ Template.subtaskDetail.helpers({
   // #6091: show the subtask's current status, i.e. the list it resides in
   // (prefixed with the board title when the subtask lives on another board
   // than the parent card).
-  subtaskStatus() {
+  subtaskStatus(this: any) {
     const subtask = this.subtask;
     if (!subtask) {
       return '';
@@ -120,7 +124,7 @@ Template.subtaskActionsPopup.helpers({
 });
 
 Template.subtaskActionsPopup.events({
-  'click .js-view-subtask'(event) {
+  'click .js-view-subtask'(event: JQuery.TriggeredEvent) {
     if ($(event.target).hasClass('js-view-subtask')) {
       const subtask = Template.currentData().subtask;
       // #3743: open the SUBTASK card itself, not the parent/current card.
@@ -141,7 +145,7 @@ Template.subtaskActionsPopup.events({
       FlowRouter.go('board', { id: board._id, slug: board.slug });
     }
   },
-  'click .js-delete-subtask' : Popup.afterConfirm('subtaskDelete', async function () {
+  'click .js-delete-subtask' : Popup.afterConfirm('subtaskDelete', async function (this: any) {
     Popup.back(2);
     const subtask = this.subtask;
     if (subtask && subtask._id) {
@@ -151,10 +155,15 @@ Template.subtaskActionsPopup.events({
 });
 
 Template.editSubtaskItemForm.helpers({
-  user() {
+  user(this: any) {
     return ReactiveCache.getUser(this.userId);
   },
   isBoardAdmin() {
     return ReactiveCache.getCurrentUser()?.isBoardAdmin();
   },
 });
+
+// The subtasks template instance tracks whether the delete-confirm dialog is open.
+interface SubtasksInstance extends Blaze.TemplateInstance {
+  toggleDeleteDialog: ReactiveVar<boolean>;
+}

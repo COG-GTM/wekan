@@ -1,9 +1,13 @@
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
+import { Meteor } from 'meteor/meteor';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { LABEL_COLORS } from '/models/metadata/colors';
 import { EscapeActions } from '/client/lib/escapeActions';
 import { Utils } from '/client/lib/utils';
 
-let labelColors;
+let labelColors: string[];
 Meteor.startup(() => {
   labelColors = LABEL_COLORS;
 });
@@ -15,7 +19,7 @@ const getFallbackLabelColor = () => {
   return 'green';
 };
 
-Template.formLabel.onCreated(function () {
+Template.formLabel.onCreated(function (this: FormLabelInstance) {
   const initialColor = this.data?.color || getFallbackLabelColor();
   this.currentColor = new ReactiveVar(initialColor);
 });
@@ -25,14 +29,15 @@ Template.formLabel.helpers({
     const colors = Array.isArray(labelColors) ? labelColors : [getFallbackLabelColor()];
     return colors.map(color => ({ color, name: '' }));
   },
-  isSelected(color) {
-    return Template.instance().currentColor.get() === color;
+  isSelected(color: string) {
+    return (Template.instance() as FormLabelInstance).currentColor.get() === color;
   },
 });
 
 Template.formLabel.events({
-  'click .js-palette-color'(event, tpl) {
-    const paletteData = Blaze.getData(event.currentTarget);
+  'click .js-palette-color'(event: JQuery.TriggeredEvent, tpl: FormLabelInstance) {
+    // dynamic Blaze data context of the clicked palette swatch
+    const paletteData = Blaze.getData(event.currentTarget) as any;
     const selectedColor = paletteData?.color || Template.currentData()?.color || getFallbackLabelColor();
     tpl.currentColor.set(selectedColor);
   },
@@ -46,13 +51,13 @@ Template.createLabelPopup.helpers({
     const board = Utils.getCurrentBoard();
     const colors = Array.isArray(labelColors) ? labelColors : [getFallbackLabelColor()];
     const labels = Array.isArray(board?.labels) ? board.labels : [];
-    const usedColors = labels.map(l => l.color);
+    const usedColors = labels.map((l: { color: string }) => l.color);
     const availableColors = colors.filter(c => !usedColors.includes(c));
     return availableColors.length > 0 ? availableColors[0] : colors[0];
   },
 });
 
-Template.cardLabelsPopup.onRendered(function () {
+Template.cardLabelsPopup.onRendered(function (this: Blaze.TemplateInstance) {
   const tpl = this;
   const itemsSelector = 'li.js-card-label-item:not(.placeholder)';
   const $labels = tpl.$('.edit-labels-pop-over');
@@ -65,9 +70,9 @@ Template.cardLabelsPopup.onRendered(function () {
       let ret = currentItem.clone();
       if (currentItem.closest('.popup-container-depth-0').length == 0)
       { // only set css transform at every sub-popup, not at the main popup
-        const content = currentItem.closest('.content')[0]
+        const content = currentItem.closest('.content')[0] as HTMLElement
         const offsetLeft = content.offsetLeft;
-        const offsetTop = $('.pop-over > .header').height() * -1;
+        const offsetTop = ($('.pop-over > .header').height() as number) * -1;
         ret.css("transform", `translate(${offsetLeft}px, ${offsetTop}px)`);
       }
       return ret;
@@ -77,12 +82,13 @@ Template.cardLabelsPopup.onRendered(function () {
     placeholder: 'card-label-wrapper placeholder',
     start(evt, ui) {
       ui.helper.css('z-index', 1000);
-      ui.placeholder.height(ui.helper.height());
+      ui.placeholder.height(ui.helper.height() as number);
       EscapeActions.clickExecute(evt.target, 'inlinedForm');
     },
-    stop(evt, ui) {
-      const newLabelOrderOnlyIds = ui.item.parent().children().toArray().map(_element => Blaze.getData(_element)._id)
-      const card = Blaze.getData(this);
+    stop(this: any, evt, ui) {
+      // Blaze.getData returns the dynamic per-label data context (has _id)
+      const newLabelOrderOnlyIds = ui.item.parent().children().toArray().map(_element => (Blaze.getData(_element) as any)._id)
+      const card = Blaze.getData(this) as any;
       card.board().setNewLabelOrder(newLabelOrderOnlyIds);
     },
   });
@@ -98,13 +104,13 @@ Template.cardLabelsPopup.onRendered(function () {
 });
 
 Template.cardLabelsPopup.helpers({
-  isLabelSelected(cardId) {
+  isLabelSelected(this: any, cardId: string) {
     return (ReactiveCache.getCard(cardId).labelIds || []).includes(this._id);
   },
 });
 
 Template.cardLabelsPopup.events({
-  'click .js-select-label'(event) {
+  'click .js-select-label'(this: any, event: JQuery.TriggeredEvent) {
     const card = Template.currentData();
     const labelId = this._id;
     card.toggleLabel(labelId);
@@ -116,21 +122,22 @@ Template.cardLabelsPopup.events({
 
 Template.createLabelPopup.events({
   // Create the new label
-  'submit .create-label'(event, templateInstance) {
+  'submit .create-label'(event: JQuery.TriggeredEvent, templateInstance: Blaze.TemplateInstance) {
     event.preventDefault();
     const board = Utils.getCurrentBoard();
     if (!board) {
       return;
     }
-    const name = templateInstance
+    const name = (templateInstance
       .$('#labelName')
-      .val()
+      .val() as string)
       .trim();
     const selectedColorIcon = templateInstance.find('.js-palette-color .fa-check');
     const selectedPaletteNode = selectedColorIcon?.closest
-      ? selectedColorIcon.closest('.js-palette-color')
+      ? selectedColorIcon.closest('.js-palette-color') as HTMLElement
       : null;
-    const selectedColorData = selectedPaletteNode && Blaze.getData(selectedPaletteNode);
+    // dynamic Blaze data context of the selected palette swatch
+    const selectedColorData = selectedPaletteNode && Blaze.getData(selectedPaletteNode) as any;
     const color = selectedColorData?.color || getFallbackLabelColor();
     board.addLabel(name, color);
     Popup.back();
@@ -138,28 +145,34 @@ Template.createLabelPopup.events({
 });
 
 Template.editLabelPopup.events({
-  'click .js-delete-label': Popup.afterConfirm('deleteLabel', function () {
+  'click .js-delete-label': Popup.afterConfirm('deleteLabel', function (this: any) {
     const board = Utils.getCurrentBoard();
     board.removeLabel(this._id);
     Popup.back(2);
   }),
-  'submit .edit-label'(event, templateInstance) {
+  'submit .edit-label'(this: any, event: JQuery.TriggeredEvent, templateInstance: Blaze.TemplateInstance) {
     event.preventDefault();
     const board = Utils.getCurrentBoard();
     if (!board) {
       return;
     }
-    const name = templateInstance
+    const name = (templateInstance
       .$('#labelName')
-      .val()
+      .val() as string)
       .trim();
     const selectedColorIcon = templateInstance.find('.js-palette-color .fa-check');
     const selectedPaletteNode = selectedColorIcon?.closest
-      ? selectedColorIcon.closest('.js-palette-color')
+      ? selectedColorIcon.closest('.js-palette-color') as HTMLElement
       : null;
-    const selectedColorData = selectedPaletteNode && Blaze.getData(selectedPaletteNode);
+    // dynamic Blaze data context of the selected palette swatch
+    const selectedColorData = selectedPaletteNode && Blaze.getData(selectedPaletteNode) as any;
     const color = selectedColorData?.color || getFallbackLabelColor();
     board.editLabel(this._id, name, color);
     Popup.back();
   },
 });
+
+// The formLabel instance tracks the currently selected label color.
+interface FormLabelInstance extends Blaze.TemplateInstance {
+  currentColor: ReactiveVar<string>;
+}
