@@ -295,6 +295,44 @@ declare module 'meteor/ostrio:flow-router-extra' {
   export { FlowRouter };
 }
 
+// reywood:publish-composite — publishes a tree of related cursors (a parent
+// cursor plus per-document child cursors). Not covered by @types/meteor. The
+// publication config's find() callbacks return Meteor cursors (or arrays of
+// them, or null), optionally as promises; child find()s receive the parent
+// document. Parent-doc and cursor element shapes vary per publication, so they
+// come through the documented interop alias.
+declare module 'meteor/reywood:publish-composite' {
+  import { Meteor } from 'meteor/meteor';
+  import { Mongo } from 'meteor/mongo';
+
+  type PublishCompositeCursorResult =
+    | Mongo.Cursor<WekanDocumentField>
+    | Array<Mongo.Cursor<WekanDocumentField>>
+    | WekanDocumentField[]
+    | null;
+
+  interface PublishCompositeNode {
+    find(
+      this: Meteor.Subscription,
+      ...parents: WekanDocumentField[]
+    ): PublishCompositeCursorResult | Promise<PublishCompositeCursorResult>;
+    children?: PublishCompositeNode[];
+  }
+
+  type PublishCompositeConfig =
+    | PublishCompositeNode
+    | ((
+        this: Meteor.Subscription,
+        ...args: WekanDocumentField[]
+      ) =>
+        | PublishCompositeNode
+        | WekanDocumentField[]
+        | Promise<PublishCompositeNode | WekanDocumentField[]>);
+
+  function publishComposite(name: string, config: PublishCompositeConfig): void;
+  export { publishComposite };
+}
+
 // communitypackages:core (useraccounts) — the T9n translation registry used by
 // the i18n/accounts layer to localise the login/account templates.
 declare module 'meteor/communitypackages:core' {

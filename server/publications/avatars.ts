@@ -6,10 +6,10 @@ Meteor.publish('my-avatars', async function() {
   return ret;
 });
 
-Meteor.publish('avatars-for-user', async function(targetUserId) {
+Meteor.publish('avatars-for-user', async function(targetUserId: string) {
   check(targetUserId, String);
   // Allow admins to view avatars for any user
-  const currentUser = await Meteor.users.findOneAsync(this.userId);
+  const currentUser = await Meteor.users.findOneAsync(this.userId as string);
   if (!currentUser || !currentUser.isAdmin) {
     return this.ready();
   }

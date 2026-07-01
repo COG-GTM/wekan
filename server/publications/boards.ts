@@ -56,7 +56,7 @@ publishComposite('boards', function() {
     },
     children: [
       {
-        async find(board) {
+        async find(board: WekanDocumentField) {
           // Publish lists with extended fields for proper sync
           // Including swimlaneId, modifiedAt, and _updatedAt for list order changes
           return await ReactiveCache.getLists(
@@ -79,7 +79,7 @@ publishComposite('boards', function() {
         }
       },
       {
-        async find(board) {
+        async find(board: WekanDocumentField) {
           return await ReactiveCache.getCards(
             { boardId: board._id, archived: false },
             {
@@ -99,7 +99,7 @@ publishComposite('boards', function() {
   };
 });
 
-Meteor.publish('boardsReport', async function(searchTerm = '', limit, skip = 0) {
+Meteor.publish('boardsReport', async function(searchTerm: string | null = '', limit: number, skip: number | null = 0) {
   check(searchTerm, Match.OneOf(String, null, undefined));
   check(limit, Number);
   check(skip, Match.OneOf(Number, null, undefined));
@@ -108,7 +108,8 @@ Meteor.publish('boardsReport', async function(searchTerm = '', limit, skip = 0) 
   // array to tell the client to remove the previously published docs.
   if (!Match.test(userId, String) || !userId) return [];
 
-  const query = { _id: { $in: await Boards.userBoardIds(userId, null) } };
+  // Dynamically-built Mongo selector: `title` is added only when searching.
+  const query: Record<string, WekanDocumentField> = { _id: { $in: await Boards.userBoardIds(userId, null) } };
   if (searchTerm) {
     query.title = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
   }
@@ -139,22 +140,22 @@ Meteor.publish('boardsReport', async function(searchTerm = '', limit, skip = 0) 
     true,
   );
 
-  const userIds = [];
-  const orgIds = [];
-  const teamIds = [];
-  boards.forEach(board => {
+  const userIds: WekanDocumentField[] = [];
+  const orgIds: WekanDocumentField[] = [];
+  const teamIds: WekanDocumentField[] = [];
+  boards.forEach((board: WekanDocumentField) => {
     if (board.members) {
-      board.members.forEach(member => {
+      board.members.forEach((member: WekanDocumentField) => {
         userIds.push(member.userId);
       });
     }
     if (board.orgs) {
-      board.orgs.forEach(org => {
+      board.orgs.forEach((org: WekanDocumentField) => {
         orgIds.push(org.orgId);
       });
     }
     if (board.teams) {
-      board.teams.forEach(team => {
+      board.teams.forEach((team: WekanDocumentField) => {
         teamIds.push(team.teamId);
       });
     }
@@ -170,13 +171,13 @@ Meteor.publish('boardsReport', async function(searchTerm = '', limit, skip = 0) 
 });
 
 Meteor.methods({
-  async getBoardsReportCount(searchTerm = '') {
+  async getBoardsReportCount(searchTerm: string | null = '') {
     check(searchTerm, Match.OneOf(String, null, undefined));
     const user = await ReactiveCache.getCurrentUser();
     if (!user || !user.isAdmin) {
       throw new Meteor.Error('not-authorized');
     }
-    const query = { _id: { $in: await Boards.userBoardIds(this.userId, null) } };
+    const query: Record<string, WekanDocumentField> = { _id: { $in: await Boards.userBoardIds(this.userId, null) } };
     if (searchTerm) {
       query.title = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     }
@@ -191,7 +192,7 @@ Meteor.methods({
   // all resolved here against the *effective* current user — so it also works
   // when a GlobalAdmin impersonates a user (impersonate() calls this.setUserId(),
   // so this.userId / getCurrentUser() are the impersonated user).
-  async getAllBoardsPage(params) {
+  async getAllBoardsPage(params: GetAllBoardsPageParams) {
     check(params, {
       search: Match.Optional(String),
       sortBy: Match.Optional(String),
@@ -212,13 +213,13 @@ Meteor.methods({
     const perPage = Math.min(200, Math.max(1, params.perPage || 25));
     const page = Math.max(1, params.page || 1);
     const search = (params.search || '').trim();
-    const sortBy = ['title-asc', 'title-desc'].includes(params.sortBy)
+    const sortBy = ['title-asc', 'title-desc'].includes(params.sortBy as string)
       ? params.sortBy
       : 'title-asc';
     const menu = params.menu || 'remaining';
 
     // Same visibility selector as the live `boards` publication.
-    const selector = {
+    const selector: Record<string, WekanDocumentField> = {
       archived: false,
       type: { $in: ['board', 'template-container'] },
       $or: [
@@ -255,20 +256,20 @@ Meteor.methods({
     const starred = profile.starredBoards || [];
     if (!search) {
       if (menu === 'starred') {
-        boards = boards.filter(b => starred.includes(b._id));
+        boards = boards.filter((b: WekanDocumentField) => starred.includes(b._id));
       } else if (menu === 'templates') {
-        boards = boards.filter(b => b.type === 'template-container');
+        boards = boards.filter((b: WekanDocumentField) => b.type === 'template-container');
       } else if (menu === 'remaining') {
         boards = boards.filter(
-          b => !assignments[b._id] && b.type !== 'template-container',
+          (b: WekanDocumentField) => !assignments[b._id] && b.type !== 'template-container',
         );
       } else {
         // menu is a workspace id
-        boards = boards.filter(b => assignments[b._id] === menu);
+        boards = boards.filter((b: WekanDocumentField) => assignments[b._id] === menu);
       }
     }
 
-    boards.sort((a, b) => {
+    boards.sort((a: WekanDocumentField, b: WekanDocumentField) => {
       const cmp = (a.title || '').localeCompare(b.title || '', undefined, {
         sensitivity: 'base',
       });
@@ -277,7 +278,7 @@ Meteor.methods({
 
     const total = boards.length;
     const start = (page - 1) * perPage;
-    const ids = boards.slice(start, start + perPage).map(b => b._id);
+    const ids = boards.slice(start, start + perPage).map((b: WekanDocumentField) => b._id);
     return { ids, total };
   },
 });
@@ -334,12 +335,12 @@ Meteor.publish('archivedBoards', async function() {
 //
 // If isArchived = false, this will only return board elements which are not archived.
 // If isArchived = true, this will only return board elements which are archived.
-publishComposite('board', async function(boardId, isArchived) {
+publishComposite('board', async function(boardId: string, isArchived: boolean) {
   check(boardId, String);
   check(isArchived, Boolean);
 
   const thisUserId = this.userId;
-  const $or = [{ permission: 'public' }];
+  const $or: Record<string, WekanDocumentField>[] = [{ permission: 'public' }];
 
   let currUser = (!Match.test(thisUserId, String) || !thisUserId) ? 'undefined' : await ReactiveCache.getUser(thisUserId);
   let orgIdsUserBelongs = currUser !== 'undefined' && currUser.teams !== 'undefined' ? currUser.orgIdsUserBelongs() : '';
@@ -383,19 +384,19 @@ publishComposite('board', async function(boardId, isArchived) {
     children: [
       // Lists
       {
-        async find(board) {
+        async find(board: WekanDocumentField) {
           return await ReactiveCache.getLists({ boardId: board._id, archived: isArchived }, {}, true);
         }
       },
       // Swimlanes
       {
-        async find(board) {
+        async find(board: WekanDocumentField) {
           return await ReactiveCache.getSwimlanes({ boardId: board._id, archived: isArchived }, {}, true);
         }
       },
       // Integrations
       {
-        async find(board) {
+        async find(board: WekanDocumentField) {
           return await ReactiveCache.getIntegrations(
             { boardId: board._id },
             { fields: { token: 0 } },
@@ -405,13 +406,13 @@ publishComposite('board', async function(boardId, isArchived) {
       },
       // CardCommentReactions at board level
       {
-        async find(board) {
+        async find(board: WekanDocumentField) {
           return await ReactiveCache.getCardCommentReactions({ boardId: board._id }, {}, true);
         }
       },
       // CustomFields
       {
-        async find(board) {
+        async find(board: WekanDocumentField) {
           return await ReactiveCache.getCustomFields(
             { boardIds: { $in: [board._id] } },
             { sort: { name: 1 } },
@@ -421,15 +422,15 @@ publishComposite('board', async function(boardId, isArchived) {
       },
       // Cards
       {
-        async find(board) {
-          const cardSelector = {
+        async find(board: WekanDocumentField) {
+          const cardSelector: Record<string, WekanDocumentField> = {
             boardId: { $in: [board._id, board.subtasksDefaultBoardId] },
             archived: isArchived,
           };
 
           // Check if current user has assigned-only permissions
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<WekanDocumentField>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               // User with assigned-only permissions should only see cards assigned to them
               cardSelector.assignees = { $in: [thisUserId] };
@@ -450,13 +451,13 @@ publishComposite('board', async function(boardId, isArchived) {
         children: [
           // CardComments for each card
           {
-            async find(card) {
+            async find(card: WekanDocumentField) {
               return await ReactiveCache.getCardComments({ cardId: card._id }, {}, true);
             }
           },
           // Attachments for each card
           {
-            async find(card) {
+            async find(card: WekanDocumentField) {
               const result = await ReactiveCache.getAttachments({ 'meta.cardId': card._id }, {}, true);
               return result.cursor || result;
             }
@@ -467,21 +468,21 @@ publishComposite('board', async function(boardId, isArchived) {
       // boardId, so checklists on newly added cards publish reactively without a
       // per-card-id snapshot that goes stale.
       {
-        async find(board) {
+        async find(board: WekanDocumentField) {
           const boardIds = [board._id];
           if (board.subtasksDefaultBoardId) boardIds.push(board.subtasksDefaultBoardId);
           // Assigned-only members must not receive checklists for cards they are
           // not assigned to; boardId alone cannot express that, so fall back to
           // the assigned cards' ids for those members.
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<WekanDocumentField>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               const cards = await ReactiveCache.getCards(
                 { boardId: { $in: boardIds }, archived: isArchived, assignees: { $in: [thisUserId] } },
                 { fields: { _id: 1 } },
                 false,
               );
-              const cardIds = (cards || []).map(c => c._id);
+              const cardIds = (cards || []).map((c: WekanDocumentField) => c._id);
               return await ReactiveCache.getChecklists({ cardId: { $in: cardIds } }, {}, true);
             }
           }
@@ -490,18 +491,18 @@ publishComposite('board', async function(boardId, isArchived) {
       },
       // ChecklistItems for the whole board — single cursor on denormalized boardId
       {
-        async find(board) {
+        async find(board: WekanDocumentField) {
           const boardIds = [board._id];
           if (board.subtasksDefaultBoardId) boardIds.push(board.subtasksDefaultBoardId);
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<WekanDocumentField>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               const cards = await ReactiveCache.getCards(
                 { boardId: { $in: boardIds }, archived: isArchived, assignees: { $in: [thisUserId] } },
                 { fields: { _id: 1 } },
                 false,
               );
-              const cardIds = (cards || []).map(c => c._id);
+              const cardIds = (cards || []).map((c: WekanDocumentField) => c._id);
               return await ReactiveCache.getChecklistItems({ cardId: { $in: cardIds } }, {}, true);
             }
           }
@@ -510,14 +511,14 @@ publishComposite('board', async function(boardId, isArchived) {
       },
       // Parent cards (for subtasks)
       {
-        async find(board) {
-          const cardSelector = {
+        async find(board: WekanDocumentField) {
+          const cardSelector: Record<string, WekanDocumentField> = {
             boardId: { $in: [board._id, board.subtasksDefaultBoardId] },
             archived: isArchived,
           };
 
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<WekanDocumentField>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               cardSelector.assignees = { $in: [thisUserId] };
             }
@@ -526,7 +527,7 @@ publishComposite('board', async function(boardId, isArchived) {
           const cards = await ReactiveCache.getCards(cardSelector, { fields: { _id: 1, parentId: 1 } }, false);
           if (!cards || cards.length === 0) return null;
 
-          const parentIds = cards.filter(c => c.parentId).map(c => c.parentId);
+          const parentIds = cards.filter((c: WekanDocumentField) => c.parentId).map((c: WekanDocumentField) => c.parentId);
           if (parentIds.length === 0) return null;
 
           return await ReactiveCache.getCards({ _id: { $in: parentIds } }, {}, true);
@@ -534,14 +535,14 @@ publishComposite('board', async function(boardId, isArchived) {
       },
       // Linked cards (cardType-linkedCard)
       {
-        async find(board) {
-          const cardSelector = {
+        async find(board: WekanDocumentField) {
+          const cardSelector: Record<string, WekanDocumentField> = {
             boardId: { $in: [board._id, board.subtasksDefaultBoardId] },
             archived: isArchived,
           };
 
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<WekanDocumentField>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               cardSelector.assignees = { $in: [thisUserId] };
             }
@@ -550,7 +551,7 @@ publishComposite('board', async function(boardId, isArchived) {
           const cards = await ReactiveCache.getCards(cardSelector, { fields: { _id: 1, type: 1, linkedId: 1 } }, false);
           if (!cards || cards.length === 0) return null;
 
-          const linkedCardIds = cards.filter(c => c.type === 'cardType-linkedCard' && c.linkedId).map(c => c.linkedId);
+          const linkedCardIds = cards.filter((c: WekanDocumentField) => c.type === 'cardType-linkedCard' && c.linkedId).map((c: WekanDocumentField) => c.linkedId);
           if (linkedCardIds.length === 0) return null;
 
           return await ReactiveCache.getCards({ _id: { $in: linkedCardIds }, archived: isArchived }, {}, true);
@@ -558,14 +559,14 @@ publishComposite('board', async function(boardId, isArchived) {
       },
       // Comments for linked cards
       {
-        async find(board) {
-          const cardSelector = {
+        async find(board: WekanDocumentField) {
+          const cardSelector: Record<string, WekanDocumentField> = {
             boardId: { $in: [board._id, board.subtasksDefaultBoardId] },
             archived: isArchived,
           };
 
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<WekanDocumentField>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               cardSelector.assignees = { $in: [thisUserId] };
             }
@@ -574,7 +575,7 @@ publishComposite('board', async function(boardId, isArchived) {
           const cards = await ReactiveCache.getCards(cardSelector, { fields: { _id: 1, type: 1, linkedId: 1 } }, false);
           if (!cards || cards.length === 0) return null;
 
-          const linkedCardIds = cards.filter(c => c.type === 'cardType-linkedCard' && c.linkedId).map(c => c.linkedId);
+          const linkedCardIds = cards.filter((c: WekanDocumentField) => c.type === 'cardType-linkedCard' && c.linkedId).map((c: WekanDocumentField) => c.linkedId);
           if (linkedCardIds.length === 0) return null;
 
           return await ReactiveCache.getCardComments({ cardId: { $in: linkedCardIds } }, {}, true);
@@ -582,14 +583,14 @@ publishComposite('board', async function(boardId, isArchived) {
       },
       // Attachments for linked cards
       {
-        async find(board) {
-          const cardSelector = {
+        async find(board: WekanDocumentField) {
+          const cardSelector: Record<string, WekanDocumentField> = {
             boardId: { $in: [board._id, board.subtasksDefaultBoardId] },
             archived: isArchived,
           };
 
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<WekanDocumentField>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               cardSelector.assignees = { $in: [thisUserId] };
             }
@@ -598,7 +599,7 @@ publishComposite('board', async function(boardId, isArchived) {
           const cards = await ReactiveCache.getCards(cardSelector, { fields: { _id: 1, type: 1, linkedId: 1 } }, false);
           if (!cards || cards.length === 0) return null;
 
-          const linkedCardIds = cards.filter(c => c.type === 'cardType-linkedCard' && c.linkedId).map(c => c.linkedId);
+          const linkedCardIds = cards.filter((c: WekanDocumentField) => c.type === 'cardType-linkedCard' && c.linkedId).map((c: WekanDocumentField) => c.linkedId);
           if (linkedCardIds.length === 0) return null;
 
           const result = await ReactiveCache.getAttachments({ 'meta.cardId': { $in: linkedCardIds } }, {}, true);
@@ -607,14 +608,14 @@ publishComposite('board', async function(boardId, isArchived) {
       },
       // Checklists for linked cards
       {
-        async find(board) {
-          const cardSelector = {
+        async find(board: WekanDocumentField) {
+          const cardSelector: Record<string, WekanDocumentField> = {
             boardId: { $in: [board._id, board.subtasksDefaultBoardId] },
             archived: isArchived,
           };
 
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<WekanDocumentField>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               cardSelector.assignees = { $in: [thisUserId] };
             }
@@ -623,7 +624,7 @@ publishComposite('board', async function(boardId, isArchived) {
           const cards = await ReactiveCache.getCards(cardSelector, { fields: { _id: 1, type: 1, linkedId: 1 } }, false);
           if (!cards || cards.length === 0) return null;
 
-          const linkedCardIds = cards.filter(c => c.type === 'cardType-linkedCard' && c.linkedId).map(c => c.linkedId);
+          const linkedCardIds = cards.filter((c: WekanDocumentField) => c.type === 'cardType-linkedCard' && c.linkedId).map((c: WekanDocumentField) => c.linkedId);
           if (linkedCardIds.length === 0) return null;
 
           return await ReactiveCache.getChecklists({ cardId: { $in: linkedCardIds } }, {}, true);
@@ -631,14 +632,14 @@ publishComposite('board', async function(boardId, isArchived) {
       },
       // ChecklistItems for linked cards
       {
-        async find(board) {
-          const cardSelector = {
+        async find(board: WekanDocumentField) {
+          const cardSelector: Record<string, WekanDocumentField> = {
             boardId: { $in: [board._id, board.subtasksDefaultBoardId] },
             archived: isArchived,
           };
 
           if (thisUserId && board.members) {
-            const member = findWhere(board.members, { userId: thisUserId, isActive: true });
+            const member = findWhere<WekanDocumentField>(board.members, { userId: thisUserId, isActive: true });
             if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
               cardSelector.assignees = { $in: [thisUserId] };
             }
@@ -647,7 +648,7 @@ publishComposite('board', async function(boardId, isArchived) {
           const cards = await ReactiveCache.getCards(cardSelector, { fields: { _id: 1, type: 1, linkedId: 1 } }, false);
           if (!cards || cards.length === 0) return null;
 
-          const linkedCardIds = cards.filter(c => c.type === 'cardType-linkedCard' && c.linkedId).map(c => c.linkedId);
+          const linkedCardIds = cards.filter((c: WekanDocumentField) => c.type === 'cardType-linkedCard' && c.linkedId).map((c: WekanDocumentField) => c.linkedId);
           if (linkedCardIds.length === 0) return null;
 
           return await ReactiveCache.getChecklistItems({ cardId: { $in: linkedCardIds } }, {}, true);
@@ -655,19 +656,19 @@ publishComposite('board', async function(boardId, isArchived) {
       },
       // Board members/Users
       {
-        async find(board) {
+        async find(board: WekanDocumentField) {
           if (board.members) {
             // Board members. This publication also includes former board members that
             // aren't members anymore but may have some activities attached to them in
             // the history.
-            const memberIds = board.members.map(x => x.userId);
+            const memberIds = board.members.map((x: WekanDocumentField) => x.userId);
 
             // We omit the current user because the client should already have that data,
             // and sending it triggers a subtle bug:
             // https://github.com/wefork/wekan/issues/15
             return await ReactiveCache.getUsers(
               {
-                _id: { $in: memberIds.filter(x => x !== thisUserId) },
+                _id: { $in: memberIds.filter((x: WekanDocumentField) => x !== thisUserId) },
               },
               {
                 fields: {
@@ -688,7 +689,7 @@ publishComposite('board', async function(boardId, isArchived) {
 });
 
 Meteor.methods({
-  async copyBoard(boardId, properties) {
+  async copyBoard(boardId: string, properties: Record<string, WekanDocumentField>) {
     check(boardId, String);
     check(properties, Object);
 
@@ -708,3 +709,13 @@ Meteor.methods({
     return board.copy();
   },
 });
+
+// Parameters accepted by the `getAllBoardsPage` method; every field is optional
+// (validated with Match.Optional above), mirroring the client's page request.
+interface GetAllBoardsPageParams {
+  search?: string;
+  sortBy?: string;
+  menu?: string;
+  page?: number;
+  perPage?: number;
+}

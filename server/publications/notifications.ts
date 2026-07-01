@@ -14,8 +14,8 @@ Meteor.publish('notificationAttachments', async function() {
     {
       _id: {
         $in: activityEntries
-          .map(v => v.attachmentId)
-          .filter(v => !!v),
+          .map((v: WekanDocumentField) => v.attachmentId)
+          .filter((v: WekanDocumentField) => !!v),
       },
     },
     {},
@@ -31,8 +31,8 @@ Meteor.publish('notificationCards', async function() {
     {
       _id: {
         $in: activityEntries
-          .map(v => v.cardId)
-          .filter(v => !!v),
+          .map((v: WekanDocumentField) => v.cardId)
+          .filter((v: WekanDocumentField) => !!v),
       },
     },
     {},
@@ -48,8 +48,8 @@ Meteor.publish('notificationChecklistItems', async function() {
     {
       _id: {
         $in: activityEntries
-          .map(v => v.checklistItemId)
-          .filter(v => !!v),
+          .map((v: WekanDocumentField) => v.checklistItemId)
+          .filter((v: WekanDocumentField) => !!v),
       },
     },
     {},
@@ -65,8 +65,8 @@ Meteor.publish('notificationChecklists', async function() {
     {
       _id: {
         $in: activityEntries
-          .map(v => v.checklistId)
-          .filter(v => !!v),
+          .map((v: WekanDocumentField) => v.checklistId)
+          .filter((v: WekanDocumentField) => !!v),
       },
     },
     {},
@@ -82,8 +82,8 @@ Meteor.publish('notificationComments', async function() {
     {
       _id: {
         $in: activityEntries
-          .map(v => v.commentId)
-          .filter(v => !!v),
+          .map((v: WekanDocumentField) => v.commentId)
+          .filter((v: WekanDocumentField) => !!v),
       },
     },
     {},
@@ -99,8 +99,8 @@ Meteor.publish('notificationLists', async function() {
     {
       _id: {
         $in: activityEntries
-          .map(v => v.listId)
-          .filter(v => !!v),
+          .map((v: WekanDocumentField) => v.listId)
+          .filter((v: WekanDocumentField) => !!v),
       },
     },
     {},
@@ -116,8 +116,8 @@ Meteor.publish('notificationSwimlanes', async function() {
     {
       _id: {
         $in: activityEntries
-          .map(v => v.swimlaneId)
-          .filter(v => !!v),
+          .map((v: WekanDocumentField) => v.swimlaneId)
+          .filter((v: WekanDocumentField) => !!v),
       },
     },
     {},
@@ -133,8 +133,8 @@ Meteor.publish('notificationUsers', async function() {
     {
       _id: {
         $in: activityEntries
-          .map(v => v.userId)
-          .filter(v => !!v),
+          .map((v: WekanDocumentField) => v.userId)
+          .filter((v: WekanDocumentField) => !!v),
       },
     },
     {
@@ -151,7 +151,7 @@ Meteor.publish('notificationUsers', async function() {
 });
 
 async function activityIds() {
-  const activityIds = (await ReactiveCache.getCurrentUser())?.profile?.notifications?.map(v => v.activity) || [];
+  const activityIds = (await ReactiveCache.getCurrentUser())?.profile?.notifications?.map((v: WekanDocumentField) => v.activity) || [];
   return activityIds;
 }
 

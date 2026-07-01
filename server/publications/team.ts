@@ -1,6 +1,6 @@
 import { ReactiveCache } from '/imports/reactiveCache';
 
-Meteor.publish('team', async function(query, limit, skip = 0) {
+Meteor.publish('team', async function(query: object | null, limit: number, skip: number | null = 0) {
   check(query, Match.OneOf(Object, null));
   check(limit, Number);
   check(skip, Match.OneOf(Number, null, undefined));
@@ -9,7 +9,7 @@ Meteor.publish('team', async function(query, limit, skip = 0) {
 
   let ret = [];
   if (user && user.isAdmin) {
-    ret = await ReactiveCache.getTeams(query,
+    ret = await ReactiveCache.getTeams(query as object,
       {
         limit,
         skip: skip || 0,

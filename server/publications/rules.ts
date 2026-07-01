@@ -4,7 +4,7 @@ import Triggers from '/models/triggers';
 import Rules from '/models/rules';
 import { ReactiveCache } from '/imports/reactiveCache';
 
-Meteor.publish('rules', async function(ruleId) {
+Meteor.publish('rules', async function(ruleId: string) {
   check(ruleId, String);
 
   if (!this.userId) {
@@ -35,7 +35,7 @@ Meteor.publish('rules', async function(ruleId) {
 // actions, for anyone who can see the board (not just global admins). This backs
 // the fullscreen Rules page, the workflow view, the board/card buttons and the
 // rules-list editor.
-Meteor.publish('boardRules', async function(boardId) {
+Meteor.publish('boardRules', async function(boardId: string) {
   check(boardId, String);
   if (!this.userId) {
     return this.ready();
@@ -78,7 +78,7 @@ Meteor.publish('allActions', async function() {
   return ret;
 });
 
-Meteor.publish('rulesReport', async function(searchTerm = '', limit, skip = 0) {
+Meteor.publish('rulesReport', async function(searchTerm: string | null = '', limit: number, skip: number | null = 0) {
   check(searchTerm, Match.OneOf(String, null, undefined));
   check(limit, Number);
   check(skip, Match.OneOf(Number, null, undefined));
@@ -86,7 +86,7 @@ Meteor.publish('rulesReport', async function(searchTerm = '', limit, skip = 0) {
     return this.ready();
   }
 
-  const query = {};
+  const query: Record<string, WekanDocumentField> = {};
   if (searchTerm) {
     query.title = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
   }
@@ -96,11 +96,11 @@ Meteor.publish('rulesReport', async function(searchTerm = '', limit, skip = 0) {
     { sort: { boardId: 1 }, limit, skip: skip || 0 },
     true,
   );
-  const actionIds = [];
-  const triggerIds = [];
-  const boardIds = [];
+  const actionIds: WekanDocumentField[] = [];
+  const triggerIds: WekanDocumentField[] = [];
+  const boardIds: WekanDocumentField[] = [];
 
-  rules.forEach(rule => {
+  rules.forEach((rule: WekanDocumentField) => {
     actionIds.push(rule.actionId);
     triggerIds.push(rule.triggerId);
     boardIds.push(rule.boardId);
@@ -116,12 +116,12 @@ Meteor.publish('rulesReport', async function(searchTerm = '', limit, skip = 0) {
 });
 
 Meteor.methods({
-  async getRulesReportCount(searchTerm = '') {
+  async getRulesReportCount(searchTerm: string | null = '') {
     check(searchTerm, Match.OneOf(String, null, undefined));
     if (!this.userId || !(await ReactiveCache.getUser(this.userId)).isAdmin) {
       throw new Meteor.Error('not-authorized');
     }
-    const query = {};
+    const query: Record<string, WekanDocumentField> = {};
     if (searchTerm) {
       query.title = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     }

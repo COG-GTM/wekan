@@ -3,20 +3,20 @@ import { ReactiveCache } from '/imports/reactiveCache';
 
 // Escape a user-supplied search string so it is matched literally (and
 // case-insensitively) instead of being interpreted as a regular expression.
-function searchRegex(term) {
+function searchRegex(term: string) {
   return new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
 }
 
 // Card ids the given user is allowed to see attachments for. Shared by the
 // paginated 'attachmentsList' publication and its matching count method so the
 // total and the published page are always computed over the same set.
-async function accessibleCardIds(userId) {
+async function accessibleCardIds(userId: string | null) {
   const userBoards = (await ReactiveCache.getBoards({
     $or: [
       { permission: 'public' },
       { members: { $elemMatch: { userId, isActive: true } } }
     ]
-  })).map(board => board._id);
+  })).map((board: WekanDocumentField) => board._id);
 
   if (userBoards.length === 0) {
     return [];
@@ -25,25 +25,27 @@ async function accessibleCardIds(userId) {
   return (await ReactiveCache.getCards({
     boardId: { $in: userBoards },
     archived: false
-  })).map(card => card._id);
+  })).map((card: WekanDocumentField) => card._id);
 }
 
 // Build the attachments query for the report: restricted to accessible cards,
 // optionally filtered by attachment name. Returns null when the user has no
 // accessible cards (caller should publish/return nothing).
-async function attachmentsReportQuery(userId, searchTerm) {
+async function attachmentsReportQuery(userId: string | null, searchTerm: string | null | undefined) {
   const userCards = await accessibleCardIds(userId);
   if (userCards.length === 0) {
     return null;
   }
-  const query = { 'meta.cardId': { $in: userCards } };
+  // A dynamically-built Mongo selector: keys are added conditionally, so it is
+  // modelled as an open dictionary of query fragments.
+  const query: Record<string, WekanDocumentField> = { 'meta.cardId': { $in: userCards } };
   if (searchTerm) {
     query.name = searchRegex(searchTerm);
   }
   return query;
 }
 
-Meteor.publish('attachmentsList', async function(searchTerm = '', limit, skip = 0) {
+Meteor.publish('attachmentsList', async function(searchTerm: string | null = '', limit: number, skip: number | null = 0) {
   check(searchTerm, Match.OneOf(String, null, undefined));
   check(limit, Number);
   check(skip, Match.OneOf(Number, null, undefined));
@@ -77,7 +79,7 @@ Meteor.publish('attachmentsList', async function(searchTerm = '', limit, skip = 
 });
 
 Meteor.methods({
-  async getAttachmentsReportCount(searchTerm = '') {
+  async getAttachmentsReportCount(searchTerm: string | null = '') {
     check(searchTerm, Match.OneOf(String, null, undefined));
     if (!(await ReactiveCache.getCurrentUser())?.isAdmin) {
       throw new Meteor.Error('not-authorized');

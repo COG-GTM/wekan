@@ -3,7 +3,7 @@ import Boards from '/models/boards';
 import { allowIsBoardMember, allowIsBoardMemberWithWriteAccess } from '/server/lib/utils';
 
 Meteor.methods({
-  async copySwimlane(swimlaneId, toBoardId, targetSwimlaneId = null, position = 'below', title = '') {
+  async copySwimlane(swimlaneId: string, toBoardId: string, targetSwimlaneId: string | null = null, position: 'above' | 'below' = 'below', title: string | null = '') {
     check(swimlaneId, String);
     check(toBoardId, String);
     check(targetSwimlaneId, Match.OneOf(String, null, undefined));
@@ -14,7 +14,7 @@ Meteor.methods({
     const swimlane = await ReactiveCache.getSwimlane(swimlaneId);
     if (!swimlane) throw new Meteor.Error('not-found');
     const sourceBoard = await Boards.findOneAsync(swimlane.boardId);
-    if (!allowIsBoardMember(this.userId, sourceBoard))
+    if (!allowIsBoardMember(this.userId, sourceBoard as WekanDocumentField))
       throw new Meteor.Error('not-authorized');
     const toBoard = await ReactiveCache.getBoard(toBoardId);
     if (!toBoard) throw new Meteor.Error('not-found');
@@ -25,7 +25,7 @@ Meteor.methods({
     return true;
   },
 
-  async moveSwimlane(swimlaneId, toBoardId, targetSwimlaneId = null, position = 'below', title = '') {
+  async moveSwimlane(swimlaneId: string, toBoardId: string, targetSwimlaneId: string | null = null, position: 'above' | 'below' = 'below', title: string | null = '') {
     check(swimlaneId, String);
     check(toBoardId, String);
     check(targetSwimlaneId, Match.OneOf(String, null, undefined));
@@ -36,7 +36,7 @@ Meteor.methods({
     const swimlane = await ReactiveCache.getSwimlane(swimlaneId);
     if (!swimlane) throw new Meteor.Error('not-found');
     const sourceBoard = await Boards.findOneAsync(swimlane.boardId);
-    if (!allowIsBoardMember(this.userId, sourceBoard))
+    if (!allowIsBoardMember(this.userId, sourceBoard as WekanDocumentField))
       throw new Meteor.Error('not-authorized');
     const toBoard = await ReactiveCache.getBoard(toBoardId);
     if (!toBoard) throw new Meteor.Error('not-found');

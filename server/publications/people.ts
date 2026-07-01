@@ -1,6 +1,6 @@
 import { ReactiveCache } from '/imports/reactiveCache';
 
-Meteor.publish('people', async function(query, limit, skip = 0) {
+Meteor.publish('people', async function(query: object | null, limit: number, skip: number | null = 0) {
   check(query, Match.OneOf(Object, null));
   check(limit, Number);
   check(skip, Match.OneOf(Number, null, undefined));
@@ -9,7 +9,7 @@ Meteor.publish('people', async function(query, limit, skip = 0) {
   const user = await ReactiveCache.getCurrentUser();
 
   if (user && user.isAdmin) {
-    ret = await ReactiveCache.getUsers(query, {
+    ret = await ReactiveCache.getUsers(query as object, {
       limit,
       skip: skip || 0,
       sort: { createdAt: -1 },

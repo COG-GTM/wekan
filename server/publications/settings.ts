@@ -72,7 +72,9 @@ Meteor.publish('setting', () => {
 Meteor.publish('mailServer', async function() {
   const user = await ReactiveCache.getCurrentUser();
 
-  let ret = []
+  // `ret` is either an empty array (to clear the client when unauthorised) or a
+  // settings cursor, so it is typed to accept both.
+  let ret: Mongo.Cursor<WekanDocumentField> | WekanDocumentField[] = []
   if (user && user.isAdmin) {
     ret = Settings.find(
       {},

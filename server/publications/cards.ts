@@ -79,7 +79,7 @@ import { CARD_TYPES } from '../../config/const';
 import Org from "../../models/org";
 import Team from "../../models/team";
 
-Meteor.publish('card', async function(cardId) {
+Meteor.publish('card', async function(cardId: string) {
   check(cardId, String);
 
   const userId = this.userId;
@@ -96,7 +96,7 @@ Meteor.publish('card', async function(cardId) {
 
   // If user has assigned-only permissions, check if they're assigned to this card
   if (userId && board.members) {
-    const member = findWhere(board.members, { userId: userId, isActive: true });
+    const member = findWhere<WekanDocumentField>(board.members, { userId: userId, isActive: true });
     if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
       // User with assigned-only permissions can only view cards assigned to them
       if (!card.assignees || !card.assignees.includes(userId)) {
@@ -116,7 +116,7 @@ Meteor.publish('card', async function(cardId) {
 /** publish all data which is necessary to display card details as popup
  * @returns array of cursors
  */
-publishComposite('popupCardData', async function(cardId) {
+publishComposite('popupCardData', async function(cardId: string) {
   check(cardId, String);
 
   const userId = this.userId;
@@ -133,7 +133,7 @@ publishComposite('popupCardData', async function(cardId) {
 
   // If user has assigned-only permissions, check if they're assigned to this card
   if (userId && board.members) {
-    const member = findWhere(board.members, { userId: userId, isActive: true });
+    const member = findWhere<WekanDocumentField>(board.members, { userId: userId, isActive: true });
     if (member && (member.isNormalAssignedOnly || member.isCommentAssignedOnly || member.isReadAssignedOnly)) {
       // User with assigned-only permissions can only view cards assigned to them
       if (!card.assignees || !card.assignees.includes(userId)) {
@@ -161,7 +161,7 @@ publishComposite('popupCardData', async function(cardId) {
   };
 });
 
-Meteor.publish('archiveSidebar', async function(boardId, activeTab = 'cards', cardsLimit = 30, listsLimit = 30, swimlanesLimit = 30) {
+Meteor.publish('archiveSidebar', async function(boardId: string, activeTab: string = 'cards', cardsLimit: number = 30, listsLimit: number = 30, swimlanesLimit: number = 30) {
   check(boardId, String);
   check(activeTab, String);
   check(cardsLimit, Match.Integer);
@@ -200,14 +200,14 @@ Meteor.publish('archiveSidebar', async function(boardId, activeTab = 'cards', ca
     return [];
   }
 
-  const cardSelector = {
+  const cardSelector: Record<string, WekanDocumentField> = {
     boardId: { $in: [board._id, board.subtasksDefaultBoardId] },
     archived: true,
   };
 
   // Respect assigned-only board permissions for archived cards as well.
   if (board.members) {
-    const member = findWhere(board.members, { userId, isActive: true });
+    const member = findWhere<WekanDocumentField>(board.members, { userId, isActive: true });
     if (
       member &&
       (member.isNormalAssignedOnly ||
@@ -243,7 +243,7 @@ Meteor.publish('archiveSidebar', async function(boardId, activeTab = 'cards', ca
   return [cardsCursor, listsCursor, swimlanesCursor];
 });
 
-Meteor.publish('myCards', async function(sessionId) {
+Meteor.publish('myCards', async function(sessionId: string) {
   check(sessionId, String);
 
   if (!this.userId) return this.ready();
@@ -263,12 +263,12 @@ Meteor.publish('myCards', async function(sessionId) {
   };
 
   const { cursors, sessionData } = await findCards(sessionId, query, this.userId);
-  if (sessionData) this.added('sessiondata', sessionData._id, sessionData);
+  if (sessionData) this.added('sessiondata', (sessionData as WekanDocumentField)._id, sessionData);
   return cursors;
 });
 
 // Optimized due cards publication for better performance
-Meteor.publish('dueCards', async function(allUsers = false) {
+Meteor.publish('dueCards', async function(allUsers: boolean = false) {
   check(allUsers, Boolean);
 
   const userId = this.userId;
@@ -282,14 +282,14 @@ Meteor.publish('dueCards', async function(allUsers = false) {
       { permission: 'public' },
       { members: { $elemMatch: { userId, isActive: true } } }
     ]
-  })).map(board => board._id);
+  })).map((board: WekanDocumentField) => board._id);
 
   if (userBoards.length === 0) {
     return this.ready();
   }
 
   // Build optimized selector
-  const selector = {
+  const selector: Record<string, WekanDocumentField> = {
     type: 'cardType-card',
     archived: false,
     dueAt: { $exists: true, $nin: [null, ''] },
@@ -329,7 +329,7 @@ Meteor.publish('dueCards', async function(allUsers = false) {
   return result;
 });
 
-Meteor.publish('globalSearch', async function(sessionId, params, text) {
+Meteor.publish('globalSearch', async function(sessionId: string, params: object, text: string) {
   check(sessionId, String);
   check(params, Object);
   check(text, String);
@@ -338,14 +338,14 @@ Meteor.publish('globalSearch', async function(sessionId, params, text) {
 
   const { cursors, sessionData } = await findCards(
     sessionId,
-    await buildQuery(new QueryParams(params, text), this.userId),
+    await buildQuery(new QueryParams(params as WekanDocumentField, text), this.userId),
     this.userId,
   );
-  if (sessionData) this.added('sessiondata', sessionData._id, sessionData);
+  if (sessionData) this.added('sessiondata', (sessionData as WekanDocumentField)._id, sessionData);
   return cursors;
 });
 
-Meteor.publish('sessionData', async function(sessionId) {
+Meteor.publish('sessionData', async function(sessionId: string) {
   check(sessionId, String);
   const userId = this.userId;
 
@@ -359,20 +359,20 @@ Meteor.publish('sessionData', async function(sessionId) {
   return cursor;
 });
 
-async function buildSelector(queryParams, userId) {
+async function buildSelector(queryParams: WekanQueryParams, userId: string | null) {
   const errors = new QueryErrors();
 
-  let selector = {};
+  let selector: Record<string, WekanDocumentField> = {};
 
   if (queryParams.selector) {
     selector = queryParams.selector;
   } else {
-    const boardsSelector = {};
+    const boardsSelector: Record<string, WekanDocumentField> = {};
 
-    let archived = false;
+    let archived: boolean | null = false;
     let endAt = null;
     if (queryParams.hasOperator(OPERATOR_STATUS)) {
-      queryParams.getPredicates(OPERATOR_STATUS).forEach(status => {
+      queryParams.getPredicates(OPERATOR_STATUS).forEach((status: WekanDocumentField) => {
         if (status === PREDICATE_ARCHIVED) {
           archived = true;
         } else if (status === PREDICATE_ALL) {
@@ -471,13 +471,13 @@ async function buildSelector(queryParams, userId) {
     }
 
     if (queryParams.hasOperator(OPERATOR_BOARD)) {
-      const queryBoards = [];
+      const queryBoards: WekanDocumentField[] = [];
       for (const query of queryParams.getPredicates(OPERATOR_BOARD)) {
         const boards = await Boards.userSearch(userId, {
           title: new RegExp(escapeForRegex(query), 'i'),
         });
         if (boards.length) {
-          boards.forEach(board => {
+          boards.forEach((board: WekanDocumentField) => {
             queryBoards.push(board._id);
           });
         } else {
@@ -489,13 +489,13 @@ async function buildSelector(queryParams, userId) {
     }
 
     if (queryParams.hasOperator(OPERATOR_SWIMLANE)) {
-      const querySwimlanes = [];
+      const querySwimlanes: WekanDocumentField[] = [];
       for (const query of queryParams.getPredicates(OPERATOR_SWIMLANE)) {
         const swimlanes = await ReactiveCache.getSwimlanes({
           title: new RegExp(escapeForRegex(query), 'i'),
         });
         if (swimlanes.length) {
-          swimlanes.forEach(swim => {
+          swimlanes.forEach((swim: WekanDocumentField) => {
             querySwimlanes.push(swim._id);
           });
         } else {
@@ -511,13 +511,13 @@ async function buildSelector(queryParams, userId) {
     }
 
     if (queryParams.hasOperator(OPERATOR_LIST)) {
-      const queryLists = [];
+      const queryLists: WekanDocumentField[] = [];
       for (const query of queryParams.getPredicates(OPERATOR_LIST)) {
         const lists = await ReactiveCache.getLists({
           title: new RegExp(escapeForRegex(query), 'i'),
         });
         if (lists.length) {
-          lists.forEach(list => {
+          lists.forEach((list: WekanDocumentField) => {
             queryLists.push(list._id);
           });
         } else {
@@ -537,11 +537,11 @@ async function buildSelector(queryParams, userId) {
         userId,
         queryParams.getPredicates(OPERATOR_COMMENT),
       ) : [];
-      const cardIds = commentsFound.map(com => com.cardId);
+      const cardIds = commentsFound.map((com: WekanDocumentField) => com.cardId);
       if (cardIds.length) {
         selector._id = { $in: cardIds };
       } else {
-        queryParams.getPredicates(OPERATOR_COMMENT).forEach(comment => {
+        queryParams.getPredicates(OPERATOR_COMMENT).forEach((comment: WekanDocumentField) => {
           errors.addNotFound(OPERATOR_COMMENT, comment);
         });
       }
@@ -555,7 +555,7 @@ async function buildSelector(queryParams, userId) {
       }
     });
 
-    const queryUsers = {};
+    const queryUsers: Record<string, WekanDocumentField> = {};
     queryUsers[OPERATOR_ASSIGNEE] = [];
     queryUsers[OPERATOR_MEMBER] = [];
     queryUsers[OPERATOR_CREATOR] = [];
@@ -595,19 +595,19 @@ async function buildSelector(queryParams, userId) {
     }
 
     if (queryParams.hasOperator(OPERATOR_LABEL)) {
-      const queryLabels = [];
+      const queryLabels: WekanDocumentField[] = [];
       for (const label of queryParams.getPredicates(OPERATOR_LABEL)) {
         let boards = await Boards.userBoards(userId, null, {
           labels: { $elemMatch: { color: label.toLowerCase() } },
         });
 
         if (boards.length) {
-          boards.forEach(board => {
+          boards.forEach((board: WekanDocumentField) => {
             board.labels
-              .filter(boardLabel => {
+              .filter((boardLabel: WekanDocumentField) => {
                 return boardLabel.color === label.toLowerCase();
               })
-              .forEach(boardLabel => {
+              .forEach((boardLabel: WekanDocumentField) => {
                 queryLabels.push(boardLabel._id);
               });
           });
@@ -618,15 +618,15 @@ async function buildSelector(queryParams, userId) {
           });
 
           if (boards.length) {
-            boards.forEach(board => {
+            boards.forEach((board: WekanDocumentField) => {
               board.labels
-                .filter(boardLabel => {
+                .filter((boardLabel: WekanDocumentField) => {
                   if (!boardLabel.name) {
                     return false;
                   }
                   return boardLabel.name.match(reLabel);
                 })
-                .forEach(boardLabel => {
+                .forEach((boardLabel: WekanDocumentField) => {
                   queryLabels.push(boardLabel._id);
                 });
             });
@@ -647,7 +647,7 @@ async function buildSelector(queryParams, userId) {
             selector.$and.push({
               _id: {
                 $in: (await ReactiveCache.getAttachments({}, { fields: { cardId: 1 } })).map(
-                  a => a.cardId,
+                  (a: WekanDocumentField) => a.cardId,
                 ),
               },
             });
@@ -656,7 +656,7 @@ async function buildSelector(queryParams, userId) {
             selector.$and.push({
               _id: {
                 $in: (await ReactiveCache.getChecklists({}, { fields: { cardId: 1 } })).map(
-                  a => a.cardId,
+                  (a: WekanDocumentField) => a.cardId,
                 ),
               },
             });
@@ -694,7 +694,7 @@ async function buildSelector(queryParams, userId) {
         {
           $or: [
             { title: regex },
-            { _id: { $in: items.map(item => item.checklistId) } },
+            { _id: { $in: items.map((item: WekanDocumentField) => item.checklistId) } },
           ],
         },
         { fields: { cardId: 1 } },
@@ -714,14 +714,14 @@ async function buildSelector(queryParams, userId) {
         { fields: { cardId: 1 } },
       );
 
-      let cardsSelector = [
+      let cardsSelector: WekanDocumentField[] = [
           { title: regex },
           { description: regex },
           { customFields: { $elemMatch: { value: regex } } },
-          { _id: { $in: checklists.map(list => list.cardId) } },
-          { _id: { $in: attachments.map(attach => attach.cardId) } },
+          { _id: { $in: checklists.map((list: WekanDocumentField) => list.cardId) } },
+          { _id: { $in: attachments.map((attach: WekanDocumentField) => attach.cardId) } },
           // #5910: include cards whose comment text matches (board-scoped).
-          { _id: { $in: comments.map(com => com.cardId) } },
+          { _id: { $in: comments.map((com: WekanDocumentField) => com.cardId) } },
         ];
       if (queryParams.text === "false" || queryParams.text === "true") {
         cardsSelector.push({ customFields: { $elemMatch: { value: queryParams.text === "true" } } } );
@@ -730,18 +730,18 @@ async function buildSelector(queryParams, userId) {
     }
 
     if (queryParams.hasOperator(OPERATOR_TITLE)) {
-      const regexes = queryParams.getPredicates(OPERATOR_TITLE).map(t => new RegExp(escapeForRegex(t), 'i'));
-      selector.$and.push({ $or: regexes.map(regex => ({ title: regex })) });
+      const regexes = queryParams.getPredicates(OPERATOR_TITLE).map((t: WekanDocumentField) => new RegExp(escapeForRegex(t), 'i'));
+      selector.$and.push({ $or: regexes.map((regex: WekanDocumentField) => ({ title: regex })) });
     }
 
     if (queryParams.hasOperator(OPERATOR_DESCRIPTION)) {
-      const regexes = queryParams.getPredicates(OPERATOR_DESCRIPTION).map(t => new RegExp(escapeForRegex(t), 'i'));
-      selector.$and.push({ $or: regexes.map(regex => ({ description: regex })) });
+      const regexes = queryParams.getPredicates(OPERATOR_DESCRIPTION).map((t: WekanDocumentField) => new RegExp(escapeForRegex(t), 'i'));
+      selector.$and.push({ $or: regexes.map((regex: WekanDocumentField) => ({ description: regex })) });
     }
 
     if (queryParams.hasOperator(OPERATOR_CUSTOMFIELD)) {
-      const regexes = queryParams.getPredicates(OPERATOR_CUSTOMFIELD).map(t => new RegExp(escapeForRegex(t), 'i'));
-      selector.$and.push({ $or: regexes.map(regex => ({ customFields: { $elemMatch: { value: regex } } })) });
+      const regexes = queryParams.getPredicates(OPERATOR_CUSTOMFIELD).map((t: WekanDocumentField) => new RegExp(escapeForRegex(t), 'i'));
+      selector.$and.push({ $or: regexes.map((regex: WekanDocumentField) => ({ customFields: { $elemMatch: { value: regex } } })) });
     }
 
     if (queryParams.hasOperator(OPERATOR_ATTACHMENT_TEXT)) {
@@ -749,7 +749,7 @@ async function buildSelector(queryParams, userId) {
         const regex = new RegExp(escapeForRegex(t), 'i');
         const attachments = await ReactiveCache.getAttachments({ 'original.name': regex });
         if (attachments.length) {
-          selector.$and.push({ _id: { $in: attachments.map(attach => attach.cardId) } });
+          selector.$and.push({ _id: { $in: attachments.map((attach: WekanDocumentField) => attach.cardId) } });
         } else {
           selector.$and.push({ _id: null });
         }
@@ -767,13 +767,13 @@ async function buildSelector(queryParams, userId) {
           {
             $or: [
               { title: regex },
-              { _id: { $in: items.map(item => item.checklistId) } },
+              { _id: { $in: items.map((item: WekanDocumentField) => item.checklistId) } },
             ],
           },
           { fields: { cardId: 1 } },
         );
         if (checklists.length) {
-          selector.$and.push({ _id: { $in: checklists.map(list => list.cardId) } });
+          selector.$and.push({ _id: { $in: checklists.map((list: WekanDocumentField) => list.cardId) } });
         } else {
           selector.$and.push({ _id: null });
         }
@@ -793,14 +793,14 @@ async function buildSelector(queryParams, userId) {
   return query;
 }
 
-function buildProjection(query) {
+function buildProjection(query: WekanQuery) {
 
   let skip = 0;
   if (query.getQueryParams().skip) {
     skip = query.getQueryParams().skip;
   }
   let limit = DEFAULT_LIMIT;
-  const configLimit = parseInt(process.env.RESULTS_PER_PAGE, 10);
+  const configLimit = parseInt(process.env.RESULTS_PER_PAGE as string, 10);
   if (!isNaN(configLimit) && configLimit > 0) {
     limit = configLimit;
   }
@@ -809,7 +809,7 @@ function buildProjection(query) {
     limit = query.getQueryParams().getPredicate(OPERATOR_LIMIT);
   }
 
-  const projection = {
+  const projection: Record<string, WekanDocumentField> = {
     fields: {
       _id: 1,
       archived: 1,
@@ -895,13 +895,13 @@ function buildProjection(query) {
   return query;
 }
 
-async function buildQuery(queryParams, userId) {
+async function buildQuery(queryParams: WekanQueryParams, userId: string | null) {
   const query = await buildSelector(queryParams, userId);
 
   return buildProjection(query);
 }
 
-Meteor.publish('brokenCards', async function(sessionId) {
+Meteor.publish('brokenCards', async function(sessionId: string) {
   check(sessionId, String);
 
   const params = new QueryParams();
@@ -915,11 +915,11 @@ Meteor.publish('brokenCards', async function(sessionId) {
   ];
 
   const { cursors: brokenCursors, sessionData: brokenSessionData } = await findCards(sessionId, query, this.userId);
-  if (brokenSessionData) this.added('sessiondata', brokenSessionData._id, brokenSessionData);
+  if (brokenSessionData) this.added('sessiondata', (brokenSessionData as WekanDocumentField)._id, brokenSessionData);
   return brokenCursors;
 });
 
-Meteor.publish('nextPage', async function(sessionId) {
+Meteor.publish('nextPage', async function(sessionId: string) {
   check(sessionId, String);
 
   const session = await ReactiveCache.getSessionData({ sessionId });
@@ -927,11 +927,11 @@ Meteor.publish('nextPage', async function(sessionId) {
   projection.skip = session.lastHit;
 
   const { cursors: nextCursors, sessionData: nextSessionData } = await findCards(sessionId, new Query(session.getSelector(), projection), this.userId);
-  if (nextSessionData) this.added('sessiondata', nextSessionData._id, nextSessionData);
+  if (nextSessionData) this.added('sessiondata', (nextSessionData as WekanDocumentField)._id, nextSessionData);
   return nextCursors;
 });
 
-Meteor.publish('previousPage', async function(sessionId) {
+Meteor.publish('previousPage', async function(sessionId: string) {
   check(sessionId, String);
 
   const session = await ReactiveCache.getSessionData({ sessionId });
@@ -939,11 +939,11 @@ Meteor.publish('previousPage', async function(sessionId) {
   projection.skip = session.lastHit - session.resultsCount - projection.limit;
 
   const { cursors: prevCursors, sessionData: prevSessionData } = await findCards(sessionId, new Query(session.getSelector(), projection), this.userId);
-  if (prevSessionData) this.added('sessiondata', prevSessionData._id, prevSessionData);
+  if (prevSessionData) this.added('sessiondata', (prevSessionData as WekanDocumentField)._id, prevSessionData);
   return prevCursors;
 });
 
-async function findCards(sessionId, query, userId) {
+async function findCards(sessionId: string, query: WekanQuery, userId: string | null) {
   let textMatches = query.getQueryParams().text;
   let isTextSearch = !!textMatches;
   let dbProjection = query.projection;
@@ -960,13 +960,13 @@ async function findCards(sessionId, query, userId) {
   if (isTextSearch && totalCardsCount > 0) {
     let fetched = typeof cards.fetchAsync === 'function' ? await cards.fetchAsync() : cards.fetch();
     const regex = new RegExp(escapeForRegex(textMatches), 'i');
-    fetched.forEach(c => {
+    fetched.forEach((c: WekanDocumentField) => {
       c._score = 0;
       if (c.title && regex.test(c.title)) c._score += 10;
       else if (c.description && regex.test(c.description)) c._score += 5;
-      else if (c.customFields && c.customFields.some(f => f.value && regex.test(String(f.value)))) c._score += 1;
+      else if (c.customFields && c.customFields.some((f: WekanDocumentField) => f.value && regex.test(String(f.value)))) c._score += 1;
     });
-    fetched.sort((a, b) => {
+    fetched.sort((a: WekanDocumentField, b: WekanDocumentField) => {
       if (b._score !== a._score) return b._score - a._score;
       return (a.title || '').localeCompare(b.title || '');
     });
@@ -974,7 +974,7 @@ async function findCards(sessionId, query, userId) {
     const skip = query.projection.skip || 0;
     const limit = query.projection.limit || 25;
     const page = fetched.slice(skip, skip + limit);
-    orderedIds = page.map(c => c._id);
+    orderedIds = page.map((c: WekanDocumentField) => c._id);
 
     // override the cursor to only contain the paginated results for this page
     cards = await ReactiveCache.getCards({ _id: { $in: orderedIds } }, { fields: query.projection.fields }, true);
@@ -1007,20 +1007,20 @@ async function findCards(sessionId, query, userId) {
       update.$set.cards = orderedIds;
     } else {
       const cardArray = typeof cards.fetchAsync === 'function' ? await cards.fetchAsync() : cards.fetch();
-      update.$set.cards = cardArray.map(card => card._id);
+      update.$set.cards = cardArray.map((card: WekanDocumentField) => card._id);
     }
     update.$set.resultsCount = update.$set.cards.length;
   }
 
 
-  const upsertResult = typeof SessionData.upsertAsync === 'function' ? await SessionData.upsertAsync({ userId, sessionId }, update) : SessionData.upsert({ userId, sessionId }, update);
+  const upsertResult = typeof SessionData.upsertAsync === 'function' ? await SessionData.upsertAsync({ userId: userId as string, sessionId }, update) : SessionData.upsert({ userId: userId as string, sessionId }, update);
 
   // Check if the session data was actually stored
-  const storedSessionData = typeof SessionData.findOneAsync === 'function' ? await SessionData.findOneAsync({ userId, sessionId }) : SessionData.findOne({ userId, sessionId });
+  const storedSessionData = typeof SessionData.findOneAsync === 'function' ? await SessionData.findOneAsync({ userId: userId as string, sessionId }) : SessionData.findOne({ userId: userId as string, sessionId });
 
   // remove old session data
   const removeSelector = {
-    userId,
+    userId: userId as string,
     modifiedAt: {
       $lt: new Date(
         subtract(now(), 1, 'day').toISOString(),
@@ -1034,16 +1034,16 @@ async function findCards(sessionId, query, userId) {
   }
 
   if (cards && totalCardsCount > 0) {
-    const boards = [];
-    const swimlanes = [];
-    const lists = [];
-    const customFieldIds = [];
+    const boards: WekanDocumentField[] = [];
+    const swimlanes: WekanDocumentField[] = [];
+    const lists: WekanDocumentField[] = [];
+    const customFieldIds: WekanDocumentField[] = [];
     const users = [userId];
 
     const cardArray = typeof cards.fetchAsync === 'function' ? await cards.fetchAsync() : cards.fetch();
-    const cardIds = cardArray.map(c => c._id);
+    const cardIds = cardArray.map((c: WekanDocumentField) => c._id);
 
-    cardArray.forEach(card => {
+    cardArray.forEach((card: WekanDocumentField) => {
       if (card.boardId) boards.push(card.boardId);
       if (card.swimlaneId) swimlanes.push(card.swimlaneId);
       if (card.listId) lists.push(card.listId);
@@ -1051,17 +1051,17 @@ async function findCards(sessionId, query, userId) {
         users.push(card.userId);
       }
       if (card.members) {
-        card.members.forEach(userId => {
+        card.members.forEach((userId: WekanDocumentField) => {
           users.push(userId);
         });
       }
       if (card.assignees) {
-        card.assignees.forEach(userId => {
+        card.assignees.forEach((userId: WekanDocumentField) => {
           users.push(userId);
         });
       }
       if (card.customFields) {
-        card.customFields.forEach(field => {
+        card.customFields.forEach((field: WekanDocumentField) => {
           customFieldIds.push(field._id);
         });
       }
@@ -1103,7 +1103,7 @@ async function findCards(sessionId, query, userId) {
 // board/swimlane/list/member context. Uses plain server-side limit/skip just
 // like the org/team/people admin lists, so only the current page is ever sent
 // to the browser instead of the whole Cards collection.
-Meteor.publish('cardsReport', async function(searchTerm = '', limit, skip = 0) {
+Meteor.publish('cardsReport', async function(searchTerm: string | null = '', limit: number, skip: number | null = 0) {
   check(searchTerm, Match.OneOf(String, null, undefined));
   check(limit, Number);
   check(skip, Match.OneOf(Number, null, undefined));
@@ -1111,7 +1111,7 @@ Meteor.publish('cardsReport', async function(searchTerm = '', limit, skip = 0) {
     return this.ready();
   }
 
-  const query = {};
+  const query: Record<string, WekanDocumentField> = {};
   if (searchTerm) {
     query.title = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
   }
@@ -1126,12 +1126,12 @@ Meteor.publish('cardsReport', async function(searchTerm = '', limit, skip = 0) {
   const listIds = new Set();
   const swimlaneIds = new Set();
   const userIds = new Set();
-  cards.forEach(card => {
+  cards.forEach((card: WekanDocumentField) => {
     if (card.boardId) boardIds.add(card.boardId);
     if (card.listId) listIds.add(card.listId);
     if (card.swimlaneId) swimlaneIds.add(card.swimlaneId);
-    (card.members || []).forEach(userId => userIds.add(userId));
-    (card.assignees || []).forEach(userId => userIds.add(userId));
+    (card.members || []).forEach((userId: WekanDocumentField) => userIds.add(userId));
+    (card.assignees || []).forEach((userId: WekanDocumentField) => userIds.add(userId));
   });
 
   return [
@@ -1144,12 +1144,12 @@ Meteor.publish('cardsReport', async function(searchTerm = '', limit, skip = 0) {
 });
 
 Meteor.methods({
-  async getCardsReportCount(searchTerm = '') {
+  async getCardsReportCount(searchTerm: string | null = '') {
     check(searchTerm, Match.OneOf(String, null, undefined));
     if (!this.userId || !(await ReactiveCache.getUser(this.userId))?.isAdmin) {
       throw new Meteor.Error('not-authorized');
     }
-    const query = {};
+    const query: Record<string, WekanDocumentField> = {};
     if (searchTerm) {
       query.title = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     }
@@ -1157,3 +1157,12 @@ Meteor.methods({
     return typeof cursor.countAsync === 'function' ? await cursor.countAsync() : cursor.count();
   },
 });
+
+// These search helpers consume `QueryParams` / `Query` through runtime-only
+// shapes that the migrated class types in /config/query-classes do not model
+// (e.g. a precomputed `.selector`/`.skip` on the params, and predicate lists
+// treated uniformly as arrays). They are therefore treated as documented
+// interop values rather than re-deriving those incomplete class types, which
+// keeps behaviour identical without editing the out-of-scope query classes.
+type WekanQueryParams = WekanDocumentField;
+type WekanQuery = WekanDocumentField;

@@ -1,7 +1,7 @@
 import Users from '/models/users';
 import { ReactiveCache } from '/imports/reactiveCache';
 
-Meteor.publish('user-miniprofile', async function (usernames) {
+Meteor.publish('user-miniprofile', async function (usernames: string[]) {
   check(usernames, Array);
 
   // eslint-disable-next-line no-console
@@ -25,7 +25,7 @@ Meteor.publish('user-miniprofile', async function (usernames) {
 });
 
 Meteor.publish('user-admin', function () {
-  const ret = Meteor.users.find(this.userId, {
+  const ret = Meteor.users.find(this.userId as string, {
     fields: {
       isAdmin: 1,
       teams: 1,
@@ -36,7 +36,7 @@ Meteor.publish('user-admin', function () {
   return ret;
 });
 
-Meteor.publish('user-authenticationMethod', async function (match) {
+Meteor.publish('user-authenticationMethod', async function (match: string) {
   check(match, String);
   const ret = await ReactiveCache.getUsers(
     { $or: [{ _id: match }, { email: match }, { username: match }] },
@@ -53,7 +53,7 @@ Meteor.publish('user-authenticationMethod', async function (match) {
 });
 
 // Secure user search publication for board sharing
-Meteor.publish('user-search', async function (searchTerm) {
+Meteor.publish('user-search', async function (searchTerm: string) {
   check(searchTerm, String);
 
   // Only allow logged-in users to search for other users

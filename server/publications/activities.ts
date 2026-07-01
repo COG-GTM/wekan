@@ -5,7 +5,7 @@ import { ReactiveCache } from '/imports/reactiveCache';
 // 2. The card activity tab
 // We use this publication to paginate for these two publications.
 
-Meteor.publish('activities', async function(kind, id, limit, showActivities) {
+Meteor.publish('activities', async function(kind: string, id: string | undefined, limit: number, showActivities: boolean) {
   check(
     kind,
     Match.Where(x => {

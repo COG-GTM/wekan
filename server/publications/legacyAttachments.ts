@@ -18,13 +18,13 @@ import { ReactiveCache } from '/imports/reactiveCache';
 // snapshot (no observe). Migrating the files to Meteor-Files removes them from
 // here and publishes them through the normal path instead.
 
-function extensionOf(name) {
+function extensionOf(name: string) {
   if (!name) return '';
   const dot = name.lastIndexOf('.');
   return dot >= 0 ? name.slice(dot + 1).toLowerCase() : '';
 }
 
-Meteor.publish('legacyBoardAttachments', async function (boardId) {
+Meteor.publish('legacyBoardAttachments', async function (boardId: string) {
   check(boardId, String);
 
   if (!this.userId) {
@@ -35,7 +35,7 @@ Meteor.publish('legacyBoardAttachments', async function (boardId) {
     return this.ready();
   }
 
-  let records = [];
+  let records: WekanDocumentField[] = [];
   try {
     // Use the raw MongoDB driver: a Meteor Mongo.Collection for
     // 'cfs.attachments.filerecord' already exists elsewhere and Meteor forbids a
