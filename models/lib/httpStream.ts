@@ -1,4 +1,13 @@
-export const httpStreamOutput = function(readStream, name, http, downloadFlag, cacheControl) {
+import type { Readable } from 'stream';
+import type { ServerResponse } from 'http';
+
+export const httpStreamOutput = function(
+  readStream: Readable,
+  name: string,
+  http: HttpStreamContext,
+  downloadFlag: string,
+  cacheControl?: string,
+) {
     readStream.on('data', data => {
       http.response.write(data);
     });
@@ -32,7 +41,7 @@ export const httpStreamOutput = function(readStream, name, http, downloadFlag, c
   };
 
 /** will initiate download, if links are called with ?download="true" queryparam */
-const getContentDisposition = (name, downloadFlag) => {
+const getContentDisposition = (name: string, downloadFlag?: string) => {
   // Force attachment disposition for SVG files to prevent XSS attacks
   const isSvgFile = name && name.toLowerCase().endsWith('.svg');
   const forceAttachment = isSvgFile || downloadFlag === 'true';
@@ -44,3 +53,10 @@ const getContentDisposition = (name, downloadFlag) => {
 
   return `${dispositionType} ${dispositionName} ${dispositionEncoding}`;
 };
+
+// The Meteor Files download context: the raw Node response plus the parsed
+// request params carrying the optional `?download=` query flag.
+interface HttpStreamContext {
+  response: ServerResponse;
+  params?: { query?: { download?: string } };
+}

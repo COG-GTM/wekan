@@ -156,6 +156,23 @@ interface MigrationCollection {
 
 declare const db: { [collection: string]: MigrationCollection };
 
+// @types/meteor declares `MongoInternals` only as a GLOBAL namespace, but app
+// code imports it from 'meteor/mongo'. Expose it as a module export with the
+// members the app uses — including `NpmModule` (singular), the raw `mongodb`
+// module the bundled driver provides for `ObjectId` / `GridFSBucket`, which
+// @types/meteor omits (it only has the plural `NpmModules`).
+declare module 'meteor/mongo' {
+  namespace MongoInternals {
+    function defaultRemoteCollectionDriver(): {
+      mongo: { db: import('mongodb').Db };
+    };
+    var NpmModule: typeof import('mongodb');
+    var NpmModules: {
+      mongodb: { version: string; module: typeof import('mongodb') };
+    };
+  }
+}
+
 // Meteor's global package registry (Package.<name> -> that package's exports).
 // Values are whole package export bags, so they are inherently dynamic (`any`).
 declare const Package: { [name: string]: any };
