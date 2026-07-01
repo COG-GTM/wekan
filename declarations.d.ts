@@ -239,8 +239,20 @@ declare const Npm: { require(id: string): WekanDocumentField };
 
 // Meteor's webapp package. Wekan reaches it via `require('meteor/webapp')` in
 // most routes, but the /metrics route uses it as a bare global; expose the
-// small `handlers` surface it touches.
-declare const WebApp: { handlers: WekanDocumentField };
+// small `handlers` surface it touches. The CORS/permissions-policy startup hook
+// registers connect-style middleware on the lower-level `rawHandlers` router.
+declare const WebApp: {
+  handlers: WekanDocumentField;
+  rawHandlers: {
+    use(
+      handler: (
+        req: WekanWebAppRequest,
+        res: WekanWebAppResponse,
+        next: (error?: WekanDocumentField) => void,
+      ) => void,
+    ): void;
+  };
+};
 
 // Meteor's `check` package registers `check` and `Match` as globals when loaded.
 // @types/meteor only models them as exports of the 'meteor/check' module, so
