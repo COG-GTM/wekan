@@ -7,7 +7,7 @@ import {
   shouldProcessHeaderLoginMiddlewareRequest,
 } from '/server/lib/headerLoginAuth';
 
-async function issueLoginTokenCookies(userId, req, res) {
+async function issueLoginTokenCookies(userId: string, req: HeaderLoginRequest, res: WekanConnectResponse) {
   if (!userId) {
     return;
   }
@@ -65,7 +65,7 @@ Meteor.startup(() => {
       );
     }
     if (!isSandstorm) {
-      WebApp.handlers.use(async (req, res, next) => {
+      WebApp.handlers.use(async (req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) => {
         try {
           if (!shouldProcessHeaderLoginMiddlewareRequest(req)) {
             return next();
@@ -89,3 +89,14 @@ Meteor.startup(() => {
     }
   }
 });
+
+// The request fields issueLoginTokenCookies inspects to decide cookie security.
+// `socket.encrypted` is present on TLS sockets; kept optional so a real
+// WekanConnectRequest satisfies it.
+interface HeaderLoginRequest {
+  headers?: { [key: string]: string | string[] | undefined };
+  // `socket.encrypted` marks a TLS connection. The index signature keeps a real
+  // Node `Socket` (whose many members are not modelled here) assignable; its
+  // element type is `any` only because we read the single `encrypted` field.
+  socket?: { encrypted?: boolean; [key: string]: any };
+}

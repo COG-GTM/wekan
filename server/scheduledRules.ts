@@ -11,12 +11,12 @@ import Activities from '/models/activities';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BOARD_LEVEL_ACTIONS = ['createCard', 'addSwimlane', 'moveAllCardsInList'];
 
-function pad(n) {
+function pad(n: number) {
   return String(n).padStart(2, '0');
 }
 
 // Has this calendar-scheduled trigger reached its day/date condition right now?
-function calendarDue(trigger, now) {
+function calendarDue(trigger: ScheduledTrigger, now: Date) {
   const dow = now.getDay(); // 0 = Sunday … 6 = Saturday
   const dom = now.getDate();
   switch (trigger.scheduleType) {
@@ -39,7 +39,7 @@ function calendarDue(trigger, now) {
 
 // Days a card has spent in its current list, from the most recent move/create
 // activity for that card (falls back to the card creation date).
-async function daysInList(card) {
+async function daysInList(card: CardDoc) {
   const acts = await ReactiveCache.getActivities(
     { cardId: card._id, activityType: { $in: ['moveCard', 'createCard'] } },
     { sort: { createdAt: -1 }, limit: 1 },
@@ -50,8 +50,8 @@ async function daysInList(card) {
 }
 
 // Resolve which cards a scheduled trigger should act on.
-async function selectCards(trigger) {
-  const selector = { boardId: trigger.boardId, archived: false };
+async function selectCards(trigger: ScheduledTrigger) {
+  const selector: CardSelector = { boardId: trigger.boardId, archived: false };
   if (trigger.listName && trigger.listName !== '*') {
     const list = await ReactiveCache.getList({
       title: trigger.listName,
@@ -65,7 +65,7 @@ async function selectCards(trigger) {
   if (trigger.scheduleKind === 'due') {
     const now = Date.now();
     const window = (Number(trigger.days) || 0) * DAY_MS;
-    cards = cards.filter(c => {
+    cards = cards.filter((c: CardDoc) => {
       if (!c.dueAt) return false;
       const due = new Date(c.dueAt).getTime();
       if (trigger.dueCondition === 'set') return true;
@@ -86,7 +86,7 @@ async function selectCards(trigger) {
   return cards;
 }
 
-async function runDueTrigger(trigger, slotKey, now) {
+async function runDueTrigger(trigger: ScheduledTrigger, slotKey: string, now: Date) {
   const rule = await ReactiveCache.getRule({ triggerId: trigger._id });
   if (!rule) return;
   const action = await ReactiveCache.getAction(rule.actionId);
@@ -127,9 +127,9 @@ export async function scanScheduledRules(now = new Date()) {
     now.getDate(),
   )} ${hhmm}`;
 
-  const triggers = await Triggers.find({
+  const triggers = (await Triggers.find({
     activityType: 'scheduledTrigger',
-  }).fetchAsync();
+  }).fetchAsync()) as ScheduledTrigger[];
 
   for (const trigger of triggers) {
     try {
@@ -151,7 +151,7 @@ Meteor.startup(() => {
   try {
     SyncedCron.add({
       name: 'wekan-scheduled-rules',
-      schedule(parser) {
+      schedule(parser: CronParser) {
         return parser.text('every 1 minute');
       },
       job() {
@@ -163,3 +163,41 @@ Meteor.startup(() => {
     console.error('scheduledRules: failed to register cron job', e);
   }
 });
+
+// A scheduled-trigger document (schemaless `triggers` collection) as read by the
+// scheduled-rules scanner. All scheduling fields are optional because they vary
+// by scheduleKind/scheduleType.
+interface ScheduledTrigger {
+  _id: string;
+  boardId: string;
+  scheduleType?: string;
+  scheduleKind?: string;
+  onDate?: string;
+  weekday?: string | number;
+  dayOfMonth?: string | number;
+  listName?: string;
+  days?: string | number;
+  dueCondition?: string;
+  atTime?: string;
+  lastRunKey?: string;
+}
+
+// The subset of a card document the scheduler reads when selecting/aging cards.
+interface CardDoc {
+  _id: string;
+  dueAt?: Date | string;
+  createdAt?: Date | string;
+}
+
+// The Cards query selector selectCards builds; listId is added only when a
+// specific list is targeted.
+interface CardSelector {
+  boardId: string;
+  archived: boolean;
+  listId?: string;
+}
+
+// The later.js-style parser passed to SyncedCron's schedule callback.
+interface CronParser {
+  text(spec: string): object;
+}

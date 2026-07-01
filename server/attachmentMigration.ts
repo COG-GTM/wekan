@@ -13,12 +13,14 @@ import AttachmentMigrationStatus from '/models/attachmentMigrationStatus';
 // Reactive variables for tracking migration progress
 const migrationProgress = new ReactiveVar(0);
 const migrationStatus = new ReactiveVar('');
-const unconvertedAttachments = new ReactiveVar([]);
+const unconvertedAttachments = new ReactiveVar<AttachmentDoc[]>([]);
 
 // Track migrated boards on server side
 const migratedBoards = new Set();
 
 class AttachmentMigrationService {
+  migrationCache: Map<string, boolean>;
+
   constructor() {
     this.migrationCache = new Map();
   }
@@ -28,7 +30,7 @@ class AttachmentMigrationService {
    * @param {string} boardId - The board ID
    * @returns {boolean} - True if board has been migrated
    */
-  async isBoardMigrated(boardId) {
+  async isBoardMigrated(boardId: string) {
     const isMigrated = migratedBoards.has(boardId);
 
     // Update status collection for pub/sub
@@ -50,7 +52,7 @@ class AttachmentMigrationService {
    * Migrate all attachments for a board
    * @param {string} boardId - The board ID
    */
-  async migrateBoardAttachments(boardId) {
+  async migrateBoardAttachments(boardId: string) {
     try {
       // Check if board has already been migrated
       if (await this.isBoardMigrated(boardId)) {
@@ -132,7 +134,7 @@ class AttachmentMigrationService {
    * @param {Object} attachment - The attachment object
    * @returns {boolean} - True if attachment needs migration
    */
-  needsMigration(attachment) {
+  needsMigration(attachment: AttachmentDoc) {
     if (this.migrationCache.has(attachment._id)) {
       return false; // Already migrated
     }
@@ -148,7 +150,7 @@ class AttachmentMigrationService {
    * Migrate a single attachment
    * @param {Object} attachment - The attachment object
    */
-  async migrateAttachment(attachment) {
+  async migrateAttachment(attachment: AttachmentDoc) {
     try {
       // Get the card to find board and list information
       const card = await ReactiveCache.getCard(attachment.cardId);
@@ -164,7 +166,7 @@ class AttachmentMigrationService {
       }
 
       // Update attachment with new structure
-      const updateData = {
+      const updateData: { meta: AttachmentMeta } = {
         meta: {
           cardId: attachment.cardId,
           boardId: list.boardId,
@@ -198,13 +200,13 @@ class AttachmentMigrationService {
    * @param {string} boardId - The board ID
    * @returns {Array} - Array of unconverted attachments
    */
-  async getUnconvertedAttachments(boardId) {
+  async getUnconvertedAttachments(boardId: string) {
     try {
       const attachments = await Attachments.find({
         'meta.boardId': boardId
       }).fetchAsync();
 
-      return attachments.filter(attachment => this.needsMigration(attachment));
+      return attachments.filter((attachment: AttachmentDoc) => this.needsMigration(attachment));
     } catch (error) {
       console.error('Error getting unconverted attachments:', error);
       return [];
@@ -216,7 +218,7 @@ class AttachmentMigrationService {
    * @param {string} boardId - The board ID
    * @returns {Object} - Migration progress data
    */
-  async getMigrationProgress(boardId) {
+  async getMigrationProgress(boardId: string) {
     const progress = migrationProgress.get();
     const status = migrationStatus.get();
     const unconverted = await this.getUnconvertedAttachments(boardId);
@@ -252,7 +254,7 @@ const attachmentMigrationService = new AttachmentMigrationService();
 
 // Meteor methods
 Meteor.methods({
-  async 'attachmentMigration.migrateBoardAttachments'(boardId) {
+  async 'attachmentMigration.migrateBoardAttachments'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -275,7 +277,7 @@ Meteor.methods({
     return await attachmentMigrationService.migrateBoardAttachments(boardId);
   },
 
-  async 'attachmentMigration.getProgress'(boardId) {
+  async 'attachmentMigration.getProgress'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -290,7 +292,7 @@ Meteor.methods({
     return await attachmentMigrationService.getMigrationProgress(boardId);
   },
 
-  async 'attachmentMigration.getUnconvertedAttachments'(boardId) {
+  async 'attachmentMigration.getUnconvertedAttachments'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -305,7 +307,7 @@ Meteor.methods({
     return attachmentMigrationService.getUnconvertedAttachments(boardId);
   },
 
-  async 'attachmentMigration.isBoardMigrated'(boardId) {
+  async 'attachmentMigration.isBoardMigrated'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -322,3 +324,26 @@ Meteor.methods({
 });
 
 export { attachmentMigrationService };
+
+// The attachment metadata block migrateAttachment writes. The index signature
+// (`any`) preserves arbitrary pre-existing meta fields that are spread through
+// unchanged; the named fields are the ones this migration sets explicitly.
+interface AttachmentMeta {
+  cardId?: string;
+  boardId?: string;
+  listId?: string;
+  userId?: string;
+  createdAt?: Date;
+  migratedAt?: Date;
+  [key: string]: any;
+}
+
+// The subset of an attachment document the migration service reads. `meta` is a
+// schemaless block, hence its index signature.
+interface AttachmentDoc {
+  _id: string;
+  cardId?: string;
+  userId?: string;
+  createdAt?: Date;
+  meta?: AttachmentMeta;
+}

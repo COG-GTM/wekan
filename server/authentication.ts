@@ -1,8 +1,10 @@
+import { Meteor } from 'meteor/meteor';
+import { Accounts } from 'meteor/accounts-base';
 import { ReactiveCache } from '/imports/reactiveCache';
 
 // Authentication helpers — exported for use by API routes and model files
 export const Authentication = {
-  async checkUserId(userId) {
+  async checkUserId(userId: string | undefined) {
     if (userId === undefined) {
       const error = new Meteor.Error('Unauthorized', 'Unauthorized');
       error.statusCode = 401;
@@ -19,7 +21,7 @@ export const Authentication = {
 
   // This will only check if the user is logged in.
   // The authorization checks for the user will have to be done inside each API endpoint
-  checkLoggedIn(userId) {
+  checkLoggedIn(userId: string | undefined) {
     if (userId === undefined) {
       const error = new Meteor.Error('Unauthorized', 'Unauthorized');
       error.statusCode = 401;
@@ -29,7 +31,7 @@ export const Authentication = {
 
   // An admin should be authorized to access everything, so we use a separate check for admins
   // This throws an error if otherReq is false and the user is not an admin
-  async checkAdminOrCondition(userId, otherReq) {
+  async checkAdminOrCondition(userId: string | undefined, otherReq: boolean) {
     if (otherReq) return;
     const admin = await ReactiveCache.getUser({ _id: userId, isAdmin: true });
     if (admin === undefined) {
@@ -40,36 +42,36 @@ export const Authentication = {
   },
 
   // Helper function. Will throw an error if the user is not active BoardAdmin or active Normal user of the board.
-  async checkBoardAccess(userId, boardId) {
+  async checkBoardAccess(userId: string | undefined, boardId: string) {
     Authentication.checkLoggedIn(userId);
     const board = await ReactiveCache.getBoard(boardId);
     Authentication.checkBoardExists(board);
-    const normalAccess = board.members.some(e => e.userId === userId && e.isActive && !e.isNoComments && !e.isCommentOnly && !e.isWorker);
+    const normalAccess = board.members.some((e: BoardMember) => e.userId === userId && e.isActive && !e.isNoComments && !e.isCommentOnly && !e.isWorker);
     await Authentication.checkAdminOrCondition(userId, normalAccess);
   },
 
   // Helper function. Will throw an error if the user does not have write access to the board (excludes read-only users).
-  async checkBoardWriteAccess(userId, boardId) {
+  async checkBoardWriteAccess(userId: string | undefined, boardId: string) {
     Authentication.checkLoggedIn(userId);
     const board = await ReactiveCache.getBoard(boardId);
     Authentication.checkBoardExists(board);
-    const writeAccess = board.members.some(e => e.userId === userId && e.isActive && !e.isNoComments && !e.isCommentOnly && !e.isWorker && !e.isReadOnly && !e.isReadAssignedOnly);
+    const writeAccess = board.members.some((e: BoardMember) => e.userId === userId && e.isActive && !e.isNoComments && !e.isCommentOnly && !e.isWorker && !e.isReadOnly && !e.isReadAssignedOnly);
     await Authentication.checkAdminOrCondition(userId, writeAccess);
   },
 
   // Helper function. Will throw an error if the user is not a board admin.
-  async checkBoardAdmin(userId, boardId) {
+  async checkBoardAdmin(userId: string | undefined, boardId: string) {
     Authentication.checkLoggedIn(userId);
     const board = await ReactiveCache.getBoard(boardId);
     Authentication.checkBoardExists(board);
-    const adminAccess = board.members.some(e => e.userId === userId && e.isActive && e.isAdmin);
+    const adminAccess = board.members.some((e: BoardMember) => e.userId === userId && e.isActive && e.isAdmin);
     await Authentication.checkAdminOrCondition(userId, adminAccess);
   },
 
   // Helper function. Throws a 404 error when the board does not exist, so REST
   // handlers return HTTP 404 instead of crashing on `board.members` of an
   // undefined board (which surfaced as a generic HTTP 500). See #5804.
-  checkBoardExists(board) {
+  checkBoardExists(board: BoardDoc | null | undefined) {
     if (!board) {
       const error = new Meteor.Error('NotFound', 'Board not found');
       error.statusCode = 404;
@@ -79,15 +81,17 @@ export const Authentication = {
 };
 
 Meteor.startup(() => {
-  Accounts.validateLoginAttempt(function(options) {
-    const user = options.user || {};
+  Accounts.validateLoginAttempt(function(options: { user?: LoginUser }) {
+    const user = options.user || ({} as LoginUser);
     return !user.loginDisabled;
   });
 
   if (Meteor.isServer) {
     if (
       process.env.ORACLE_OIM_ENABLED === 'true' ||
-      process.env.ORACLE_OIM_ENABLED === true
+      // Pre-existing dead comparison (env vars are strings); widen so the
+      // boolean literal comparison type-checks without changing behavior.
+      (process.env.ORACLE_OIM_ENABLED as string | boolean) === true
     ) {
       ServiceConfiguration.configurations.upsertAsync(
         // eslint-disable-line no-undef
@@ -109,7 +113,9 @@ Meteor.startup(() => {
       );
     } else if (
       process.env.OAUTH2_ENABLED === 'true' ||
-      process.env.OAUTH2_ENABLED === true
+      // Pre-existing dead comparison (env vars are strings); widen so the
+      // boolean literal comparison type-checks without changing behavior.
+      (process.env.OAUTH2_ENABLED as string | boolean) === true
     ) {
       ServiceConfiguration.configurations.upsertAsync(
         // eslint-disable-line no-undef
@@ -133,7 +139,9 @@ Meteor.startup(() => {
         );
     } else if (
       process.env.CAS_ENABLED === 'true' ||
-      process.env.CAS_ENABLED === true
+      // Pre-existing dead comparison (env vars are strings); widen so the
+      // boolean literal comparison type-checks without changing behavior.
+      (process.env.CAS_ENABLED as string | boolean) === true
     ) {
       ServiceConfiguration.configurations.upsertAsync(
         // eslint-disable-line no-undef
@@ -157,7 +165,9 @@ Meteor.startup(() => {
       );
     } else if (
       process.env.SAML_ENABLED === 'true' ||
-      process.env.SAML_ENABLED === true
+      // Pre-existing dead comparison (env vars are strings); widen so the
+      // boolean literal comparison type-checks without changing behavior.
+      (process.env.SAML_ENABLED as string | boolean) === true
     ) {
       ServiceConfiguration.configurations.upsertAsync(
         // eslint-disable-line no-undef
@@ -201,3 +211,26 @@ Meteor.startup(() => {
     }
   }
 });
+
+// A board member entry, with the access-restriction flags the Authentication
+// helpers consult when deciding board access.
+interface BoardMember {
+  userId: string;
+  isActive?: boolean;
+  isAdmin?: boolean;
+  isNoComments?: boolean;
+  isCommentOnly?: boolean;
+  isWorker?: boolean;
+  isReadOnly?: boolean;
+  isReadAssignedOnly?: boolean;
+}
+
+// The subset of a board document checkBoardExists guards on.
+interface BoardDoc {
+  members?: BoardMember[];
+}
+
+// The subset of the user document validateLoginAttempt inspects.
+interface LoginUser {
+  loginDisabled?: boolean;
+}

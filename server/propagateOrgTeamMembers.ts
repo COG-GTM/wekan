@@ -34,7 +34,7 @@ Meteor.methods({
 
     // Add the given member userIds to a single board, add-only. Returns the
     // number of members actually added (0 if all were already present).
-    const addMembersToBoard = async (board, memberUserIds) => {
+    const addMembersToBoard = async (board: BoardMembersDoc, memberUserIds: string[]) => {
       const existing = new Set((board.members || []).map(m => m.userId));
       const toAdd = memberUserIds.filter(userId => !existing.has(userId));
       if (toAdd.length === 0) {
@@ -58,7 +58,7 @@ Meteor.methods({
     // Propagate one org or team. `field` is the user-doc membership array
     // ('orgs'/'teams') and `idField` is the id within it ('orgId'/'teamId');
     // `boardField` is the board array ('orgs'/'teams').
-    const propagate = async (groupId, field, idField, boardField) => {
+    const propagate = async (groupId: string, field: string, idField: string, boardField: string) => {
       const memberUsers = await Meteor.users
         .find({ [`${field}.${idField}`]: groupId }, { fields: { _id: 1 } })
         .fetchAsync();
@@ -97,3 +97,12 @@ Meteor.methods({
     return { boardsUpdated, membersAdded };
   },
 });
+
+// The subset of a board document addMembersToBoard reads. The index signature
+// (element type `any`) lets a generic Mongo `Document` from Boards.find() be
+// passed in; only `_id` and each member's `userId` are actually consulted.
+interface BoardMembersDoc {
+  _id?: string;
+  members?: Array<{ userId: string }>;
+  [key: string]: any;
+}

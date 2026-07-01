@@ -2,13 +2,13 @@
 // Replaces communitypackages:rest-accounts-password.
 // Logic copied from the package source to maintain identical API behavior.
 
-const { Meteor } = require('meteor/meteor');
-const { Accounts } = require('meteor/accounts-base');
-const { WebApp } = require('meteor/webapp');
-const { check, Match } = require('meteor/check');
-const { sendJsonResult } = require('/server/apiMiddleware');
+import { Meteor } from 'meteor/meteor';
+import { Accounts } from 'meteor/accounts-base';
+import { WebApp } from 'meteor/webapp';
+import { check, Match } from 'meteor/check';
+import { sendJsonResult } from '/server/apiMiddleware';
 
-const NonEmptyString = Match.Where(function (x) {
+const NonEmptyString = Match.Where(function (x: string) {
   check(x, String);
   return x.length > 0;
 });
@@ -16,11 +16,11 @@ const NonEmptyString = Match.Where(function (x) {
 // ---------------------------------------------------------------------------
 // POST /users/login
 // ---------------------------------------------------------------------------
-WebApp.handlers.options('/users/login', function (req, res) {
+WebApp.handlers.options('/users/login', function (req: WekanConnectRequest, res: WekanConnectResponse) {
   sendJsonResult(res);
 });
 
-WebApp.handlers.post('/users/login', async function (req, res) {
+WebApp.handlers.post('/users/login', async function (req: WekanConnectRequest, res: WekanConnectResponse) {
   try {
     const options = req.body;
 
@@ -65,7 +65,10 @@ WebApp.handlers.post('/users/login', async function (req, res) {
       }
       if (
         !Accounts._isTokenValid(
-          user.services.twoFactorAuthentication.secret,
+          // Two-step cast via `object` (avoids `unknown`/`any`): this branch is
+          // only reached once _check2faEnabled(user) confirmed the 2FA service,
+          // so the secret is asserted present per the pre-existing behavior.
+          (user as object as TwoFactorUser).services.twoFactorAuthentication.secret,
           options.code,
         )
       ) {
@@ -88,7 +91,7 @@ WebApp.handlers.post('/users/login', async function (req, res) {
         tokenExpires: tokenExpiration,
       },
     });
-  } catch (error) {
+  } catch (error: any) { // REST error payloads carry ad-hoc statusCode/error/reason fields
     res.statusCode = error.statusCode || 401;
     res.setHeader('Content-Type', 'application/json');
     res.end(
@@ -103,11 +106,11 @@ WebApp.handlers.post('/users/login', async function (req, res) {
 // ---------------------------------------------------------------------------
 // POST /users/register
 // ---------------------------------------------------------------------------
-WebApp.handlers.options('/users/register', function (req, res) {
+WebApp.handlers.options('/users/register', function (req: WekanConnectRequest, res: WekanConnectResponse) {
   sendJsonResult(res);
 });
 
-WebApp.handlers.post('/users/register', async function (req, res) {
+WebApp.handlers.post('/users/register', async function (req: WekanConnectRequest, res: WekanConnectResponse) {
   try {
     if (Accounts._options.forbidClientAccountCreation) {
       sendJsonResult(res, { code: 403 });
@@ -121,7 +124,7 @@ WebApp.handlers.post('/users/register', async function (req, res) {
       password: String,
     });
 
-    const userOptions = { password: options.password };
+    const userOptions: CreateUserOptions = { password: options.password };
     if (options.username) userOptions.username = options.username;
     if (options.email) userOptions.email = options.email;
 
@@ -142,7 +145,7 @@ WebApp.handlers.post('/users/register', async function (req, res) {
         id: userId,
       },
     });
-  } catch (error) {
+  } catch (error: any) { // REST error payloads carry ad-hoc statusCode/error/reason fields
     res.statusCode = error.statusCode || 400;
     res.setHeader('Content-Type', 'application/json');
     res.end(
@@ -153,3 +156,20 @@ WebApp.handlers.post('/users/register', async function (req, res) {
     );
   }
 });
+
+// Options passed to Accounts.createUserAsync by the register endpoint. `password`
+// comes off the untyped request body, hence `any`; username/email are added only
+// when present in the request.
+interface CreateUserOptions {
+  password: any;
+  username?: string;
+  email?: string;
+}
+
+// A user document known to have 2FA configured; this branch only runs after
+// Accounts._check2faEnabled(user) confirmed the twoFactorAuthentication service
+// exists, so its secret is asserted present (matching the pre-existing runtime
+// assumption).
+interface TwoFactorUser {
+  services: { twoFactorAuthentication: { secret: string } };
+}

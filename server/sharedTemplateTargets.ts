@@ -1,3 +1,4 @@
+import { Meteor } from 'meteor/meteor';
 import { ReactiveCache } from '/imports/reactiveCache';
 import Org from '/models/org';
 import Team from '/models/team';
@@ -14,13 +15,13 @@ Meteor.methods({
     }
 
     const user = ReactiveCache.getUser(this.userId);
-    const result = { orgs: [], teams: [], domains: [] };
+    const result: MyShareableGroups = { orgs: [], teams: [], domains: [] };
     if (!user) {
       return result;
     }
 
-    const orgIds = (user.orgs || []).map(o => o.orgId).filter(Boolean);
-    const teamIds = (user.teams || []).map(t => t.teamId).filter(Boolean);
+    const orgIds = (user.orgs || []).map((o: { orgId?: string }) => o.orgId).filter(Boolean);
+    const teamIds = (user.teams || []).map((t: { teamId?: string }) => t.teamId).filter(Boolean);
 
     if (orgIds.length) {
       const orgs = await Org.find(
@@ -47,8 +48,8 @@ Meteor.methods({
     }
 
     // Domains have no per-record flag; include the user's email domains.
-    const domains = [];
-    (user.emails || []).forEach((email) => {
+    const domains: string[] = [];
+    (user.emails || []).forEach((email: { address?: string }) => {
       const addr = (email && email.address) || '';
       const at = addr.lastIndexOf('@');
       if (at !== -1) {
@@ -63,3 +64,17 @@ Meteor.methods({
     return result;
   },
 });
+
+// A drag-to-share drop target: an org, team, or email domain the user belongs to.
+interface ShareableGroup {
+  type: string;
+  id: string;
+  name: string;
+}
+
+// The result of getMyShareableGroups: the user's shareable orgs, teams and domains.
+interface MyShareableGroups {
+  orgs: ShareableGroup[];
+  teams: ShareableGroup[];
+  domains: ShareableGroup[];
+}

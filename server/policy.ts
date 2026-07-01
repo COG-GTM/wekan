@@ -1,4 +1,5 @@
 //import { BrowserPolicy } from 'meteor/browser-policy-common';
+import { Meteor } from 'meteor/meteor';
 
 Meteor.startup(() => {
 /*

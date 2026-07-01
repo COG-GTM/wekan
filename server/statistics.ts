@@ -13,7 +13,7 @@ Meteor.methods({
     if (currentUser?.isAdmin) {
       const os = require('os');
       const pjson = require('/package.json');
-      const statistics = {};
+      const statistics: Statistics = {};
       let wekanVersion = pjson.version;
       wekanVersion = wekanVersion.replace('v', '');
       statistics.version = wekanVersion;
@@ -67,7 +67,7 @@ Meteor.methods({
       let mongoStorageEngine;
       let mongoOplogEnabled;
       try {
-        const { mongo } = MongoInternals.defaultRemoteCollectionDriver();
+        const { mongo } = MongoInternals.defaultRemoteCollectionDriver() as { mongo: MongoConnection };
         mongoOplogEnabled = Boolean(
           mongo._oplogHandle && mongo._oplogHandle.onOplogEntry,
         );
@@ -92,7 +92,7 @@ Meteor.methods({
         mongoStorageEngine,
         mongoOplogEnabled,
       };
-      const client = MongoInternals.defaultRemoteCollectionDriver()?.mongo?.client;
+      const client = (MongoInternals.defaultRemoteCollectionDriver() as { mongo?: MongoConnection })?.mongo?.client;
       const sessionsCount = client?.s?.activeSessions?.size;
       statistics.session = {
         sessionsCount,
@@ -103,3 +103,28 @@ Meteor.methods({
     }
   },
 });
+
+// The server statistics payload assembled by getStatistics. Each section is a
+// grouped object; they are typed as `object` because the response is serialised
+// verbatim and no field is read back after assignment.
+interface Statistics {
+  version?: string;
+  os?: object;
+  process?: object;
+  nodeHeapStats?: object;
+  nodeMemoryUsage?: object;
+  meteor?: object;
+  mongo?: object;
+  session?: object;
+}
+
+// MongoInternals' remote driver connection exposes Meteor-internal fields
+// (_oplogHandle, client) beyond the `{ db }` surface @types/meteor models.
+interface MongoConnection {
+  db: import('mongodb').Db;
+  // Meteor oplog tailing handle; only tested for existence. `any` because its
+  // onOplogEntry callback is a Meteor internal with no public type.
+  _oplogHandle?: { onOplogEntry?: any };
+  // Underlying mongodb driver client; only the active-session count is read.
+  client?: { s?: { activeSessions?: { size?: number } } };
+}

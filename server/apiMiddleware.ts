@@ -2,11 +2,11 @@
 // Replaces communitypackages:json-routes middleware chain.
 // Must be imported before model files that register API routes.
 
-const { Meteor } = require('meteor/meteor');
-const { Accounts } = require('meteor/accounts-base');
-const { WebApp } = require('meteor/webapp');
-const bodyParser = require('body-parser');
-const { safeJsonStringify } = require('/server/lib/apiResponseHelpers');
+import { Meteor } from 'meteor/meteor';
+import { Accounts } from 'meteor/accounts-base';
+import { WebApp } from 'meteor/webapp';
+import bodyParser from 'body-parser';
+import { safeJsonStringify } from '/server/lib/apiResponseHelpers';
 
 // ---------------------------------------------------------------------------
 // 1. Body parsing (previously registered by json-routes)
@@ -17,7 +17,7 @@ WebApp.handlers.use(bodyParser.json({ limit: '50mb' }));
 // ---------------------------------------------------------------------------
 // 2. API gate — check WITH_API env var (previously in models/users.js)
 // ---------------------------------------------------------------------------
-WebApp.handlers.use(function apiGate(req, res, next) {
+WebApp.handlers.use(function apiGate(req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) {
   const api = req.url.startsWith('/api');
   if ((api && process.env.WITH_API === 'true') || !api) {
     return next();
@@ -29,7 +29,7 @@ WebApp.handlers.use(function apiGate(req, res, next) {
 // ---------------------------------------------------------------------------
 // 3. Bearer token parser (replaces communitypackages:rest-bearer-token-parser)
 // ---------------------------------------------------------------------------
-WebApp.handlers.use(function parseBearerToken(req, res, next) {
+WebApp.handlers.use(function parseBearerToken(req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) {
   // Check Authorization header first
   const authHeader = req.headers.authorization;
   if (authHeader) {
@@ -41,7 +41,9 @@ WebApp.handlers.use(function parseBearerToken(req, res, next) {
 
   // Fallback to access_token query param
   if (!req.authToken && req.query && req.query.access_token) {
-    req.authToken = req.query.access_token;
+    // The access_token query param is single-valued in practice; narrow the
+    // `string | string[] | undefined` query value to the string authToken holds.
+    req.authToken = req.query.access_token as string;
   }
 
   next();
@@ -50,7 +52,7 @@ WebApp.handlers.use(function parseBearerToken(req, res, next) {
 // ---------------------------------------------------------------------------
 // 4. User authentication (replaces communitypackages:authenticate-user-by-token)
 // ---------------------------------------------------------------------------
-WebApp.handlers.use(async function authenticateByToken(req, res, next) {
+WebApp.handlers.use(async function authenticateByToken(req: WekanConnectRequest, res: WekanConnectResponse, next: (err?: any) => void) {
   if (req.authToken) {
     try {
       const hashedToken = Accounts._hashLoginToken(req.authToken);
@@ -71,7 +73,7 @@ WebApp.handlers.use(async function authenticateByToken(req, res, next) {
 // ---------------------------------------------------------------------------
 // 5. sendJsonResult — drop-in replacement for JsonRoutes.sendResult
 // ---------------------------------------------------------------------------
-function sendJsonResult(res, options) {
+export function sendJsonResult(res: WekanConnectResponse, options?: JsonResultOptions) {
   options = options || {};
 
   // Default response headers (matching json-routes behavior)
@@ -102,4 +104,11 @@ function sendJsonResult(res, options) {
   res.end();
 }
 
-module.exports = { sendJsonResult };
+// Options accepted by sendJsonResult: HTTP status code, extra response headers,
+// and the JSON-serialisable body. `data` is `any` because every REST route
+// passes its own payload shape through this generic responder.
+interface JsonResultOptions {
+  code?: number;
+  headers?: { [key: string]: string | number | string[] };
+  data?: any;
+}

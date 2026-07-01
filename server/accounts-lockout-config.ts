@@ -1,3 +1,4 @@
+import { Meteor } from 'meteor/meteor';
 import { AccountsLockout } from 'meteor/wekan-accounts-lockout';
 import LockoutSettings from '/models/lockoutSettings';
 

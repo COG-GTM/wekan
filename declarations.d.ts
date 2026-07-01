@@ -224,6 +224,9 @@ declare module 'i18next-sprintf-postprocessor' {
 declare module 'meteor/webapp' {
   namespace WebApp {
     const handlers: WekanConnectRouter;
+    // `rawHandlers` is the pre-Meteor-middleware connect router; server/cors.ts
+    // mounts CORS/permissions-policy header middleware on it.
+    const rawHandlers: WekanConnectRouter;
   }
 }
 
@@ -245,6 +248,12 @@ declare module 'meteor/accounts-express' {
 declare module 'meteor/meteor' {
   namespace Meteor {
     const absolutePath: string;
+    // wekan attaches an HTTP `statusCode` to Meteor.Error instances so REST
+    // handlers (server/authentication.ts and API routes) can map a thrown error
+    // to a response status code.
+    interface Error {
+      statusCode?: number;
+    }
   }
 }
 
@@ -267,6 +276,9 @@ type WekanConnectRequest = import('http').IncomingMessage & {
   // Route params extracted from `:name` path segments by the connect router.
   params: { [key: string]: string };
   query?: { [key: string]: string | string[] | undefined };
+  // Bearer/access_token extracted by the parseBearerToken middleware
+  // (server/apiMiddleware.ts) and read by the token authenticator.
+  authToken?: string;
 };
 
 type WekanConnectResponse = import('http').ServerResponse;
@@ -405,8 +417,44 @@ declare module 'meteor/accounts-base' {
     // @types/meteor's public surface.
     function _insertLoginToken(userId: string, stampedToken: { token: string; when: Date }): void;
     function destroyToken(userId: string, loginToken: string): void;
+    // Computes a login token's expiration Date from its `when` timestamp; used by
+    // server/header-login.ts to set the login cookie's expiry.
+    function _tokenExpiration(when: Date): Date;
+    // Server-internal password/2FA helpers (accounts-base) used by the REST
+    // login endpoint in server/apiAuthRoutes.ts. Not part of @types/meteor's
+    // public surface. The `user` doc is a Meteor user; `error` is a login error.
+    function _checkPasswordAsync(
+      user: object,
+      password: string,
+    ): Promise<{ userId: string; error?: Error }>;
+    function _check2faEnabled(user: object): boolean;
+    function _handleError(
+      message: string,
+      throwError?: boolean,
+      errorCode?: string,
+    ): void;
+    function _isTokenValid(secret: string, code: string): boolean;
+    // The accounts-base options bag; only forbidClientAccountCreation is read.
+    const _options: { forbidClientAccountCreation?: boolean };
+    // Registers a login-attempt validator; wekan uses it to block disabled users.
+    // The attempt payload is a Meteor internal, hence `any` fields.
+    function validateLoginAttempt(
+      func: (attempt: { user?: any; [key: string]: any }) => boolean,
+    ): { stop(): void };
   }
 }
+
+// meteor/service-configuration exposes the global `ServiceConfiguration` that
+// server/authentication.ts uses to upsert OAuth2/OIDC/CAS/SAML login-service
+// configs. Used as a global (no import), so declared as an ambient const.
+declare const ServiceConfiguration: {
+  configurations: {
+    upsertAsync(
+      selector: object,
+      modifier: object,
+    ): Promise<{ numberAffected?: number; insertedId?: string }>;
+  };
+};
 
 // meteor/matb33:collection-hooks also exports a mutable `getUserId` resolver that
 // wekan overrides (server/models/users.ts) to inject a fake user id while running

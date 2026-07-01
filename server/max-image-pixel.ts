@@ -1,3 +1,5 @@
+import { Meteor } from 'meteor/meteor';
+
 Meteor.startup(() => {
   if (process.env.MAX_IMAGE_PIXEL) {
     Meteor.settings.public.MAX_IMAGE_PIXEL = process.env.MAX_IMAGE_PIXEL;

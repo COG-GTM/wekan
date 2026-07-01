@@ -56,7 +56,7 @@ Meteor.methods({
         } else if (org.orgSyncMembersFromAuth !== true) {
           await Org.updateAsync({ _id: org._id }, { $set: { orgSyncMembersFromAuth: true } });
         }
-        const alreadyMember = (user.orgs || []).some(o => o.orgId === org._id);
+        const alreadyMember = (user.orgs || []).some((o: { orgId?: string }) => o.orgId === org._id);
         if (!alreadyMember) {
           await Meteor.users.updateAsync(
             { _id: userId },
@@ -77,7 +77,7 @@ Meteor.methods({
         } else if (team.teamSyncMembersFromAuth !== true) {
           await Team.updateAsync({ _id: team._id }, { $set: { teamSyncMembersFromAuth: true } });
         }
-        const alreadyMember = (user.teams || []).some(t => t.teamId === team._id);
+        const alreadyMember = (user.teams || []).some((t: { teamId?: string }) => t.teamId === team._id);
         if (!alreadyMember) {
           await Meteor.users.updateAsync(
             { _id: userId },

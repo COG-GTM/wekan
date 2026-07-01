@@ -49,7 +49,7 @@ Meteor.methods({
   // board-button's trigger never re-published to the board view (the button only
   // appeared after a full page reload). Inserting on the server avoids the
   // optimistic-ghost reconciliation problem entirely.
-  async 'rules.createRule'(boardId, title, trigger, action) {
+  async 'rules.createRule'(boardId: string, title: string | undefined, trigger: TriggerButtonInput, action: RuleDocInput) {
     check(boardId, String);
     check(title, Match.Optional(String));
     check(trigger, Object);
@@ -61,14 +61,14 @@ Meteor.methods({
       throw new Meteor.Error('not-authorized', 'Must be a board admin');
     }
 
-    const clean = doc => {
+    const clean = (doc: RuleDocInput) => {
       const { _id, ...rest } = doc || {};
       return rest;
     };
 
     const triggerId = await Triggers.insertAsync({ ...clean(trigger), boardId });
     const actionId = await Actions.insertAsync({ ...clean(action), boardId });
-    const ruleDoc = {
+    const ruleDoc: RuleDoc = {
       title: title || 'Rule',
       triggerId,
       actionId,
@@ -88,3 +88,28 @@ Meteor.methods({
     return { _id: ruleId, triggerId, actionId };
   },
 });
+
+// A schemaless trigger/action document passed to rules.createRule; the button
+// fields are read to denormalise manual-button metadata onto the rule. The index
+// signature is `any` because these collections are schemaless and the document
+// is spread verbatim into the new trigger/action.
+interface RuleDocInput {
+  _id?: string;
+  activityType?: string;
+  buttonType?: string;
+  buttonLabel?: string;
+  [key: string]: any;
+}
+
+type TriggerButtonInput = RuleDocInput;
+
+// The rule document written to the schema-backed `rules` collection, including
+// the optional denormalised manual-button metadata.
+interface RuleDoc {
+  title: string;
+  triggerId: string;
+  actionId: string;
+  boardId: string;
+  buttonType?: string;
+  buttonLabel?: string;
+}
