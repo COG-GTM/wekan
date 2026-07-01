@@ -131,7 +131,9 @@ const ReactiveCacheServer = {
     }
     return ret;
   },
-  async getCard(idOrFirstObjectSelector = null, options = {}) {
+  // `idOrFirstObjectSelector` is a card id string or a Mongo selector object
+  // (defaulting to null), so it is typed `any`.
+  async getCard(idOrFirstObjectSelector: any = null, options = {}) {
     if (
       idOrFirstObjectSelector === null ||
       idOrFirstObjectSelector === undefined ||
@@ -518,7 +520,9 @@ const ReactiveCacheClient: CacheHolder = {
     const ret = this.__checklistItems.get(EJSON.stringify(select));
     return ret;
   },
-  getCard(idOrFirstObjectSelector = null, options = {}) {
+  // `idOrFirstObjectSelector` is a card id string or a Mongo selector object
+  // (defaulting to null), so it is typed `any`.
+  getCard(idOrFirstObjectSelector: any = null, options = {}) {
     if (
       idOrFirstObjectSelector === null ||
       idOrFirstObjectSelector === undefined ||
@@ -1175,7 +1179,9 @@ const ReactiveCache = {
       return ReactiveCacheClient.getChecklistItems(selector, options, getQuery);
     }
   },
-  getCard(idOrFirstObjectSelector = null, options = {}, noCache = false) {
+  // `idOrFirstObjectSelector` is a card id string or a Mongo selector object
+  // (defaulting to null), so it is typed `any`.
+  getCard(idOrFirstObjectSelector: any = null, options = {}, noCache = false) {
     if (Meteor.isServer || noCache === true) {
       return ReactiveCacheServer.getCard(idOrFirstObjectSelector, options);
     } else {

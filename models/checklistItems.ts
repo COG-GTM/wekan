@@ -2,7 +2,7 @@ import { Meteor } from 'meteor/meteor';
 import { Mongo } from 'meteor/mongo';
 import { ReactiveCache } from '/imports/reactiveCache';
 import Activities from '/models/activities';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
 
 const ChecklistItems = new Mongo.Collection('checklistItems');
 
@@ -88,7 +88,7 @@ ChecklistItems.before.insert((userId, doc) => {
 });
 
 ChecklistItems.helpers({
-  async setTitle(title) {
+  async setTitle(title: string) {
     return await ChecklistItems.updateAsync(this._id, { $set: { title } });
   },
   async check() {
@@ -100,7 +100,7 @@ ChecklistItems.helpers({
   async toggleItem() {
     return await ChecklistItems.updateAsync(this._id, { $set: { isFinished: !this.isFinished } });
   },
-  async move(checklistId, sortIndex) {
+  async move(checklistId: string, sortIndex: number) {
     const checklist = await ReactiveCache.getChecklist(checklistId);
     const cardId = checklist.cardId;
     return await ChecklistItems.updateAsync(this._id, {
@@ -110,7 +110,8 @@ ChecklistItems.helpers({
 });
 
 // Activities helper
-export async function itemCreation(userId, doc) {
+// `doc` is a checklist-item document (dynamic Mongo shape), hence `any`.
+export async function itemCreation(userId: string, doc: any) {
   const card = await ReactiveCache.getCard(doc.cardId);
   if (!card) {
     console.warn('[itemCreation] Card not found for cardId:', doc.cardId, '— skipping activity insert.');
@@ -130,13 +131,13 @@ export async function itemCreation(userId, doc) {
   });
 }
 
-export async function itemRemover(userId, doc) {
+export async function itemRemover(userId: string, doc: any) {
   await Activities.removeAsync({
     checklistItemId: doc._id,
   });
 }
 
-export async function publishCheckActivity(userId, doc) {
+export async function publishCheckActivity(userId: string, doc: any) {
   const card = await ReactiveCache.getCard(doc.cardId);
   if (!card) {
     console.warn('[publishCheckActivity] Card not found for cardId:', doc.cardId, '— skipping activity insert.');
@@ -163,7 +164,7 @@ export async function publishCheckActivity(userId, doc) {
   await Activities.insertAsync(act);
 }
 
-export async function publishChekListCompleted(userId, doc) {
+export async function publishChekListCompleted(userId: string, doc: any) {
   const card = await ReactiveCache.getCard(doc.cardId);
   if (!card) {
     console.warn('[publishChekListCompleted] Card not found for cardId:', doc.cardId, '— skipping activity insert.');
@@ -178,7 +179,7 @@ export async function publishChekListCompleted(userId, doc) {
   }
   const checklistItems = await ReactiveCache.getChecklistItems({ checklistId });
   const isChecklistFinished = checkList.hideAllChecklistItems ||
-    (checklistItems.length > 0 && checklistItems.length === checklistItems.filter(i => i.isFinished).length);
+    (checklistItems.length > 0 && checklistItems.length === checklistItems.filter((i: any) => i.isFinished).length);
   if (isChecklistFinished) {
     const act = {
       userId,
@@ -194,7 +195,7 @@ export async function publishChekListCompleted(userId, doc) {
   }
 }
 
-export async function publishChekListUncompleted(userId, doc) {
+export async function publishChekListUncompleted(userId: string, doc: any) {
   const card = await ReactiveCache.getCard(doc.cardId);
   if (!card) {
     console.warn('[publishChekListUncompleted] Card not found for cardId:', doc.cardId, '— skipping activity insert.');
@@ -222,7 +223,7 @@ export async function publishChekListUncompleted(userId, doc) {
   //         wekan/client/components/rules/triggers/checklistTriggers.js
   const uncheckItems = await ReactiveCache.getChecklistItems({ checklistId });
   const isChecklistFinished = checkList.hideAllChecklistItems ||
-    (uncheckItems.length > 0 && uncheckItems.length === uncheckItems.filter(i => i.isFinished).length);
+    (uncheckItems.length > 0 && uncheckItems.length === uncheckItems.filter((i: any) => i.isFinished).length);
   if (isChecklistFinished) {
     const act = {
       userId,

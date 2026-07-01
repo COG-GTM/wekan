@@ -88,6 +88,9 @@ declare module 'meteor/mongo' {
       before: CollectionHooks;
       after: CollectionHooks;
       hookOptions: any;
+      // collection-hooks `.direct` exposes the underlying mutation methods that
+      // bypass the registered hooks; its shape mirrors the collection, so `any`.
+      direct: any;
     }
   }
 }
