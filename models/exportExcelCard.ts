@@ -30,7 +30,8 @@ runOnServer(function() {
    */
   WebApp.handlers.get(
     '/api/boards/:boardId/lists/:listId/cards/:cardId/exportExcel',
-    async function (req, res) {
+    // `req`/`res` come from the untyped WebApp.handlers router, hence `any`.
+    async function (req: any, res: any) {
       const boardId = req.params.boardId;
       const paramListId = req.params.listId;
       const paramCardId = req.params.cardId;
@@ -49,7 +50,7 @@ runOnServer(function() {
       if (board.isPublic()) {
         const fieldsParam = req.query.fields;
         const fields = fieldsParam
-          ? fieldsParam.split(',').map(f => f.trim()).filter(f => ALL_FIELDS.includes(f))
+          ? fieldsParam.split(',').map((f: any) => f.trim()).filter((f: any) => ALL_FIELDS.includes(f))
           : null;
         const exporter = new ExporterExcelCard(boardId, paramListId, paramCardId, 'en', fields);
         await exporter.build(res);
@@ -112,7 +113,7 @@ runOnServer(function() {
       // Parse optional ?fields=people,dates,... query param
       const fieldsParam = req.query.fields;
       const fields = fieldsParam
-        ? fieldsParam.split(',').map(f => f.trim()).filter(f => ALL_FIELDS.includes(f))
+        ? fieldsParam.split(',').map((f: any) => f.trim()).filter((f: any) => ALL_FIELDS.includes(f))
         : null;
 
       const exporter = new ExporterExcelCard(boardId, paramListId, paramCardId, userLanguage, fields, dateFormat);

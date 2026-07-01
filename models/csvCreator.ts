@@ -1,6 +1,5 @@
 import { Meteor } from 'meteor/meteor';
 import { ReactiveCache } from '/imports/reactiveCache';
-import { isEmptyObject } from 'jquery';
 import Activities from '/models/activities';
 import Boards from './boards';
 import Cards from '/models/cards';
@@ -9,7 +8,17 @@ import Lists from '/models/lists';
 import Swimlanes from '/models/swimlanes';
 
 export class CsvCreator {
-  constructor(data) {
+  _nowDate: Date;
+  // `fieldIndex` maps card fields (and custom fields) to CSV column indexes; its
+  // shape is built dynamically from the header row, hence `any`.
+  fieldIndex: any;
+  lists: { [key: string]: any };
+  members: { [key: string]: any };
+  // Default swimlane id created during import, or null before creation.
+  swimlane: any;
+
+  // `data` is the parsed CSV import payload (dynamic shape), hence `any`.
+  constructor(data: any) {
     // date to be used for timestamps during import
     this._nowDate = new Date();
     // index to help keep track of what information a column stores
@@ -30,7 +39,7 @@ export class CsvCreator {
    *
    * @param {String} dateString a properly formatted Date
    */
-  _now(dateString) {
+  _now(dateString?: string | Date) {
     if (dateString) {
       return new Date(dateString);
     }
@@ -40,7 +49,7 @@ export class CsvCreator {
     return this._nowDate;
   }
 
-  _user(wekanUserId) {
+  _user(wekanUserId?: string) {
     if (wekanUserId && this.members[wekanUserId]) {
       return this.members[wekanUserId];
     }
@@ -56,8 +65,8 @@ export class CsvCreator {
    *
    * @param {Array} headerRow array from row of headers of imported CSV/TSV for cards
    */
-  mapHeadertoCardFieldIndex(headerRow) {
-    const index = {};
+  mapHeadertoCardFieldIndex(headerRow: any[]) {
+    const index: { [key: string]: any } = {};
     index.customFields = [];
     for (let i = 0; i < headerRow.length; i++) {
       switch (headerRow[i].trim().toLowerCase()) {
@@ -133,12 +142,13 @@ export class CsvCreator {
     }
     this.fieldIndex = index;
   }
-  async createCustomFields(boardId) {
+  async createCustomFields(boardId: string) {
     for (const customField of this.fieldIndex.customFields) {
-      let settings = {};
+      // `settings` holds dropdownItems / currencyCode shapes, hence `any`.
+      let settings: any = {};
       if (customField.type === 'dropdown') {
         settings = {
-          dropdownItems: customField.options.map(option => {
+          dropdownItems: customField.options.map((option: any) => {
             return { _id: Random.id(6), name: option };
           }),
         };
@@ -164,8 +174,9 @@ export class CsvCreator {
     }
   }
 
-  async createBoard(csvData) {
-    const boardToCreate = {
+  async createBoard(csvData: any[]) {
+    // `boardToCreate` is a board document assembled incrementally, hence `any`.
+    const boardToCreate: { [key: string]: any } = {
       archived: false,
       color: 'belize',
       createdAt: this._now(),
@@ -190,7 +201,7 @@ export class CsvCreator {
     };
 
     // create labels
-    const labelsToCreate = new Set();
+    const labelsToCreate = new Set<string>();
     for (let i = 1; i < csvData.length; i++) {
       if (csvData[i][this.fieldIndex.labels]) {
         for (const importedLabel of csvData[i][this.fieldIndex.labels].split(
@@ -240,7 +251,7 @@ export class CsvCreator {
     return boardId;
   }
 
-  async createSwimlanes(boardId) {
+  async createSwimlanes(boardId: string) {
     const swimlaneToCreate = {
       archived: false,
       boardId,
@@ -253,10 +264,11 @@ export class CsvCreator {
     this.swimlane = swimlaneId;
   }
 
-  async createLists(csvData, boardId) {
+  async createLists(csvData: any[], boardId: string) {
     let numOfCreatedLists = 0;
     for (let i = 1; i < csvData.length; i++) {
-      const listToCreate = {
+      // `listToCreate` is a list document assembled incrementally, hence `any`.
+      const listToCreate: { [key: string]: any } = {
         archived: false,
         boardId,
         createdAt: this._now(),
@@ -285,9 +297,10 @@ export class CsvCreator {
     }
   }
 
-  async createCards(csvData, boardId) {
+  async createCards(csvData: any[], boardId: string) {
     for (let i = 1; i < csvData.length; i++) {
-      const cardToCreate = {
+      // `cardToCreate` is a card document assembled incrementally, hence `any`.
+      const cardToCreate: { [key: string]: any } = {
         archived: false,
         boardId,
         dateLastActivity: this._now(),
@@ -345,7 +358,7 @@ export class CsvCreator {
       }
       // add the members
       if (csvData[i][this.fieldIndex.members]) {
-        const wekanMembers = [];
+        const wekanMembers: any[] = [];
         for (const importedMember of csvData[i][this.fieldIndex.members].split(
           ' ',
         )) {
@@ -362,14 +375,14 @@ export class CsvCreator {
       }
       // add the custom fields
       if (this.fieldIndex.customFields.length > 0) {
-        const customFields = [];
-        this.fieldIndex.customFields.forEach(customField => {
+        const customFields: any[] = [];
+        this.fieldIndex.customFields.forEach((customField: any) => {
           if (csvData[i][customField.position] !== ' ') {
             if (customField.type === 'dropdown') {
               customFields.push({
                 _id: customField.id,
                 value: customField.settings.dropdownItems.find(
-                  ({ name }) => name === csvData[i][customField.position],
+                  ({ name }: any) => name === csvData[i][customField.position],
                 )._id,
               });
             } else {
@@ -386,7 +399,7 @@ export class CsvCreator {
     }
   }
 
-  async create(board, currentBoardId) {
+  async create(board: any[], currentBoardId?: string | null) {
     const isSandstorm =
       Meteor.settings &&
       Meteor.settings.public &&

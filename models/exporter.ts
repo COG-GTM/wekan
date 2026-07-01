@@ -29,7 +29,11 @@ import {
 
 // exporter maybe is broken since Gridfs introduced, add fs and path
 export class Exporter {
-  constructor(boardId, attachmentId, options = {}) {
+  _boardId: string;
+  _attachmentId?: string;
+  _excludeAttachments: boolean;
+
+  constructor(boardId: string, attachmentId?: string, options: { excludeAttachments?: boolean } = {}) {
     this._boardId = boardId;
     this._attachmentId = attachmentId;
     // #5870: when true, board export omits the base64-encoded attachment file
@@ -58,7 +62,9 @@ export class Exporter {
         boardId: 0,
       },
     };
-    const result = {
+    // `result` is the aggregated wekan-board export payload; it collects many
+    // differently-shaped collection documents, so it is an open `any` map.
+    const result: { [key: string]: any } = {
       _format: 'wekan-board-1.0.0',
     };
     Object.assign(
@@ -73,7 +79,8 @@ export class Exporter {
     // [Old] for attachments we only export IDs and absolute url to original doc
     // [New] Encode attachment to base64
 
-    const getBase64Data = function (doc, callback) {
+    // `doc` is an attachment document (dynamic ostrio:files shape), hence `any`.
+    const getBase64Data = function (doc: any, callback: (err: any, res: any) => void) {
       let buffer = Buffer.allocUnsafe(0);
       buffer.fill(0);
 
@@ -84,7 +91,7 @@ export class Exporter {
       );
       const tmpWriteable = fs.createWriteStream(tmpFile);
       const readStream = fs.createReadStream(doc.versions.original.path);
-      readStream.on('data', function (chunk) {
+      readStream.on('data', function (chunk: any) {
         buffer = Buffer.concat([buffer, chunk]);
       });
 
@@ -101,7 +108,7 @@ export class Exporter {
       });
       readStream.pipe(tmpWriteable);
     };
-    const getBase64DataAsync = (doc) => new Promise((resolve, reject) => {
+    const getBase64DataAsync = (doc: any) => new Promise((resolve, reject) => {
       getBase64Data(doc, (err, res) => err ? reject(err) : resolve(res));
     });
     const byBoardAndAttachment = this._attachmentId
@@ -110,7 +117,7 @@ export class Exporter {
     const attachmentDocs = await ReactiveCache.getAttachments(byBoardAndAttachment);
     result.attachments = [];
     for (const attachment of attachmentDocs) {
-      const attachmentExport = {
+      const attachmentExport: { [key: string]: any } = {
         _id: attachment._id,
         cardId: attachment.meta.cardId,
         // `source` distinguishes board-level backgrounds ('board-background')
@@ -140,7 +147,7 @@ export class Exporter {
       { boardIds: this._boardId },
       { fields: { boardIds: 0 } },
     );
-    const cardIds = result.cards.map(card => card._id);
+    const cardIds = result.cards.map((card: any) => card._id);
     result.comments = await ReactiveCache.getCardComments(
       { cardId: { $in: cardIds } },
       noBoardId,
@@ -197,28 +204,29 @@ export class Exporter {
     // include id but we have to be careful:
     // 1- only exports users that are linked somehow to that board
     // 2- do not export any sensitive information
-    const users = {};
-    result.members.forEach((member) => {
+    // `users` maps userId -> true for every user referenced by the board.
+    const users: { [key: string]: any } = {};
+    result.members.forEach((member: any) => {
       users[member.userId] = true;
     });
-    result.lists.forEach((list) => {
+    result.lists.forEach((list: any) => {
       users[list.userId] = true;
     });
-    result.cards.forEach((card) => {
+    result.cards.forEach((card: any) => {
       users[card.userId] = true;
       if (card.members) {
-        card.members.forEach((memberId) => {
+        card.members.forEach((memberId: any) => {
           users[memberId] = true;
         });
       }
     });
-    result.comments.forEach((comment) => {
+    result.comments.forEach((comment: any) => {
       users[comment.userId] = true;
     });
-    result.activities.forEach((activity) => {
+    result.activities.forEach((activity: any) => {
       users[activity.userId] = true;
     });
-    result.checklists.forEach((checklist) => {
+    result.checklists.forEach((checklist: any) => {
       users[checklist.userId] = true;
     });
     const byUserIds = {
@@ -238,7 +246,7 @@ export class Exporter {
       },
     };
     result.users = (await ReactiveCache.getUsers(byUserIds, userFields))
-      .map((user) => {
+      .map((user: any) => {
         // user avatar is stored as a relative url, we export absolute
         if ((user.profile || {}).avatarUrl) {
           user.profile.avatarUrl = FlowRouter.url(user.profile.avatarUrl);
@@ -250,8 +258,8 @@ export class Exporter {
 
   async buildCsv(userDelimiter = ',', userLanguage='en') {
     const result = await this.build();
-    const columnHeaders = [];
-    const cardRows = [];
+    const columnHeaders: any[] = [];
+    const cardRows: any[] = [];
 
     const papaconfig = {
       quotes: true,
@@ -286,16 +294,16 @@ export class Exporter {
       TAPi18n.__('voting','',userLanguage),
       TAPi18n.__('archived','',userLanguage),
     );
-    const customFieldMap = {};
+    const customFieldMap: { [key: string]: any } = {};
     let i = 0;
-    result.customFields.forEach((customField) => {
+    result.customFields.forEach((customField: any) => {
       customFieldMap[customField._id] = {
         position: i,
         type: customField.type,
       };
       if (customField.type === 'dropdown') {
         let options = '';
-        customField.settings.dropdownItems.forEach((item) => {
+        customField.settings.dropdownItems.forEach((item: any) => {
           options = options === '' ? item.name : `${`${options}/${item.name}`}`;
         });
         columnHeaders.push(
@@ -315,36 +323,36 @@ export class Exporter {
     //cardRows.push([[columnHeaders]]);
     cardRows.push(columnHeaders);
 
-    result.cards.forEach((card) => {
-      const currentRow = [];
+    result.cards.forEach((card: any) => {
+      const currentRow: any[] = [];
       currentRow.push(card.title);
       currentRow.push(card.description);
       currentRow.push(
-        result.lists.find(({ _id }) => _id === card.listId).title,
+        result.lists.find(({ _id }: any) => _id === card.listId).title,
       );
       currentRow.push(
-        result.swimlanes.find(({ _id }) => _id === card.swimlaneId).title,
+        result.swimlanes.find(({ _id }: any) => _id === card.swimlaneId).title,
       );
       currentRow.push(
-        result.users.find(({ _id }) => _id === card.userId).username,
+        result.users.find(({ _id }: any) => _id === card.userId).username,
       );
       currentRow.push(card.requestedBy ? card.requestedBy : ' ');
       currentRow.push(card.assignedBy ? card.assignedBy : ' ');
       let usernames = '';
-      card.members.forEach((memberId) => {
-        const user = result.users.find(({ _id }) => _id === memberId);
+      card.members.forEach((memberId: any) => {
+        const user = result.users.find(({ _id }: any) => _id === memberId);
         usernames = `${usernames + user.username} `;
       });
       currentRow.push(usernames.trim());
       let assignees = '';
-      card.assignees.forEach((assigneeId) => {
-        const user = result.users.find(({ _id }) => _id === assigneeId);
+      card.assignees.forEach((assigneeId: any) => {
+        const user = result.users.find(({ _id }: any) => _id === assigneeId);
         assignees = `${assignees + user.username} `;
       });
       currentRow.push(assignees.trim());
       let labels = '';
-      card.labelIds.forEach((labelId) => {
-        const label = result.labels.find(({ _id }) => _id === labelId);
+      card.labelIds.forEach((labelId: any) => {
+        const label = result.labels.find(({ _id }: any) => _id === labelId);
         labels = `${labels + label.name}-${label.color} `;
       });
       currentRow.push(labels.trim());
@@ -361,12 +369,12 @@ export class Exporter {
       if (card.vote && card.vote.question !== '') {
         let positiveVoters = '';
         let negativeVoters = '';
-        card.vote.positive.forEach((userId) => {
-          const user = result.users.find(({ _id }) => _id === userId);
+        card.vote.positive.forEach((userId: any) => {
+          const user = result.users.find(({ _id }: any) => _id === userId);
           positiveVoters = `${positiveVoters + user.username} `;
         });
-        card.vote.negative.forEach((userId) => {
-          const user = result.users.find(({ _id }) => _id === userId);
+        card.vote.negative.forEach((userId: any) => {
+          const user = result.users.find(({ _id }: any) => _id === userId);
           negativeVoters = `${negativeVoters + user.username} `;
         });
         const votingResult = `${
@@ -385,17 +393,17 @@ export class Exporter {
       currentRow.push(card.archived ? 'true' : 'false');
       //Custom fields
       const customFieldValuesToPush = new Array(result.customFields.length);
-      card.customFields.forEach((field) => {
+      card.customFields.forEach((field: any) => {
         if (field.value !== null) {
           if (customFieldMap[field._id].type === 'date') {
             customFieldValuesToPush[customFieldMap[field._id].position] =
               new Date(field.value).toISOString();
           } else if (customFieldMap[field._id].type === 'dropdown') {
             const dropdownOptions = result.customFields.find(
-              ({ _id }) => _id === field._id,
+              ({ _id }: any) => _id === field._id,
             ).settings.dropdownItems;
             const fieldObj = dropdownOptions.find(
-              ({ _id }) => _id === field.value,
+              ({ _id }: any) => _id === field.value,
             );
             const fieldValue = (fieldObj && fieldObj.name) || null;
             customFieldValuesToPush[customFieldMap[field._id].position] =
@@ -424,7 +432,8 @@ export class Exporter {
     return Papa.unparse(cardRows, papaconfig);
   }
 
-  async canExport(user) {
+  // `user` is a user document (dynamic shape), hence `any`.
+  async canExport(user: any) {
     const board = await ReactiveCache.getBoard(this._boardId);
     return board && board.isVisibleBy(user);
   }

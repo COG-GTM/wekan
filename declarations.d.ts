@@ -60,6 +60,7 @@ declare module 'meteor/ostrio:flow-router-extra' {
     route(path: string, options?: FlowRouterRoute): void;
     go(pathOrName: string, params?: { [key: string]: string }): void;
     path(pathDef: string, params?: { [key: string]: string }): string;
+    url(pathDef: string, params?: { [key: string]: string }, queryParams?: { [key: string]: string }): string;
     reload(): void;
     getRouteName(): string;
     getQueryParam(key: string): string | undefined;
@@ -190,6 +191,9 @@ interface AccountsEmailTemplates {
 interface AccountsStatic {
   emailTemplates: AccountsEmailTemplates;
   sendResetPasswordEmail: any;
+  // Internal Meteor helper used by the export routes to match a login token
+  // against its stored hash.
+  _hashLoginToken(loginToken: string): string;
 }
 
 declare const Accounts: AccountsStatic;
@@ -253,6 +257,8 @@ interface Window {
 // without an explicit import. Declare them as ambient globals with real types
 // where available so those files type-check without changing their runtime.
 declare const Random: typeof import('meteor/random').Random;
+// Meteor server global for CommonJS requires from within package/app scope.
+declare const Npm: { require(id: string): any };
 declare const ReactiveCache: typeof import('/imports/reactiveCache').ReactiveCache;
 // Minimal shape of the ostrio:files FilesCollection wrappers (Attachments,
 // Avatars) that model code interacts with. `collection` is the underlying

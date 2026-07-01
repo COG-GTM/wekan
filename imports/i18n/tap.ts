@@ -186,7 +186,9 @@ export const TAPi18n: TAPi18nApi = {
     await this.loadLanguage(language);
   },
   // Return translation by key
-  __(key: string, options?: object, language?: string) {
+  // `options` accepts a string (callers pass '' to mean "no interpolation")
+  // in addition to the interpolation-values object.
+  __(key: string, options?: object | string, language?: string) {
     this.current.dep.depend();
 
     // The global sprintf post-processor (`postProcess: ["sprintf"]`) throws when
@@ -198,7 +200,9 @@ export const TAPi18n: TAPi18nApi = {
       // Look the key up under the same normalised code the bundle is stored
       // under. `lng === undefined` means "use i18next's current language",
       // which setLanguage() already set to the normalised code.
-      const opts = { ...options, ...extra, lng: lng === undefined ? undefined : this.toI18nCode(lng) };
+      // `options` may be the '' string some callers pass to mean "no values";
+      // spreading it is a runtime no-op, so cast to object for the spread.
+      const opts = { ...(options as object), ...extra, lng: lng === undefined ? undefined : this.toI18nCode(lng) };
       try {
         return this.i18n!.t(key, opts);
       } catch (e) {
@@ -255,5 +259,5 @@ interface TAPi18nApi {
   loadLanguage(language: string): Promise<void>;
   setLanguage(language: string): Promise<void>;
   ensureLanguageLoaded(language: string): Promise<void>;
-  __(key: string, options?: object, language?: string): string;
+  __(key: string, options?: object | string, language?: string): string;
 }

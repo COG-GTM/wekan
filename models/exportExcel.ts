@@ -33,7 +33,8 @@ runOnServer(function() {
    * @param {string} boardId the ID of the board we are exporting
    * @param {string} authToken the loginToken
    */
-  WebApp.handlers.get('/api/boards/:boardId/exportExcel', async function (req, res) {
+  // `req`/`res` come from the untyped WebApp.handlers router, hence `any`.
+  WebApp.handlers.get('/api/boards/:boardId/exportExcel', async function (req: any, res: any) {
     const boardId = req.params.boardId;
     let user = null;
     let impersonateDone = false;
