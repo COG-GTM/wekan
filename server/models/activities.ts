@@ -10,11 +10,12 @@ import { Notifications } from '/server/notifications/notifications';
 import { ensureIndex } from '/server/lib/mongoStartup';
 import { safeDeliver } from '/server/lib/webhookGuard';
 
-function normalizeActivityText(value, fallback = '') {
+function normalizeActivityText(value: any, fallback: string = '') {
   return typeof value === 'string' ? value : fallback;
 }
 
-function getActivityUserName(user, fallback = '') {
+// `user` is a user model instance (dynamic helper surface), hence `any`.
+function getActivityUserName(user: any, fallback: string = '') {
   if (!user) {
     return fallback;
   }
@@ -55,14 +56,16 @@ Meteor.startup(async () => {
 
 Activities.after.insert(async (userId, doc) => {
   const activity = Activities._transform(doc);
-  let participants = [];
-  let watchers = [];
+  // Accumulated notification recipient ids (dynamic user id values), hence `any[]`.
+  let participants: any[] = [];
+  let watchers: any[] = [];
   let title = 'act-activity-notify';
   const board = activity.boardId
     ? (await ReactiveCache.getBoard(activity.boardId)) || (await Boards.findOneAsync(activity.boardId))
     : null;
   const description = `act-${activity.activityType}`;
-  const params = {
+  // Notification params: fields are added conditionally per activity type below.
+  const params: { [key: string]: any } = {
     activityId: activity._id,
   };
 
@@ -304,7 +307,7 @@ Activities.after.insert(async (userId, doc) => {
   });
 
   if (board) {
-    const activeMemberIds = (board.members || []).filter(m => m.isActive === true).map(m => m.userId);
+    const activeMemberIds = (board.members || []).filter((m: any) => m.isActive === true).map((m: any) => m.userId);
     const BIGEVENTS = process.env.BIGEVENTS_PATTERN;
     if (BIGEVENTS) {
       try {
@@ -315,13 +318,13 @@ Activities.after.insert(async (userId, doc) => {
       } catch (e) {}
     }
 
-    const watchingUsers = where(board.watchers, { level: 'watching' }).map(x => x.userId);
-    const trackingUsers = where(board.watchers, { level: 'tracking' }).map(x => x.userId);
+    const watchingUsers = where(board.watchers, { level: 'watching' }).map((x: any) => x.userId);
+    const trackingUsers = where(board.watchers, { level: 'tracking' }).map((x: any) => x.userId);
     if (!params.hasMentions) {
       watchers = [...new Set([
         ...watchers,
         ...watchingUsers,
-        ...participants.filter(x => trackingUsers.includes(x)),
+        ...participants.filter((x: any) => trackingUsers.includes(x)),
       ])];
     }
 
@@ -332,7 +335,9 @@ Activities.after.insert(async (userId, doc) => {
     // self-notified. Opt out with NOTIFY_ON_ASSIGN=false; on by default.
     if (
       process.env.NOTIFY_ON_ASSIGN !== 'false' &&
-      process.env.NOTIFY_ON_ASSIGN !== false
+      // Pre-existing dead comparison (env var is a string, never boolean `false`);
+      // the `as any` cast preserves it without a runtime change.
+      (process.env.NOTIFY_ON_ASSIGN as any) !== false
     ) {
       const assignedUserId = activity.assigneeId || activity.memberId;
       if (
@@ -343,7 +348,7 @@ Activities.after.insert(async (userId, doc) => {
       }
     }
 
-    watchers = watchers.filter(x => activeMemberIds.includes(x));
+    watchers = watchers.filter((x: any) => activeMemberIds.includes(x));
   }
 
   (await Notifications.getUsers(watchers)).forEach((user) => {
@@ -355,8 +360,10 @@ Activities.after.insert(async (userId, doc) => {
   });
 
   const integrationBoardIds = board
-    ? [board._id, Integrations.Const.GLOBAL_WEBHOOK_ID]
-    : [Integrations.Const.GLOBAL_WEBHOOK_ID];
+    // `Const` is a custom static on the Integrations collection (not part of
+    // Mongo.Collection), hence the `any` cast.
+    ? [board._id, (Integrations as any).Const.GLOBAL_WEBHOOK_ID]
+    : [(Integrations as any).Const.GLOBAL_WEBHOOK_ID];
   const integrations = await ReactiveCache.getIntegrations({
     boardId: { $in: integrationBoardIds },
     enabled: true,
@@ -364,15 +371,15 @@ Activities.after.insert(async (userId, doc) => {
   });
   if (integrations.length > 0) {
     params.watchers = watchers;
-    integrations.forEach((integration) => {
+    integrations.forEach((integration: any) => {
       // Fire-and-forget, error-isolated: a failing/slow/unreachable outgoing
       // webhook must never abort this activity insert or the originating
       // operation (e.g. adding/removing a card member). See bug #1402.
       // safeDeliver() never rejects, so we intentionally do not await it.
       safeDeliver(
         () =>
-          new Promise((resolve, reject) => {
-            Meteor.call('outgoingWebhooks', integration, description, params, (err) => {
+          new Promise<void>((resolve, reject) => {
+            Meteor.call('outgoingWebhooks', integration, description, params, (err: any) => {
               if (err) {
                 reject(err);
               } else {
