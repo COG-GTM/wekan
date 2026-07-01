@@ -23,9 +23,10 @@ import { comprehensiveBoardMigration } from './migrations/comprehensiveBoardMigr
 export const cronMigrationProgress = new ReactiveVar(0);
 export const cronMigrationStatus = new ReactiveVar('');
 export const cronMigrationCurrentStep = new ReactiveVar('');
-export const cronMigrationSteps = new ReactiveVar([]);
+export const cronMigrationSteps = new ReactiveVar<MigrationStep[]>([]);
 export const cronIsMigrating = new ReactiveVar(false);
-export const cronJobs = new ReactiveVar([]);
+// any[]: SyncedCron entry summaries (name/schedule/status/lastRun/nextRun/running).
+export const cronJobs = new ReactiveVar<any[]>([]);
 export const cronMigrationCurrentStepNum = new ReactiveVar(0);
 export const cronMigrationTotalSteps = new ReactiveVar(0);
 
@@ -34,6 +35,16 @@ export const boardOperations = new ReactiveVar(new Map());
 export const boardOperationProgress = new ReactiveVar(new Map());
 
 class CronMigrationManager {
+  migrationSteps: MigrationStep[];
+  currentStepIndex: number;
+  startTime: number | null;
+  isRunning: boolean;
+  // any: opaque job-processor handle placeholder; only ever assigned null here.
+  jobProcessor: any;
+  processingInterval: number | null;
+  monitorInterval: number | null;
+  pausedJobs: Map<string, any>;
+
   constructor() {
     this.migrationSteps = this.initializeMigrationSteps();
     this.currentStepIndex = 0;
@@ -256,13 +267,14 @@ class CronMigrationManager {
     }
 
     // Start the job
-    await this.executeJob(nextJob);
+    // getNextJob returns a generic Mongo Document; narrow to the QueueJob shape.
+    await this.executeJob(nextJob as object as QueueJob);
   }
 
   /**
    * Execute a job from the queue
    */
-  async executeJob(queueJob) {
+  async executeJob(queueJob: QueueJob) {
     const { jobId, jobType, jobData } = queueJob;
 
     try {
@@ -316,7 +328,7 @@ class CronMigrationManager {
   /**
    * Execute a migration job
    */
-  async executeMigrationJob(jobId, jobData) {
+  async executeMigrationJob(jobId: string, jobData?: MigrationJobData) {
     if (!jobData) {
       throw new Error('Job data is required for migration execution');
     }
@@ -326,7 +338,7 @@ class CronMigrationManager {
       throw new Error('Step ID is required in job data');
     }
 
-    const step = this.migrationSteps.find(s => s.id === stepId);
+    const step = this.migrationSteps.find((s: MigrationStep) => s.id === stepId);
     if (!step) {
       throw new Error(`Migration step ${stepId} not found`);
     }
@@ -363,7 +375,7 @@ class CronMigrationManager {
   /**
    * Create migration steps for a job
    */
-  createMigrationSteps(step) {
+  createMigrationSteps(step: MigrationStep) {
     const steps = [];
 
     switch (step.id) {
@@ -400,7 +412,7 @@ class CronMigrationManager {
     return steps;
   }
 
-  async isMigrationNeeded(stepId) {
+  async isMigrationNeeded(stepId: string) {
     switch (stepId) {
       case 'lowercase-board-permission':
         return !!(await Boards.findOneAsync({
@@ -487,7 +499,7 @@ class CronMigrationManager {
   /**
    * Execute a migration step
    */
-  async executeMigrationStep(jobId, stepIndex, stepData, stepId) {
+  async executeMigrationStep(jobId: string, stepIndex: number, stepData: MigrationStepData, stepId: string) {
     const { name, duration } = stepData;
 
     // Check if this is the star count migration that needs real implementation
@@ -568,7 +580,7 @@ class CronMigrationManager {
   /**
    * Execute the denormalize star count migration
    */
-  async executeDenormalizeStarCount(jobId, stepIndex, stepData) {
+  async executeDenormalizeStarCount(jobId: string, stepIndex: number, stepData: MigrationStepData) {
     try {
       const { name } = stepData;
 
@@ -596,7 +608,7 @@ class CronMigrationManager {
       // Count stars for each board
       users.forEach(user => {
         const starredBoards = (user.profile && user.profile.starredBoards) || [];
-        starredBoards.forEach(boardId => {
+        starredBoards.forEach((boardId: string) => {
           starCounts.set(boardId, (starCounts.get(boardId) || 0) + 1);
         });
       });
@@ -697,7 +709,7 @@ class CronMigrationManager {
   /**
    * Execute the ensure valid swimlane IDs migration
    */
-  async executeEnsureValidSwimlaneIds(jobId, stepIndex, stepData) {
+  async executeEnsureValidSwimlaneIds(jobId: string, stepIndex: number, stepData: MigrationStepData) {
     try {
       const { name } = stepData;
 
@@ -735,7 +747,7 @@ class CronMigrationManager {
   /**
    * Execute the lowercase board permission migration
    */
-  async executeLowercasePermission(jobId, stepIndex, stepData) {
+  async executeLowercasePermission(jobId: string, stepIndex: number, stepData: MigrationStepData) {
     try {
       await cronJobStorage.saveJobStep(jobId, stepIndex, {
         progress: 0,
@@ -809,7 +821,7 @@ class CronMigrationManager {
   /**
    * Execute the comprehensive per-swimlane list migration across boards
    */
-  async executeComprehensiveBoardMigration(jobId, stepIndex, stepData) {
+  async executeComprehensiveBoardMigration(jobId: string, stepIndex: number, stepData: MigrationStepData) {
     try {
       await cronJobStorage.saveJobStep(jobId, stepIndex, {
         progress: 0,
@@ -894,7 +906,7 @@ class CronMigrationManager {
   /**
    * Execute attachment type standardization migration
    */
-  async executeAttachmentTypeStandardization(jobId, stepIndex, stepData) {
+  async executeAttachmentTypeStandardization(jobId: string, stepIndex: number, stepData: MigrationStepData) {
     try {
       await cronJobStorage.saveJobStep(jobId, stepIndex, {
         progress: 0,
@@ -967,7 +979,7 @@ class CronMigrationManager {
   /**
    * Execute card covers migration
    */
-  async executeCardCoversMigration(jobId, stepIndex, stepData) {
+  async executeCardCoversMigration(jobId: string, stepIndex: number, stepData: MigrationStepData) {
     try {
       await cronJobStorage.saveJobStep(jobId, stepIndex, {
         progress: 0,
@@ -1046,7 +1058,7 @@ class CronMigrationManager {
   /**
    * Execute member activity status migration
    */
-  async executeMemberActivityMigration(jobId, stepIndex, stepData) {
+  async executeMemberActivityMigration(jobId: string, stepIndex: number, stepData: MigrationStepData) {
     try {
       await cronJobStorage.saveJobStep(jobId, stepIndex, {
         progress: 0,
@@ -1074,7 +1086,7 @@ class CronMigrationManager {
       for (const board of boards) {
         if (!board.members || board.members.length === 0) continue;
 
-        const updatedMembers_board = board.members.map(member => {
+        const updatedMembers_board = board.members.map((member: any) => {
           if (member.isActive === undefined) {
             return { ...member, isActive: true };
           }
@@ -1123,7 +1135,7 @@ class CronMigrationManager {
   /**
    * Execute add swimlane IDs to cards migration
    */
-  async executeAddSwimlanesIdMigration(jobId, stepIndex, stepData) {
+  async executeAddSwimlanesIdMigration(jobId: string, stepIndex: number, stepData: MigrationStepData) {
     try {
       await cronJobStorage.saveJobStep(jobId, stepIndex, {
         progress: 0,
@@ -1197,7 +1209,7 @@ class CronMigrationManager {
   /**
    * Execute add card types migration
    */
-  async executeAddCardTypesMigration(jobId, stepIndex, stepData) {
+  async executeAddCardTypesMigration(jobId: string, stepIndex: number, stepData: MigrationStepData) {
     try {
       await cronJobStorage.saveJobStep(jobId, stepIndex, {
         progress: 0,
@@ -1275,7 +1287,7 @@ class CronMigrationManager {
    * Execute attachment migration from CollectionFS to Meteor-Files
    * In fresh WeKan installations, this migration is not needed as they use Meteor-Files only
    */
-  async executeAttachmentMigration(jobId, stepIndex, stepData) {
+  async executeAttachmentMigration(jobId: string, stepIndex: number, stepData: MigrationStepData) {
     try {
       await cronJobStorage.saveJobStep(jobId, stepIndex, {
         progress: 0,
@@ -1331,7 +1343,7 @@ class CronMigrationManager {
   /**
    * Execute avatar migration from CollectionFS to Meteor-Files
    */
-  async executeAvatarMigration(jobId, stepIndex, stepData) {
+  async executeAvatarMigration(jobId: string, stepIndex: number, stepData: MigrationStepData) {
     try {
       await cronJobStorage.saveJobStep(jobId, stepIndex, {
         progress: 0,
@@ -1362,7 +1374,7 @@ class CronMigrationManager {
   /**
    * Execute board color CSS class migration
    */
-  async executeBoardColorMigration(jobId, stepIndex, stepData) {
+  async executeBoardColorMigration(jobId: string, stepIndex: number, stepData: MigrationStepData) {
     try {
       await cronJobStorage.saveJobStep(jobId, stepIndex, {
         progress: 0,
@@ -1419,7 +1431,7 @@ class CronMigrationManager {
   /**
    * Execute checklist items migration
    */
-  async executeChecklistItemsMigration(jobId, stepIndex, stepData) {
+  async executeChecklistItemsMigration(jobId: string, stepIndex: number, stepData: MigrationStepData) {
     try {
       await cronJobStorage.saveJobStep(jobId, stepIndex, {
         progress: 0,
@@ -1476,7 +1488,7 @@ class CronMigrationManager {
   /**
    * Execute a board operation job
    */
-  async executeBoardOperationJob(jobId, jobData) {
+  async executeBoardOperationJob(jobId: string, jobData: MigrationJobData) {
     const { operationType, operationData } = jobData;
 
     // Use existing board operation logic
@@ -1486,7 +1498,7 @@ class CronMigrationManager {
   /**
    * Execute a board migration job
    */
-  async executeBoardMigrationJob(jobId, jobData) {
+  async executeBoardMigrationJob(jobId: string, jobData: MigrationJobData) {
     const { boardId, boardTitle, migrationType } = jobData;
 
     try {
@@ -1535,7 +1547,7 @@ class CronMigrationManager {
   /**
    * Create migration steps for a board
    */
-  createBoardMigrationSteps(boardId, migrationType) {
+  createBoardMigrationSteps(boardId: string, migrationType: string) {
     const steps = [];
 
     if (migrationType === 'full_board_migration') {
@@ -1561,7 +1573,7 @@ class CronMigrationManager {
   /**
    * Execute a board migration step
    */
-  async executeBoardMigrationStep(jobId, stepIndex, stepData, boardId) {
+  async executeBoardMigrationStep(jobId: string, stepIndex: number, stepData: MigrationStepData, boardId: string) {
     const { name, duration, type } = stepData;
 
     // Simulate step execution with progress updates
@@ -1576,14 +1588,14 @@ class CronMigrationManager {
       });
 
       // Simulate work based on step type
-      await this.simulateBoardMigrationWork(type, duration / progressSteps);
+      await this.simulateBoardMigrationWork(type, duration! / progressSteps);
     }
   }
 
   /**
    * Simulate board migration work
    */
-  async simulateBoardMigrationWork(stepType, duration) {
+  async simulateBoardMigrationWork(stepType: string, duration: number) {
     // Simulate different types of migration work
     switch (stepType) {
       case 'validation':
@@ -1615,7 +1627,7 @@ class CronMigrationManager {
   /**
    * Mark a board as migrated
    */
-  async markBoardAsMigrated(boardId, migrationType) {
+  async markBoardAsMigrated(boardId: string, migrationType: string) {
     try {
       // Update board with migration markers and version
       const updateQuery = {
@@ -1640,10 +1652,10 @@ class CronMigrationManager {
   /**
    * Create a cron job for a migration step
    */
-  createCronJob(step) {
+  createCronJob(step: MigrationStep) {
     SyncedCron.add({
       name: step.cronName,
-      schedule: (parser) => parser.text(step.schedule),
+      schedule: (parser: any) => parser.text(step.schedule),
       job: async () => {
         await this.runMigrationStep(step);
       },
@@ -1653,7 +1665,7 @@ class CronMigrationManager {
   /**
    * Run a migration step
    */
-  async runMigrationStep(step) {
+  async runMigrationStep(step: MigrationStep) {
     try {
       // Check if already completed
       if (step.completed) {
@@ -1728,7 +1740,7 @@ class CronMigrationManager {
 
     try {
       // Remove cron jobs to prevent conflicts with job queue
-      this.migrationSteps.forEach(step => {
+      this.migrationSteps.forEach((step: MigrationStep) => {
         try {
           SyncedCron.remove(step.cronName);
         } catch (error) {
@@ -1829,7 +1841,7 @@ class CronMigrationManager {
   /**
    * Start a specific migration by index
    */
-  async startSpecificMigration(migrationIndex) {
+  async startSpecificMigration(migrationIndex: number) {
     if (this.isRunning) {
       return;
     }
@@ -1929,7 +1941,7 @@ class CronMigrationManager {
           cronMigrationStatus.set('');
         }, 5000);
 
-        Meteor.clearInterval(this.monitorInterval);
+        Meteor.clearInterval(this.monitorInterval!);
         this.monitorInterval = null;
         return; // Exit early to avoid setting progress to 100%
       }
@@ -1962,7 +1974,7 @@ class CronMigrationManager {
   /**
    * Start a specific cron job
    */
-  async startCronJob(cronName) {
+  async startCronJob(cronName: string) {
     // Change schedule to run once
       const job = SyncedCron._entries?.[cronName];
     if (job) {
@@ -1974,8 +1986,8 @@ class CronMigrationManager {
   /**
    * Wait for a cron job to complete
    */
-  async waitForCronJobCompletion(step) {
-    return new Promise((resolve) => {
+  async waitForCronJobCompletion(step: MigrationStep) {
+    return new Promise<void>((resolve) => {
       const checkInterval = setInterval(() => {
         if (step.completed || step.status === 'error') {
           clearInterval(checkInterval);
@@ -1988,9 +2000,9 @@ class CronMigrationManager {
   /**
    * Stop a specific cron job
    */
-  stopCronJob(cronName) {
+  stopCronJob(cronName: string) {
     SyncedCron.remove(cronName);
-    const step = this.migrationSteps.find(s => s.cronName === cronName);
+    const step = this.migrationSteps.find((s: MigrationStep) => s.cronName === cronName);
     if (step) {
       step.status = 'stopped';
     }
@@ -2002,7 +2014,7 @@ class CronMigrationManager {
    * Note: quave:synced-cron only has global pause(), so we implement per-job pause
    * by storing the job config and removing it, then re-adding on resume.
    */
-  pauseCronJob(cronName) {
+  pauseCronJob(cronName: string) {
     const entry = SyncedCron._entries?.[cronName];
     if (entry) {
       // Store the job config before removing
@@ -2013,7 +2025,7 @@ class CronMigrationManager {
       });
       SyncedCron.remove(cronName);
     }
-    const step = this.migrationSteps.find(s => s.cronName === cronName);
+    const step = this.migrationSteps.find((s: MigrationStep) => s.cronName === cronName);
     if (step) {
       step.status = 'paused';
     }
@@ -2024,14 +2036,14 @@ class CronMigrationManager {
    * Resume a specific cron job
    * Note: quave:synced-cron doesn't have resume(), so we re-add the stored job config.
    */
-  resumeCronJob(cronName) {
+  resumeCronJob(cronName: string) {
     const pausedJob = this.pausedJobs.get(cronName);
     if (pausedJob) {
       SyncedCron.add(pausedJob);
       this.pausedJobs.delete(cronName);
       startSyncedCron();
     }
-    const step = this.migrationSteps.find(s => s.cronName === cronName);
+    const step = this.migrationSteps.find((s: MigrationStep) => s.cronName === cronName);
     if (step) {
       step.status = 'running';
     }
@@ -2041,16 +2053,16 @@ class CronMigrationManager {
   /**
    * Remove a cron job
    */
-  removeCronJob(cronName) {
+  removeCronJob(cronName: string) {
     SyncedCron.remove(cronName);
-    this.migrationSteps = this.migrationSteps.filter(s => s.cronName !== cronName);
+    this.migrationSteps = this.migrationSteps.filter((s: MigrationStep) => s.cronName !== cronName);
     this.updateCronJobsList();
   }
 
   /**
    * Add a new cron job
    */
-  addCronJob(jobData) {
+  addCronJob(jobData: MigrationJobData) {
     const step = {
       id: jobData.id || `custom_${Date.now()}`,
       name: jobData.name,
@@ -2063,8 +2075,10 @@ class CronMigrationManager {
       status: 'stopped'
     };
 
-    this.migrationSteps.push(step);
-    this.createCronJob(step);
+    // A custom job may omit name/description; cast to the tracked step shape to
+    // preserve the original runtime behavior (fields may be undefined).
+    this.migrationSteps.push(step as MigrationStep);
+    this.createCronJob(step as MigrationStep);
     this.updateCronJobsList();
   }
 
@@ -2072,8 +2086,8 @@ class CronMigrationManager {
    * Update progress variables
    */
   updateProgress() {
-    const totalWeight = this.migrationSteps.reduce((total, step) => total + step.weight, 0);
-    const completedWeight = this.migrationSteps.reduce((total, step) => {
+    const totalWeight = this.migrationSteps.reduce((total: number, step: MigrationStep) => total + step.weight, 0);
+    const completedWeight = this.migrationSteps.reduce((total: number, step: MigrationStep) => {
       return total + (step.completed ? step.weight : step.progress * step.weight / 100);
     }, 0);
     const progress = Math.round((completedWeight / totalWeight) * 100);
@@ -2094,8 +2108,8 @@ class CronMigrationManager {
       return;
     }
 
-    const jobs = Object.values(entries).map(job => {
-      const step = this.migrationSteps.find(s => s.cronName === job.name);
+    const jobs = Object.values(entries).map((job: any) => {
+      const step = this.migrationSteps.find((s: MigrationStep) => s.cronName === job.name);
       return {
         name: job.name,
         schedule: job.schedule,
@@ -2125,7 +2139,7 @@ class CronMigrationManager {
   /**
    * Start a long-running operation for a specific board
    */
-  async startBoardOperation(boardId, operationType, operationData) {
+  async startBoardOperation(boardId: string, operationType: string, operationData: any) {
     const operationId = `${boardId}_${operationType}_${Date.now()}`;
 
     // Add to job queue
@@ -2169,7 +2183,7 @@ class CronMigrationManager {
   /**
    * Execute a board operation
    */
-  async executeBoardOperation(operationId, operationType, operationData) {
+  async executeBoardOperation(operationId: string, operationType: string, operationData: any) {
     const operations = boardOperations.get();
     const operation = operations.get(operationId);
 
@@ -2242,7 +2256,7 @@ class CronMigrationManager {
   /**
    * Update board operation progress
    */
-  updateBoardOperation(operationId, operation) {
+  updateBoardOperation(operationId: string, operation: any) {
     const operations = boardOperations.get();
     operations.set(operationId, operation);
     boardOperations.set(operations);
@@ -2260,7 +2274,7 @@ class CronMigrationManager {
   /**
    * Copy board operation
    */
-  async copyBoard(operationId, data) {
+  async copyBoard(operationId: string, data: any) {
     const { sourceBoardId, targetBoardId, copyOptions } = data;
     const operation = boardOperations.get().get(operationId);
 
@@ -2278,7 +2292,7 @@ class CronMigrationManager {
   /**
    * Move board operation
    */
-  async moveBoard(operationId, data) {
+  async moveBoard(operationId: string, data: any) {
     const { sourceBoardId, targetBoardId, moveOptions } = data;
     const operation = boardOperations.get().get(operationId);
 
@@ -2296,7 +2310,7 @@ class CronMigrationManager {
   /**
    * Copy swimlane operation
    */
-  async copySwimlane(operationId, data) {
+  async copySwimlane(operationId: string, data: any) {
     const { sourceSwimlaneId, targetBoardId, copyOptions } = data;
     const operation = boardOperations.get().get(operationId);
 
@@ -2314,7 +2328,7 @@ class CronMigrationManager {
   /**
    * Move swimlane operation
    */
-  async moveSwimlane(operationId, data) {
+  async moveSwimlane(operationId: string, data: any) {
     const { sourceSwimlaneId, targetBoardId, moveOptions } = data;
     const operation = boardOperations.get().get(operationId);
 
@@ -2332,7 +2346,7 @@ class CronMigrationManager {
   /**
    * Copy list operation
    */
-  async copyList(operationId, data) {
+  async copyList(operationId: string, data: any) {
     const { sourceListId, targetBoardId, copyOptions } = data;
     const operation = boardOperations.get().get(operationId);
 
@@ -2350,7 +2364,7 @@ class CronMigrationManager {
   /**
    * Move list operation
    */
-  async moveList(operationId, data) {
+  async moveList(operationId: string, data: any) {
     const { sourceListId, targetBoardId, moveOptions } = data;
     const operation = boardOperations.get().get(operationId);
 
@@ -2368,7 +2382,7 @@ class CronMigrationManager {
   /**
    * Copy card operation
    */
-  async copyCard(operationId, data) {
+  async copyCard(operationId: string, data: any) {
     const { sourceCardId, targetListId, copyOptions } = data;
     const operation = boardOperations.get().get(operationId);
 
@@ -2386,7 +2400,7 @@ class CronMigrationManager {
   /**
    * Move card operation
    */
-  async moveCard(operationId, data) {
+  async moveCard(operationId: string, data: any) {
     const { sourceCardId, targetListId, moveOptions } = data;
     const operation = boardOperations.get().get(operationId);
 
@@ -2404,7 +2418,7 @@ class CronMigrationManager {
   /**
    * Copy checklist operation
    */
-  async copyChecklist(operationId, data) {
+  async copyChecklist(operationId: string, data: any) {
     const { sourceChecklistId, targetCardId, copyOptions } = data;
     const operation = boardOperations.get().get(operationId);
 
@@ -2422,7 +2436,7 @@ class CronMigrationManager {
   /**
    * Move checklist operation
    */
-  async moveChecklist(operationId, data) {
+  async moveChecklist(operationId: string, data: any) {
     const { sourceChecklistId, targetCardId, moveOptions } = data;
     const operation = boardOperations.get().get(operationId);
 
@@ -2440,7 +2454,7 @@ class CronMigrationManager {
   /**
    * Get board operations for a specific board
    */
-  getBoardOperations(boardId) {
+  getBoardOperations(boardId: string) {
     const operations = boardOperations.get();
     const boardOps = [];
 
@@ -2491,7 +2505,7 @@ class CronMigrationManager {
    */
   getBoardOperationStats() {
     const operations = boardOperations.get();
-    const stats = {
+    const stats: OperationStats = {
       total: operations.size,
       running: 0,
       completed: 0,
@@ -2518,7 +2532,7 @@ class CronMigrationManager {
     try {
       // Stop all existing cron jobs
       if (SyncedCron?._entries) {
-        Object.values(SyncedCron._entries).forEach(job => {
+        Object.values(SyncedCron._entries).forEach((job: any) => {
           try {
             SyncedCron.remove(job.name);
           } catch (error) {
@@ -2536,7 +2550,9 @@ class CronMigrationManager {
       this.isRunning = false;
 
       // Restart the migration system
-      this.initialize();
+      // `initialize` is a pre-existing reference to a method that does not exist
+      // on this class; cast to any to preserve the original runtime behavior.
+      (this as any).initialize();
 
       console.log('All cron jobs cleared and migration system restarted');
       return { success: true, message: 'All cron jobs cleared and migration system restarted' };
@@ -2732,7 +2748,7 @@ class CronMigrationManager {
   /**
    * Get errors for a specific job
    */
-  async getJobErrors(jobId, options = {}) {
+  async getJobErrors(jobId: string, options: JobErrorsQuery = {}) {
     return await cronJobStorage.getJobErrors(jobId, options);
   }
 
@@ -2742,9 +2758,9 @@ class CronMigrationManager {
   async getMigrationStats() {
     const queueStats = await cronJobStorage.getQueueStats();
     const allErrors = await cronJobStorage.getAllRecentErrors(100);
-    const errorsByJob = {};
+    const errorsByJob: { [key: string]: any[] } = {};
 
-    allErrors.forEach(error => {
+    allErrors.forEach((error: any) => {
       if (!errorsByJob[error.jobId]) {
         errorsByJob[error.jobId] = [];
       }
@@ -2804,45 +2820,6 @@ Meteor.methods({
     }
 
     return cronMigrationManager.startCronJob(cronName);
-  },
-  
-  async 'cron.stopJob'(cronName) {
-    const userId = this.userId;
-    if (!userId) {
-      throw new Meteor.Error('not-authorized', 'Must be logged in');
-    }
-    const user = await ReactiveCache.getUser(userId);
-    if (!user || !user.isAdmin) {
-      throw new Meteor.Error('not-authorized', 'Admin access required');
-    }
-
-    return cronMigrationManager.stopCronJob(cronName);
-  },
-  
-  async 'cron.pauseJob'(cronName) {
-    const userId = this.userId;
-    if (!userId) {
-      throw new Meteor.Error('not-authorized', 'Must be logged in');
-    }
-    const user = await ReactiveCache.getUser(userId);
-    if (!user || !user.isAdmin) {
-      throw new Meteor.Error('not-authorized', 'Admin access required');
-    }
-
-    return cronMigrationManager.pauseCronJob(cronName);
-  },
-  
-  async 'cron.resumeJob'(cronName) {
-    const userId = this.userId;
-    if (!userId) {
-      throw new Meteor.Error('not-authorized', 'Must be logged in');
-    }
-    const user = await ReactiveCache.getUser(userId);
-    if (!user || !user.isAdmin) {
-      throw new Meteor.Error('not-authorized', 'Admin access required');
-    }
-
-    return cronMigrationManager.resumeCronJob(cronName);
   },
   
   async 'cron.removeJob'(cronName) {
@@ -2963,45 +2940,6 @@ Meteor.methods({
     };
   },
 
-  async 'cron.pauseAllMigrations'() {
-    const userId = this.userId;
-    if (!userId) {
-      throw new Meteor.Error('not-authorized', 'Must be logged in');
-    }
-    const user = await ReactiveCache.getUser(userId);
-    if (!user || !user.isAdmin) {
-      throw new Meteor.Error('not-authorized', 'Admin access required');
-    }
-
-    return cronMigrationManager.pauseAllMigrations();
-  },
-
-  async 'cron.stopAllMigrations'() {
-    const userId = this.userId;
-    if (!userId) {
-      throw new Meteor.Error('not-authorized', 'Must be logged in');
-    }
-    const user = await ReactiveCache.getUser(userId);
-    if (!user || !user.isAdmin) {
-      throw new Meteor.Error('not-authorized', 'Admin access required');
-    }
-
-    return cronMigrationManager.stopAllMigrations();
-  },
-
-  async 'cron.stopAllMigrations'() {
-    const userId = this.userId;
-    if (!userId) {
-      throw new Meteor.Error('not-authorized', 'Must be logged in');
-    }
-    const user = await ReactiveCache.getUser(userId);
-    if (!user || !user.isAdmin) {
-      throw new Meteor.Error('not-authorized', 'Admin access required');
-    }
-
-    return cronMigrationManager.stopAllMigrations();
-  },
-
   async 'cron.resumeAllMigrations'() {
     const userId = this.userId;
     if (!userId) {
@@ -3092,7 +3030,7 @@ Meteor.methods({
 
     // Check global admin or board admin
     const isGlobalAdmin = user.isAdmin;
-    const isBoardAdmin = board.members && board.members.some(member =>
+    const isBoardAdmin = board.members && board.members.some((member: any) =>
       member.userId === userId && member.isAdmin
     );
 
@@ -3123,7 +3061,7 @@ Meteor.methods({
 
     // Check global admin or board admin
     const isGlobalAdmin = user.isAdmin;
-    const isBoardAdmin = board.members && board.members.some(member =>
+    const isBoardAdmin = board.members && board.members.some((member: any) =>
       member.userId === userId && member.isAdmin
     );
 
@@ -3368,3 +3306,62 @@ Meteor.methods({
   },
 
 });
+
+// A single migration step tracked by the manager (also the shape pushed by
+// addCronJob and stored in this.migrationSteps).
+interface MigrationStep {
+  id: string;
+  name: string;
+  description: string;
+  weight: number;
+  completed: boolean;
+  progress: number;
+  cronName: string;
+  schedule: string;
+  status: string;
+}
+
+// A unit of work created by createMigrationSteps/createBoardMigrationSteps and
+// consumed by the execute* handlers.
+interface MigrationStepData {
+  name: string;
+  duration?: number;
+  [key: string]: any;
+}
+
+// The payload carried by a queued job. Named fields are those read here; the
+// index signature covers the per-job-type extras (boardId, operationType, ...).
+interface MigrationJobData {
+  id?: string;
+  name?: string;
+  description?: string;
+  weight?: number;
+  cronName?: string;
+  schedule?: string;
+  stepId?: string;
+  [key: string]: any;
+}
+
+// A job pulled off the queue by processJobQueue and passed to executeJob.
+interface QueueJob {
+  jobId: string;
+  jobType: string;
+  jobData: MigrationJobData;
+}
+
+// Options forwarded to cronJobStorage.getJobErrors.
+interface JobErrorsQuery {
+  limit?: number;
+  severity?: string | null;
+}
+
+// Aggregated counters returned by getBoardOperationStats. The status/byType
+// buckets are keyed by dynamic operation status/type strings.
+interface OperationStats {
+  total: number;
+  running: number;
+  completed: number;
+  error: number;
+  byType: { [key: string]: number };
+  [key: string]: any;
+}
