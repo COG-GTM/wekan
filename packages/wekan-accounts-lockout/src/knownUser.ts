@@ -4,9 +4,13 @@ import { Meteor } from 'meteor/meteor';
 import { Accounts } from 'meteor/accounts-base';
 
 class KnownUser {
-  constructor(settings) {
+  private unchangedSettings: LockoutSettings | KnownUserSettingsFn;
+
+  private settings: LockoutSettings;
+
+  constructor(settings: LockoutSettings | KnownUserSettingsFn) {
     this.unchangedSettings = settings;
-    this.settings = settings;
+    this.settings = settings as LockoutSettings;
   }
 
   async startup() {
@@ -21,7 +25,7 @@ class KnownUser {
   updateSettings() {
     const settings = KnownUser.knownUsers();
     if (settings) {
-      settings.forEach(function updateSetting({ key, value }) {
+      settings.forEach(function updateSetting(this: KnownUser, { key, value }: LockoutSettingEntry) {
         this.settings[key] = value;
       });
     }
@@ -100,7 +104,7 @@ class KnownUser {
   }
 
 
-  async validateLoginAttempt(loginInfo) {
+  async validateLoginAttempt(loginInfo: LoginAttemptInfo) {
     if (
       // don't interrupt non-password logins
       loginInfo.type !== 'password' ||
@@ -162,8 +166,8 @@ class KnownUser {
   }
 
   static async resetAttempts(
-    failedAttempts,
-    userId,
+    failedAttempts: number,
+    userId: string,
   ) {
     const currentTime = Number(new Date());
     const query = { _id: userId };
@@ -178,8 +182,8 @@ class KnownUser {
   }
 
   static async incrementAttempts(
-    failedAttempts,
-    userId,
+    failedAttempts: number,
+    userId: string,
   ) {
     const currentTime = Number(new Date());
     const query = { _id: userId };
@@ -193,8 +197,8 @@ class KnownUser {
   }
 
   async setNewUnlockTime(
-    failedAttempts,
-    userId,
+    failedAttempts: number,
+    userId: string,
   ) {
     const currentTime = Number(new Date());
     const newUnlockTime = (1000 * this.settings.lockoutPeriod) + currentTime;
@@ -213,7 +217,7 @@ class KnownUser {
     );
   }
 
-  static async onLogin(loginInfo) {
+  static async onLogin(loginInfo: LoginSuccessInfo) {
     if (loginInfo.type !== 'password') {
       return;
     }
@@ -229,9 +233,9 @@ class KnownUser {
   }
 
   static incorrectPassword(
-    failedAttempts,
-    maxAttemptsAllowed,
-    attemptsRemaining,
+    failedAttempts: number,
+    maxAttemptsAllowed: number,
+    attemptsRemaining: number,
   ) {
     throw new Meteor.Error(
       403,
@@ -245,7 +249,7 @@ class KnownUser {
     );
   }
 
-  static tooManyAttempts(duration) {
+  static tooManyAttempts(duration: number) {
     throw new Meteor.Error(
       403,
       'Too many attempts',
@@ -256,8 +260,8 @@ class KnownUser {
     );
   }
 
-  static knownUsers() {
-    let knownUsers;
+  static knownUsers(): LockoutSettingEntry[] | false {
+    let knownUsers: LockoutSettingEntry[] | false | undefined;
     try {
       knownUsers = Meteor.settings['accounts-lockout'].knownUsers;
     } catch (e) {
@@ -266,8 +270,8 @@ class KnownUser {
     return knownUsers || false;
   }
 
-  static unlockTime(user) {
-    let unlockTime;
+  static unlockTime(user: LockoutUser) {
+    let unlockTime: number | undefined;
     try {
       unlockTime = user.services['accounts-lockout'].unlockTime;
     } catch (e) {
@@ -276,8 +280,8 @@ class KnownUser {
     return unlockTime || 0;
   }
 
-  static failedAttempts(user) {
-    let failedAttempts;
+  static failedAttempts(user: LockoutUser) {
+    let failedAttempts: number | undefined;
     try {
       failedAttempts = user.services['accounts-lockout'].failedAttempts;
     } catch (e) {
@@ -286,8 +290,8 @@ class KnownUser {
     return failedAttempts || 0;
   }
 
-  static lastFailedAttempt(user) {
-    let lastFailedAttempt;
+  static lastFailedAttempt(user: LockoutUser) {
+    let lastFailedAttempt: number | undefined;
     try {
       lastFailedAttempt = user.services['accounts-lockout'].lastFailedAttempt;
     } catch (e) {
@@ -296,8 +300,8 @@ class KnownUser {
     return lastFailedAttempt || 0;
   }
 
-  static firstFailedAttempt(user) {
-    let firstFailedAttempt;
+  static firstFailedAttempt(user: LockoutUser) {
+    let firstFailedAttempt: number | undefined;
     try {
       firstFailedAttempt = user.services['accounts-lockout'].firstFailedAttempt;
     } catch (e) {
@@ -306,7 +310,7 @@ class KnownUser {
     return firstFailedAttempt || 0;
   }
 
-  static async unlockAccount(userId) {
+  static async unlockAccount(userId: string) {
     const query = { _id: userId };
     const data = {
       $unset: {
@@ -317,5 +321,7 @@ class KnownUser {
     await Meteor.users.updateAsync(query, data);
   }
 }
+
+type KnownUserSettingsFn = (user: LockoutUser) => LockoutSettings;
 
 export default KnownUser;

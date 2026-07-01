@@ -14,5 +14,5 @@ Package.onUse((api) => {
     'ecmascript',
     'accounts-password',
   ]);
-  api.mainModule('accounts-lockout.js');
+  api.mainModule('accounts-lockout.ts');
 });

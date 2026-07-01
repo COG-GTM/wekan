@@ -2,6 +2,8 @@ import KnownUser from './knownUser';
 import UnknownUser from './unknownUser';
 
 class AccountsLockout {
+  private settings: { knownUsers: LockoutSettings; unknownUsers: LockoutSettings };
+
   constructor({
     knownUsers = {
       failuresBeforeLockout: 3,
@@ -13,7 +15,7 @@ class AccountsLockout {
       lockoutPeriod: 60,
       failureWindow: 15,
     },
-  }) {
+  }: AccountsLockoutOptions) {
     this.settings = {
       knownUsers,
       unknownUsers,
@@ -24,6 +26,11 @@ class AccountsLockout {
     (new KnownUser(this.settings.knownUsers)).startup();
     (new UnknownUser(this.settings.unknownUsers)).startup();
   }
+}
+
+interface AccountsLockoutOptions {
+  knownUsers?: LockoutSettings;
+  unknownUsers?: LockoutSettings;
 }
 
 export default AccountsLockout;
