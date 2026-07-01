@@ -230,6 +230,12 @@ Accounts.registerLoginHandler('ldap', async function(loginRequest) {
 
   const result = await addLdapUser(ldapUser, username, loginRequest.ldapPass);
 
+  // NOTE: the `username!` assertions below preserve pre-existing JS behaviour.
+  // When LDAP_USERNAME_FIELD is empty, `username` is set to undefined above and
+  // still passed to getUserGroups(); the original code did the same, producing an
+  // LDAP filter containing the literal "undefined". The `!` is compile-time only
+  // and does not change this behaviour; fixing it is out of scope for this
+  // behaviour-preserving migration.
   if (LDAP.settings_get('LDAP_SYNC_ADMIN_STATUS') === true) {
     log_debug('Updating admin status');
     const targetGroups = LDAP.settings_get('LDAP_SYNC_ADMIN_GROUPS').split(',');
