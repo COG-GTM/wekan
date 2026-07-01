@@ -53,7 +53,7 @@ Meteor.methods({
     };
   },
 
-  async 'fixDuplicateLists.fixBoard'(boardId) {
+  async 'fixDuplicateLists.fixBoard'(boardId: string) {
     check(boardId, String);
 
     if (!this.userId) {
@@ -70,7 +70,7 @@ Meteor.methods({
 });
 
 // Helper functions defined outside of Meteor.methods
-async function fixDuplicateListsForBoard(boardId) {
+async function fixDuplicateListsForBoard(boardId: string) {
     if (process.env.DEBUG === 'true') {
       console.log(`Fixing duplicate lists for board ${boardId}...`);
     }
@@ -90,9 +90,9 @@ async function fixDuplicateListsForBoard(boardId) {
 }
 
 // Helper functions defined outside of Meteor.methods
-async function fixDuplicateSwimlanes(boardId) {
+async function fixDuplicateSwimlanes(boardId: string) {
     const swimlanes = await Swimlanes.find({ boardId }).fetchAsync();
-    const swimlaneGroups = {};
+    const swimlaneGroups: Record<string, (typeof swimlanes)[number][]> = {};
     let fixed = 0;
 
     // Group swimlanes by title
@@ -109,7 +109,7 @@ async function fixDuplicateSwimlanes(boardId) {
       const group = swimlaneGroups[title];
       if (group.length > 1) {
         // Sort by creation date, keep the oldest
-        group.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+        group.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
         const keepSwimlane = group[0];
         const removeSwimlanes = group.slice(1);
 
@@ -136,13 +136,13 @@ async function fixDuplicateSwimlanes(boardId) {
                 { multi: true }
               );
               // Remove duplicate list
-              await Lists.removeAsync(list._id);
+              await Lists.removeAsync(list._id!);
               if (process.env.DEBUG === 'true') {
                 console.log(`Moved cards from duplicate list "${list.title}" to existing list in kept swimlane`);
               }
             } else {
               // Move list to kept swimlane
-              await Lists.updateAsync(list._id, { $set: { swimlaneId: keepSwimlane._id } });
+              await Lists.updateAsync(list._id!, { $set: { swimlaneId: keepSwimlane._id } });
               if (process.env.DEBUG === 'true') {
                 console.log(`Moved list "${list.title}" to kept swimlane`);
               }
@@ -150,7 +150,7 @@ async function fixDuplicateSwimlanes(boardId) {
           }
 
           // Remove duplicate swimlane
-          await Swimlanes.removeAsync(swimlane._id);
+          await Swimlanes.removeAsync(swimlane._id!);
           fixed++;
         }
       }
@@ -159,9 +159,9 @@ async function fixDuplicateSwimlanes(boardId) {
     return { fixed };
 }
 
-async function fixDuplicateLists(boardId) {
+async function fixDuplicateLists(boardId: string) {
     const lists = await Lists.find({ boardId }).fetchAsync();
-    const listGroups = {};
+    const listGroups: Record<string, (typeof lists)[number][]> = {};
     let fixed = 0;
 
     // Group lists by title and swimlaneId
@@ -178,7 +178,7 @@ async function fixDuplicateLists(boardId) {
       const group = listGroups[key];
       if (group.length > 1) {
         // Sort by creation date, keep the oldest
-        group.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+        group.sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
         const keepList = group[0];
         const removeLists = group.slice(1);
 
@@ -195,7 +195,7 @@ async function fixDuplicateLists(boardId) {
           );
 
           // Remove duplicate list
-          await Lists.removeAsync(list._id);
+          await Lists.removeAsync(list._id!);
           fixed++;
           if (process.env.DEBUG === 'true') {
             console.log(`Moved cards from duplicate list "${list.title}" to kept list`);
@@ -218,14 +218,14 @@ Meteor.methods({
     }
 
     const allBoards = await Boards.find({}).fetchAsync();
-    const report = [];
+    const report: DuplicateListsReportEntry[] = [];
 
     for (const board of allBoards) {
       const swimlanes = await Swimlanes.find({ boardId: board._id }).fetchAsync();
       const lists = await Lists.find({ boardId: board._id }).fetchAsync();
 
       // Check for duplicate swimlanes
-      const swimlaneGroups = {};
+      const swimlaneGroups: Record<string, (typeof swimlanes)[number][]> = {};
       swimlanes.forEach(swimlane => {
         const key = swimlane.title || 'Default';
         if (!swimlaneGroups[key]) {
@@ -235,7 +235,7 @@ Meteor.methods({
       });
 
       // Check for duplicate lists
-      const listGroups = {};
+      const listGroups: Record<string, (typeof lists)[number][]> = {};
       lists.forEach(list => {
         const key = `${list.swimlaneId || 'null'}-${list.title}`;
         if (!listGroups[key]) {
@@ -266,3 +266,14 @@ Meteor.methods({
     };
   }
 });
+
+// A per-board entry in the duplicate-lists report produced by
+// `fixDuplicateLists.getReport`.
+interface DuplicateListsReportEntry {
+  boardId: string;
+  boardTitle: string;
+  duplicateSwimlanes: number;
+  duplicateLists: number;
+  totalSwimlanes: number;
+  totalLists: number;
+}

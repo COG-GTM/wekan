@@ -13,7 +13,13 @@ import { allowIsBoardMemberWithWriteAccess } from '/server/lib/utils';
 // Shared import logic used by both the Meteor method and the REST endpoint.
 // Validates that the target list/swimlane belong to the board (no cross-board
 // writes), parses the .ics text into card shapes and inserts them.
-async function importIcsCards(userId, boardId, listId, swimlaneId, icsText) {
+async function importIcsCards(
+  userId: string,
+  boardId: string,
+  listId: string,
+  swimlaneId: string,
+  icsText: string,
+) {
   const list = await Lists.findOneAsync(listId);
   if (!list || list.boardId !== boardId) {
     throw new Meteor.Error('list-not-found', 'List not found on this board.');
@@ -23,9 +29,9 @@ async function importIcsCards(userId, boardId, listId, swimlaneId, icsText) {
     throw new Meteor.Error('swimlane-not-found', 'Swimlane not found on this board.');
   }
   const cardShapes = icsToCards(icsText, { boardId, listId, swimlaneId });
-  const cardIds = [];
+  const cardIds: string[] = [];
   for (const shape of cardShapes) {
-    const doc = {
+    const doc: IcsCardInsert = {
       title: shape.title,
       description: shape.description,
       boardId,
@@ -63,7 +69,12 @@ Meteor.methods({
    * @param {string} icsText    raw .ics file contents
    * @returns {{ created: number, cardIds: string[] }}
    */
-  async importIcsToBoard(boardId, listId, swimlaneId, icsText) {
+  async importIcsToBoard(
+    boardId: string,
+    listId: string,
+    swimlaneId: string,
+    icsText: string,
+  ) {
     check(boardId, String);
     check(listId, String);
     check(swimlaneId, String);
@@ -114,7 +125,7 @@ WebApp.handlers.post(
     Authentication.checkLoggedIn(req.userId);
     const { boardId, swimlaneId, listId } = req.params;
     const board = await ReactiveCache.getBoard(boardId);
-    if (!board || !allowIsBoardMemberWithWriteAccess(req.userId, board)) {
+    if (!board || !allowIsBoardMemberWithWriteAccess(req.userId!, board)) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'not-authorized' }));
       return;
@@ -125,7 +136,22 @@ WebApp.handlers.post(
       res.end(JSON.stringify({ error: 'missing-ics', message: 'Provide the .ics file contents in the "ics" field.' }));
       return;
     }
-    const result = await importIcsCards(req.userId, boardId, listId, swimlaneId, icsText);
+    const result = await importIcsCards(req.userId!, boardId, listId, swimlaneId, icsText);
     sendJsonResult(res, { code: 200, data: result });
   },
 );
+
+// The card document assembled from a single parsed .ics VEVENT before it is
+// inserted into the Cards collection. startAt/dueAt are only set when the event
+// carries the corresponding date.
+interface IcsCardInsert {
+  title: string;
+  description: string;
+  boardId: string;
+  listId: string;
+  swimlaneId: string;
+  userId: string;
+  sort: number;
+  startAt?: Date | null;
+  dueAt?: Date | null;
+}

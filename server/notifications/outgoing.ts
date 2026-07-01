@@ -6,7 +6,7 @@ import { fetchSafe } from '/server/lib/ssrfGuard';
 import CardComments from '/models/cardComments';
 import Integrations from '/models/integrations';
 
-const Lock = {
+const Lock: OutgoingLock = {
     _lock: {},
     _timer: {},
     echoDelay: 500, // echo should be happening much faster
@@ -23,7 +23,7 @@ const Lock = {
       return ret;
     },
     clear(id, delay) {
-      const previous = this._timer[id];
+      const previous: number | undefined = this._timer[id];
       if (previous) {
         Meteor.clearTimeout(previous);
       }
@@ -64,7 +64,10 @@ const Lock = {
     'label',
     'attachmentId',
   ];
-  const responseFunc = async (data, integration) => {
+  const responseFunc = async (
+    data: OutgoingWebhookResponseData,
+    integration: OutgoingIntegration,
+  ) => {
     const paramCommentId = data.commentId;
     const paramCardId = data.cardId;
     const paramBoardId = data.boardId;
@@ -102,7 +105,11 @@ const Lock = {
     }
   };
 Meteor.methods({
-    async outgoingWebhooks(integration, description, params) {
+    async outgoingWebhooks(
+      integration: OutgoingIntegration,
+      description: string,
+      params: OutgoingWebhookParams,
+    ) {
       if (this.userId) {
         check(integration, Object);
         check(description, String);
@@ -151,7 +158,7 @@ Meteor.methods({
 
         if (text.length === 0) return;
 
-        const value = {
+        const value: OutgoingWebhookPayload = {
           text: `${text}`,
         };
 
@@ -162,7 +169,7 @@ Meteor.methods({
         //integrations.forEach(integration => {
         const is2way = integration.type === Integrations.Const.TWOWAY;
         const token = integration.token || '';
-        const fetchHeaders = {
+        const fetchHeaders: Record<string, string> = {
           'Content-Type': 'application/json',
         };
         if (token) fetchHeaders['X-Wekan-Token'] = token;
@@ -196,7 +203,7 @@ Meteor.methods({
 
         // fetchSafe resolves DNS once, pins the connection to the resolved IP,
         // and blocks redirects — fully preventing DNS-rebinding SSRF attacks.
-        let response;
+        let response: Awaited<ReturnType<typeof fetchSafe>> | undefined;
         try {
           response = await fetchSafe(url, {
             method: 'POST',
@@ -210,7 +217,7 @@ Meteor.methods({
           );
         }
 
-        if (response && response.status >= 200 && response.status < 300) {
+        if (response && response.status! >= 200 && response.status! < 300) {
           if (is2way) {
             // Only act on a JSON-encoded response body
             let data = null;
@@ -234,3 +241,61 @@ Meteor.methods({
       }
     },
   });
+
+// The two-way webhook response body: Wekan reads back an (edited) comment to
+// mirror it into the card. The remote may send other fields, but only these are
+// consulted.
+interface OutgoingWebhookResponseData {
+  commentId?: string;
+  cardId?: string;
+  boardId?: string;
+  comment?: string;
+}
+
+// The integration record driving a webhook (caller-supplied to the method, then
+// re-verified against the stored integration). Only the members the webhook flow
+// reads are modelled.
+interface OutgoingIntegration {
+  type?: string;
+  boardId?: string;
+  // The webhook endpoint. Always present on a stored integration record (it is
+  // a required field of the Integrations schema) and re-verified before use.
+  url: string;
+  token?: string;
+  userId?: string;
+}
+
+// The activity context params forwarded to the webhook. Carries a handful of
+// well-known fields plus the dynamic per-activity attributes copied into the
+// payload, so the remaining fields come through the documented index signature.
+interface OutgoingWebhookParams {
+  userId?: string;
+  user?: string;
+  url?: string;
+  commentId?: string;
+  comment?: string;
+  [key: string]: WekanDocumentField;
+}
+
+// The JSON body POSTed to the webhook endpoint: a rendered `text` plus the
+// selected activity attributes and the raw activity `description`.
+interface OutgoingWebhookPayload {
+  text: string;
+  description?: string;
+  [key: string]: WekanDocumentField;
+}
+
+// The in-memory de-duplication lock guarding two-way webhook comment echoes.
+interface OutgoingLock {
+  _lock: Record<string, string | number>;
+  _timer: Record<string, number>;
+  echoDelay: number;
+  normalDelay: number;
+  ECHO: number;
+  NORMAL: number;
+  NULL: number;
+  has(id: string, value: string | number | undefined): number;
+  clear(id: string, delay: number): void;
+  set(id: string, value: string | number | undefined): void;
+  unset(id: string): void;
+}

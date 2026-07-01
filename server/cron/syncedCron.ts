@@ -1,11 +1,11 @@
 let syncedCronConfigured = false;
-let syncedCronInstance = null;
+let syncedCronInstance: SyncedCronInstance | null = null;
 
-function getSyncedCronInstance() {
+function getSyncedCronInstance(): SyncedCronInstance {
   if (!syncedCronInstance) {
     syncedCronInstance = require('meteor/quave:synced-cron').SyncedCron;
   }
-  return syncedCronInstance;
+  return syncedCronInstance!;
 }
 
 export function configureSyncedCron() {
@@ -41,3 +41,19 @@ export const SyncedCron = new Proxy(
     },
   },
 );
+
+// The quave:synced-cron community package (loaded lazily via require) ships no
+// type definitions. Only the `config`/`start` surface Wekan calls directly is
+// modelled precisely; the Proxy above forwards every other member access, so the
+// remaining surface comes through the documented interop index signatures.
+interface SyncedCronInstance {
+  config(options: {
+    log?: boolean;
+    collectionName?: string;
+    utc?: boolean;
+    collectionTTL?: number;
+  }): void;
+  start(): void;
+  [member: string]: WekanDocumentField;
+  [member: symbol]: WekanDocumentField;
+}

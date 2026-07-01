@@ -67,7 +67,7 @@ interface LocalizedEmailOptions {
   to: string;
   from?: string;
   subject: string;
-  text: string;
+  text?: string;
   params?: Record<string, string>;
   language?: string;
   userId?: string;

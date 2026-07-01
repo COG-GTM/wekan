@@ -63,7 +63,21 @@ declare module 'meteor/meteor' {
       isAdmin?: boolean;
       [field: string]: WekanDocumentField;
     }
+    // @types/meteor leaves UserServices intentionally empty. The wekan
+    // brute-force lockout package (wekan-accounts-lockout) records its state
+    // under `services.accounts-lockout`, which the lockedUsers admin methods
+    // read back.
+    interface UserServices {
+      'accounts-lockout'?: AccountsLockoutUserService;
+    }
   }
+}
+
+// State the wekan-accounts-lockout package stores on a locked-out user under
+// `services.accounts-lockout`.
+interface AccountsLockoutUserService {
+  unlockTime: number;
+  failedAttempts: number;
 }
 
 // Wekan flags site administrators directly on the user document. @types/meteor
@@ -444,6 +458,29 @@ declare module 'meteor/ostrio:files' {
 // i18next post-processor plugin shipped without type definitions; the i18n layer
 // only ever passes it straight to `i18next.use()`.
 declare module 'i18next-sprintf-postprocessor';
+
+// wekan-accounts-lockout — the community brute-force-lockout package. Not
+// covered by @types/meteor; only the constructor + startup surface the
+// lockoutSettings method drives is modelled here.
+declare module 'meteor/wekan-accounts-lockout' {
+  interface AccountsLockoutUserRules {
+    failuresBeforeLockout: number;
+    lockoutPeriod: number;
+    failureWindow: number;
+  }
+
+  interface AccountsLockoutOptions {
+    knownUsers: AccountsLockoutUserRules;
+    unknownUsers: AccountsLockoutUserRules;
+  }
+
+  class AccountsLockout {
+    constructor(options: AccountsLockoutOptions);
+    startup(): void;
+  }
+
+  export { AccountsLockout };
+}
 
 // Spacebars appends a trailing keyword-arguments object (carrying `.hash`) to
 // every Blaze helper call; the leading positional arguments are the translation

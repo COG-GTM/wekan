@@ -3,7 +3,7 @@ import { check, Match } from 'meteor/check';
 import { ReactiveCache } from '/imports/reactiveCache';
 
 Meteor.methods({
-  async watch(watchableType, id, level) {
+  async watch(watchableType: string, id: string, level: string | null) {
     check(watchableType, String);
     check(id, String);
     check(level, Match.OneOf(String, null));

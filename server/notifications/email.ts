@@ -75,7 +75,7 @@ Meteor.startup(() => {
         } catch (e) {
           return;
         }
-      }, process.env.EMAIL_NOTIFICATION_TIMEOUT || 30000);
+      }, (process.env.EMAIL_NOTIFICATION_TIMEOUT || 30000) as number);
     } catch (error) {
       console.error('Error preparing email notification:', error);
     }

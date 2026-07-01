@@ -38,20 +38,20 @@ Meteor.methods({
     // Format the results for the UI
     return lockedUsers.map(user => {
       const email = user.emails && user.emails.length > 0 ? user.emails[0].address : 'No email';
-      const remainingLockTime = Math.round((user.services['accounts-lockout'].unlockTime - currentTime) / 1000);
+      const remainingLockTime = Math.round((user.services!['accounts-lockout']!.unlockTime - currentTime) / 1000);
 
       return {
         _id: user._id,
         username: user.username || 'No username',
         email,
-        failedAttempts: user.services['accounts-lockout'].failedAttempts || 0,
-        unlockTime: user.services['accounts-lockout'].unlockTime,
+        failedAttempts: user.services!['accounts-lockout']!.failedAttempts || 0,
+        unlockTime: user.services!['accounts-lockout']!.unlockTime,
         remainingLockTime // in seconds
       };
     });
   },
 
-  async unlockUser(userId) {
+  async unlockUser(userId: string) {
     // Check if user has admin rights
     const adminId = this.userId;
     if (!adminId) {
