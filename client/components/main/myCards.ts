@@ -1,3 +1,6 @@
+import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 import { CardSearchPaged } from '../../lib/cardSearch';
 import { Utils } from '/client/lib/utils';
 
@@ -23,12 +26,12 @@ Template.myCardsHeaderBar.events({
     'myCardsViewChange'),
 });
 
-Template.myCards.onCreated(function () {
+Template.myCards.onCreated(function (this: MyCardsInstance) {
   const search = new CardSearchPaged(this);
   this.search = search;
 
   // Override getSubscription for myCards
-  search.getSubscription = function (queryParams) {
+  search.getSubscription = function (queryParams: any) {
     return Meteor.subscribe(
       'myCards',
       search.sessionId,
@@ -36,7 +39,9 @@ Template.myCards.onCreated(function () {
     );
   };
 
-  search.runGlobalSearch(null);
+  // null as any — myCards overrides getSubscription above, so the queryParams
+  // arg is ignored; the null preserves the original call.
+  search.runGlobalSearch(null as any);
   Meteor.subscribe('setting');
 });
 
@@ -50,7 +55,7 @@ Template.myCards.helpers({
 
   // Return ReactiveVar so jade can use .get pattern
   searching() {
-    return Template.instance().search.searching;
+    return (Template.instance() as MyCardsInstance).search.searching;
   },
 
   myCardsView() {
@@ -59,29 +64,29 @@ Template.myCards.helpers({
     return Utils.myCardsView();
   },
 
-  labelName(board, labelId) {
+  labelName(board: any, labelId: any) {
     const label = board.getLabelById(labelId);
     const name = label.name;
     return name;
   },
 
-  labelColor(board, labelId) {
+  labelColor(board: any, labelId: any) {
     const label = board.getLabelById(labelId);
     const color = label.color;
     return color;
   },
 
   myCardsList() {
-    const search = Template.instance().search;
-    const boards = [];
-    let board = null;
-    let swimlane = null;
-    let list = null;
+    const search = (Template.instance() as MyCardsInstance).search;
+    const boards: any[] = [];
+    let board: any = null;
+    let swimlane: any = null;
+    let list: any = null;
 
     const cursor = search.getResults();
 
     if (cursor) {
-      cursor.forEach(card => {
+      cursor.forEach((card: any) => {
         // eslint-disable-next-line no-console
         // console.log('card:', card.title);
         if (board === null || card.boardId !== board._id) {
@@ -129,23 +134,23 @@ Template.myCards.helpers({
       });
 
       // sort the data structure
-      boards.forEach(board => {
-        board.mySwimlanes.forEach(swimlane => {
-          swimlane.myLists.forEach(list => {
-            list.myCards.sort((a, b) => {
+      boards.forEach((board: any) => {
+        board.mySwimlanes.forEach((swimlane: any) => {
+          swimlane.myLists.forEach((list: any) => {
+            list.myCards.sort((a: any, b: any) => {
               return a.sort - b.sort;
             });
           });
-          swimlane.myLists.sort((a, b) => {
+          swimlane.myLists.sort((a: any, b: any) => {
             return a.sort - b.sort;
           });
         });
-        board.mySwimlanes.sort((a, b) => {
+        board.mySwimlanes.sort((a: any, b: any) => {
           return a.sort - b.sort;
         });
       });
 
-      boards.sort((a, b) => {
+      boards.sort((a: any, b: any) => {
         let x = a.sort;
         let y = b.sort;
 
@@ -168,11 +173,11 @@ Template.myCards.helpers({
 });
 
 Template.myCards.events({
-  'click .js-next-page'(evt, tpl) {
+  'click .js-next-page'(evt: JQuery.TriggeredEvent, tpl: MyCardsInstance) {
     evt.preventDefault();
     tpl.search.nextPage();
   },
-  'click .js-previous-page'(evt, tpl) {
+  'click .js-previous-page'(evt: JQuery.TriggeredEvent, tpl: MyCardsInstance) {
     evt.preventDefault();
     tpl.search.previousPage();
   },
@@ -189,3 +194,7 @@ Template.myCardsViewChangePopup.events({
     Popup.back();
   },
 });
+
+interface MyCardsInstance extends Blaze.TemplateInstance {
+  search: CardSearchPaged;
+}

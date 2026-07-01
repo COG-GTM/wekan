@@ -1,4 +1,7 @@
 import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 import { Session } from 'meteor/session';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
@@ -12,15 +15,17 @@ Meteor.subscribe('user-admin');
 Meteor.subscribe('boards');
 Meteor.subscribe('setting');
 Meteor.subscribe('announcements');
-Template.header.onCreated(function () {
+Template.header.onCreated(function (this: HeaderInstance) {
   const templateInstance = this;
-  templateInstance.currentSetting = new ReactiveVar();
+  templateInstance.currentSetting = new ReactiveVar(undefined);
   templateInstance.isLoading = new ReactiveVar(false);
 
   Meteor.subscribe('setting', {
-    onReady() {
+    // this: any — inside the subscription's onReady, `this` is the handle.
+    onReady(this: any) {
       templateInstance.currentSetting.set(ReactiveCache.getCurrentSetting());
-      let currSetting = templateInstance.currentSetting.curValue;
+      // curValue is ReactiveVar's untracked current value (not in @types).
+      let currSetting = (templateInstance.currentSetting as any).curValue;
       if (
         currSetting &&
         currSetting !== undefined &&
@@ -29,13 +34,13 @@ Template.header.onCreated(function () {
       )
         document.getElementById(
           'headerIsSettingDatabaseCallDone',
-        ).style.display = 'none';
+        )!.style.display = 'none';
       else if (
         document.getElementById('headerIsSettingDatabaseCallDone') != null
       )
         document.getElementById(
           'headerIsSettingDatabaseCallDone',
-        ).style.display = 'block';
+        )!.style.display = 'block';
       return this.stop();
     },
   });
@@ -114,7 +119,7 @@ Template.header.helpers({
 
 Template.header.events({
   'click .js-create-board': Popup.open('headerBarCreateBoard'),
-  'click .js-zoom-level-click'(evt) {
+  'click .js-zoom-level-click'(evt: JQuery.TriggeredEvent) {
     const $zoomDisplay = $(evt.currentTarget).find('.zoom-display');
     const $zoomInput = $(evt.currentTarget).find('.zoom-input');
 
@@ -123,10 +128,10 @@ Template.header.events({
     $zoomInput.show().focus().select();
   },
 
-  'keypress .js-zoom-input'(evt) {
+  'keypress .js-zoom-input'(evt: JQuery.TriggeredEvent) {
     if (evt.which === 13) {
       // Enter key
-      const newZoomPercent = parseInt(evt.target.value);
+      const newZoomPercent = parseInt((evt.target as HTMLInputElement).value);
 
       if (
         !isNaN(newZoomPercent) &&
@@ -143,12 +148,13 @@ Template.header.events({
         $zoomDisplay.show();
       } else {
         alert('Please enter a zoom level between 50% and 300%');
-        evt.target.focus().select();
+        (evt.target as HTMLInputElement).focus();
+        (evt.target as HTMLInputElement).select();
       }
     }
   },
 
-  'blur .js-zoom-input'(evt) {
+  'blur .js-zoom-input'(evt: JQuery.TriggeredEvent) {
     // When input loses focus, hide it and show display
     const $zoomDisplay = $(evt.target).siblings('.zoom-display');
     const $zoomInput = $(evt.target);
@@ -159,20 +165,17 @@ Template.header.events({
     const currentMode = Utils.getMobileMode();
     Utils.setMobileMode(!currentMode);
   },
-  'click .js-open-bookmarks'(evt) {
-    // Already added but ensure single definition -- safe guard
-  },
   'click .js-close-announcement'() {
     $('.announcement').hide();
     // Permanently dismiss the current announcement for this user (#6051).
     // The banner reappears only when the admin changes the announcement text.
-    Meteor.call('dismissAnnouncement', (err) => {
+    Meteor.call('dismissAnnouncement', (err: Meteor.Error | undefined) => {
       if (err && process.env.DEBUG === 'true') {
         console.error('dismissAnnouncement error', err);
       }
     });
   },
-  'click .js-select-list'() {
+  'click .js-select-list'(this: any) {
     Session.set('currentList', this._id);
     Session.set('currentCard', null);
   },
@@ -188,7 +191,7 @@ Template.header.events({
       location.reload();
     }
   },
-  'click .js-open-bookmarks'(evt) {
+  'click .js-open-bookmarks'(evt: JQuery.TriggeredEvent) {
     // Desktop: open popup, Mobile: route to page
     if (Utils.isMiniScreen()) {
       FlowRouter.go('bookmarks');
@@ -199,8 +202,13 @@ Template.header.events({
 });
 
 Template.offlineWarning.events({
-  'click a.app-try-reconnect'(event) {
+  'click a.app-try-reconnect'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     Meteor.reconnect();
   },
 });
+
+interface HeaderInstance extends Blaze.TemplateInstance {
+  currentSetting: ReactiveVar<any>;
+  isLoading: ReactiveVar<boolean>;
+}

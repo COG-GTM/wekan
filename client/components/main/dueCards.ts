@@ -1,3 +1,7 @@
+import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
 import { Utils } from '/client/lib/utils';
@@ -17,7 +21,7 @@ Template.dueCardsHeaderBar.events({
   'click .js-due-cards-view-change': Popup.open('dueCardsViewChange'),
 });
 
-Template.dueCards.onCreated(function () {
+Template.dueCards.onCreated(function (this: DueCardsInstance) {
   this._cachedCards = null;
   this._cachedTimestamp = null;
   this.subscriptionHandle = null;
@@ -57,7 +61,7 @@ Template.dueCards.onCreated(function () {
 
     if (process.env.DEBUG === 'true') {
       console.log('dueCards client: found', cards.length, 'cards with due dates');
-      console.log('dueCards client: cards details:', cards.map(c => ({
+      console.log('dueCards client: cards details:', cards.map((c: any) => ({
         id: c._id,
         title: c.title,
         dueAt: c.dueAt,
@@ -131,7 +135,7 @@ Template.dueCards.onCreated(function () {
   });
 });
 
-Template.dueCards.onDestroyed(function () {
+Template.dueCards.onDestroyed(function (this: DueCardsInstance) {
   if (this.subscriptionHandle) {
     this.subscriptionHandle.stop();
   }
@@ -143,10 +147,10 @@ Template.dueCards.helpers({
   },
   // Return ReactiveVar so jade can use .get pattern
   searching() {
-    return Template.instance().isLoading;
+    return (Template.instance() as DueCardsInstance).isLoading;
   },
   hasResults() {
-    return Template.instance().hasResults;
+    return (Template.instance() as DueCardsInstance).hasResults;
   },
   hasQueryErrors() {
     return new ReactiveVar(false);
@@ -155,11 +159,11 @@ Template.dueCards.helpers({
     return [];
   },
   dueCardsList() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as DueCardsInstance;
     return tpl.dueCardsList ? tpl.dueCardsList() : [];
   },
   resultsText() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as DueCardsInstance;
     const cards = tpl.dueCardsList ? tpl.dueCardsList() : [];
     const count = cards ? cards.length : 0;
     if (count === 1) {
@@ -167,7 +171,7 @@ Template.dueCards.helpers({
     } else {
       // Get the translated text and manually replace %s with the count
       const baseText = TAPi18n.__('n-cards-found');
-      const result = baseText.replace('%s', count);
+      const result = baseText.replace('%s', String(count));
 
       if (process.env.DEBUG === 'true') {
         console.log('dueCards: base text:', baseText, 'count:', count, 'result:', result);
@@ -192,3 +196,14 @@ Template.dueCardsViewChangePopup.events({
     Popup.back();
   },
 });
+
+interface DueCardsInstance extends Blaze.TemplateInstance {
+  _cachedCards: any[] | null;
+  _cachedTimestamp: number | null;
+  subscriptionHandle: Meteor.SubscriptionHandle | null;
+  isLoading: ReactiveVar<boolean>;
+  hasResults: ReactiveVar<boolean>;
+  searching: ReactiveVar<boolean>;
+  dueCardsList: () => any[];
+  dueCardsView: () => string;
+}
