@@ -129,7 +129,7 @@ const ReactiveCacheServer = {
     }
     return ret;
   },
-  async getCard(idOrFirstObjectSelector = null, options = {}) {
+  async getCard(idOrFirstObjectSelector: MongoSelector | string | null = null, options = {}) {
     if (
       idOrFirstObjectSelector === null ||
       idOrFirstObjectSelector === undefined ||
@@ -1173,7 +1173,7 @@ const ReactiveCache = {
       return ReactiveCacheClient.getChecklistItems(selector, options, getQuery);
     }
   },
-  getCard(idOrFirstObjectSelector = null, options = {}, noCache = false) {
+  getCard(idOrFirstObjectSelector: MongoSelector | string | null = null, options = {}, noCache = false) {
     if (Meteor.isServer || noCache === true) {
       return ReactiveCacheServer.getCard(idOrFirstObjectSelector, options);
     } else {

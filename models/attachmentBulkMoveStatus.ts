@@ -4,6 +4,17 @@ import { Mongo } from 'meteor/mongo';
 // attachment move job. Because the job runs on the server, its progress
 // survives the admin navigating away from (or closing) the Move Attachment
 // page and is shown again when they return.
-const AttachmentBulkMoveStatus = new Mongo.Collection('attachmentBulkMoveStatus');
+const AttachmentBulkMoveStatus = new Mongo.Collection<AttachmentBulkMoveStatusDocument>('attachmentBulkMoveStatus');
 
 export default AttachmentBulkMoveStatus;
+
+interface AttachmentBulkMoveStatusDocument {
+  _id?: string;
+  running?: boolean;
+  total?: number;
+  processed?: number;
+  failed?: number;
+  startedAt?: Date;
+  finishedAt?: Date;
+  updatedAt?: Date;
+}

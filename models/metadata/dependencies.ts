@@ -86,7 +86,9 @@ export function normalizeDependency(
 export function normalizeDependencies(
   deps: Array<string | DependencyInput | null | undefined> | null | undefined,
 ) {
-  return (deps || []).map(normalizeDependency).filter(Boolean);
+  return (deps || [])
+    .map(normalizeDependency)
+    .filter((dep): dep is Dependency => Boolean(dep));
 }
 
 // A stored/normalized card-to-card dependency (see the module header).

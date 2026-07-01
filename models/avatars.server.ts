@@ -13,8 +13,8 @@ import Avatars, { normalizeRemovedFiles, setAvatarsUploadSize } from './avatars'
 // Server-only configuration
 // ---------------------------------------------------------------------------
 
-let avatarsUploadExternalProgram;
-let avatarsUploadMimeTypes = [];
+let avatarsUploadExternalProgram: string | undefined;
+let avatarsUploadMimeTypes: string[] = [];
 let avatarsUploadSize = 72000;
 
 if (process.env.AVATARS_UPLOAD_MIME_TYPES) {
@@ -82,7 +82,7 @@ Avatars.onAfterUpload = async function (fileObj) {
   if (isSvgFile(fileObj.type, fileObj.name)) {
     Object.keys(fileObj.versions).forEach(versionName => {
       const version = fileObj.versions[versionName];
-      const newSize = sanitizeSvgFileSync(version && version.path);
+      const newSize = sanitizeSvgFileSync(version && version.path!);
       if (newSize !== null) {
         version.size = newSize;
       }
@@ -117,7 +117,7 @@ Avatars.onAfterUpload = async function (fileObj) {
 };
 
 Avatars.interceptDownload = function (http, fileObj, versionName) {
-  const ret = fileStoreStrategyFactory.getFileStrategy(fileObj, versionName).interceptDownload(http, this.cacheControl);
+  const ret = fileStoreStrategyFactory.getFileStrategy(fileObj, versionName)!.interceptDownload(http, this.cacheControl);
   return ret;
 };
 
@@ -179,7 +179,7 @@ Avatars.onAfterRemove = async function (filesInput) {
     }
 
     Object.keys(fileObj.versions).forEach(versionName => {
-      fileStoreStrategyFactory.getFileStrategy(fileObj, versionName).onAfterRemove();
+      fileStoreStrategyFactory.getFileStrategy(fileObj, versionName)!.onAfterRemove();
     });
   });
 };

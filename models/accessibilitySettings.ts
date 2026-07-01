@@ -1,8 +1,8 @@
 import { Mongo } from 'meteor/mongo';
 import { ReactiveCache } from '/imports/reactiveCache';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const AccessibilitySettings = new Mongo.Collection('accessibilitySettings');
+const AccessibilitySettings = new Mongo.Collection<AccessibilitySettingsDocument>('accessibilitySettings');
 
 AccessibilitySettings.attachSchema(
   new SimpleSchema({
@@ -47,3 +47,12 @@ AccessibilitySettings.attachSchema(
 );
 
 export default AccessibilitySettings;
+
+interface AccessibilitySettingsDocument {
+  _id?: string;
+  enabled: boolean;
+  title?: string;
+  body?: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+}

@@ -135,7 +135,12 @@ export async function waitForMongoReady() {
  * collection and only create the index when no index with the same key pattern
  * is present. Never throws — a single index problem must not crash startup.
  *
- * @param {Mongo.Collection|{rawCollection:Function}} collection
+ * Accepts a Meteor Mongo.Collection, a Meteor-Files FilesCollection (whose
+ * underlying Mongo.Collection is at `.collection`), or anything exposing a
+ * rawCollection() directly or under `._collection`/`.collection` (see
+ * getRawCollection above).
+ *
+ * @param {Mongo.Collection|{rawCollection:Function}|{_collection:{rawCollection:Function}}|{collection:{rawCollection:Function}}} collection
  * @param {Object} keys     index key spec, e.g. { boardId: 1 }
  * @param {Object} [options] passed straight through to createIndex (unique, etc.)
  * @returns {Promise<boolean>} true if an index was created, false if skipped

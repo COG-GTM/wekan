@@ -35,7 +35,7 @@ const Avatars = new FilesCollection({
     if (opts?.name) {
       // Client
       filenameWithoutExtension = opts.name.replace(/(.+)\..+/, "$1");
-      fileId = opts.meta.fileId;
+      fileId = opts.meta.fileId!;
       delete opts.meta.fileId;
     } else if (opts?.file?.name) {
       // Server
@@ -45,7 +45,7 @@ const Avatars = new FilesCollection({
         // file has no extension, so don't replace anything, otherwise the last character is removed (because extensionWithDot = '.')
         filenameWithoutExtension = opts.file.name;
       }
-      fileId = opts.fileId;
+      fileId = opts.fileId!;
     }
     else {
       // should never reach here
@@ -87,7 +87,7 @@ const Avatars = new FilesCollection({
   },
 });
 
-function normalizeRemovedFiles(filesInput) {
+function normalizeRemovedFiles(filesInput: WekanDocumentField) {
   if (!filesInput) {
     return [];
   }
@@ -122,7 +122,7 @@ function normalizeRemovedFiles(filesInput) {
 // Export normalizeRemovedFiles and avatarsUploadSize setter for use in server file
 export { normalizeRemovedFiles };
 
-export function setAvatarsUploadSize(size) {
+export function setAvatarsUploadSize(size: number) {
   avatarsUploadSize = size;
 }
 

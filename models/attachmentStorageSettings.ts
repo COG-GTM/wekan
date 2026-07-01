@@ -1,5 +1,5 @@
 import { Mongo } from 'meteor/mongo';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 import {
   STORAGE_NAME_FILESYSTEM,
   STORAGE_NAME_GRIDFS,
@@ -9,7 +9,7 @@ import {
 } from '/models/lib/fileStoreConstants';
 
 // Attachment Storage Settings Collection
-const AttachmentStorageSettings = new Mongo.Collection('attachmentStorageSettings');
+const AttachmentStorageSettings = new Mongo.Collection<AttachmentStorageSettingsDocument>('attachmentStorageSettings');
 
 // Schema for attachment storage settings
 AttachmentStorageSettings.attachSchema(
@@ -292,7 +292,7 @@ AttachmentStorageSettings.helpers({
   },
 
   // Check if storage backend is enabled
-  isStorageEnabled(storageName) {
+  isStorageEnabled(storageName: string) {
     if (!this.storageConfig) return false;
 
     switch (storageName) {
@@ -313,19 +313,19 @@ AttachmentStorageSettings.helpers({
 
   // Check if reading from a storage backend is allowed by the admin.
   // Defaults to true when unset so existing files stay readable.
-  isStorageReadEnabled(storageName) {
+  isStorageReadEnabled(storageName: string) {
     const config = this.getStorageConfig(storageName);
     return !config || config.read !== false;
   },
 
   // Check if writing to a storage backend is allowed by the admin.
-  isStorageWriteEnabled(storageName) {
+  isStorageWriteEnabled(storageName: string) {
     const config = this.getStorageConfig(storageName);
     return !config || config.write !== false;
   },
 
   // Get storage configuration
-  getStorageConfig(storageName) {
+  getStorageConfig(storageName: string) {
     if (!this.storageConfig) return null;
 
     switch (storageName) {
@@ -361,3 +361,48 @@ AttachmentStorageSettings.helpers({
 });
 
 export default AttachmentStorageSettings;
+
+interface AttachmentStorageBackendConfig {
+  enabled?: boolean;
+  read?: boolean;
+  write?: boolean;
+  path?: string;
+  // S3/Azure/GCS backends are stored blackbox, so extra provider-specific
+  // options come through this documented index signature.
+  [option: string]: WekanDocumentField;
+}
+
+interface AttachmentStorageSettingsDocument {
+  _id?: string;
+  defaultStorage?: string;
+  storageConfig?: {
+    filesystem?: AttachmentStorageBackendConfig;
+    gridfs?: AttachmentStorageBackendConfig;
+    s3?: AttachmentStorageBackendConfig;
+    azure?: AttachmentStorageBackendConfig;
+    gcs?: AttachmentStorageBackendConfig;
+    // Backends are also looked up by dynamic name (e.g. cloudStorage).
+    [backend: string]: AttachmentStorageBackendConfig | undefined;
+  };
+  // Upload/limit/migration settings are read back defensively (isFinite-guarded
+  // numeric checks etc.) by dynamic consumers, so their leaf values are modelled
+  // as documented interop fields rather than a fixed shape.
+  uploadSettings?: WekanDocumentField;
+  limitSettings?: WekanDocumentField;
+  migrationSettings?: WekanDocumentField;
+  createdAt?: Date;
+  updatedAt?: Date;
+  createdBy?: string;
+  updatedBy?: string;
+  // dburles:collection-helpers methods attached to the transformed document.
+  getDefaultStorage(): string;
+  isStorageEnabled(storageName: string): boolean;
+  isStorageReadEnabled(storageName: string): boolean;
+  isStorageWriteEnabled(storageName: string): boolean;
+  getStorageConfig(
+    storageName: string,
+  ): AttachmentStorageBackendConfig | null | undefined;
+  getUploadSettings(): WekanDocumentField;
+  getMigrationSettings(): WekanDocumentField;
+  getLimitSettings(): WekanDocumentField;
+}

@@ -235,7 +235,7 @@ export async function getAttachmentWithBackwardCompatibility(attachmentId: strin
  * @returns {Promise<Array>} - Array of attachments
  */
 export async function getAttachmentsWithBackwardCompatibility(query: Record<string, any>) {
-  let newAttachments = [];
+  let newAttachments: WekanFileObj[] = [];
 
   // Get new attachments
   if (Meteor.isServer) {

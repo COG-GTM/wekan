@@ -1,8 +1,8 @@
 import { Mongo } from 'meteor/mongo';
 import { ReactiveCache } from '/imports/reactiveCache';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const AccountSettings = new Mongo.Collection('accountSettings');
+const AccountSettings = new Mongo.Collection<AccountSettingsDocument>('accountSettings');
 
 AccountSettings.attachSchema(
   new SimpleSchema({
@@ -46,14 +46,22 @@ AccountSettings.attachSchema(
 
 AccountSettings.helpers({
   allowEmailChange() {
-    return AccountSettings.findOne('accounts-allowEmailChange').booleanValue;
+    return AccountSettings.findOne('accounts-allowEmailChange')!.booleanValue;
   },
   allowUserNameChange() {
-    return AccountSettings.findOne('accounts-allowUserNameChange').booleanValue;
+    return AccountSettings.findOne('accounts-allowUserNameChange')!.booleanValue;
   },
   allowUserDelete() {
-    return AccountSettings.findOne('accounts-allowUserDelete').booleanValue;
+    return AccountSettings.findOne('accounts-allowUserDelete')!.booleanValue;
   },
 });
 
 export default AccountSettings;
+
+interface AccountSettingsDocument {
+  _id: string;
+  booleanValue?: boolean;
+  sort: number;
+  createdAt?: Date;
+  modifiedAt?: Date;
+}

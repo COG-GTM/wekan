@@ -1,6 +1,6 @@
 import { Mongo } from 'meteor/mongo';
 import { ReactiveCache } from '/imports/reactiveCache';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
 const commentReactionSchema = new SimpleSchema({
   reactionCodepoint: {
@@ -17,8 +17,21 @@ const commentReactionSchema = new SimpleSchema({
   'userIds.$': { type: String }
 });
 
-const CardCommentReactions = new Mongo.Collection('card_comment_reactions');
+const CardCommentReactions = new Mongo.Collection<CardCommentReactionsDocument>('card_comment_reactions');
 export default CardCommentReactions;
+
+interface CardCommentReaction {
+  reactionCodepoint: string;
+  userIds: string[];
+}
+
+interface CardCommentReactionsDocument {
+  _id?: string;
+  boardId: string;
+  cardId: string;
+  cardCommentId: string;
+  reactions: CardCommentReaction[];
+}
 
 /**
  * All reactions of a card comment

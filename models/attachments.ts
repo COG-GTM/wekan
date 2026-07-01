@@ -7,7 +7,7 @@ import { generateUniversalAttachmentUrl } from '/models/lib/universalUrlGenerato
 // Mirrors the shape used for the 'deleteAttachment' activity, so card
 // history rendering and member/subscriber notifications behave identically.
 // see #5905
-export function buildAttachmentAddedActivity(fileObj) {
+export function buildAttachmentAddedActivity(fileObj: WekanFileObj) {
   const meta = (fileObj && fileObj.meta) || {};
   return {
     userId: fileObj && fileObj.userId,
@@ -54,7 +54,7 @@ const Attachments = new FilesCollection({
     if (opts?.name) {
       // Client
       filenameWithoutExtension = opts.name.replace(/(.+)\..+/, "$1");
-      fileId = opts.meta.fileId;
+      fileId = opts.meta.fileId!;
       delete opts.meta.fileId;
     } else if (opts?.file?.name) {
       // Server
@@ -64,7 +64,7 @@ const Attachments = new FilesCollection({
         // file has no extension, so don't replace anything, otherwise the last character is removed (because extensionWithDot = '.')
         filenameWithoutExtension = opts.file.name;
       }
-      fileId = opts.fileId;
+      fileId = opts.fileId!;
     }
     else {
       // should never reach here
@@ -88,7 +88,8 @@ const Attachments = new FilesCollection({
     // SECURITY: Sanitize filename to prevent path traversal attacks
     if (file.name && typeof file.name === 'string') {
       // Strip directory components (client-safe alternative to path.basename)
-      let safeName = file.name.split(/[\\/]/).pop();
+      // split() always yields at least one element, so pop() is defined here.
+      let safeName = file.name.split(/[\\/]/).pop()!;
       // Remove null bytes
       safeName = safeName.replace(/\0/g, '');
       // Remove path traversal sequences (repeat until stable to avoid incomplete multi-character sanitization)
@@ -127,7 +128,7 @@ const Attachments = new FilesCollection({
   },
 });
 
-function normalizeRemovedFiles(filesInput) {
+function normalizeRemovedFiles(filesInput: WekanDocumentField) {
   if (!filesInput) {
     return [];
   }
@@ -163,15 +164,15 @@ function normalizeRemovedFiles(filesInput) {
 export { normalizeRemovedFiles };
 
 // Backward compatibility stubs (overridden in attachments.server.js with real implementations)
-Attachments.getAttachmentWithBackwardCompatibility = async () => null;
-Attachments.getAttachmentsWithBackwardCompatibility = async () => [];
+Attachments.getAttachmentWithBackwardCompatibility = async (): Promise<WekanFileObj | null> => null;
+Attachments.getAttachmentsWithBackwardCompatibility = async (): Promise<WekanFileObj[]> => [];
 
 // Override Attachments.link to use universal short URLs and to bypass
 // the `check(fileRef, Object)` inside the original which fails when fileRef is
 // a collection-helpers class instance (not a plain object).
 // Uses short URL format handled by universalFileServer.js.
 if (Meteor.isClient) {
-  Attachments.link = function () {
+  Attachments.link = function (this: WekanFileObj) {
     let fileRef;
     if (this && this._id) {
       // Called as instance method: doc.link(version)
@@ -202,7 +203,7 @@ if (Meteor.isServer) {
       return;
     }
     // Lazy import to keep this out of the client bundle.
-    const Activities = require('/models/activities').default;
+    const Activities: typeof import('/models/activities').default = require('/models/activities').default;
     Activities.insertAsync(buildAttachmentAddedActivity(doc)).catch(error => {
       console.error('Failed to insert addAttachment activity:', error);
     });

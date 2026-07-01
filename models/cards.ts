@@ -50,9 +50,9 @@ import ChecklistItems from '/models/checklistItems';
 import Checklists from '/models/checklists';
 import Lists from '/models/lists';
 import { debounce } from '/imports/lib/collectionHelpers';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const Cards = new Mongo.Collection('cards');
+const Cards = new Mongo.Collection<CardDocument>('cards');
 
 // XXX To improve pub/sub performances a card document should include a
 // de-normalized number of comments so we don't have to publish the whole list
@@ -828,13 +828,13 @@ Cards.helpers({
 },
 
 
-  async copy(boardId, swimlaneId, listId, cardIdMap = null) {
+  async copy(boardId: string, swimlaneId: string, listId: string, cardIdMap: Record<string, string> | null = null) {
     const oldId = this._id;
     const oldCard = await ReactiveCache.getCard(oldId);
 
     // Work on a shallow copy to avoid mutating the source card in ReactiveCache
     const cardData = { ...this };
-    delete cardData._id;
+    delete (cardData as Partial<CardDocument>)._id;
 
     // Normalize customFields to ensure it's always an array
     if (!Array.isArray(cardData.customFields)) {
@@ -851,9 +851,9 @@ Cards.helpers({
       const oldBoardLabels = (oldBoard && oldBoard.labels) || [];
 
       // Get old label names
-      const oldCardLabels = oldBoardLabels.filter(label => {
+      const oldCardLabels = oldBoardLabels.filter((label: WekanDocumentField) => {
           return (this.labelIds || []).includes(label._id);
-        }).map(x => x.name);
+        }).map((x: WekanDocumentField) => x.name);
 
       const newBoard = await ReactiveCache.getBoard(boardId);
       // #2970: only map labels that exist by NAME on the destination board and
@@ -869,7 +869,7 @@ Cards.helpers({
       this.customFields = this.mapCustomFieldsToBoard(newBoard._id);
     }
 
-    delete this._id;
+    delete (this as Partial<CardDocument>)._id;
     this.boardId = boardId;
     const board = await ReactiveCache.getBoard(boardId);
     this.cardNumber = await board.getNextCardNumber();
@@ -1062,7 +1062,7 @@ Cards.helpers({
     const board = this.board();
     if (!board) return [];
     const boardLabels = board.labels;
-    const cardLabels = (boardLabels || []).filter(label => {
+    const cardLabels = (boardLabels || []).filter((label: WekanDocumentField) => {
       return (this.labelIds || []).includes(label._id);
     });
     return cardLabels;
@@ -1198,10 +1198,10 @@ Cards.helpers({
   checklistItemCount() {
     const checklists = this.checklists();
     const ret = checklists
-      .map(checklist => {
+      .map((checklist: WekanDocumentField) => {
         return checklist.itemCount();
       })
-      .reduce((prev, next) => {
+      .reduce((prev: number, next: number) => {
         return prev + next;
       }, 0);
     return ret;
@@ -1210,10 +1210,10 @@ Cards.helpers({
   checklistFinishedCount() {
     const checklists = this.checklists();
     const ret = checklists
-      .map(checklist => {
+      .map((checklist: WekanDocumentField) => {
         return checklist.finishedCount();
       })
-      .reduce((prev, next) => {
+      .reduce((prev: number, next: number) => {
         return prev + next;
       }, 0);
     return ret;
@@ -1273,8 +1273,8 @@ Cards.helpers({
     return this.subtasksCount() !== 0;
   },
 
-  customFieldIndex(customFieldId) {
-    return (this.customFields || []).map(x => x._id).indexOf(customFieldId);
+  customFieldIndex(customFieldId: string) {
+    return (this.customFields || []).map((x: WekanDocumentField) => x._id).indexOf(customFieldId);
   },
 
   // customFields with definitions
@@ -1288,8 +1288,8 @@ Cards.helpers({
     }
     // match right definition to each field
     if (!this.customFields) return [];
-    const ret = this.customFields.map(customField => {
-      const definition = definitions.find(definition => {
+    const ret = this.customFields.map((customField: WekanDocumentField) => {
+      const definition = definitions.find((definition: WekanDocumentField) => {
         return definition._id === customField._id;
       });
       if (!definition) {
@@ -1316,7 +1316,7 @@ Cards.helpers({
     });
     // at linked cards custom fields definition is not found
     ret.sort(
-      (a, b) =>
+      (a: WekanDocumentField, b: WekanDocumentField) =>
         a.definition !== undefined &&
         b.definition !== undefined &&
         a.definition.name !== undefined &&
@@ -1383,7 +1383,7 @@ Cards.helpers({
   },
 
   parentListId() {
-    const result = [];
+    const result: string[] = [];
     let crtParentId = this.parentId;
     while (crtParentId) {
       const crt = ReactiveCache.getCard(crtParentId);
@@ -1404,8 +1404,8 @@ Cards.helpers({
   },
 
   parentList() {
-    const resultId = [];
-    const result = [];
+    const resultId: string[] = [];
+    const result: WekanDocumentField[] = [];
     let crtParentId = this.parentId;
     while (crtParentId) {
       const crt = ReactiveCache.getCard(crtParentId);
@@ -1426,9 +1426,9 @@ Cards.helpers({
     return result;
   },
 
-  parentString(sep) {
+  parentString(sep: string) {
     return (this.parentList())
-      .map(function(elem) {
+      .map(function(elem: WekanDocumentField) {
         return elem.title;
       })
       .join(sep);
@@ -1491,7 +1491,7 @@ Cards.helpers({
       if (board === undefined) {
         return null;
       } else {
-        return board.activeMembers().map(member => {
+        return board.activeMembers().map((member: WekanDocumentField) => {
           return member.userId;
         });
       }
@@ -1515,93 +1515,13 @@ Cards.helpers({
       if (board === undefined) {
         return null;
       } else {
-        return board.activeMembers().map(assignee => {
+        return board.activeMembers().map((assignee: WekanDocumentField) => {
           return assignee.userId;
         });
       }
     } else {
       // #3697: heal legacy data where assignees was stored as null.
       return this.assignees || [];
-    }
-  },
-
-  assignMember(memberId) {
-    let ret;
-    if (this.isLinkedBoard()) {
-      const board = ReactiveCache.getBoard(this.linkedId);
-      ret = board.addMember(memberId);
-    } else {
-      ret = Cards.updateAsync(
-        { _id: this.getRealId() },
-        { $addToSet: { members: memberId } },
-      );
-    }
-    return ret;
-  },
-
-  assignAssignee(assigneeId) {
-    if (this.isLinkedCard()) {
-      return Cards.updateAsync(
-        { _id: this.linkedId },
-        { $addToSet: { assignees: assigneeId } },
-      );
-    } else if (this.isLinkedBoard()) {
-      const board = ReactiveCache.getBoard(this.linkedId);
-      return board.addAssignee(assigneeId);
-    } else {
-      return Cards.updateAsync(
-        { _id: this._id },
-        { $addToSet: { assignees: assigneeId } },
-      );
-    }
-  },
-
-  unassignMember(memberId) {
-    if (this.isLinkedCard()) {
-      return Cards.updateAsync(
-        { _id: this.linkedId },
-        { $pull: { members: memberId } },
-      );
-    } else if (this.isLinkedBoard()) {
-      const board = ReactiveCache.getBoard(this.linkedId);
-      return board.removeMember(memberId);
-    } else {
-      return Cards.updateAsync({ _id: this._id }, { $pull: { members: memberId } });
-    }
-  },
-
-  unassignAssignee(assigneeId) {
-    if (this.isLinkedCard()) {
-      return Cards.updateAsync(
-        { _id: this.linkedId },
-        { $pull: { assignees: assigneeId } },
-      );
-    } else if (this.isLinkedBoard()) {
-      const board = ReactiveCache.getBoard(this.linkedId);
-      return board.removeAssignee(assigneeId);
-    } else {
-      return Cards.updateAsync(
-        { _id: this._id },
-        { $pull: { assignees: assigneeId } },
-      );
-    }
-  },
-
-  toggleMember(memberId) {
-    const members = this.getMembers();
-    if (members && members.indexOf(memberId) > -1) {
-      return this.unassignMember(memberId);
-    } else {
-      return this.assignMember(memberId);
-    }
-  },
-
-  toggleAssignee(assigneeId) {
-    const assignees = this.getAssignees();
-    if (assignees && assignees.indexOf(assigneeId) > -1) {
-      return this.unassignAssignee(assigneeId);
-    } else {
-      return this.assignAssignee(assigneeId);
     }
   },
 
@@ -1624,7 +1544,7 @@ Cards.helpers({
       return undefined;
     }
     const deps = this.getDependencies();
-    const existing = deps.find(dep => dep.cardId === targetCardId);
+    const existing = deps.find((dep: WekanDocumentField) => dep.cardId === targetCardId);
     const entry = normalizeDependency({
       cardId: targetCardId,
       type: options.type || (existing && existing.type),
@@ -1634,7 +1554,7 @@ Cards.helpers({
     // Read-modify-write the whole array and update by _id only: the client
     // (untrusted code) may not updateAsync with a selector / positional `$`.
     const next = existing
-      ? deps.map(dep => (dep.cardId === targetCardId ? entry : dep))
+      ? deps.map((dep: WekanDocumentField) => (dep.cardId === targetCardId ? entry : dep))
       : [...deps, entry];
     return Cards.updateAsync(this._id, {
       $set: { cardDependencies: next },
@@ -1647,7 +1567,7 @@ Cards.helpers({
   setDependencyProps(targetCardId, props = {}) {
     const deps = this.getDependencies();
     let changed = false;
-    const next = deps.map(dep => {
+    const next = deps.map((dep: WekanDocumentField) => {
       if (dep.cardId !== targetCardId) {
         return dep;
       }
@@ -1671,7 +1591,7 @@ Cards.helpers({
     // Rewrite the array and update by _id only (no selector / positional `$`
     // updates from untrusted client code).
     const next = this.getDependencies().filter(
-      dep => dep.cardId !== targetCardId,
+      (dep: WekanDocumentField) => dep.cardId !== targetCardId,
     );
     return Cards.updateAsync(this._id, {
       $set: { cardDependencies: next },
@@ -1869,14 +1789,6 @@ Cards.helpers({
       }
     } else {
       return this.spentTime;
-    }
-  },
-
-  setSpentTime(spentTime) {
-    if (this.isLinkedBoard()) {
-      return Boards.updateAsync({ _id: this.linkedId }, { $set: { spentTime } });
-    } else {
-      return Cards.updateAsync({ _id: this.getRealId() }, { $set: { spentTime } });
     }
   },
 
@@ -2387,8 +2299,8 @@ Cards.helpers({
     );
   },
   pokerWinner() {
-    const pokerListMaps = [];
-    let pokerWinnersListMap = [];
+    const pokerListMaps: PokerListMap[] = [];
+    let pokerWinnersListMap: PokerListMap[] = [];
     if (this.expiredPoker()) {
       const one = { count: this.pokerCountOne(), pokerCard: 1 };
       const two = { count: this.pokerCountTwo(), pokerCard: 2 };
@@ -2415,15 +2327,15 @@ Cards.helpers({
         return b.count - a.count;
       });
       const max = pokerListMaps[0].count;
-      pokerWinnersListMap = pokerListMaps.filter(task => task.count >= max);
-      pokerWinnersListMap.sort(function(a, b) {
-        return b.pokerCard - a.pokerCard;
+      pokerWinnersListMap = pokerListMaps.filter((task: PokerListMap) => task.count >= max);
+      pokerWinnersListMap.sort(function(a: PokerListMap, b: PokerListMap) {
+        return (b.pokerCard as number) - (a.pokerCard as number);
       });
     }
     return pokerWinnersListMap[0].pokerCard;
   },
 
-  async applyToChildren(funct) {
+  async applyToChildren(funct: (card: WekanDocumentField) => Promise<void>) {
     const cards = await ReactiveCache.getCards({ parentId: this._id });
     if (!cards) return;
     for (const card of cards) {
@@ -2432,7 +2344,7 @@ Cards.helpers({
   },
 
   async archive() {
-    await this.applyToChildren(async card => {
+    await this.applyToChildren(async (card: WekanDocumentField) => {
       await card.archive();
     });
     return Cards.updateAsync(this._id, {
@@ -2441,7 +2353,7 @@ Cards.helpers({
   },
 
   async restore() {
-    await this.applyToChildren(async card => {
+    await this.applyToChildren(async (card: WekanDocumentField) => {
       await card.restore();
     });
     return Cards.updateAsync(this._id, {
@@ -2458,7 +2370,7 @@ Cards.helpers({
       const board = ReactiveCache.getBoard(boardId);
       swimlaneId = board.getDefaultSwimline()._id;
     }
-    let parentElementDom = $(`#swimlane-${swimlaneId}`).get(0);
+    let parentElementDom: WekanDocumentField = $(`#swimlane-${swimlaneId}`).get(0);
     if (!parentElementDom) parentElementDom = $(':root');
 
     const lastCardDom = $(parentElementDom)
@@ -2486,7 +2398,7 @@ Cards.helpers({
     return this.move(boardId, swimlaneId, listId, sort);
   },
 
-  async move(boardId, swimlaneId, listId, sort = null) {
+  async move(boardId: string, swimlaneId: string, listId: string, sort: number | null = null) {
     const previousState = {
       boardId: this.boardId,
       swimlaneId: this.swimlaneId,
@@ -2494,7 +2406,7 @@ Cards.helpers({
       sort: this.sort,
     };
 
-    const mutatedFields = { boardId, swimlaneId, listId };
+    const mutatedFields: Record<string, WekanDocumentField> = { boardId, swimlaneId, listId };
 
     if (sort !== null) {
       mutatedFields.sort = sort;
@@ -2503,19 +2415,19 @@ Cards.helpers({
     if (this.boardId !== boardId) {
       const oldBoard = ReactiveCache.getBoard(this.boardId);
       const oldBoardLabels = Array.isArray(oldBoard?.labels) ? oldBoard.labels : [];
-      const oldCardLabels = oldBoardLabels.filter(label => {
+      const oldCardLabels = oldBoardLabels.filter((label: WekanDocumentField) => {
           return (this.labelIds || []).includes(label._id);
-        }).map(x => x.name);
+        }).map((x: WekanDocumentField) => x.name);
 
       const newBoard = ReactiveCache.getBoard(boardId);
       if (!newBoard) {
         throw new Meteor.Error('board-not-found', 'Destination board not found while moving card.');
       }
-      const allowedMemberIds = (newBoard.members || []).filter(member => member.isActive === true).map(x => x.userId);
+      const allowedMemberIds = (newBoard.members || []).filter((member: WekanDocumentField) => member.isActive === true).map((x: WekanDocumentField) => x.userId);
       const newBoardLabels = Array.isArray(newBoard.labels) ? newBoard.labels : [];
-      const newCardLabelIds = newBoardLabels.filter(label => {
+      const newCardLabelIds = newBoardLabels.filter((label: WekanDocumentField) => {
           return label.name && oldCardLabels.includes(label.name);
-        }).map(x => x._id);
+        }).map((x: WekanDocumentField) => x._id);
 
       const newCardNumber = await newBoard.getNextCardNumber();
 
@@ -2582,7 +2494,7 @@ Cards.helpers({
     }
 
     if (Meteor.isServer) {
-      const updateMeta = {};
+      const updateMeta: Record<string, WekanDocumentField> = {};
       if (mutatedFields.boardId !== undefined) updateMeta['meta.boardId'] = mutatedFields.boardId;
       if (mutatedFields.listId !== undefined) updateMeta['meta.listId'] = mutatedFields.listId;
       if (mutatedFields.swimlaneId !== undefined) updateMeta['meta.swimlaneId'] = mutatedFields.swimlaneId;
@@ -2607,7 +2519,7 @@ Cards.helpers({
   },
 
   removeLabel(labelId) {
-    this.labelIds = (this.labelIds || []).filter(x => x !== labelId);
+    this.labelIds = (this.labelIds || []).filter((x: WekanDocumentField) => x !== labelId);
     return Cards.updateAsync(this._id, { $pull: { labelIds: labelId } });
   },
 
@@ -2622,15 +2534,15 @@ Cards.helpers({
   // A sticker is identified by its icon plus its highlight style ('underline'
   // for the mascot pack, 'round' for the computer pack, or none), so the same
   // icon can exist as a plain, mascot or computer sticker.
-  hasSticker(icon, highlight) {
+  hasSticker(icon: string, highlight: string) {
     const h = highlight || '';
-    return (this.stickers || []).some(s => s.icon === icon && (s.highlight || '') === h);
+    return (this.stickers || []).some((s: WekanDocumentField) => s.icon === icon && (s.highlight || '') === h);
   },
 
-  addSticker(icon, highlight, name) {
+  addSticker(icon: string, highlight: string, name: string) {
     if (!icon || this.hasSticker(icon, highlight)) return Promise.resolve();
     const position = (this.stickers || []).length;
-    const sticker = { icon, position };
+    const sticker: Record<string, WekanDocumentField> = { icon, position };
     if (highlight) sticker.highlight = highlight;
     if (name) sticker.name = name;
     return Cards.updateAsync(
@@ -2639,11 +2551,11 @@ Cards.helpers({
     );
   },
 
-  removeSticker(icon, highlight) {
+  removeSticker(icon: string, highlight: string) {
     const h = highlight || '';
     const stickers = (this.stickers || []).slice();
     const index = stickers.findIndex(
-      s => s.icon === icon && (s.highlight || '') === h,
+      (s: WekanDocumentField) => s.icon === icon && (s.highlight || '') === h,
     );
     if (index === -1) return Promise.resolve();
     stickers.splice(index, 1);
@@ -2655,7 +2567,7 @@ Cards.helpers({
 
   // Remove a single sticker by its position in the array (so duplicates with
   // the same icon/name can be removed individually).
-  removeStickerAt(index) {
+  removeStickerAt(index: number) {
     const stickers = (this.stickers || []).slice();
     if (index < 0 || index >= stickers.length) return Promise.resolve();
     stickers.splice(index, 1);
@@ -2665,7 +2577,7 @@ Cards.helpers({
     );
   },
 
-  toggleSticker(icon, highlight, name) {
+  toggleSticker(icon: string, highlight: string, name: string) {
     if (this.hasSticker(icon, highlight)) {
       return this.removeSticker(icon, highlight);
     }
@@ -2708,7 +2620,7 @@ Cards.helpers({
     ) {
       return Promise.resolve();
     }
-    const legacy = {
+    const legacy: Record<string, WekanDocumentField> = {
       _id: Random.id(),
       name: this.locationName || '',
       address: this.locationAddress || '',
@@ -2725,9 +2637,9 @@ Cards.helpers({
     );
   },
 
-  async addLocation({ name, address, latitude, longitude }) {
+  async addLocation({ name, address, latitude, longitude }: { name?: string; address?: string; latitude?: number; longitude?: number }) {
     await this._migrateLegacyLocation();
-    const location = {
+    const location: Record<string, WekanDocumentField> = {
       _id: Random.id(),
       name: name || '',
       address: address || '',
@@ -2740,12 +2652,12 @@ Cards.helpers({
     );
   },
 
-  async updateLocation(locationId, { name, address, latitude, longitude }) {
+  async updateLocation(locationId: string, { name, address, latitude, longitude }: { name?: string; address?: string; latitude?: number; longitude?: number }) {
     await this._migrateLegacyLocation();
     const locations = (this.locations || []).slice();
-    const index = locations.findIndex(loc => loc._id === locationId);
+    const index = locations.findIndex((loc: WekanDocumentField) => loc._id === locationId);
     if (index === -1) return Promise.resolve();
-    const updated = {
+    const updated: Record<string, WekanDocumentField> = {
       _id: locationId,
       name: name || '',
       address: address || '',
@@ -2857,10 +2769,10 @@ Cards.helpers({
     });
   },
 
-  setCustomField(customFieldId, value) {
+  setCustomField(customFieldId: string, value: WekanDocumentField) {
     const index = this.customFieldIndex(customFieldId);
     if (index > -1) {
-      const update = { $set: {} };
+      const update: { $set: Record<string, WekanDocumentField> } = { $set: {} };
       update.$set[`customFields.${index}.value`] = value;
       return Cards.updateAsync(this._id, update);
     }
@@ -3023,17 +2935,18 @@ Cards.helpers({
     return Cards.updateAsync(this._id, { $unset: { 'poker.end': '' } });
   },
 
-  setPoker(userId, state) {
+  setPoker(userId: string, state: string) {
     const pokerFields = ['one', 'two', 'three', 'five', 'eight', 'thirteen', 'twenty', 'forty', 'oneHundred', 'unsure'];
-    const pullFields = {};
+    const pullFields: Record<string, WekanDocumentField> = {};
     pokerFields.forEach(f => { pullFields[`poker.${f}`] = userId; });
 
     if (pokerFields.includes(state)) {
       delete pullFields[`poker.${state}`];
-      return Cards.updateAsync(this._id, {
+      const modifier: WekanMongoModifier = {
         $pull: pullFields,
         $addToSet: { [`poker.${state}`]: userId },
-      });
+      };
+      return Cards.updateAsync(this._id, modifier);
     } else {
       return Cards.updateAsync(this._id, { $pull: pullFields });
     }
@@ -3059,7 +2972,7 @@ Cards.helpers({
 
 //FUNCTIONS FOR creation of Activities
 
-async function updateActivities(doc, fieldNames, modifier) {
+async function updateActivities(doc: WekanDocumentField, fieldNames: string[], modifier: WekanDocumentField) {
   // Only react to a real board CHANGE. This is a before.update hook, so doc is
   // the pre-update card and modifier.$set.boardId is the new value. Card.move()
   // always re-sets boardId (even for a move within the same board), so checking
@@ -3098,12 +3011,12 @@ async function updateActivities(doc, fieldNames, modifier) {
 
 
 async function cardMove(
-  userId,
-  doc,
-  fieldNames,
-  oldListId,
-  oldSwimlaneId,
-  oldBoardId,
+  userId: string,
+  doc: WekanDocumentField,
+  fieldNames: string[],
+  oldListId: string,
+  oldSwimlaneId: string,
+  oldBoardId: string,
 ) {
   if (fieldNames.includes('boardId') && doc.boardId !== oldBoardId) {
     const newBoard = await ReactiveCache.getBoard(doc.boardId);
@@ -3143,7 +3056,7 @@ async function cardMove(
   }
 }
 
-async function cardState(userId, doc, fieldNames) {
+async function cardState(userId: string, doc: WekanDocumentField, fieldNames: string[]) {
   if (fieldNames.includes('archived')) {
     const list = await ReactiveCache.getList(doc.listId);
     if (doc.archived) {
@@ -3170,7 +3083,7 @@ async function cardState(userId, doc, fieldNames) {
   }
 }
 
-async function cardMembers(userId, doc, fieldNames, modifier) {
+async function cardMembers(userId: string, doc: WekanDocumentField, fieldNames: string[], modifier: WekanDocumentField) {
   if (!fieldNames.includes('members')) return;
   let memberId;
   // Say hello to the new member
@@ -3213,7 +3126,7 @@ async function cardMembers(userId, doc, fieldNames, modifier) {
   }
 }
 
-async function cardAssignees(userId, doc, fieldNames, modifier) {
+async function cardAssignees(userId: string, doc: WekanDocumentField, fieldNames: string[], modifier: WekanDocumentField) {
   if (!fieldNames.includes('assignees')) return;
   let assigneeId;
   // Say hello to the new assignee
@@ -3255,7 +3168,7 @@ async function cardAssignees(userId, doc, fieldNames, modifier) {
   }
 }
 
-async function cardLabels(userId, doc, fieldNames, modifier) {
+async function cardLabels(userId: string, doc: WekanDocumentField, fieldNames: string[], modifier: WekanDocumentField) {
   if (!fieldNames.includes('labelIds')) return;
   let labelId;
   // Say hello to the new label
@@ -3294,7 +3207,7 @@ async function cardLabels(userId, doc, fieldNames, modifier) {
   }
 }
 
-async function cardCustomFields(userId, doc, fieldNames, modifier) {
+async function cardCustomFields(userId: string, doc: WekanDocumentField, fieldNames: string[], modifier: WekanDocumentField) {
   if (!fieldNames.includes('customFields')) return;
 
   // Say hello to the new customField value
@@ -3345,7 +3258,7 @@ async function cardCustomFields(userId, doc, fieldNames, modifier) {
   }
 }
 
-async function cardCreation(userId, doc) {
+async function cardCreation(userId: string, doc: WekanDocumentField) {
   const list = await ReactiveCache.getList(doc.listId);
   const swimlane = await ReactiveCache.getSwimlane(doc.swimlaneId);
   await Activities.insertAsync({
@@ -3361,7 +3274,7 @@ async function cardCreation(userId, doc) {
   });
 }
 
-async function cardRemover(userId, doc) {
+async function cardRemover(userId: string, doc: WekanDocumentField) {
   // Performance (#3252 / #5322): when a whole card is permanently deleted, remove
   // its checklist items, checklists and comments with `.direct` so their
   // per-document before.remove hooks do NOT run. Those hooks only log/clean up
@@ -3386,8 +3299,8 @@ async function cardRemover(userId, doc) {
   await Attachments.removeAsync({ cardId: doc._id });
 }
 
-const findDueCards = async days => {
-  const seekDue = async ($from, $to, activityType) => {
+const findDueCards = async (days: WekanDocumentField) => {
+  const seekDue = async ($from: Date, $to: Date, activityType: string) => {
     const cards = await ReactiveCache.getCards({
       archived: false,
       dueAt: { $gte: $from, $lt: $to },
@@ -3417,11 +3330,11 @@ const findDueCards = async days => {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const aday = 3600 * 24 * 1e3;
-  const then = day => new Date(startOfToday.getTime() + day * aday);
+  const then = (day: number) => new Date(startOfToday.getTime() + day * aday);
   if (!days) return;
   if (!days.map) days = [days];
   for (const day of days) {
-    let args = [];
+    let args: Array<Date | string> = [];
     if (day === 0) {
       args = [then(0), then(1), 'duenow'];
     } else if (day > 0) {
@@ -3430,7 +3343,7 @@ const findDueCards = async days => {
     } else {
       args = [then(day), then(0), 'pastdue'];
     }
-    await seekDue(...args);
+    await seekDue(...(args as [Date, Date, string]));
   }
 };
 const addCronJob = debounce(
@@ -3452,7 +3365,7 @@ const addCronJob = debounce(
       .filter(v => v !== false);
     const notifyitvl = process.env.NOTIFY_DUE_AT_HOUR_OF_DAY; //passed in the itvl has to be a number standing for the hour of current time
     const defaultitvl = 8; // default every morning at 8am, if the passed env variable has parsing error use default
-    const itvl = parseInt(notifyitvl, 10) || defaultitvl;
+    const itvl = parseInt(notifyitvl as string, 10) || defaultitvl;
     const scheduler = (job => () => {
       const now = new Date();
       const hour = 3600 * 1e3;
@@ -3557,5 +3470,22 @@ Cards.helpers({
     return `Original position: ${history.originalPosition.sort || 0}${swimlaneInfo}${listInfo}`;
   },
 });
+
+// One poker-card tally used by pokerWinner(): the number of votes for a given
+// card value. `pokerCard` is a number for every real card and the string
+// 'Unsure' for the abstain option.
+interface PokerListMap {
+  count: number;
+  pokerCard: number | string;
+}
+
+interface CardDocument {
+  _id: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  // The schema fields, the dburles:collection-helpers methods, and any other
+  // dynamically-accessed members come through this documented index signature.
+  [field: string]: WekanDocumentField;
+}
 
 export default Cards;

@@ -4,10 +4,10 @@ import { ReactiveCache } from '/imports/reactiveCache';
 import escapeForRegex from 'escape-string-regexp';
 import Boards from '/models/boards';
 import CardCommentReactions from '/models/cardCommentReactions';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
 // Server-side text sanitization function
-function sanitizeText(text) {
+function sanitizeText(text: string) {
   if (typeof text !== 'string') return text;
   // Strip HTML tags and return only text content.
   // Repeat replacement until stable to avoid incomplete multi-character sanitization.
@@ -20,7 +20,7 @@ function sanitizeText(text) {
   return sanitized;
 }
 
-const CardComments = new Mongo.Collection('card_comments');
+const CardComments = new Mongo.Collection<CardCommentDocument>('card_comments');
 
 /**
  * Pure permission decision for editing/deleting a comment.
@@ -36,7 +36,7 @@ const CardComments = new Mongo.Collection('card_comments');
  *                                               authored by others.
  * @returns {boolean} whether the acting user may edit/delete the comment.
  */
-export function canEditComment({ isAuthor, isBoardAdmin, restrictCommentEditing }) {
+export function canEditComment({ isAuthor, isBoardAdmin, restrictCommentEditing }: CardCommentEditPermissionArgs) {
   // The author may always edit/delete their own comment.
   if (isAuthor) {
     return true;
@@ -126,7 +126,7 @@ CardComments.attachSchema(
 );
 
 CardComments.helpers({
-  copy(newCardId, newBoardId) {
+  copy(newCardId: string, newBoardId?: string) {
     this.cardId = newCardId;
     // #5166: when a card is copied to another board, the copied comments must
     // belong to the destination board too. Without this they kept the source
@@ -157,7 +157,7 @@ CardComments.helpers({
     return !!cardCommentReactions ? cardCommentReactions.reactions : [];
   },
 
-  toggleReaction(reactionCodepoint) {
+  toggleReaction(reactionCodepoint: string) {
     if (reactionCodepoint !== sanitizeText(reactionCodepoint)) {
       return false;
     } else {
@@ -165,7 +165,7 @@ CardComments.helpers({
       const cardCommentReactions = ReactiveCache.getCardCommentReaction({cardCommentId: this._id});
       const reactions = !!cardCommentReactions ? cardCommentReactions.reactions : [];
       const userId = Meteor.userId();
-      const reaction = reactions.find(r => r.reactionCodepoint === reactionCodepoint);
+      const reaction = reactions.find((r: WekanDocumentField) => r.reactionCodepoint === reactionCodepoint);
 
       // If no reaction is set for the codepoint, add this
       if (!reaction) {
@@ -190,7 +190,7 @@ CardComments.helpers({
       } else {
         return CardCommentReactions.insertAsync({
           boardId: this.boardId,
-          cardCommentId: this._id,
+          cardCommentId: this._id!,
           cardId: this.cardId,
           reactions
         });
@@ -207,7 +207,7 @@ if (Meteor.isServer) {
   // The DDP `allow` rule in server/permissions/cardComments.js is the first
   // gate, but the per-board `restrictCommentEditing` setting is enforced here
   // so the rule cannot be bypassed and the decision lives next to the data.
-  const assertCanMutateComment = async (userId, doc) => {
+  const assertCanMutateComment = async (userId: string, doc: CardCommentDocument) => {
     // Server-internal operations (board copy, cleanup, migrations, etc.) run
     // without an authenticated user; do not block those here. User-initiated
     // DDP calls always carry a userId and are still gated by the allow rule.
@@ -238,7 +238,7 @@ if (Meteor.isServer) {
   });
 }
 
-async function commentCreation(userId, doc) {
+async function commentCreation(userId: string, doc: CardCommentDocument) {
   const card = await ReactiveCache.getCard(doc.cardId);
   if (!card) {
     console.warn('[commentCreation] Card not found for cardId:', doc.cardId, '— skipping activity insert.');
@@ -255,8 +255,8 @@ async function commentCreation(userId, doc) {
   });
 }
 
-CardComments.textSearch = async (userId, textArray) => {
-  const selector = {
+CardComments.textSearch = async (userId: string, textArray: string[]) => {
+  const selector: { boardId: { $in: string[] }; $and: WekanDocumentField[] } = {
     boardId: { $in: await Boards.userBoardIds(userId) },
     $and: [],
   };
@@ -278,3 +278,19 @@ CardComments.textSearch = async (userId, textArray) => {
 };
 
 export default CardComments;
+
+interface CardCommentEditPermissionArgs {
+  isAuthor: boolean;
+  isBoardAdmin: boolean;
+  restrictCommentEditing: boolean;
+}
+
+interface CardCommentDocument {
+  _id?: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  // The schema fields (boardId/cardId/text/parentId/userId), the
+  // dburles:collection-helpers methods, and any other dynamically-accessed
+  // members come through this documented index signature.
+  [field: string]: WekanDocumentField;
+}

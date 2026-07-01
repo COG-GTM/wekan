@@ -1,8 +1,8 @@
 import { Mongo } from 'meteor/mongo';
 import { ReactiveCache } from '/imports/reactiveCache';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const Announcements = new Mongo.Collection('announcements');
+const Announcements = new Mongo.Collection<AnnouncementDocument>('announcements');
 
 Announcements.attachSchema(
   new SimpleSchema({
@@ -58,7 +58,9 @@ Announcements.attachSchema(
 // The version changes whenever the admin edits the announcement title/body,
 // so a previously dismissed announcement reappears for everyone once updated.
 // Returns null when there is no usable announcement.
-export function announcementVersion(announcement) {
+export function announcementVersion(
+  announcement: AnnouncementDocument | null | undefined,
+) {
   if (!announcement || !announcement._id) {
     return null;
   }
@@ -78,7 +80,11 @@ export function announcementVersion(announcement) {
 // - enabled: the global admin toggle (unchanged semantics).
 // - version: announcementVersion(currentAnnouncement).
 // - dismissedVersion: the version the user previously dismissed (or null).
-export function shouldShowAnnouncement({ enabled, version, dismissedVersion }) {
+export function shouldShowAnnouncement({
+  enabled,
+  version,
+  dismissedVersion,
+}: AnnouncementVisibilityArgs) {
   if (!enabled || !version) {
     return false;
   }
@@ -86,3 +92,19 @@ export function shouldShowAnnouncement({ enabled, version, dismissedVersion }) {
 }
 
 export default Announcements;
+
+interface AnnouncementDocument {
+  _id?: string;
+  enabled: boolean;
+  title?: string;
+  body?: string;
+  sort: number;
+  createdAt?: Date;
+  modifiedAt?: Date;
+}
+
+interface AnnouncementVisibilityArgs {
+  enabled: boolean;
+  version: string | null;
+  dismissedVersion: string | null;
+}

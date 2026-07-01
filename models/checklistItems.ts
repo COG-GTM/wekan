@@ -2,9 +2,9 @@ import { Meteor } from 'meteor/meteor';
 import { Mongo } from 'meteor/mongo';
 import { ReactiveCache } from '/imports/reactiveCache';
 import Activities from '/models/activities';
-const { SimpleSchema } = require('/imports/simpleSchema');
+const { SimpleSchema }: { SimpleSchema: WekanSimpleSchemaConstructor } = require('/imports/simpleSchema');
 
-const ChecklistItems = new Mongo.Collection('checklistItems');
+const ChecklistItems = new Mongo.Collection<ChecklistItemDocument>('checklistItems');
 
 /**
  * An item in a checklist
@@ -88,29 +88,29 @@ ChecklistItems.before.insert((userId, doc) => {
 });
 
 ChecklistItems.helpers({
-  async setTitle(title) {
-    return await ChecklistItems.updateAsync(this._id, { $set: { title } });
+  async setTitle(title: string) {
+    return await ChecklistItems.updateAsync(this._id!, { $set: { title } });
   },
   async check() {
-    return await ChecklistItems.updateAsync(this._id, { $set: { isFinished: true } });
+    return await ChecklistItems.updateAsync(this._id!, { $set: { isFinished: true } });
   },
   async uncheck() {
-    return await ChecklistItems.updateAsync(this._id, { $set: { isFinished: false } });
+    return await ChecklistItems.updateAsync(this._id!, { $set: { isFinished: false } });
   },
   async toggleItem() {
-    return await ChecklistItems.updateAsync(this._id, { $set: { isFinished: !this.isFinished } });
+    return await ChecklistItems.updateAsync(this._id!, { $set: { isFinished: !this.isFinished } });
   },
-  async move(checklistId, sortIndex) {
+  async move(checklistId: string, sortIndex: number) {
     const checklist = await ReactiveCache.getChecklist(checklistId);
     const cardId = checklist.cardId;
-    return await ChecklistItems.updateAsync(this._id, {
+    return await ChecklistItems.updateAsync(this._id!, {
       $set: { cardId, checklistId, sort: sortIndex },
     });
   },
 });
 
 // Activities helper
-export async function itemCreation(userId, doc) {
+export async function itemCreation(userId: string, doc: ChecklistItemDocument) {
   const card = await ReactiveCache.getCard(doc.cardId);
   if (!card) {
     console.warn('[itemCreation] Card not found for cardId:', doc.cardId, '— skipping activity insert.');
@@ -130,13 +130,13 @@ export async function itemCreation(userId, doc) {
   });
 }
 
-export async function itemRemover(userId, doc) {
+export async function itemRemover(userId: string, doc: ChecklistItemDocument) {
   await Activities.removeAsync({
     checklistItemId: doc._id,
   });
 }
 
-export async function publishCheckActivity(userId, doc) {
+export async function publishCheckActivity(userId: string, doc: ChecklistItemDocument) {
   const card = await ReactiveCache.getCard(doc.cardId);
   if (!card) {
     console.warn('[publishCheckActivity] Card not found for cardId:', doc.cardId, '— skipping activity insert.');
@@ -163,7 +163,7 @@ export async function publishCheckActivity(userId, doc) {
   await Activities.insertAsync(act);
 }
 
-export async function publishChekListCompleted(userId, doc) {
+export async function publishChekListCompleted(userId: string, doc: ChecklistItemDocument) {
   const card = await ReactiveCache.getCard(doc.cardId);
   if (!card) {
     console.warn('[publishChekListCompleted] Card not found for cardId:', doc.cardId, '— skipping activity insert.');
@@ -178,7 +178,7 @@ export async function publishChekListCompleted(userId, doc) {
   }
   const checklistItems = await ReactiveCache.getChecklistItems({ checklistId });
   const isChecklistFinished = checkList.hideAllChecklistItems ||
-    (checklistItems.length > 0 && checklistItems.length === checklistItems.filter(i => i.isFinished).length);
+    (checklistItems.length > 0 && checklistItems.length === checklistItems.filter((i: WekanDocumentField) => i.isFinished).length);
   if (isChecklistFinished) {
     const act = {
       userId,
@@ -194,7 +194,7 @@ export async function publishChekListCompleted(userId, doc) {
   }
 }
 
-export async function publishChekListUncompleted(userId, doc) {
+export async function publishChekListUncompleted(userId: string, doc: ChecklistItemDocument) {
   const card = await ReactiveCache.getCard(doc.cardId);
   if (!card) {
     console.warn('[publishChekListUncompleted] Card not found for cardId:', doc.cardId, '— skipping activity insert.');
@@ -222,7 +222,7 @@ export async function publishChekListUncompleted(userId, doc) {
   //         wekan/client/components/rules/triggers/checklistTriggers.js
   const uncheckItems = await ReactiveCache.getChecklistItems({ checklistId });
   const isChecklistFinished = checkList.hideAllChecklistItems ||
-    (uncheckItems.length > 0 && uncheckItems.length === uncheckItems.filter(i => i.isFinished).length);
+    (uncheckItems.length > 0 && uncheckItems.length === uncheckItems.filter((i: WekanDocumentField) => i.isFinished).length);
   if (isChecklistFinished) {
     const act = {
       userId,
@@ -239,3 +239,13 @@ export async function publishChekListUncompleted(userId, doc) {
 }
 
 export default ChecklistItems;
+
+interface ChecklistItemDocument {
+  _id?: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  // The schema fields (title/sort/isFinished/checklistId/cardId/boardId/userId),
+  // the dburles:collection-helpers methods, and any other dynamically-accessed
+  // members come through this documented index signature.
+  [field: string]: WekanDocumentField;
+}

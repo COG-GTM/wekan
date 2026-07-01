@@ -13,7 +13,7 @@ import { findWhere, where } from '/imports/lib/collectionHelpers';
 // instance if a user archive a card, and un-archive it a few seconds later we
 // should remove both activities assuming it was an error the user decided to
 // revert.
-const Activities = new Mongo.Collection('activities');
+const Activities = new Mongo.Collection<ActivityDocument>('activities');
 
 Activities.helpers({
   board() {
@@ -78,3 +78,15 @@ Activities.before.insert((userId, doc) => {
 });
 
 export default Activities;
+
+// Activities are intentionally schema-less: as noted above, different activity
+// types carry different fields, so the document is modelled as an open shape.
+// The commonly-referenced timestamps are named; the heterogeneous per-activity
+// fields (boardId, cardId, userId, ...) come through the documented index
+// signature.
+interface ActivityDocument {
+  _id?: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  [field: string]: WekanDocumentField;
+}

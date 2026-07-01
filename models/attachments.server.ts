@@ -21,11 +21,11 @@ import { ensureIndex } from '/server/lib/mongoStartup';
 // Server-only configuration
 // ---------------------------------------------------------------------------
 
-let attachmentUploadExternalProgram;
-let attachmentUploadMimeTypes = [];
+let attachmentUploadExternalProgram: string | undefined;
+let attachmentUploadMimeTypes: string[] = [];
 let attachmentUploadSize = 0;
 
-function parseNonNegativeInt(value, fallback = 0) {
+function parseNonNegativeInt(value: string, fallback = 0) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed < 0) {
     return fallback;
@@ -112,7 +112,7 @@ Attachments.onAfterUpload = async function (fileObj) {
     let svgSanitized = false;
     Object.keys(fileObj.versions).forEach(versionName => {
       const version = fileObj.versions[versionName];
-      const newSize = sanitizeSvgFileSync(version && version.path);
+      const newSize = sanitizeSvgFileSync(version && version.path!);
       if (newSize !== null) {
         version.size = newSize;
         svgSanitized = true;
@@ -182,20 +182,20 @@ Attachments.onAfterUpload = async function (fileObj) {
 };
 
 Attachments.interceptDownload = function (http, fileObj, versionName) {
-  const ret = fileStoreStrategyFactory.getFileStrategy(fileObj, versionName).interceptDownload(http, this.cacheControl);
+  const ret = fileStoreStrategyFactory.getFileStrategy(fileObj, versionName)!.interceptDownload(http, this.cacheControl);
   return ret;
 };
 
 Attachments.onAfterRemove = function (filesInput) {
   const files = normalizeRemovedFiles(filesInput);
 
-  files.forEach(fileObj => {
+  files.forEach((fileObj: WekanFileObj) => {
     if (!fileObj || !fileObj.versions) {
       return;
     }
 
     Object.keys(fileObj.versions).forEach(versionName => {
-      fileStoreStrategyFactory.getFileStrategy(fileObj, versionName).onAfterRemove();
+      fileStoreStrategyFactory.getFileStrategy(fileObj, versionName)!.onAfterRemove();
     });
   });
 };
@@ -233,7 +233,7 @@ Attachments.getAttachmentsWithBackwardCompatibility = getAttachmentsWithBackward
 
 Meteor.methods({
   // Validate image URL to prevent SVG-based DoS attacks
-  validateImageUrl(imageUrl) {
+  validateImageUrl(imageUrl: string) {
     check(imageUrl, String);
 
     if (!imageUrl) {
@@ -269,7 +269,7 @@ Meteor.methods({
 
     return { valid: true };
   },
-  async moveAttachmentToStorage(fileObjId, storageDestination) {
+  async moveAttachmentToStorage(fileObjId: string, storageDestination: string) {
     check(fileObjId, String);
     check(storageDestination, String);
 
@@ -300,7 +300,7 @@ Meteor.methods({
 
     moveToStorage(fileObj, storageDestination, fileStoreStrategyFactory);
   },
-  async renameAttachment(fileObjId, newName) {
+  async renameAttachment(fileObjId: string, newName: string) {
     check(fileObjId, String);
     check(newName, String);
 
@@ -329,7 +329,7 @@ Meteor.methods({
 
     rename(fileObj, newName, fileStoreStrategyFactory);
   },
-  async validateAttachment(fileObjId) {
+  async validateAttachment(fileObjId: string) {
     check(fileObjId, String);
 
     if (!this.userId) {
@@ -353,7 +353,7 @@ Meteor.methods({
       await Attachments.removeAsync(fileObjId);
     }
   },
-  async validateAttachmentAndMoveToStorage(fileObjId, storageDestination) {
+  async validateAttachmentAndMoveToStorage(fileObjId: string, storageDestination: string) {
     check(fileObjId, String);
     check(storageDestination, String);
 

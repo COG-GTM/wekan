@@ -43,6 +43,10 @@ type MeteorConnectFn = (url: string, options?: object) => any;
 declare module 'meteor/meteor' {
   namespace Meteor {
     let connect: MeteorConnectFn;
+    // Wekan flags site administrators directly on the user document.
+    interface User {
+      isAdmin?: boolean;
+    }
   }
 }
 
@@ -88,6 +92,7 @@ type WekanMongoInternals = typeof import('meteor/mongo').MongoInternals & {
 interface WekanFileVersion {
   path?: string;
   storage?: string;
+  size?: number;
   meta: Record<string, any>;
 }
 
@@ -143,6 +148,19 @@ declare const Attachments: WekanFilesCollection;
 declare const ReactiveCache: WekanReactiveCache;
 declare const Random: { id(n?: number): string };
 
+// Activities are intentionally schema-less: different activity types carry
+// different fields, so the document is modelled as an open shape.
+interface WekanActivityDocument {
+  _id?: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  [field: string]: WekanDocumentField;
+}
+
+// Wekan exposes some Mongo collections as ambient globals (legacy pattern);
+// a few modules reference them without importing.
+declare const Activities: import('meteor/mongo').Mongo.Collection<WekanActivityDocument>;
+
 // Meteor injects its runtime config onto the browser window; only the ROOT_URL
 // prefix is read by the client-side URL helpers.
 interface Window {
@@ -192,6 +210,101 @@ declare module 'meteor/communitypackages:core' {
 
   const T9n: T9nStatic;
   export { T9n };
+}
+
+// ostrio:files (Meteor-Files) — the FilesCollection used for card Attachments
+// and user Avatars. Only the surface Wekan touches is modelled here.
+declare module 'meteor/ostrio:files' {
+  // Bound `this` inside FilesCollection lifecycle callbacks (ostrio internals).
+  interface WekanFilesCallbackContext {
+    userId?: string | null;
+    cacheControl?: string;
+    _now?: Date;
+    // Other ostrio-internal callback context members are accessed dynamically.
+    [member: string]: WekanDocumentField;
+  }
+
+  // The `opts` object passed to `namingFunction`. Carries either client-side
+  // (`name`/`meta`) or server-side (`file`/`fileId`) shapes.
+  interface WekanFilesNamingOpts {
+    name?: string;
+    fileId?: string;
+    meta: { fileId?: string; [key: string]: WekanDocumentField };
+    file?: {
+      name: string;
+      extension?: string;
+      extensionWithDot: string;
+      [key: string]: WekanDocumentField;
+    };
+    [key: string]: WekanDocumentField;
+  }
+
+  // The candidate file passed to `onBeforeUpload` before it becomes a stored
+  // WekanFileObj; `name` is mutated in place to sanitise it.
+  interface WekanFileUploadCandidate {
+    name: string;
+    type: string;
+    size: number;
+    [prop: string]: WekanDocumentField;
+  }
+
+  interface FilesCollectionConfig {
+    debug?: boolean;
+    collectionName?: string;
+    allowClientCode?: boolean;
+    storagePath?: string | (() => string);
+    namingFunction?: (opts: WekanFilesNamingOpts) => string;
+    sanitize?: (str: string, max: number, replacement: string) => string;
+    onBeforeUpload?: (
+      this: WekanFilesCallbackContext,
+      file: WekanFileUploadCandidate,
+    ) => boolean | string;
+    // Additional ostrio config options are passed through untouched.
+    [option: string]: WekanDocumentField;
+  }
+
+  class FilesCollection {
+    constructor(config?: FilesCollectionConfig);
+    collection: import('meteor/mongo').Mongo.Collection<WekanFileObj>;
+    find(selector?: WekanDocumentField): { fetch(): WekanFileObj[] };
+    link(fileRef?: WekanFileObj, version?: string): string;
+    addFile(
+      path: string,
+      config: object,
+      callback?: (error: Error | null, fileRef: WekanFileObj) => void,
+      proceedAfterUpload?: boolean,
+    ): void;
+    updateAsync(selector: object, modifier: object): Promise<number>;
+    removeAsync(selector: WekanDocumentField): Promise<number>;
+    storagePath?: string | (() => string);
+    onAfterUpload?: (
+      this: WekanFilesCallbackContext,
+      fileObj: WekanFileObj,
+    ) => void | Promise<void>;
+    onBeforeRemove?: (
+      this: WekanFilesCallbackContext,
+      filesInput: WekanDocumentField,
+    ) => boolean | Promise<boolean>;
+    onAfterRemove?: (
+      this: WekanFilesCallbackContext,
+      filesInput: WekanDocumentField,
+    ) => void | Promise<void>;
+    interceptDownload?: (
+      this: WekanFilesCallbackContext,
+      http: WekanDocumentField,
+      fileObj: WekanFileObj,
+      versionName: string,
+    ) => boolean | void;
+    protected?: (
+      this: WekanFilesCallbackContext,
+      fileObj: WekanFileObj,
+    ) => boolean | Promise<boolean>;
+    // Wekan attaches extra model helpers (e.g. backward-compatibility lookups)
+    // directly onto the collection instance.
+    [member: string]: WekanDocumentField;
+  }
+
+  export { FilesCollection };
 }
 
 // i18next post-processor plugin shipped without type definitions; the i18n layer
@@ -278,6 +391,112 @@ interface AccountsTemplatesStatic {
 
 declare const AccountsTemplates: AccountsTemplatesStatic;
 
+// ---------------------------------------------------------------------------
+// Community Meteor collection extensions used across the models/ layer.
+// @types/meteor models none of these, so `Mongo.Collection` is augmented below:
+//   - aldeed:simple-schema / collection2 -> attachSchema / simpleSchema
+//   - dburles:collection-helpers          -> helpers
+//   - matb33:collection-hooks             -> before / after / hookOptions
+// ---------------------------------------------------------------------------
+
+// A value crossing the untyped SimpleSchema boundary (a field's value under
+// validation, a compiled schema, etc.). Modelled as a documented interop alias
+// because SimpleSchema (aldeed:simple-schema) ships no usable public types.
+type WekanSchemaValue = any;
+
+// A single field of a Mongo document whose concrete type is runtime-dynamic.
+// Used as the value of the documented index signature on model document
+// interfaces for collections that are intentionally schema-less or hold
+// heterogeneous, per-record fields (mirrors the WekanQueryResult interop alias
+// in /imports/reactiveCache). Aliased so document interfaces avoid a bare `any`.
+type WekanDocumentField = any;
+
+// The SimpleSchema validation context bound to `this` inside a field's
+// autoValue()/custom() callbacks.
+interface WekanSchemaValidationContext {
+  isInsert: boolean;
+  isUpsert: boolean;
+  isUpdate: boolean;
+  isSet: boolean;
+  // Present during insert validation so autoValue()s can default owner fields.
+  userId?: string;
+  operator: string | null;
+  value: WekanSchemaValue;
+  unset(): void;
+  field(name: string): { isSet: boolean; value: WekanSchemaValue };
+  siblingField(name: string): { isSet: boolean; value: WekanSchemaValue };
+}
+
+type WekanSchemaAutoValue = (this: WekanSchemaValidationContext) => WekanSchemaValue;
+type WekanSchemaCustom = (this: WekanSchemaValidationContext) => string | undefined;
+
+// A single field descriptor in a SimpleSchema definition. Only the callback
+// members needing a bound `this` are modelled precisely; the remaining per-field
+// options (type, optional, min/max, defaultValue, ...) vary widely and are
+// accepted through the documented index signature.
+interface WekanSchemaFieldDefinition {
+  autoValue?: WekanSchemaAutoValue;
+  custom?: WekanSchemaCustom;
+  [option: string]: WekanSchemaValue;
+}
+
+type WekanSchemaDefinition = Record<string, WekanSchemaFieldDefinition>;
+
+// A compiled SimpleSchema instance. The model layer only ever forwards the
+// instance to attachSchema, so its surface is a documented interop shape.
+interface WekanSimpleSchemaInstance {
+  _schema?: WekanSchemaValue;
+  _schemaDefinition?: WekanSchemaValue;
+}
+
+interface WekanSimpleSchemaConstructor {
+  new (
+    definition: WekanSchemaDefinition,
+    options?: object,
+  ): WekanSimpleSchemaInstance;
+}
+
+// A Mongo update modifier ($set/$unset/$inc/...); its operator keys and values
+// are runtime-dynamic, hence the documented interop alias.
+type WekanMongoModifier = any;
+
+// A dburles:collection-helpers map: each helper runs with `this` bound to the
+// transformed document. Helper argument and return types vary per helper.
+type WekanCollectionHelperArg = any;
+type WekanCollectionHelperReturn = any;
+interface WekanCollectionHelpersMap<T> {
+  [helperName: string]: (
+    this: T,
+    ...args: WekanCollectionHelperArg[]
+  ) => WekanCollectionHelperReturn;
+}
+
+// A matb33:collection-hooks lifecycle callback set. The document argument is the
+// collection's document type; hooks may run synchronously or return a promise.
+interface WekanCollectionMutationHooks<T> {
+  insert(hook: (userId: string, doc: T) => void | Promise<void>): void;
+  update(
+    hook: (
+      userId: string,
+      doc: T,
+      fieldNames: string[],
+      modifier: WekanMongoModifier,
+    ) => void | Promise<void>,
+  ): void;
+  remove(hook: (userId: string, doc: T) => void | Promise<void>): void;
+}
+
+interface WekanCollectionHookOptions {
+  after: {
+    update: { fetchPrevious?: boolean };
+  };
+}
+
+// The `meteor/mongo` module augmentation that adds these community-package
+// methods to `Mongo.Collection` lives in `collectionExtensions.d.ts` (a
+// module-scoped file, so it merges with @types/meteor instead of shadowing the
+// rest of the 'meteor/mongo' surface such as MongoInternals).
+
 /** Wekan's global modal helper. */
 interface WekanModalStatic {
   open(
@@ -288,3 +507,13 @@ interface WekanModalStatic {
 }
 
 declare const Modal: WekanModalStatic;
+
+// Wekan client-side helper bag (imports/utils). Its surface is large and
+// client-only, so it is exposed through the documented interop alias.
+declare const Utils: WekanDocumentField;
+
+// Server-side per-user position-history collection (server/models). It is not
+// present in the client bundle, so call sites guard access with
+// `typeof UserPositionHistory !== 'undefined'`; modelled as a documented
+// interop global.
+declare const UserPositionHistory: WekanDocumentField;
