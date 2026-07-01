@@ -1,9 +1,12 @@
 import { ReactiveCache } from '/imports/reactiveCache';
 import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
+import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 import Boards from '/models/boards';
 import { Utils } from '/client/lib/utils';
 
-Template.archivedBoards.onCreated(function () {
+Template.archivedBoards.onCreated(function (this: Blaze.TemplateInstance) {
   this.subscribe('archivedBoards');
 });
 
@@ -24,7 +27,7 @@ Template.archivedBoards.helpers({
 });
 
 Template.archivedBoards.events({
-  async 'click .js-restore-board'() {
+  async 'click .js-restore-board'(this: any) {
     // TODO : Make isSandstorm variable global
     const isSandstorm =
       Meteor.settings &&
@@ -38,7 +41,7 @@ Template.archivedBoards.events({
     await board.restore();
     Utils.goBoardId(board._id);
   },
-  'click .js-delete-board': Popup.afterConfirm('boardDelete', async function() {
+  'click .js-delete-board': Popup.afterConfirm('boardDelete', async function(this: any) {
     Popup.back();
     const isSandstorm =
       Meteor.settings &&

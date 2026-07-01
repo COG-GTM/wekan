@@ -1,6 +1,11 @@
 import { ReactiveCache } from '/imports/reactiveCache';
 import { TAPi18n } from '/imports/i18n';
 import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
+import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
+import { Session } from 'meteor/session';
 import dragscroll from '@wekanteam/dragscroll';
 import getSlug from 'limax';
 import Boards from '/models/boards';
@@ -21,7 +26,7 @@ const sortCardsBy = new ReactiveVar('');
 // is reset on reload, which is why "sort by due date" kept reverting to the
 // default. See https://github.com/wekan/wekan/issues/5886
 const CARDS_SORT_BY_STORAGE_KEY = 'wekan-cards-sortBy';
-function setCardsSortBy(sortBy) {
+function setCardsSortBy(sortBy: any) {
   Session.set('sortBy', sortBy);
   try {
     if (sortBy) {
@@ -33,15 +38,15 @@ function setCardsSortBy(sortBy) {
 }
 
 Template.boardChangeTitlePopup.events({
-  async submit(event, templateInstance) {
+  async submit(event: JQuery.TriggeredEvent, templateInstance: Blaze.TemplateInstance) {
     event.preventDefault();
-    const newTitle = templateInstance
+    const newTitle = (templateInstance
       .$('.js-board-name')
-      .val()
+      .val() as string)
       .trim();
-    const newDesc = templateInstance
+    const newDesc = (templateInstance
       .$('.js-board-desc')
-      .val()
+      .val() as string)
       .trim();
     if (newTitle) {
       const board = Utils.getCurrentBoard();
@@ -153,8 +158,8 @@ Template.boardHeaderBar.events({
         console.warn('Sidebar not available, trying alternative approach');
       }
       // Try to trigger the sidebar through the global Blaze helper
-      if (typeof Blaze !== 'undefined' && Blaze._globalHelpers && Blaze._globalHelpers.Sidebar) {
-        const blazeSidebar = Blaze._globalHelpers.Sidebar();
+      if (typeof Blaze !== 'undefined' && (Blaze as any)._globalHelpers && (Blaze as any)._globalHelpers.Sidebar) {
+        const blazeSidebar = (Blaze as any)._globalHelpers.Sidebar();
         if (blazeSidebar && typeof blazeSidebar.toggle === 'function') {
           if (process.env.DEBUG === 'true') {
             console.log('Using Blaze helper Sidebar.toggle()');
@@ -185,7 +190,7 @@ Template.boardHeaderBar.events({
     }
   },
   */
-  'click .js-filter-reset'(event) {
+  'click .js-filter-reset'(event: JQuery.TriggeredEvent) {
     event.stopPropagation();
     const sidebar = getSidebarInstance();
     if (sidebar) {
@@ -219,7 +224,7 @@ Template.boardHeaderBar.events({
       MultiSelection.add(currentCard);
     }
   },
-  'click .js-multiselection-reset'(event) {
+  'click .js-multiselection-reset'(event: JQuery.TriggeredEvent) {
     event.stopPropagation();
     MultiSelection.disable();
   },
@@ -252,7 +257,7 @@ Template.boardChangeViewPopup.events({
 });
 
 // Shared setup for all create board popups
-function setupCreateBoardState(tpl) {
+function setupCreateBoardState(tpl: any) {
   tpl.visibilityMenuIsOpen = new ReactiveVar(false);
   tpl.visibility = new ReactiveVar('private');
   tpl.boardId = new ReactiveVar('');
@@ -265,23 +270,23 @@ function setupCreateBoardState(tpl) {
 function createBoardHelpers() {
   return {
     visibilityMenuIsOpen() {
-      return Template.instance().visibilityMenuIsOpen.get();
+      return (Template.instance() as CreateBoardInstance).visibilityMenuIsOpen.get();
     },
     visibility() {
-      return Template.instance().visibility.get();
+      return (Template.instance() as CreateBoardInstance).visibility.get();
     },
     notAllowPrivateVisibilityOnly() {
       return !TableVisibilityModeSettings.findOne('tableVisibilityMode-allowPrivateOnly')?.booleanValue;
     },
     visibilityCheck() {
-      return Template.currentData() === Template.instance().visibility.get();
+      return Template.currentData() === (Template.instance() as CreateBoardInstance).visibility.get();
     },
   };
 }
 
-async function createBoardSubmit(tpl, event) {
+async function createBoardSubmit(tpl: any, event: any) {
   event.preventDefault();
-  const title = tpl.find('.js-new-board-title').value;
+  const title = (tpl.find('.js-new-board-title') as HTMLInputElement).value;
   const slug = getSlug(title) || 'board';
 
   // #5850: template boards are created via the dedicated "Add Template Board"
@@ -308,7 +313,8 @@ async function createBoardSubmit(tpl, event) {
     // Assign to space if one was selected
     const spaceId = Session.get('createBoardInWorkspace');
     if (spaceId) {
-      Meteor.call('assignBoardToWorkspace', tpl.boardId.get(), spaceId, (err) => {
+      // err: any — untyped Meteor method callback.
+      Meteor.call('assignBoardToWorkspace', tpl.boardId.get(), spaceId, (err: any) => {
         if (err) console.error('Error assigning board to space:', err);
       });
       Session.set('createBoardInWorkspace', null); // Clear after use
@@ -332,7 +338,8 @@ async function createBoardSubmit(tpl, event) {
     // Assign to space if one was selected
     const spaceId = Session.get('createBoardInWorkspace');
     if (spaceId) {
-      Meteor.call('assignBoardToWorkspace', tpl.boardId.get(), spaceId, (err) => {
+      // err: any — untyped Meteor method callback.
+      Meteor.call('assignBoardToWorkspace', tpl.boardId.get(), spaceId, (err: any) => {
         if (err) console.error('Error assigning board to space:', err);
       });
       Session.set('createBoardInWorkspace', null); // Clear after use
@@ -344,14 +351,14 @@ async function createBoardSubmit(tpl, event) {
 
 function createBoardEvents() {
   return {
-    'click .js-select-visibility'(event, tpl) {
+    'click .js-select-visibility'(this: any, event: any, tpl: CreateBoardInstance) {
       tpl.visibility.set(this);
       tpl.visibilityMenuIsOpen.set(false);
     },
-    'click .js-change-visibility'(event, tpl) {
+    'click .js-change-visibility'(event: any, tpl: CreateBoardInstance) {
       tpl.visibilityMenuIsOpen.set(!tpl.visibilityMenuIsOpen.get());
     },
-    async 'submit'(event, tpl) {
+    async 'submit'(event: any, tpl: CreateBoardInstance) {
       await createBoardSubmit(tpl, event);
     },
     'click .js-import-board': Popup.open('chooseBoardSource'),
@@ -360,7 +367,7 @@ function createBoardEvents() {
 }
 
 // createBoard (non-popup version)
-Template.createBoard.onCreated(function () {
+Template.createBoard.onCreated(function (this: any) {
   setupCreateBoardState(this);
 });
 
@@ -369,7 +376,7 @@ Template.createBoard.helpers(createBoardHelpers());
 Template.createBoard.events(createBoardEvents());
 
 // createBoardPopup
-Template.createBoardPopup.onCreated(function () {
+Template.createBoardPopup.onCreated(function (this: any) {
   setupCreateBoardState(this);
 });
 
@@ -378,7 +385,7 @@ Template.createBoardPopup.helpers(createBoardHelpers());
 Template.createBoardPopup.events(createBoardEvents());
 
 // createTemplateContainerPopup
-Template.createTemplateContainerPopup.onCreated(function () {
+Template.createTemplateContainerPopup.onCreated(function (this: any) {
   setupCreateBoardState(this);
 });
 
@@ -392,24 +399,24 @@ Template.createTemplateContainerPopup.helpers(createBoardHelpers());
 Template.createTemplateContainerPopup.events(createBoardEvents());
 
 // headerBarCreateBoardPopup
-Template.headerBarCreateBoardPopup.onCreated(function () {
+Template.headerBarCreateBoardPopup.onCreated(function (this: any) {
   setupCreateBoardState(this);
 });
 
 Template.headerBarCreateBoardPopup.helpers(createBoardHelpers());
 
 Template.headerBarCreateBoardPopup.events({
-  'click .js-select-visibility'(event, tpl) {
+  'click .js-select-visibility'(this: any, event: any, tpl: CreateBoardInstance) {
     tpl.visibility.set(this);
     tpl.visibilityMenuIsOpen.set(false);
   },
-  'click .js-change-visibility'(event, tpl) {
+  'click .js-change-visibility'(event: any, tpl: CreateBoardInstance) {
     tpl.visibilityMenuIsOpen.set(!tpl.visibilityMenuIsOpen.get());
   },
-  async submit(event, tpl) {
+  async submit(event: any, tpl: CreateBoardInstance) {
     await createBoardSubmit(tpl, event);
     // Immediately star boards created with the headerbar popup.
-    await ReactiveCache.getCurrentUser().toggleBoardStar(tpl.boardId.get());
+    await ReactiveCache.getCurrentUser()!.toggleBoardStar(tpl.boardId.get());
   },
   'click .js-import-board': Popup.open('chooseBoardSource'),
   'click .js-board-template': Popup.open('searchElement'),
@@ -429,18 +436,18 @@ Template.boardChangeVisibilityPopup.helpers({
   notAllowPrivateVisibilityOnly(){
     return !TableVisibilityModeSettings.findOne('tableVisibilityMode-allowPrivateOnly')?.booleanValue;
   },
-  visibilityCheck() {
+  visibilityCheck(this: any) {
     const currentBoard = Utils.getCurrentBoard();
-    return this === currentBoard.permission;
+    return this === currentBoard!.permission;
   },
 });
 
 Template.boardChangeVisibilityPopup.events({
-  'click .js-select-visibility'() {
+  'click .js-select-visibility'(this: any) {
     const currentBoard = Utils.getCurrentBoard();
     const visibility = this;
     if (typeof visibility === 'string') {
-      currentBoard.setVisibility(visibility);
+      currentBoard!.setVisibility(visibility);
       Popup.back();
     }
   },
@@ -449,25 +456,26 @@ Template.boardChangeVisibilityPopup.events({
 Template.boardChangeWatchPopup.helpers({
   watchLevel() {
     const currentBoard = Utils.getCurrentBoard();
-    return currentBoard.getWatchLevel(Meteor.userId());
+    return currentBoard!.getWatchLevel(Meteor.userId());
   },
 
-  watchCheck() {
+  watchCheck(this: any) {
     const currentBoard = Utils.getCurrentBoard();
-    return this === currentBoard.getWatchLevel(Meteor.userId());
+    return this === currentBoard!.getWatchLevel(Meteor.userId());
   },
 });
 
 Template.boardChangeWatchPopup.events({
-  'click .js-select-watch'() {
+  'click .js-select-watch'(this: any) {
     const level = this;
     if (typeof level === 'string') {
+      // err/ret: any — untyped Meteor method callback.
       Meteor.call(
         'watch',
         'board',
         Session.get('currentBoard'),
         level,
-        (err, ret) => {
+        (err: any, ret: any) => {
           if (!err && ret) Popup.back();
         },
       );
@@ -583,3 +591,11 @@ Template.cardsSortPopup.events({
     Popup.back();
   },
 });
+
+// Shared template instance for the various create-board popups; each holds the
+// visibility menu state and the id of the board being created.
+interface CreateBoardInstance extends Blaze.TemplateInstance {
+  visibilityMenuIsOpen: ReactiveVar<any>;
+  visibility: ReactiveVar<any>;
+  boardId: ReactiveVar<any>;
+}

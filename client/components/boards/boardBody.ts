@@ -11,15 +11,21 @@ import Lists from '/models/lists';
 import TableVisibilityModeSettings from '/models/tableVisibilityModeSettings';
 import { EscapeActions } from '/client/lib/escapeActions';
 import { Utils } from '/client/lib/utils';
+import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
+import { Session } from 'meteor/session';
+import { Tracker } from 'meteor/tracker';
 
 // SubsManager removed for Meteor 3 migration
 const { calculateIndex } = Utils;
 const swimlaneWhileSortingHeight = 150;
 
 // Global reference so child components (swimlanes, cards) can access boardBody instance
-let BoardBody = null;
+let BoardBody: any = null;
 
-Template.board.onCreated(function () {
+Template.board.onCreated(function (this: BoardInstance) {
   this.isBoardReady = new ReactiveVar(false);
   // Kept for the template/jade which still references it; conversion is a no-op.
   this.isConverting = new ReactiveVar(false);
@@ -29,7 +35,7 @@ Template.board.onCreated(function () {
   // fire-and-forget so it never blocks rendering. The board is marked
   // immediately to avoid duplicate concurrent calls, and the mark is rolled
   // back on failure so a later attempt can retry.
-  this.ensureDefaultSwimlane = async (boardId) => {
+  this.ensureDefaultSwimlane = async (boardId: any) => {
     if (this._swimlaneCreated.has(boardId)) {
       return;
     }
@@ -96,8 +102,8 @@ Template.board.helpers({
     if (!isMobile) {
       const openCardIds = Session.get('openCards') || [];
       return openCardIds
-        .map((id) => ReactiveCache.getCard(id))
-        .filter((card) => card);
+        .map((id: any) => ReactiveCache.getCard(id))
+        .filter((card: any) => card);
     }
     return [];
   },
@@ -107,11 +113,11 @@ Template.board.helpers({
   },
 
   isConverting() {
-    return Template.instance().isConverting.get();
+    return (Template.instance() as BoardInstance).isConverting.get();
   },
 
   isBoardReady() {
-    return Template.instance().isBoardReady.get();
+    return (Template.instance() as BoardInstance).isBoardReady.get();
   },
 
   currentBoard() {
@@ -119,7 +125,7 @@ Template.board.helpers({
   },
 });
 
-Template.boardBody.onCreated(function () {
+Template.boardBody.onCreated(function (this: BoardBodyInstance) {
   Meteor.subscribe('tableVisibilityModeSettings');
   Meteor.subscribe('inviteToBoardRolesSettings');
   this.showOverlay = new ReactiveVar(false);
@@ -133,11 +139,11 @@ Template.boardBody.onCreated(function () {
   BoardBody = this;
 
   // Methods on the template instance for programmatic access
-  this.setIsDragging = (bool) => {
+  this.setIsDragging = (bool: any) => {
     this.draggingActive.set(bool);
   };
 
-  this.scrollLeft = (position = 0) => {
+  this.scrollLeft = (position: any = 0) => {
     const swimlanes = this.$('.js-swimlanes');
     swimlanes &&
       swimlanes.animate({
@@ -145,7 +151,7 @@ Template.boardBody.onCreated(function () {
       });
   };
 
-  this.scrollTop = (position = 0) => {
+  this.scrollTop = (position: any = 0) => {
     const swimlanes = this.$('.js-swimlanes');
     swimlanes &&
       swimlanes.animate({
@@ -194,7 +200,7 @@ Template.boardBody.onCreated(function () {
       if (nullSortSwimlanes.length > 0) {
         const swimlanes = currentBoardData.swimlanes();
         let count = 0;
-        swimlanes.forEach((s) => {
+        swimlanes.forEach((s: any) => {
           Swimlanes.update(s._id, {
             $set: {
               sort: count,
@@ -216,7 +222,7 @@ Template.boardBody.onCreated(function () {
       if (nullSortLists.length > 0) {
         const lists = currentBoardData.lists();
         let count = 0;
-        lists.forEach((l) => {
+        lists.forEach((l: any) => {
           Lists.update(l._id, {
             $set: {
               sort: count,
@@ -230,7 +236,7 @@ Template.boardBody.onCreated(function () {
   }
 });
 
-Template.boardBody.onRendered(function () {
+Template.boardBody.onRendered(function (this: BoardBodyInstance) {
   // Initialize user settings (zoom and mobile mode)
   Utils.initializeUserSettings();
 
@@ -241,7 +247,7 @@ Template.boardBody.onRendered(function () {
   }
 
   // Accessibility: Focus management for popups and menus
-  function focusFirstInteractive(container) {
+  function focusFirstInteractive(container: any) {
     if (!container) return;
     // Find first focusable element
     const focusable = container.querySelectorAll(
@@ -256,9 +262,9 @@ Template.boardBody.onRendered(function () {
   }
 
   // Observe for new popups/menus and set focus (but exclude swimlane content)
-  const popupObserver = new MutationObserver(function (mutations) {
-    mutations.forEach(function (mutation) {
-      mutation.addedNodes.forEach(function (node) {
+  const popupObserver = new MutationObserver(function (mutations: MutationRecord[]) {
+    mutations.forEach(function (mutation: MutationRecord) {
+      mutation.addedNodes.forEach(function (node: any) {
         if (
           node.nodeType === 1 &&
           (node.classList.contains('popup') ||
@@ -441,7 +447,7 @@ Template.boardBody.onRendered(function () {
   $swimlanesDom.sortable({
     tolerance: 'pointer',
     appendTo: '.board-canvas',
-    helper(evt, item) {
+    helper(evt: any, item: any) {
       const helper = $(`<div class="swimlane"
                              style="flex-direction: column;
                                     height: ${swimlaneWhileSortingHeight}px;
@@ -456,7 +462,7 @@ Template.boardBody.onRendered(function () {
     items: '.swimlane:not(.placeholder)',
     placeholder: 'swimlane placeholder',
     distance: 7,
-    start(evt, ui) {
+    start(evt: any, ui: any) {
       const listDom = ui.placeholder.next('.js-swimlane');
       const parentOffset = ui.item.parent().offset();
 
@@ -481,7 +487,7 @@ Template.boardBody.onRendered(function () {
       ui.item.parent().get(0).scrollTop =
         ui.placeholder.get(0).offsetTop + parentOffset.top - evt.pageY;
     },
-    beforeStop(evt, ui) {
+    beforeStop(evt: any, ui: any) {
       const parentOffset = ui.item.parent().offset();
       const siblings = ui.item.siblings('.js-swimlane');
       siblings.css('height', '');
@@ -497,7 +503,7 @@ Template.boardBody.onRendered(function () {
       // and apply the computed scrollheight
       ui.item.parent().get(0).scrollTop = scrollTop;
     },
-    stop(evt, ui) {
+    stop(evt: any, ui: any) {
       // To attribute the new index number, we need to get the DOM element
       // of the previous and the following card -- if any.
       const prevSwimlaneDom = ui.item.prevAll('.js-swimlane').get(0);
@@ -506,7 +512,8 @@ Template.boardBody.onRendered(function () {
 
       $swimlanesDom.sortable('cancel');
       const swimlaneDomElement = ui.item.get(0);
-      const swimlane = Blaze.getData(swimlaneDomElement);
+      // swimlane: any — Blaze.getData returns the dynamic Blaze data context.
+      const swimlane: any = Blaze.getData(swimlaneDomElement);
 
       Swimlanes.update(swimlane._id, {
         $set: {
@@ -516,7 +523,7 @@ Template.boardBody.onRendered(function () {
 
       tpl.setIsDragging(false);
     },
-    sort(evt, ui) {
+    sort(evt: any, ui: any) {
       // get the mouse position in the sortable
       const parentOffset = ui.item.parent().offset();
       const cursorY =
@@ -578,10 +585,11 @@ Template.boardBody.onRendered(function () {
   });
 
   dragscroll.reset();
-  Utils.setBackgroundImage();
+  // as any — Utils.setBackgroundImage's url param is optional at runtime
+  (Utils.setBackgroundImage as any)();
 });
 
-Template.boardBody.onDestroyed(function () {
+Template.boardBody.onDestroyed(function (this: BoardBodyInstance) {
   if (BoardBody === this) {
     BoardBody = null;
   }
@@ -593,17 +601,17 @@ Template.boardBody.helpers({
     if (!isMobile) {
       const openCardIds = Session.get('openCards') || [];
       return openCardIds
-        .map((id) => ReactiveCache.getCard(id))
-        .filter((card) => card);
+        .map((id: any) => ReactiveCache.getCard(id))
+        .filter((card: any) => card);
     }
     return [];
   },
 
   draggingActive() {
-    return Template.instance().draggingActive.get();
+    return (Template.instance() as BoardBodyInstance).draggingActive.get();
   },
   showOverlay() {
-    return Template.instance().showOverlay.get();
+    return (Template.instance() as BoardBodyInstance).showOverlay.get();
   },
   notDisplayThisBoard() {
     let allowPrivateVisibilityOnly = TableVisibilityModeSettings.findOne(
@@ -732,7 +740,7 @@ Template.boardBody.helpers({
   debugBoardStateData() {
     const currentBoard = Utils.getCurrentBoard();
     const currentBoardId = Session.get('currentBoard');
-    const tpl = Template.instance();
+    const tpl = Template.instance() as BoardBodyInstance;
     const isBoardReady = tpl.isBoardReady.get();
     const isConverting = tpl.isConverting.get();
     const boardView = Utils.boardView();
@@ -765,15 +773,15 @@ Template.boardBody.helpers({
 Template.boardBody.events({
   // XXX The board-overlay div should probably be moved to the parent
   // component.
-  mouseup(event, tpl) {
+  mouseup(event: JQuery.TriggeredEvent, tpl: BoardBodyInstance) {
     if (tpl._isDragging) {
       tpl._isDragging = false;
     }
   },
   'click .js-empty-board-add-swimlane': Popup.open('swimlaneAdd'),
   // Global drag and drop file upload handlers for better visual feedback
-  'dragover .board-canvas'(event) {
-    const dataTransfer = event.originalEvent.dataTransfer;
+  'dragover .board-canvas'(event: JQuery.TriggeredEvent) {
+    const dataTransfer = (event.originalEvent as DragEvent).dataTransfer;
     if (
       dataTransfer &&
       dataTransfer.types &&
@@ -784,21 +792,21 @@ Template.boardBody.events({
       $('.board-canvas').addClass('file-drag-over');
     }
   },
-  'dragleave .board-canvas'(event) {
-    const dataTransfer = event.originalEvent.dataTransfer;
+  'dragleave .board-canvas'(event: JQuery.TriggeredEvent) {
+    const dataTransfer = (event.originalEvent as DragEvent).dataTransfer;
     if (
       dataTransfer &&
       dataTransfer.types &&
       dataTransfer.types.includes('Files')
     ) {
       // Only remove class if we're leaving the board canvas entirely
-      if (!event.currentTarget.contains(event.relatedTarget)) {
+      if (!(event.currentTarget as HTMLElement).contains((event.originalEvent as DragEvent).relatedTarget as Node)) {
         $('.board-canvas').removeClass('file-drag-over');
       }
     }
   },
-  'drop .board-canvas'(event) {
-    const dataTransfer = event.originalEvent.dataTransfer;
+  'drop .board-canvas'(event: JQuery.TriggeredEvent) {
+    const dataTransfer = (event.originalEvent as DragEvent).dataTransfer;
     if (
       dataTransfer &&
       dataTransfer.types &&
@@ -812,7 +820,7 @@ Template.boardBody.events({
 
 // Accessibility: Allow users to enable/disable keyboard shortcuts
 window.wekanShortcutsEnabled = true;
-window.toggleWekanShortcuts = function (enabled) {
+window.toggleWekanShortcuts = function (enabled: any) {
   window.wekanShortcutsEnabled = !!enabled;
 };
 
@@ -830,7 +838,7 @@ document.addEventListener('keydown', function (e) {
 document.addEventListener('keydown', function (e) {
   if (!window.wekanShortcutsEnabled) return;
   // Only proceed if focus is on a card action element
-  const active = document.activeElement;
+  const active = document.activeElement as HTMLElement | null;
   if (active && active.classList.contains('js-card-action')) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -922,7 +930,7 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-Template.calendarView.onRendered(function () {
+Template.calendarView.onRendered(function (this: Blaze.TemplateInstance) {
   // Set the language and direction attributes on the <html> element for
   // accessibility and RTL layout.
   document.documentElement.lang = TAPi18n.getLanguage();
@@ -930,15 +938,15 @@ Template.calendarView.onRendered(function () {
 
   this.autorun(function () {
     const calendarEl = document.getElementById('calendar-view');
-    if (calendarEl && calendarEl._wekanCalendar) {
-      calendarEl._wekanCalendar.refetchEvents();
+    if (calendarEl && (calendarEl as any)._wekanCalendar) {
+      (calendarEl as any)._wekanCalendar.refetchEvents();
     }
   });
 });
 
 Template.calendarView.helpers({
   calendarOptions() {
-    const t = (key, fallback) => {
+    const t = (key: any, fallback: any) => {
       const translated = TAPi18n.__(key);
       return translated && translated !== key ? translated : fallback;
     };
@@ -1000,10 +1008,12 @@ Template.calendarView.helpers({
       },
       locale: TAPi18n.getLanguage(),
       isRTL: TAPi18n.isRTL(),
-      events(fetchInfo, callback) {
-        const currentBoard = Utils.getCurrentBoard();
-        const events = [];
-        const pushEvent = function (card, title, start, end, extraCls) {
+      events(fetchInfo: any, callback: any) {
+        // currentBoard is present whenever the calendar view is rendered.
+        const currentBoard = Utils.getCurrentBoard()!;
+        // events: any[] — FullCalendar event descriptors built below.
+        const events: any[] = [];
+        const pushEvent = function (card: any, title?: any, start?: any, end?: any, extraCls?: any) {
           start = start || card.startAt;
           end = end || card.endAt;
           title = title || card.title;
@@ -1027,12 +1037,12 @@ Template.calendarView.helpers({
         };
         currentBoard
           .cardsInInterval(fetchInfo.start, fetchInfo.end)
-          .forEach(function (card) {
+          .forEach(function (card: any) {
             pushEvent(card);
           });
         currentBoard
           .cardsDueInBetween(fetchInfo.start, fetchInfo.end)
-          .forEach(function (card) {
+          .forEach(function (card: any) {
             pushEvent(
               card,
               `${card.title} ${TAPi18n.__('card-due')}`,
@@ -1040,12 +1050,12 @@ Template.calendarView.helpers({
               new Date(card.dueAt.getTime() + 36e5),
             );
           });
-        events.sort(function (first, second) {
+        events.sort(function (first: any, second: any) {
           return first.id > second.id ? 1 : -1;
         });
         callback(events);
       },
-      eventResize(info) {
+      eventResize(info: any) {
         let isOk = false;
         const card = ReactiveCache.getCard(info.event.id);
 
@@ -1057,7 +1067,7 @@ Template.calendarView.helpers({
           info.revert();
         }
       },
-      eventDrop(info) {
+      eventDrop(info: any) {
         let isOk = false;
         const card = ReactiveCache.getCard(info.event.id);
         if (card) {
@@ -1074,8 +1084,9 @@ Template.calendarView.helpers({
           info.revert();
         }
       },
-      select: function (selectionInfo) {
-        const currentBoard = Utils.getCurrentBoard();
+      select: function (selectionInfo: any) {
+        // currentBoard is present whenever the calendar view is rendered.
+        const currentBoard = Utils.getCurrentBoard()!;
         const currentUser = ReactiveCache.getCurrentUser();
         const modalElement = document.createElement('div');
         modalElement.classList.add('modal', 'fade');
@@ -1101,9 +1112,9 @@ Template.calendarView.helpers({
         `;
         const createCardButton = modalElement.querySelector(
           '#create-card-button',
-        );
+        )!;
         createCardButton.addEventListener('click', async function () {
-          const myTitle = modalElement.querySelector('#card-title-input').value;
+          const myTitle = (modalElement.querySelector('#card-title-input') as HTMLInputElement).value;
           if (myTitle) {
             let firstSwimlane = currentBoard.swimlanes()[0];
             if (!firstSwimlane) {
@@ -1136,7 +1147,8 @@ Template.calendarView.helpers({
               myTitle,
               selectionInfo.start,
               firstSwimlane._id,
-              function (error, result) {
+              // error/result: any — untyped Meteor method callback.
+              function (error: any, result: any) {
                 if (error) {
                   if (process.env.DEBUG === 'true') {
                     console.log(error);
@@ -1155,7 +1167,7 @@ Template.calendarView.helpers({
         const openModal = function () {
           modalElement.style.display = 'flex';
           // Set focus to the input field for better keyboard accessibility
-          const input = modalElement.querySelector('#card-title-input');
+          const input = modalElement.querySelector('#card-title-input') as HTMLElement | null;
           if (input) input.focus();
         };
         const closeModal = function () {
@@ -1163,7 +1175,7 @@ Template.calendarView.helpers({
         };
         const closeButton = modalElement.querySelector(
           '[data-dismiss="modal"]',
-        );
+        )!;
         closeButton.addEventListener('click', closeModal);
         openModal();
       },
@@ -1183,3 +1195,30 @@ Template.calendarView.helpers({
  * Gantt View Component
  * Displays cards as a Gantt chart with start/due dates
  */
+
+// Template instance for the outer `board` template (readiness/conversion flags
+// plus the once-per-board default-swimlane guard).
+interface BoardInstance extends Blaze.TemplateInstance {
+  isBoardReady: ReactiveVar<any>;
+  isConverting: ReactiveVar<any>;
+  _swimlaneCreated: Set<any>;
+  ensureDefaultSwimlane: (boardId: any) => Promise<void>;
+}
+
+// Template instance for the `boardBody` template. Besides its own drag/overlay
+// state it also exposes the board readiness flags read by debugBoardStateData.
+interface BoardBodyInstance extends Blaze.TemplateInstance {
+  showOverlay: ReactiveVar<any>;
+  draggingActive: ReactiveVar<any>;
+  isBoardReady: ReactiveVar<any>;
+  isConverting: ReactiveVar<any>;
+  _isDragging: boolean;
+  mouseHasEnterCardDetails: boolean;
+  _sortFieldsFixed: Set<any>;
+  origPlaceholderIndex: any;
+  setIsDragging: (bool: any) => void;
+  scrollLeft: (position?: any) => void;
+  scrollTop: (position?: any) => void;
+  isViewSwimlanes: () => boolean;
+  isViewLists: () => boolean;
+}

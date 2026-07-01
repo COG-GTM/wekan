@@ -29,7 +29,7 @@
  *        name so first-letter keyboard navigation keeps working.
  * @returns {string} The option label.
  */
-export function boardOptionLabel(name, index, { numbered = false } = {}) {
+export function boardOptionLabel(name: any, index: any, { numbered = false } = {}) {
   const label = name == null ? '' : String(name);
   if (!numbered) {
     return label;

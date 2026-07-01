@@ -1,5 +1,10 @@
 import { ReactiveCache } from '/imports/reactiveCache';
 import { Utils } from '/client/lib/utils';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
+import { Meteor } from 'meteor/meteor';
+import { Session } from 'meteor/session';
 
 // Board "Table" view: lists every card of the current board in a table that
 // reuses the My Cards table styling (the .my-cards-board-table CSS classes in
@@ -12,7 +17,7 @@ import { Utils } from '/client/lib/utils';
 
 const rowsPerPage = 25;
 
-Template.tableView.onCreated(function () {
+Template.tableView.onCreated(function (this: TableViewInstance) {
   this.searchQuery = new ReactiveVar('');
   this.sortField = new ReactiveVar('card'); // card | list | swimlane | due
   this.sortDirection = new ReactiveVar(1); // 1 ascending, -1 descending
@@ -33,14 +38,15 @@ Template.tableView.onCreated(function () {
     const field = this.sortField.get();
     const direction = this.sortDirection.get();
 
-    const rows = [];
-    board.cards().forEach(card => {
+    // rows: any[] — flattened per-card view rows built for the table.
+    const rows: any[] = [];
+    board.cards().forEach((card: any) => {
       const swimlane = card.getSwimlane();
       const list = card.getList();
       if (!swimlane || swimlane.archived || !list || list.archived) return;
 
       const labels = (card.labelIds || [])
-        .map(labelId => {
+        .map((labelId: any) => {
           const label = board.getLabelById(labelId);
           return label ? { name: label.name || '', color: label.color } : null;
         })
@@ -62,12 +68,12 @@ Template.tableView.onCreated(function () {
 
     let filtered = rows;
     if (query) {
-      filtered = rows.filter(row => {
+      filtered = rows.filter((row: any) => {
         const haystack = [
           row.title,
           row.listTitle,
           row.swimlaneTitle,
-          ...row.labels.map(label => label.name),
+          ...row.labels.map((label: any) => label.name),
         ]
           .join(' ')
           .toLowerCase();
@@ -76,14 +82,14 @@ Template.tableView.onCreated(function () {
     }
 
     // Map a date sort field to the matching row property.
-    const dateFieldProp = {
+    const dateFieldProp: Record<string, string> = {
       received: 'receivedAt',
       start: 'startAt',
       due: 'dueAt',
       end: 'endAt',
     };
 
-    filtered = filtered.slice().sort((a, b) => {
+    filtered = filtered.slice().sort((a: any, b: any) => {
       const dateProp = dateFieldProp[field];
       if (dateProp) {
         // Cards without the date sort last, regardless of direction.
@@ -119,7 +125,7 @@ Template.tableView.helpers({
   },
 
   rows() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as TableViewInstance;
     const all = tpl.filteredRows.get();
     const totalPages = Math.max(1, Math.ceil(all.length / rowsPerPage));
     // Clamp on read so a shrinking list (deleted cards) never shows an empty
@@ -130,20 +136,20 @@ Template.tableView.helpers({
   },
 
   currentPage() {
-    return Template.instance().page.get();
+    return (Template.instance() as TableViewInstance).page.get();
   },
 
   totalPages() {
-    const count = Template.instance().filteredRows.get().length;
+    const count = (Template.instance() as TableViewInstance).filteredRows.get().length;
     return Math.max(1, Math.ceil(count / rowsPerPage));
   },
 
   hasPrevPage() {
-    return Template.instance().page.get() > 1;
+    return (Template.instance() as TableViewInstance).page.get() > 1;
   },
 
   hasNextPage() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as TableViewInstance;
     const totalPages = Math.max(
       1,
       Math.ceil(tpl.filteredRows.get().length / rowsPerPage),
@@ -174,21 +180,21 @@ Template.tableView.helpers({
   },
 
   // Excel-like sort arrow shown on the active sort column header.
-  sortIndicator(field) {
-    const tpl = Template.instance();
+  sortIndicator(field: any) {
+    const tpl = Template.instance() as TableViewInstance;
     if (tpl.sortField.get() !== field) return '';
     return tpl.sortDirection.get() === 1 ? '▲' : '▼';
   },
 });
 
 Template.tableView.events({
-  'click .js-table-view-search-button'(event, tpl) {
+  'click .js-table-view-search-button'(event: JQuery.TriggeredEvent, tpl: TableViewInstance) {
     event.preventDefault();
     tpl.searchQuery.set(tpl.$('.js-table-view-search').val() || '');
     tpl.page.set(1);
   },
 
-  'keydown .js-table-view-search'(event, tpl) {
+  'keydown .js-table-view-search'(event: JQuery.TriggeredEvent, tpl: TableViewInstance) {
     if (event.keyCode === 13) {
       event.preventDefault();
       tpl.searchQuery.set(tpl.$('.js-table-view-search').val() || '');
@@ -196,13 +202,13 @@ Template.tableView.events({
     }
   },
 
-  'click .js-table-view-prev-page'(event, tpl) {
+  'click .js-table-view-prev-page'(event: JQuery.TriggeredEvent, tpl: TableViewInstance) {
     event.preventDefault();
     const current = tpl.page.get();
     if (current > 1) tpl.page.set(current - 1);
   },
 
-  'click .js-table-view-next-page'(event, tpl) {
+  'click .js-table-view-next-page'(event: JQuery.TriggeredEvent, tpl: TableViewInstance) {
     event.preventDefault();
     const totalPages = Math.max(
       1,
@@ -212,9 +218,9 @@ Template.tableView.events({
     if (current < totalPages) tpl.page.set(current + 1);
   },
 
-  'click .js-table-view-sort'(event, tpl) {
+  'click .js-table-view-sort'(event: JQuery.TriggeredEvent, tpl: TableViewInstance) {
     event.preventDefault();
-    const field = event.currentTarget.dataset.sort;
+    const field = (event.currentTarget as HTMLElement).dataset.sort;
     if (!field) return;
     if (tpl.sortField.get() === field) {
       tpl.sortDirection.set(tpl.sortDirection.get() * -1);
@@ -227,9 +233,9 @@ Template.tableView.events({
 
   // Clicking the leftmost "Edit" link opens the Card Details popup on top of the
   // Board Table view (same mechanism as opening a card from search results).
-  'click .js-table-view-edit-card'(event) {
+  'click .js-table-view-edit-card'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
-    const cardId = event.currentTarget.dataset.cardId;
+    const cardId = (event.currentTarget as HTMLElement).dataset.cardId;
     if (!cardId) return;
     const board = Utils.getCurrentBoard();
     Meteor.subscribe('popupCardData', cardId, {
@@ -252,3 +258,13 @@ Template.tableView.events({
   'click .js-due-date': Popup.open('editCardDueDate'),
   'click .js-end-date': Popup.open('editCardEndDate'),
 });
+
+// Template instance for the board Table view. Rows are dynamic per-card view
+// models built in the autorun, so ReactiveVar<any>.
+interface TableViewInstance extends Blaze.TemplateInstance {
+  searchQuery: ReactiveVar<any>;
+  sortField: ReactiveVar<any>;
+  sortDirection: ReactiveVar<any>;
+  page: ReactiveVar<any>;
+  filteredRows: ReactiveVar<any>;
+}

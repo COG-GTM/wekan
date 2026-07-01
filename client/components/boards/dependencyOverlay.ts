@@ -1,5 +1,8 @@
 import { ReactiveCache } from '/imports/reactiveCache';
 import { ReactiveVar } from 'meteor/reactive-var';
+import { Meteor } from 'meteor/meteor';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
 import { Utils } from '/client/lib/utils';
 import {
   DEPENDENCY_ICON_CHOICES,
@@ -22,11 +25,11 @@ import {
 // current bounding rect.
 
 // Stable, css-safe marker id for an arrowhead of a given color.
-function markerIdForColor(color) {
+function markerIdForColor(color: any) {
   return `dependency-arrowhead-${String(color).replace(/[^a-zA-Z0-9]/g, '')}`;
 }
 
-Template.dependencyOverlay.onCreated(function () {
+Template.dependencyOverlay.onCreated(function (this: DependencyOverlayInstance) {
   this.lines = new ReactiveVar([]);
   this.markers = new ReactiveVar([]);
   this.tempLine = new ReactiveVar(null); // line being drawn while dragging
@@ -35,7 +38,7 @@ Template.dependencyOverlay.onCreated(function () {
   this._overlayDestroyed = false;
 
   // Rect of a card relative to the overlay SVG, or null if not rendered.
-  this.rectOf = (cardId, svgRect) => {
+  this.rectOf = (cardId: any, svgRect: any) => {
     const el = document.querySelector(`[data-card-id="${cardId}"]`);
     if (!el) return null;
     const r = el.getBoundingClientRect();
@@ -44,7 +47,7 @@ Template.dependencyOverlay.onCreated(function () {
   };
 
   this.recompute = () => {
-    if (this._overlayDestroyed || !this.view || this.view.isDestroyed) {
+    if (this._overlayDestroyed || !this.view || (this.view as any).isDestroyed) {
       return;
     }
     const svg = this.find('.js-dependency-overlay');
@@ -58,16 +61,17 @@ Template.dependencyOverlay.onCreated(function () {
     }
 
     const svgRect = svg.getBoundingClientRect();
-    const centerOf = cardId => this.rectOf(cardId, svgRect);
+    const centerOf = (cardId: any) => this.rectOf(cardId, svgRect);
 
     const cards = ReactiveCache.getCards({
       boardId: board._id,
       archived: false,
     });
 
-    const lines = [];
-    const markerColors = new Set();
-    cards.forEach(card => {
+    // lines: any[] — SVG path descriptors built for each dependency.
+    const lines: any[] = [];
+    const markerColors = new Set<any>();
+    cards.forEach((card: any) => {
       const deps = normalizeDependencies(card.cardDependencies);
       if (deps.length === 0) {
         return;
@@ -76,12 +80,14 @@ Template.dependencyOverlay.onCreated(function () {
       if (!sourceRect) {
         return;
       }
-      deps.forEach(dep => {
+      deps.forEach((dep: any) => {
         const targetRect = centerOf(dep.cardId);
         if (!targetRect) {
           return;
         }
-        const meta = dependencyTypeMeta(dep.type);
+        // dependencyTypeMeta returns undefined only for unknown types; a stored
+        // dependency always has a known type here.
+        const meta = dependencyTypeMeta(dep.type)!;
         // Draw the arrow from the prerequisite card's right edge to the
         // dependent card's left edge. For forward relations (blocks/fixes/
         // related-to) the source card is the prerequisite; for the reverse
@@ -113,7 +119,7 @@ Template.dependencyOverlay.onCreated(function () {
     });
     this.lines.set(lines);
     this.markers.set(
-      [...markerColors].map(color => ({
+      [...markerColors].map((color: any) => ({
         color,
         markerId: markerIdForColor(color),
       })),
@@ -132,10 +138,10 @@ Template.dependencyOverlay.onCreated(function () {
   };
 });
 
-Template.dependencyOverlay.onRendered(function () {
+Template.dependencyOverlay.onRendered(function (this: DependencyOverlayInstance) {
   const instance = this;
   const svg = this.find('.js-dependency-overlay');
-  this.scrollEl = svg ? this.firstNode.closest('.board-canvas') : null;
+  this.scrollEl = svg ? (this.firstNode as Element).closest('.board-canvas') : null;
 
   this.autorun(() => {
     const board = Utils.getCurrentBoard();
@@ -157,7 +163,7 @@ Template.dependencyOverlay.onRendered(function () {
   // --- drag-to-connect (from a minicard's connect handle) -----------------
   // Find the card under a viewport point. The overlay is pointer-events:none,
   // so elementsFromPoint returns the minicards directly.
-  const cardIdAtPoint = (clientX, clientY) => {
+  const cardIdAtPoint = (clientX: any, clientY: any) => {
     const els = document.elementsFromPoint(clientX, clientY);
     for (const el of els) {
       if (svg && svg.contains(el)) continue;
@@ -167,7 +173,7 @@ Template.dependencyOverlay.onRendered(function () {
     return null;
   };
 
-  this.onMouseDown = e => {
+  this.onMouseDown = (e: any) => {
     if (e.button !== 0) return;
     const handle =
       e.target.closest && e.target.closest('.js-dependency-connect-handle');
@@ -180,7 +186,7 @@ Template.dependencyOverlay.onRendered(function () {
     instance.dragSourceId = cardEl.getAttribute('data-card-id');
   };
 
-  this.onMouseMove = e => {
+  this.onMouseMove = (e: any) => {
     if (!instance.dragSourceId || !svg) return;
     const svgRect = svg.getBoundingClientRect();
     const from = instance.rectOf(instance.dragSourceId, svgRect);
@@ -195,7 +201,7 @@ Template.dependencyOverlay.onRendered(function () {
     );
   };
 
-  this.onMouseUp = e => {
+  this.onMouseUp = (e: any) => {
     if (!instance.dragSourceId) return;
     const sourceId = instance.dragSourceId;
     instance.dragSourceId = null;
@@ -217,7 +223,7 @@ Template.dependencyOverlay.onRendered(function () {
   this._initTimeout = Meteor.setTimeout(() => instance.scheduleRecompute(), 300);
 });
 
-Template.dependencyOverlay.onDestroyed(function () {
+Template.dependencyOverlay.onDestroyed(function (this: DependencyOverlayInstance) {
   this._overlayDestroyed = true;
   if (this.scrollEl) {
     this.scrollEl.removeEventListener('scroll', this.onScroll);
@@ -237,21 +243,21 @@ Template.dependencyOverlay.onDestroyed(function () {
 
 Template.dependencyOverlay.helpers({
   dependencyLines() {
-    return Template.instance().lines.get();
+    return (Template.instance() as DependencyOverlayInstance).lines.get();
   },
   dependencyMarkers() {
-    return Template.instance().markers.get();
+    return (Template.instance() as DependencyOverlayInstance).markers.get();
   },
   tempLine() {
-    return Template.instance().tempLine.get();
+    return (Template.instance() as DependencyOverlayInstance).tempLine.get();
   },
-  markerUrl() {
+  markerUrl(this: any) {
     return this.markerId ? `url(#${this.markerId})` : '';
   },
 });
 
 Template.dependencyOverlay.events({
-  'click .dependency-line'(event) {
+  'click .dependency-line'(this: any, event: JQuery.TriggeredEvent) {
     event.preventDefault();
     event.stopPropagation();
     // `this` is the line data object (fromId/toId/type/color/icon).
@@ -262,39 +268,60 @@ Template.dependencyOverlay.events({
 // #3392: popup to edit or delete an on-board dependency line. Data context is the
 // line object { fromId, toId, type, color, icon }.
 Template.dependencyLinePopup.helpers({
-  typeOption() {
+  typeOption(this: any) {
     const current = this.type;
-    return DEPENDENCY_TYPES.map(t => ({
+    return DEPENDENCY_TYPES.map((t: any) => ({
       id: t.id,
       label: `dependency-type-${t.id}`,
       selected: t.id === current,
     }));
   },
-  color() {
+  color(this: any) {
     return this.color;
   },
-  dependencyIcons() {
+  dependencyIcons(this: any) {
     const current = this.icon;
-    return DEPENDENCY_ICON_CHOICES.map(name => ({ name, selected: name === current }));
+    return DEPENDENCY_ICON_CHOICES.map((name: any) => ({ name, selected: name === current }));
   },
 });
 
 Template.dependencyLinePopup.events({
-  'change .js-line-type'(event) {
+  'change .js-line-type'(this: any, event: JQuery.TriggeredEvent) {
     const card = ReactiveCache.getCard(this.fromId);
-    if (card) card.setDependencyProps(this.toId, { type: event.currentTarget.value });
+    if (card) card.setDependencyProps(this.toId, { type: (event.currentTarget as HTMLSelectElement).value });
   },
-  'change .js-line-color'(event) {
+  'change .js-line-color'(this: any, event: JQuery.TriggeredEvent) {
     const card = ReactiveCache.getCard(this.fromId);
-    if (card) card.setDependencyProps(this.toId, { color: event.currentTarget.value });
+    if (card) card.setDependencyProps(this.toId, { color: (event.currentTarget as HTMLInputElement).value });
   },
-  'click .js-line-icon'(event) {
+  'click .js-line-icon'(this: any, event: JQuery.TriggeredEvent) {
     const card = ReactiveCache.getCard(this.fromId);
-    if (card) card.setDependencyProps(this.toId, { icon: event.currentTarget.dataset.icon });
+    if (card) card.setDependencyProps(this.toId, { icon: (event.currentTarget as HTMLElement).dataset.icon });
   },
-  'click .js-line-delete'() {
+  'click .js-line-delete'(this: any) {
     const card = ReactiveCache.getCard(this.fromId);
     if (card) card.removeDependency(this.toId);
     Popup.back();
   },
 });
+
+// Template instance for the on-board dependency overlay. It holds reactive SVG
+// line/marker descriptors plus imperative DOM handlers wired up in onRendered.
+interface DependencyOverlayInstance extends Blaze.TemplateInstance {
+  lines: ReactiveVar<any>;
+  markers: ReactiveVar<any>;
+  tempLine: ReactiveVar<any>;
+  _overlayDestroyed: boolean;
+  _raf: number | null;
+  _initTimeout: any; // Meteor timeout handle (untyped).
+  scrollEl: Element | null;
+  dragSourceId: any; // card id string while dragging, else null.
+  rectOf: (cardId: any, svgRect: any) => any;
+  recompute: () => void;
+  scheduleRecompute: () => void;
+  onScroll: () => void;
+  onResize: () => void;
+  onMouseDown: (e: any) => void;
+  onMouseMove: (e: any) => void;
+  onMouseUp: (e: any) => void;
+}

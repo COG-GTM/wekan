@@ -6,6 +6,10 @@ import TableVisibilityModeSettings from '/models/tableVisibilityModeSettings';
 import { BoardMultiSelection } from '/client/lib/boardMultiSelection';
 import { EscapeActions } from '/client/lib/escapeActions';
 import { Utils } from '/client/lib/utils';
+import { Template } from 'meteor/templating';
+import { Blaze } from 'meteor/blaze';
+import { ReactiveVar } from 'meteor/reactive-var';
+import { EJSON } from 'meteor/ejson';
 
 // SubsManager removed for Meteor 3 migration
 
@@ -25,20 +29,20 @@ function loadSharedTemplatesScopes() {
 // #5850: share a (template) board with an Organization / Team / Domain by adding
 // it to the board's groups, add-only (does not remove existing shares and does
 // not add individual members). Called when a board is dropped on a share target.
-function shareBoardWith(boardId, shareType, name, id) {
+function shareBoardWith(boardId: any, shareType: any, name: any, id: any) {
   const board = ReactiveCache.getBoard(boardId);
   if (!board || !boardId) {
     return;
   }
   if (shareType === 'org') {
     const orgs = (board.orgs || []).slice();
-    if (!orgs.some(o => o.orgId === id)) {
+    if (!orgs.some((o: any) => o.orgId === id)) {
       orgs.push({ orgId: id, orgDisplayName: name, isActive: true });
       Meteor.call('setBoardOrgs', orgs, boardId);
     }
   } else if (shareType === 'team') {
     const teams = (board.teams || []).slice();
-    if (!teams.some(t => t.teamId === id)) {
+    if (!teams.some((t: any) => t.teamId === id)) {
       teams.push({ teamId: id, teamDisplayName: name, isActive: true });
       // Preserve the board's current members (group-only sharing adds no
       // individual members); setBoardTeams sets both members and teams.
@@ -46,7 +50,7 @@ function shareBoardWith(boardId, shareType, name, id) {
     }
   } else if (shareType === 'domain') {
     const domains = (board.domains || []).slice();
-    if (!domains.some(d => d.domain === id)) {
+    if (!domains.some((d: any) => d.domain === id)) {
       domains.push({ domain: id, isActive: true });
       Meteor.call('setBoardDomains', domains, boardId);
     }
@@ -69,7 +73,7 @@ function getCurrentWorkspacesTree() {
   return EJSON.clone(tree);
 }
 
-function findSpace(nodes, id) {
+function findSpace(nodes: any, id: any): any {
   for (const node of nodes) {
     if (node.id === id) return node;
     if (node.children) {
@@ -80,8 +84,8 @@ function findSpace(nodes, id) {
   return null;
 }
 
-function updateSpaceInTree(nodes, id, updates) {
-  return nodes.map((node) => {
+function updateSpaceInTree(nodes: any, id: any, updates: any) {
+  return nodes.map((node: any) => {
     if (node.id === id) {
       return { ...node, ...updates };
     }
@@ -94,26 +98,26 @@ function updateSpaceInTree(nodes, id, updates) {
     return node;
   });
 }
-function addSubworkspace(parentId, name) {
+function addSubworkspace(parentId: any, name: any) {
   if (name && name.trim()) {
     Meteor.call(
       'createWorkspace',
       { parentId, name: name.trim() },
-      (err) => {
+      (err: any) => {
         if (err) console.error(err);
       },
     );
   }
 }
 
-function saveWorkspace(workspaceId, { name, icon }) {
+function saveWorkspace(workspaceId: any, { name, icon }: any) {
   if (!workspaceId || !name || !name.trim()) return;
   const tree = getCurrentWorkspacesTree();
   const updatedTree = updateSpaceInTree(tree, workspaceId, {
     name: name.trim(),
     icon: icon || DEFAULT_WORKSPACE_ICON,
   });
-  Meteor.call('setWorkspacesTree', updatedTree, (err) => {
+  Meteor.call('setWorkspacesTree', updatedTree, (err: any) => {
     if (err) console.error(err);
   });
 }
@@ -158,7 +162,7 @@ Template.boardListHeaderBar.helpers({
   },
 });
 
-Template.boardList.onCreated(function () {
+Template.boardList.onCreated(function (this: BoardListInstance) {
   Meteor.subscribe('setting');
   Meteor.subscribe('tableVisibilityModeSettings');
   // Honor the URL-addressable sub-view (#5850). The route sets
@@ -177,7 +181,7 @@ Template.boardList.onCreated(function () {
   // flag set (plus email domains), fetched via a non-admin server method since
   // the org/team publications are admin-only. Gates the drag-to-share targets.
   this.shareableGroups = new ReactiveVar({ orgs: [], teams: [], domains: [] });
-  Meteor.call('getMyShareableGroups', (err, res) => {
+  Meteor.call('getMyShareableGroups', (err: any, res: any) => {
     if (!err && res) this.shareableGroups.set(res);
   });
   let currUser = ReactiveCache.getCurrentUser();
@@ -189,11 +193,11 @@ Template.boardList.onCreated(function () {
     TAPi18n.setLanguage(userLanguage);
   }
 
-  this.reorderWorkspaces = (draggedSpaceId, targetSpaceId) => {
+  this.reorderWorkspaces = (draggedSpaceId: any, targetSpaceId: any) => {
     const tree = this.workspacesTreeVar.get();
 
     // Helper to remove a space from tree
-    const removeSpace = (nodes, id) => {
+    const removeSpace = (nodes: any, id: any): any => {
       for (let i = 0; i < nodes.length; i++) {
         if (nodes[i].id === id) {
           const removed = nodes.splice(i, 1)[0];
@@ -210,7 +214,7 @@ Template.boardList.onCreated(function () {
     };
 
     // Helper to insert a space after target
-    const insertAfter = (nodes, targetId, spaceToInsert) => {
+    const insertAfter = (nodes: any, targetId: any, spaceToInsert: any) => {
       for (let i = 0; i < nodes.length; i++) {
         if (nodes[i].id === targetId) {
           nodes.splice(i + 1, 0, spaceToInsert);
@@ -239,7 +243,7 @@ Template.boardList.onCreated(function () {
       insertAfter(treeAfterRemoval, targetSpaceId, removed);
 
       // Save the new tree
-      Meteor.call('setWorkspacesTree', treeAfterRemoval, (err) => {
+      Meteor.call('setWorkspacesTree', treeAfterRemoval, (err: any) => {
         if (err) console.error(err);
       });
     }
@@ -305,7 +309,7 @@ Template.boardList.onCreated(function () {
     Meteor.call(
       'getAllBoardsPage',
       { search, sortBy, menu, page, perPage: BOARDS_PER_PAGE },
-      (err, res) => {
+      (err: any, res: any) => {
         if (err) {
           console.error('getAllBoardsPage failed:', err);
           return;
@@ -383,7 +387,7 @@ Template.boardList.helpers({
   teamsDatas() {
     const teams = ReactiveCache.getCurrentUser()?.teams;
     if (teams)
-      return teams.sort((a, b) =>
+      return teams.sort((a: any, b: any) =>
         a.teamDisplayName.localeCompare(b.teamDisplayName),
       );
     else return [];
@@ -395,20 +399,20 @@ Template.boardList.helpers({
   orgsDatas() {
     const orgs = ReactiveCache.getCurrentUser()?.orgs;
     if (orgs)
-      return orgs.sort((a, b) =>
+      return orgs.sort((a: any, b: any) =>
         a.orgDisplayName.localeCompare(b.orgDisplayName),
       );
     else return [];
   },
   userHasOrgsOrTeams() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as BoardListInstance;
     const userHasOrgs = ReactiveCache.getCurrentUser()?.orgs?.length > 0;
     const userHasTeams = ReactiveCache.getCurrentUser()?.teams?.length > 0;
     return userHasOrgs || userHasTeams;
   },
   currentMenuPath() {
     try {
-      const tpl = Template.instance();
+      const tpl = Template.instance() as BoardListInstance;
       const selectedMenuVar = tpl.selectedMenu;
       if (!selectedMenuVar || typeof selectedMenuVar.get !== 'function') {
         return { icon: '🗂️', text: 'Workspaces' };
@@ -417,7 +421,7 @@ Template.boardList.helpers({
       const currentUser = ReactiveCache.getCurrentUser();
 
       // Helper function to safely get translation or fallback
-      const safeTranslate = (key, fallback) => {
+      const safeTranslate = (key: any, fallback: any) => {
         try {
           return TAPi18n.__(key) || fallback;
         } catch (e) {
@@ -426,7 +430,7 @@ Template.boardList.helpers({
       };
 
       // Helper to find space by id in tree
-      const findSpaceById = (nodes, targetId, path = []) => {
+      const findSpaceById = (nodes: any, targetId: any, path: any[] = []): any => {
         if (!nodes || !Array.isArray(nodes)) return null;
         for (const node of nodes) {
           if (node.id === targetId) {
@@ -457,7 +461,7 @@ Template.boardList.helpers({
         const tree = tpl.workspacesTreeVar.get();
         const spacePath = findSpaceById(tree, sel);
         if (spacePath && spacePath.length > 0) {
-          const pathText = spacePath.map((s) => s.name).join(' / ');
+          const pathText = spacePath.map((s: any) => s.name).join(' / ');
           return {
             icon: '🗂️',
             text: `${safeTranslate('allboards.workspaces', 'Workspaces')} / ${pathText}`,
@@ -471,15 +475,16 @@ Template.boardList.helpers({
     }
   },
   boards() {
-    const tpl = Template.instance();
-    let query = {
+    const tpl = Template.instance() as BoardListInstance;
+    // query: any — the selector is rebuilt with different shapes below.
+    let query: any = {
       $and: [
         { archived: false },
         { type: { $in: ['board', 'template-container'] } },
         { title: { $not: { $regex: /^\^.*\^$/ } } },
       ],
     };
-    const membershipOrs = [];
+    const membershipOrs: any[] = [];
 
     let allowPrivateVisibilityOnly = TableVisibilityModeSettings.findOne(
       'tableVisibilityMode-allowPrivateOnly',
@@ -541,7 +546,7 @@ Template.boardList.helpers({
     if (sortMode !== 'custom') {
       const paged = tpl.pagedBoardsVar.get();
       return (paged.ids || [])
-        .map((id) => ReactiveCache.getBoard(id))
+        .map((id: any) => ReactiveCache.getBoard(id))
         .filter(Boolean);
     }
 
@@ -558,23 +563,23 @@ Template.boardList.helpers({
     // — is found from a single search box.
     const search = (tpl.boardSearchVar.get() || '').trim().toLowerCase();
     if (search) {
-      list = list.filter((b) => (b.title || '').toLowerCase().includes(search));
+      list = list.filter((b: any) => (b.title || '').toLowerCase().includes(search));
     } else {
       // Apply left menu filtering
       const sel = tpl.selectedMenu.get();
       if (sel === 'starred') {
         // Starred boards are always visible in Starred.
-        list = list.filter((b) => currentUser && currentUser.hasStarred(b._id));
+        list = list.filter((b: any) => currentUser && currentUser.hasStarred(b._id));
       } else if (sel === 'templates') {
-        list = list.filter((b) => b.type === 'template-container');
+        list = list.filter((b: any) => b.type === 'template-container');
       } else if (sel === 'remaining') {
         // Remaining only shows boards not assigned to any workspace.
         list = list.filter(
-          (b) => !assignments[b._id] && b.type !== 'template-container',
+          (b: any) => !assignments[b._id] && b.type !== 'template-container',
         );
       } else {
         // Workspace view includes all boards in that workspace, including starred.
-        list = list.filter((b) => assignments[b._id] === sel);
+        list = list.filter((b: any) => assignments[b._id] === sel);
       }
     }
 
@@ -583,9 +588,9 @@ Template.boardList.helpers({
     }
     return list
       .slice()
-      .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+      .sort((a: any, b: any) => (a.title || '').localeCompare(b.title || ''));
   },
-  boardLists(boardId) {
+  boardLists(boardId: any) {
     /* Bug Board icons random dance https://github.com/wekan/wekan/issues/4214
     const lists = ReactiveCache.getLists({ 'boardId': boardId, 'archived': false },{sort: ['sort','asc']});
     const ret = lists.map(list => {
@@ -597,7 +602,7 @@ Template.boardList.helpers({
     return [];
   },
 
-  boardMembers(boardId) {
+  boardMembers(boardId: any) {
     /* Bug Board icons random dance https://github.com/wekan/wekan/issues/4214
     const lists = ReactiveCache.getBoard(boardId)
     const boardMembers = lists?.members.map(member => member.userId);
@@ -606,60 +611,60 @@ Template.boardList.helpers({
     return [];
   },
 
-  isStarred() {
+  isStarred(this: any) {
     const user = ReactiveCache.getCurrentUser();
     return user && user.hasStarred(this._id);
   },
-  isAdministrable() {
+  isAdministrable(this: any) {
     const user = ReactiveCache.getCurrentUser();
     return user && user.isBoardAdmin(this._id);
   },
 
-  hasOvertimeCards() {
+  hasOvertimeCards(this: any) {
     return this.hasOvertimeCards();
   },
 
-  hasSpentTimeCards() {
+  hasSpentTimeCards(this: any) {
     return this.hasSpentTimeCards();
   },
 
-  isInvited() {
+  isInvited(this: any) {
     const user = ReactiveCache.getCurrentUser();
     return user && user.isInvitedTo(this._id);
   },
 
   // Helpers for templates
   workspacesTree() {
-    return Template.instance().workspacesTreeVar.get();
+    return (Template.instance() as BoardListInstance).workspacesTreeVar.get();
   },
   selectedWorkspaceId() {
-    return Template.instance().selectedWorkspaceIdVar.get();
+    return (Template.instance() as BoardListInstance).selectedWorkspaceIdVar.get();
   },
-  isSelectedMenu(type) {
-    return Template.instance().selectedMenu.get() === type;
+  isSelectedMenu(type: any) {
+    return (Template.instance() as BoardListInstance).selectedMenu.get() === type;
   },
   // #5850: drag-to-share drop targets — the user's organizations/teams/domains,
   // gated by the admin's Shared Templates scopes (localStorage). Shown in the
   // Templates view so a personal Template Board can be dragged onto one to share.
   shareTargets() {
     const scopes = loadSharedTemplatesScopes();
-    const groups = Template.instance().shareableGroups.get() || {};
-    const targets = [];
+    const groups = (Template.instance() as BoardListInstance).shareableGroups.get() || {};
+    const targets: any[] = [];
     if (scopes.includes('organizations')) {
-      (groups.orgs || []).forEach(o => targets.push(o));
+      (groups.orgs || []).forEach((o: any) => targets.push(o));
     }
     if (scopes.includes('teams')) {
-      (groups.teams || []).forEach(t => targets.push(t));
+      (groups.teams || []).forEach((t: any) => targets.push(t));
     }
     if (scopes.includes('domains')) {
-      (groups.domains || []).forEach(d => targets.push(d));
+      (groups.domains || []).forEach((d: any) => targets.push(d));
     }
     return targets;
   },
-  isSpaceSelected(id) {
-    return Template.instance().selectedWorkspaceIdVar.get() === id;
+  isSpaceSelected(id: any) {
+    return (Template.instance() as BoardListInstance).selectedWorkspaceIdVar.get() === id;
   },
-  menuItemCount(type) {
+  menuItemCount(type: any) {
     const currentUser = ReactiveCache.getCurrentUser();
     const assignments =
       (currentUser &&
@@ -680,20 +685,20 @@ Template.boardList.helpers({
 
     if (type === 'starred') {
       return allBoards.filter(
-        (b) => currentUser && currentUser.hasStarred(b._id),
+        (b: any) => currentUser && currentUser.hasStarred(b._id),
       ).length;
     } else if (type === 'templates') {
-      return allBoards.filter((b) => b.type === 'template-container').length;
+      return allBoards.filter((b: any) => b.type === 'template-container').length;
     } else if (type === 'remaining') {
       // Count boards not in any workspace AND not templates
       // Include starred boards (they appear in both Starred and Remaining)
       return allBoards.filter(
-        (b) => !assignments[b._id] && b.type !== 'template-container',
+        (b: any) => !assignments[b._id] && b.type !== 'template-container',
       ).length;
     }
     return 0;
   },
-  workspaceCount(workspaceId) {
+  workspaceCount(workspaceId: any) {
     const currentUser = ReactiveCache.getCurrentUser();
     const assignments =
       (currentUser &&
@@ -713,7 +718,7 @@ Template.boardList.helpers({
     const allBoards = ReactiveCache.getBoards(query, {});
 
     // Count boards directly assigned to this space (not including children)
-    return allBoards.filter((b) => assignments[b._id] === workspaceId).length;
+    return allBoards.filter((b: any) => assignments[b._id] === workspaceId).length;
   },
   canModifyBoards() {
     const currentUser = ReactiveCache.getCurrentUser();
@@ -721,7 +726,7 @@ Template.boardList.helpers({
   },
   // #5799: current board-name search text (for the input value and the clear button).
   boardSearch() {
-    return Template.instance().boardSearchVar.get();
+    return (Template.instance() as BoardListInstance).boardSearchVar.get();
   },
   // #5799: pagination controls (only shown in the sorted, non-custom modes).
   boardsPaginationActive() {
@@ -731,27 +736,27 @@ Template.boardList.helpers({
         ? currentUser.getAllBoardsSortBy()
         : 'custom';
     if (sortMode === 'custom') return false;
-    const total = Template.instance().pagedBoardsVar.get().total || 0;
+    const total = (Template.instance() as BoardListInstance).pagedBoardsVar.get().total || 0;
     return total > BOARDS_PER_PAGE;
   },
   boardsCurrentPage() {
-    return Template.instance().boardsPageVar.get();
+    return (Template.instance() as BoardListInstance).boardsPageVar.get();
   },
   boardsTotalPages() {
-    const total = Template.instance().pagedBoardsVar.get().total || 0;
+    const total = (Template.instance() as BoardListInstance).pagedBoardsVar.get().total || 0;
     return Math.max(1, Math.ceil(total / BOARDS_PER_PAGE));
   },
   hasBoardsPrevPage() {
-    return Template.instance().boardsPageVar.get() > 1;
+    return (Template.instance() as BoardListInstance).boardsPageVar.get() > 1;
   },
   hasBoardsNextPage() {
-    const tpl = Template.instance();
+    const tpl = Template.instance() as BoardListInstance;
     const total = tpl.pagedBoardsVar.get().total || 0;
     const totalPages = Math.max(1, Math.ceil(total / BOARDS_PER_PAGE));
     return tpl.boardsPageVar.get() < totalPages;
   },
   // #5799: current All Boards sort mode ('custom' | 'title-asc' | 'title-desc').
-  isBoardsSort(mode) {
+  isBoardsSort(mode: any) {
     const currentUser = ReactiveCache.getCurrentUser();
     const current =
       currentUser && typeof currentUser.getAllBoardsSortBy === 'function'
@@ -787,7 +792,7 @@ Template.boardList.helpers({
 });
 
 Template.workspaceTree.helpers({
-  workspaceCount(workspaceId) {
+  workspaceCount(workspaceId: any) {
     const currentUser = ReactiveCache.getCurrentUser();
     const assignments =
       (currentUser &&
@@ -805,23 +810,23 @@ Template.workspaceTree.helpers({
     };
     const allBoards = ReactiveCache.getBoards(query, {});
 
-    return allBoards.filter((b) => assignments[b._id] === workspaceId).length;
+    return allBoards.filter((b: any) => assignments[b._id] === workspaceId).length;
   },
 });
 
 Template.boardList.events({
-  'click .js-select-menu'(evt, tpl) {
+  'click .js-select-menu'(evt: JQuery.TriggeredEvent, tpl: BoardListInstance) {
     const type = evt.currentTarget.getAttribute('data-type');
     tpl.selectedWorkspaceIdVar.set(null);
     tpl.selectedMenu.set(type);
   },
-  'click .js-select-workspace'(evt, tpl) {
+  'click .js-select-workspace'(evt: JQuery.TriggeredEvent, tpl: BoardListInstance) {
     const id = evt.currentTarget.getAttribute('data-id');
     tpl.selectedWorkspaceIdVar.set(id);
     tpl.selectedMenu.set(id);
   },
   'click .js-open-workspace-menu': Popup.open('workspaceActions'),
-  'click .js-add-workspace'(evt, tpl) {
+  'click .js-add-workspace'(evt: JQuery.TriggeredEvent, tpl: BoardListInstance) {
     evt.preventDefault();
     const name = prompt(
       TAPi18n.__('allboards.add-workspace-prompt') || 'New Space name',
@@ -830,13 +835,13 @@ Template.boardList.events({
       Meteor.call(
         'createWorkspace',
         { parentId: null, name: name.trim() },
-        (err, res) => {
+        (err: any, res: any) => {
           if (err) console.error(err);
         },
       );
     }
   },
-  'click .js-add-board'(evt, tpl) {
+  'click .js-add-board'(evt: JQuery.TriggeredEvent, tpl: BoardListInstance) {
     // Store the currently selected workspace/menu for board creation
     const selectedWorkspaceId = tpl.selectedWorkspaceIdVar.get();
     const selectedMenu = tpl.selectedMenu.get();
@@ -857,39 +862,39 @@ Template.boardList.events({
   // #5799: choose how the All Boards page is sorted.
   'click .js-open-boards-sort': Popup.open('boardsSort'),
   // #5799: search boards by name across all categories.
-  'input .js-board-search-input'(evt, tpl) {
+  'input .js-board-search-input'(evt: JQuery.TriggeredEvent, tpl: BoardListInstance) {
     tpl.boardSearchVar.set(evt.currentTarget.value);
   },
-  'keydown .js-board-search-input'(evt, tpl) {
+  'keydown .js-board-search-input'(evt: JQuery.TriggeredEvent, tpl: BoardListInstance) {
     // Esc clears the search.
     if (evt.keyCode === 27) {
       tpl.boardSearchVar.set('');
       evt.currentTarget.value = '';
     }
   },
-  'click .js-board-search-clear'(evt, tpl) {
+  'click .js-board-search-clear'(evt: JQuery.TriggeredEvent, tpl: BoardListInstance) {
     evt.preventDefault();
     tpl.boardSearchVar.set('');
-    const input = tpl.find('.js-board-search-input');
+    const input = tpl.find('.js-board-search-input') as HTMLInputElement;
     if (input) {
       input.value = '';
       input.focus();
     }
   },
   // #5799: board grid pagination (sorted modes only).
-  'click .js-boards-prev-page'(evt, tpl) {
+  'click .js-boards-prev-page'(evt: JQuery.TriggeredEvent, tpl: BoardListInstance) {
     evt.preventDefault();
     const page = tpl.boardsPageVar.get();
     if (page > 1) tpl.boardsPageVar.set(page - 1);
   },
-  'click .js-boards-next-page'(evt, tpl) {
+  'click .js-boards-next-page'(evt: JQuery.TriggeredEvent, tpl: BoardListInstance) {
     evt.preventDefault();
     const total = tpl.pagedBoardsVar.get().total || 0;
     const totalPages = Math.max(1, Math.ceil(total / BOARDS_PER_PAGE));
     const page = tpl.boardsPageVar.get();
     if (page < totalPages) tpl.boardsPageVar.set(page + 1);
   },
-  'click .js-star-board'(evt) {
+  'click .js-star-board'(this: any, evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     evt.stopPropagation();
     const boardId = this._id;
@@ -899,22 +904,22 @@ Template.boardList.events({
   },
   // HTML5 DnD from boards to spaces
   // #5850: drag a (template) board onto an Org/Team/Domain target to share it.
-  'dragover .js-share-target'(evt) {
+  'dragover .js-share-target'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
-    if (evt.originalEvent.dataTransfer) {
-      evt.originalEvent.dataTransfer.dropEffect = 'copy';
+    if ((evt.originalEvent as DragEvent).dataTransfer!) {
+      (evt.originalEvent as DragEvent).dataTransfer!.dropEffect = 'copy';
     }
     evt.currentTarget.classList.add('board-drag-hint');
   },
-  'dragleave .js-share-target'(evt) {
+  'dragleave .js-share-target'(evt: JQuery.TriggeredEvent) {
     evt.currentTarget.classList.remove('board-drag-hint');
   },
-  'drop .js-share-target'(evt) {
+  'drop .js-share-target'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     evt.stopPropagation();
     const target = evt.currentTarget;
     target.classList.remove('board-drag-hint');
-    const dt = evt.originalEvent.dataTransfer;
+    const dt = (evt.originalEvent as DragEvent).dataTransfer!;
     const data = dt.getData('text/plain');
     if (!data) {
       return;
@@ -933,9 +938,9 @@ Template.boardList.events({
     const shareType = target.getAttribute('data-share-type');
     const name = target.getAttribute('data-share-name');
     const id = target.getAttribute('data-share-id');
-    boardIds.forEach(boardId => shareBoardWith(boardId, shareType, name, id));
+    boardIds.forEach((boardId: any) => shareBoardWith(boardId, shareType, name, id));
   },
-  'dragstart .js-board'(evt) {
+  'dragstart .js-board'(this: any, evt: JQuery.TriggeredEvent) {
     const boardId = this._id;
 
     // Support multi-drag
@@ -945,18 +950,18 @@ Template.boardList.events({
     ) {
       const selectedIds = BoardMultiSelection.getSelectedBoardIds();
       try {
-        evt.originalEvent.dataTransfer.setData(
+        (evt.originalEvent as DragEvent).dataTransfer!.setData(
           'text/plain',
           JSON.stringify(selectedIds),
         );
-        evt.originalEvent.dataTransfer.setData(
+        (evt.originalEvent as DragEvent).dataTransfer!.setData(
           'application/x-board-multi',
           'true',
         );
       } catch (e) {}
     } else {
       try {
-        evt.originalEvent.dataTransfer.setData('text/plain', boardId);
+        (evt.originalEvent as DragEvent).dataTransfer!.setData('text/plain', boardId);
       } catch (e) {}
     }
     // Highlight valid drop targets in the sidebar so users know where to drop
@@ -974,7 +979,7 @@ Template.boardList.events({
       el.classList.remove('board-drag-hint');
     });
   },
-  'click .js-clone-board'(evt) {
+  'click .js-clone-board'(this: any, evt: JQuery.TriggeredEvent) {
     if (confirm(TAPi18n.__('duplicate-board-confirm'))) {
       let title =
         getSlug(ReactiveCache.getBoard(this._id).title) ||
@@ -987,7 +992,7 @@ Template.boardList.events({
           type: 'board',
           title: ReactiveCache.getBoard(this._id).title,
         },
-        (err, res) => {
+        (err: any, res: any) => {
           if (err) {
             console.error(err);
           } else {
@@ -1003,29 +1008,29 @@ Template.boardList.events({
       evt.preventDefault();
     }
   },
-  'click .js-archive-board'(evt) {
+  'click .js-archive-board'(this: any, evt: JQuery.TriggeredEvent) {
     if (confirm(TAPi18n.__('archive-board-confirm'))) {
       const boardId = this._id;
-      Meteor.call('archiveBoard', boardId, (err) => {
+      Meteor.call('archiveBoard', boardId, (err: any) => {
         if (err) alert(err?.reason || err?.message || 'Failed to archive board');
       });
       evt.preventDefault();
     }
   },
-  'click .js-accept-invite'() {
+  'click .js-accept-invite'(this: any) {
     const boardId = this._id;
     Meteor.call('acceptInvite', boardId);
   },
-  'click .js-decline-invite'() {
+  'click .js-decline-invite'(this: any) {
     const boardId = this._id;
-    Meteor.call('quitBoard', boardId, (err, ret) => {
+    Meteor.call('quitBoard', boardId, (err: any, ret: any) => {
       if (!err && ret) {
         Meteor.call('acceptInvite', boardId);
         FlowRouter.go('home');
       }
     });
   },
-  'click .js-multiselection-activate'(evt) {
+  'click .js-multiselection-activate'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     if (BoardMultiSelection.isActive()) {
       BoardMultiSelection.disable();
@@ -1033,39 +1038,39 @@ Template.boardList.events({
       BoardMultiSelection.activate();
     }
   },
-  'click .js-multiselection-reset'(evt) {
+  'click .js-multiselection-reset'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     BoardMultiSelection.disable();
   },
-  'click .js-toggle-board-multi-selection'(evt) {
+  'click .js-toggle-board-multi-selection'(this: any, evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     evt.stopPropagation();
     const boardId = this._id;
     BoardMultiSelection.toogle(boardId);
   },
-  'click .js-archive-selected-boards'(evt) {
+  'click .js-archive-selected-boards'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     const selectedBoards = BoardMultiSelection.getSelectedBoardIds();
     if (
       selectedBoards.length > 0 &&
       confirm(TAPi18n.__('archive-board-confirm'))
     ) {
-      selectedBoards.forEach((boardId) => {
-        Meteor.call('archiveBoard', boardId, (err) => {
+      selectedBoards.forEach((boardId: any) => {
+        Meteor.call('archiveBoard', boardId, (err: any) => {
           if (err) alert(err?.reason || err?.message || 'Failed to archive board');
         });
       });
       BoardMultiSelection.reset();
     }
   },
-  'click .js-duplicate-selected-boards'(evt) {
+  'click .js-duplicate-selected-boards'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     const selectedBoards = BoardMultiSelection.getSelectedBoardIds();
     if (
       selectedBoards.length > 0 &&
       confirm(TAPi18n.__('duplicate-board-confirm'))
     ) {
-      selectedBoards.forEach((boardId) => {
+      selectedBoards.forEach((boardId: any) => {
         const board = ReactiveCache.getBoard(boardId);
         if (board) {
           Meteor.call(
@@ -1076,7 +1081,7 @@ Template.boardList.events({
               type: 'board',
               title: board.title,
             },
-            (err, res) => {
+            (err: any, res: any) => {
               if (err) console.error(err);
             },
           );
@@ -1085,21 +1090,21 @@ Template.boardList.events({
       BoardMultiSelection.reset();
     }
   },
-  'click #resetBtn'(event) {
+  'click #resetBtn'(event: JQuery.TriggeredEvent) {
     let allBoards = document.getElementsByClassName('js-board');
-    let currBoard;
+    let currBoard: any;
     for (let i = 0; i < allBoards.length; i++) {
       currBoard = allBoards[i];
       currBoard.style.display = 'block';
     }
   },
-  'click #filterBtn'(event) {
+  'click #filterBtn'(event: JQuery.TriggeredEvent) {
     event.preventDefault();
     let selectedTeams = document.querySelectorAll(
       '#jsAllBoardTeams option:checked',
     );
     let selectedTeamsValues = Array.from(selectedTeams).map(
-      function (elt) {
+      function (elt: any) {
         return elt.value;
       },
     );
@@ -1111,7 +1116,7 @@ Template.boardList.events({
     let selectedOrgs = document.querySelectorAll(
       '#jsAllBoardOrgs option:checked',
     );
-    let selectedOrgsValues = Array.from(selectedOrgs).map(function (elt) {
+    let selectedOrgsValues = Array.from(selectedOrgs).map(function (elt: any) {
       return elt.value;
     });
     index = selectedOrgsValues.indexOf('-1');
@@ -1120,10 +1125,11 @@ Template.boardList.events({
     }
 
     if (selectedTeamsValues.length > 0 || selectedOrgsValues.length > 0) {
-      const query = {
+      // query: any — an $or clause is pushed onto $and below.
+      const query: any = {
         $and: [{ archived: false }, { type: 'board' }],
       };
-      const ors = [];
+      const ors: any[] = [];
       if (selectedTeamsValues.length > 0) {
         ors.push({ 'teams.teamId': { $in: selectedTeamsValues } });
       }
@@ -1136,14 +1142,14 @@ Template.boardList.events({
 
       let filteredBoards = ReactiveCache.getBoards(query, {});
       let allBoards = document.getElementsByClassName('js-board');
-      let currBoard;
+      let currBoard: any;
       if (filteredBoards.length > 0) {
-        let currBoardId;
+        let currBoardId: any;
         let found;
         for (let i = 0; i < allBoards.length; i++) {
           currBoard = allBoards[i];
           currBoardId = currBoard.classList[0];
-          found = filteredBoards.find(function (board) {
+          found = filteredBoards.find(function (board: any) {
             return board._id == currBoardId;
           });
 
@@ -1158,11 +1164,11 @@ Template.boardList.events({
       }
     }
   },
-  'dragstart .workspace-node'(evt) {
+  'dragstart .workspace-node'(evt: JQuery.TriggeredEvent) {
     const workspaceId =
       evt.currentTarget.getAttribute('data-workspace-id');
-    evt.originalEvent.dataTransfer.effectAllowed = 'move';
-    evt.originalEvent.dataTransfer.setData(
+    (evt.originalEvent as DragEvent).dataTransfer!.effectAllowed = 'move';
+    (evt.originalEvent as DragEvent).dataTransfer!.setData(
       'application/x-workspace-id',
       workspaceId,
     );
@@ -1173,18 +1179,18 @@ Template.boardList.events({
     dragImage.style.top = '-9999px';
     dragImage.style.opacity = '0.8';
     document.body.appendChild(dragImage);
-    evt.originalEvent.dataTransfer.setDragImage(dragImage, 0, 0);
+    (evt.originalEvent as DragEvent).dataTransfer!.setDragImage(dragImage, 0, 0);
     setTimeout(() => document.body.removeChild(dragImage), 0);
 
     evt.currentTarget.classList.add('dragging');
   },
-  'dragend .workspace-node'(evt) {
+  'dragend .workspace-node'(evt: JQuery.TriggeredEvent) {
     evt.currentTarget.classList.remove('dragging');
     document.querySelectorAll('.workspace-node').forEach((el) => {
       el.classList.remove('drag-over');
     });
   },
-  'dragover .workspace-node'(evt) {
+  'dragover .workspace-node'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     evt.stopPropagation();
 
@@ -1197,14 +1203,14 @@ Template.boardList.events({
       !draggingEl ||
       (targetEl !== draggingEl && !draggingEl.contains(targetEl))
     ) {
-      evt.originalEvent.dataTransfer.dropEffect = 'move';
+      (evt.originalEvent as DragEvent).dataTransfer!.dropEffect = 'move';
       targetEl.classList.add('drag-over');
     }
   },
-  'dragleave .workspace-node'(evt) {
+  'dragleave .workspace-node'(evt: JQuery.TriggeredEvent) {
     evt.currentTarget.classList.remove('drag-over');
   },
-  'drop .workspace-node'(evt, tpl) {
+  'drop .workspace-node'(evt: JQuery.TriggeredEvent, tpl: BoardListInstance) {
     evt.preventDefault();
     evt.stopPropagation();
 
@@ -1212,14 +1218,14 @@ Template.boardList.events({
     targetEl.classList.remove('drag-over');
 
     // Check what's being dropped - board or workspace
-    const draggedWorkspaceId = evt.originalEvent.dataTransfer.getData(
+    const draggedWorkspaceId = (evt.originalEvent as DragEvent).dataTransfer!.getData(
       'application/x-workspace-id',
     );
-    const isMultiBoard = evt.originalEvent.dataTransfer.getData(
+    const isMultiBoard = (evt.originalEvent as DragEvent).dataTransfer!.getData(
       'application/x-board-multi',
     );
     const boardData =
-      evt.originalEvent.dataTransfer.getData('text/plain');
+      (evt.originalEvent as DragEvent).dataTransfer!.getData('text/plain');
 
     if (draggedWorkspaceId && !boardData) {
       // This is a workspace reorder operation
@@ -1239,7 +1245,7 @@ Template.boardList.events({
           // Multi-board drag
           try {
             const boardIds = JSON.parse(boardData);
-            boardIds.forEach((boardId) => {
+            boardIds.forEach((boardId: any) => {
               Meteor.call('assignBoardToWorkspace', boardId, workspaceId);
             });
           } catch (e) {
@@ -1252,21 +1258,21 @@ Template.boardList.events({
       }
     }
   },
-  'dragover .js-select-menu'(evt) {
+  'dragover .js-select-menu'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     evt.stopPropagation();
 
     const menuType = evt.currentTarget.getAttribute('data-type');
     // Only allow drop on "remaining" menu to unassign boards from spaces
     if (menuType === 'remaining') {
-      evt.originalEvent.dataTransfer.dropEffect = 'move';
+      (evt.originalEvent as DragEvent).dataTransfer!.dropEffect = 'move';
       evt.currentTarget.classList.add('drag-over');
     }
   },
-  'dragleave .js-select-menu'(evt) {
+  'dragleave .js-select-menu'(evt: JQuery.TriggeredEvent) {
     evt.currentTarget.classList.remove('drag-over');
   },
-  'drop .js-select-menu'(evt) {
+  'drop .js-select-menu'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     evt.stopPropagation();
 
@@ -1276,18 +1282,18 @@ Template.boardList.events({
     // Only handle drops on "remaining" menu
     if (menuType !== 'remaining') return;
 
-    const isMultiBoard = evt.originalEvent.dataTransfer.getData(
+    const isMultiBoard = (evt.originalEvent as DragEvent).dataTransfer!.getData(
       'application/x-board-multi',
     );
     const boardData =
-      evt.originalEvent.dataTransfer.getData('text/plain');
+      (evt.originalEvent as DragEvent).dataTransfer!.getData('text/plain');
 
     if (boardData) {
       if (isMultiBoard) {
         // Multi-board drag - unassign all from workspaces
         try {
           const boardIds = JSON.parse(boardData);
-          boardIds.forEach((boardId) => {
+          boardIds.forEach((boardId: any) => {
             Meteor.call('unassignBoardFromWorkspace', boardId);
           });
         } catch (e) {
@@ -1304,7 +1310,7 @@ Template.boardList.events({
 // #5799: All Boards sort popup — pick custom (manual drag order) or
 // alphabetical A→Z / Z→A. The choice is stored per user.
 Template.boardsSortPopup.helpers({
-  isBoardsSort(mode) {
+  isBoardsSort(mode: any) {
     const currentUser = ReactiveCache.getCurrentUser();
     const current =
       currentUser && typeof currentUser.getAllBoardsSortBy === 'function'
@@ -1315,7 +1321,7 @@ Template.boardsSortPopup.helpers({
 });
 
 Template.boardsSortPopup.events({
-  'click .js-boards-sort'(evt) {
+  'click .js-boards-sort'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     const mode = evt.currentTarget.getAttribute('data-sort');
     if (mode) {
@@ -1326,16 +1332,16 @@ Template.boardsSortPopup.events({
 });
 
 Template.workspaceActionsPopup.helpers({
-  workspaceName() {
+  workspaceName(this: any) {
     return this.name || '';
   },
-  workspaceIcon() {
+  workspaceIcon(this: any) {
     return this.icon || DEFAULT_WORKSPACE_ICON;
   },
 });
 
 Template.workspaceActionsPopup.events({
-  'submit .js-workspace-actions-form'(evt) {
+  'submit .js-workspace-actions-form'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     const workspaceId = evt.currentTarget.getAttribute('data-id');
     const name = evt.currentTarget.querySelector('.js-workspace-name').value;
@@ -1343,14 +1349,14 @@ Template.workspaceActionsPopup.events({
     saveWorkspace(workspaceId, { name, icon });
     Popup.back();
   },
-  'submit .js-workspace-subspace-form'(evt) {
+  'submit .js-workspace-subspace-form'(evt: JQuery.TriggeredEvent) {
     evt.preventDefault();
     const workspaceId = evt.currentTarget.getAttribute('data-id');
     const name = evt.currentTarget.querySelector('.js-subworkspace-name').value;
     addSubworkspace(workspaceId, name);
     Popup.back();
   },
-  'click .js-delete-workspace'(evt, tpl) {
+  'click .js-delete-workspace'(evt: JQuery.TriggeredEvent, tpl: Blaze.TemplateInstance) {
     evt.preventDefault();
     if (!confirm(TAPi18n.__('allboards.delete-workspace-confirm') || 'Delete this workspace and return its boards to Remaining?')) {
       return;
@@ -1360,7 +1366,7 @@ Template.workspaceActionsPopup.events({
       evt.currentTarget.getAttribute('data-id');
     if (!workspaceId) return;
     tpl.$('.js-delete-workspace').prop('disabled', true);
-    Meteor.call('deleteWorkspace', workspaceId, (err) => {
+    Meteor.call('deleteWorkspace', workspaceId, (err: any) => {
       tpl.$('.js-delete-workspace').prop('disabled', false);
       if (err) {
         tpl.$('.js-workspace-delete-error').text(TAPi18n.__(err.reason || 'delete-workspace-failed'));
@@ -1371,8 +1377,22 @@ Template.workspaceActionsPopup.events({
   },
 });
 
-Template.workspaceActionsPopup.onRendered(function() {
+Template.workspaceActionsPopup.onRendered(function(this: Blaze.TemplateInstance) {
   this.$('.js-workspace-delete-error').text('');
 });
+
+// Template instance for the boardList template (the All Boards page): the
+// selected sub-view/workspace, workspaces tree, board search text, pagination
+// state, shareable groups and the workspace-reorder helper.
+interface BoardListInstance extends Blaze.TemplateInstance {
+  selectedMenu: ReactiveVar<any>;
+  selectedWorkspaceIdVar: ReactiveVar<any>;
+  workspacesTreeVar: ReactiveVar<any>;
+  boardSearchVar: ReactiveVar<any>;
+  boardsPageVar: ReactiveVar<any>;
+  pagedBoardsVar: ReactiveVar<any>;
+  shareableGroups: ReactiveVar<any>;
+  reorderWorkspaces: (draggedSpaceId: any, targetSpaceId: any) => void;
+}
 
 

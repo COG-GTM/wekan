@@ -763,6 +763,10 @@ interface Window {
   // Popup singleton and returns the popup event handler. `tpl` is the Blaze
   // template instance (dynamic Blaze surface), hence `any`.
   ExportHtml?: (popup: PopupStatic) => (evt: Event, tpl: any) => void;
+  // Accessibility toggle for character-key keyboard shortcuts, set up in
+  // client/components/boards/boardBody.ts.
+  wekanShortcutsEnabled?: boolean;
+  toggleWekanShortcuts?: (enabled: any) => void;
 }
 
 // Firefox exposes non-standard scroll maxima used by client/lib/popup.ts to
