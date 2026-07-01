@@ -194,3 +194,9 @@ declare module 'meteor/blaze' {
     function registerHelper(name: string, func: (...args: any[]) => any): void;
   }
 }
+
+// Meteor injects its runtime configuration (ROOT_URL, etc.) onto the browser
+// window as `__meteor_runtime_config__`; only the fields app code reads here.
+interface Window {
+  __meteor_runtime_config__?: { ROOT_URL?: string };
+}

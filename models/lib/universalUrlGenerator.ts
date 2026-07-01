@@ -30,7 +30,7 @@ function getRootUrlPath() {
  * @param {string} version - The file version (default: 'original')
  * @returns {string} - Universal file URL
  */
-export function generateUniversalFileUrl(fileId, type, version = 'original') {
+export function generateUniversalFileUrl(fileId: string, type: string, version = 'original') {
   if (!fileId) {
     return '';
   }
@@ -53,7 +53,7 @@ export function generateUniversalFileUrl(fileId, type, version = 'original') {
  * @param {string} version - The file version (default: 'original')
  * @returns {string} - Universal background URL
  */
-export function generateUniversalBackgroundUrl(backgroundId, version = 'original') {
+export function generateUniversalBackgroundUrl(backgroundId: string, version = 'original') {
   return generateUniversalFileUrl(backgroundId, 'background', version);
 }
 
@@ -63,7 +63,7 @@ export function generateUniversalBackgroundUrl(backgroundId, version = 'original
  * @param {string} version - The file version (default: 'original')
  * @returns {string} - Universal attachment URL
  */
-export function generateUniversalAttachmentUrl(attachmentId, version = 'original') {
+export function generateUniversalAttachmentUrl(attachmentId: string, version = 'original') {
   return generateUniversalFileUrl(attachmentId, 'attachment', version);
 }
 
@@ -73,7 +73,7 @@ export function generateUniversalAttachmentUrl(attachmentId, version = 'original
  * @param {string} version - The file version (default: 'original')
  * @returns {string} - Universal avatar URL
  */
-export function generateUniversalAvatarUrl(avatarId, version = 'original') {
+export function generateUniversalAvatarUrl(avatarId: string, version = 'original') {
   return generateUniversalFileUrl(avatarId, 'avatar', version);
 }
 
@@ -83,7 +83,7 @@ export function generateUniversalAvatarUrl(avatarId, version = 'original') {
  * @param {string} type - The file type ('attachment' or 'avatar')
  * @returns {string} - Cleaned universal URL
  */
-export function cleanFileUrl(url, type) {
+export function cleanFileUrl(url: string, type: string) {
   if (!url) {
     return '';
   }
@@ -134,7 +134,7 @@ export function cleanFileUrl(url, type) {
  * @param {string} type - The file type ('attachment' or 'avatar')
  * @returns {boolean} - True if it's a universal file URL
  */
-export function isUniversalFileUrl(url, type) {
+export function isUniversalFileUrl(url: string, type: string) {
   if (!url) {
     return false;
   }
@@ -154,7 +154,7 @@ export function isUniversalFileUrl(url, type) {
  * @param {string} type - The file type ('attachment' or 'avatar')
  * @returns {string|null} - The file ID or null if not found
  */
-export function extractFileIdFromUrl(url, type) {
+export function extractFileIdFromUrl(url: string, type: string) {
   if (!url) {
     return null;
   }
@@ -178,7 +178,7 @@ export function extractFileIdFromUrl(url, type) {
  * @param {string} type - The file type ('attachment' or 'avatar')
  * @returns {string} - Fallback URL
  */
-export function generateFallbackUrl(fileId, type) {
+export function generateFallbackUrl(fileId: string, type: string) {
   if (!fileId) {
     return '';
   }
@@ -199,7 +199,7 @@ export function generateFallbackUrl(fileId, type) {
  * @param {string} type - The file type ('attachment' or 'avatar')
  * @returns {Array<string>} - Array of possible URLs
  */
-export function getAllPossibleUrls(fileId, type) {
+export function getAllPossibleUrls(fileId: string, type: string) {
   if (!fileId) {
     return [];
   }

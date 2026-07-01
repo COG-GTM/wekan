@@ -39,23 +39,23 @@ import {
 
 // provider -> { storage, bucketName, read, write } where `storage` is the
 // adapter instance (it exposes the same methods the Storage wrapper would).
-const adapters = {};
+const adapters: { [provider: string]: CloudAdapter } = {};
 
 // The exported adapter class name per provider, used after require().
-const ADAPTER_CLASS_NAME = {
+const ADAPTER_CLASS_NAME: { [provider: string]: string } = {
   [STORAGE_NAME_S3]: 'AdapterAmazonS3',
   [STORAGE_NAME_AZURE]: 'AdapterAzureBlob',
   [STORAGE_NAME_GCS]: 'AdapterGoogleCloud',
 };
 
 // Cache of loaded adapter classes (null = tried and unavailable).
-const adapterClassCache = {};
+const adapterClassCache: { [provider: string]: CloudAdapterClass | null } = {};
 
 /**
  * Load a provider's adapter class. Uses a literal-string require per provider
  * so the bundler includes the package (no dynamic-expression require).
  */
-function loadAdapterClass(provider) {
+function loadAdapterClass(provider: string) {
   if (Object.prototype.hasOwnProperty.call(adapterClassCache, provider)) {
     return adapterClassCache[provider];
   }
@@ -95,7 +95,7 @@ function loadAdapterClass(provider) {
  *
  * Note: the field is `type` (storage-abstraction v2.x), not `provider`.
  */
-function buildProviderConfig(provider, cfg) {
+function buildProviderConfig(provider: string, cfg: CloudProviderConfig) {
   if (!cfg) {
     return null;
   }
@@ -104,7 +104,7 @@ function buildProviderConfig(provider, cfg) {
     if (!cfg.bucket || !cfg.accessKeyId || !cfg.secretAccessKey) {
       return null;
     }
-    const config = {
+    const config: CloudProviderConfig = {
       type: 's3',
       bucketName: cfg.bucket,
       accessKeyId: cfg.accessKeyId,
@@ -146,7 +146,7 @@ function buildProviderConfig(provider, cfg) {
     if (!cfg.bucket) {
       return null;
     }
-    const config = {
+    const config: CloudProviderConfig = {
       type: 'gcs',
       bucketName: cfg.bucket,
     };
@@ -179,7 +179,7 @@ function buildProviderConfig(provider, cfg) {
  * Catch obviously-wrong cloud config before the adapter turns it into a cryptic
  * "Invalid URL". Returns a human-friendly error string, or null when it looks OK.
  */
-function validateCloudConfig(provider, cfg) {
+function validateCloudConfig(provider: string, cfg: CloudProviderConfig) {
   if (!cfg) {
     return 'Configuration is empty';
   }
@@ -209,7 +209,7 @@ function validateCloudConfig(provider, cfg) {
 }
 
 /** Construct a provider adapter instance from its WeKan config, or null. */
-function createAdapterInstance(provider, cfg) {
+function createAdapterInstance(provider: string, cfg: CloudProviderConfig) {
   const AdapterClass = loadAdapterClass(provider);
   if (!AdapterClass) {
     return null;
@@ -232,7 +232,7 @@ function createAdapterInstance(provider, cfg) {
   }
 }
 
-function buildAdapter(provider, cfg) {
+function buildAdapter(provider: string, cfg: CloudProviderConfig) {
   const instance = createAdapterInstance(provider, cfg);
   if (!instance) {
     return null;
@@ -253,7 +253,8 @@ export async function refreshCloudStorageFromSettings() {
   if (!Meteor.isServer) {
     return;
   }
-  let settings;
+  // The settings document is loaded from an untyped (.js) collection.
+  let settings: any;
   try {
     settings = await AttachmentStorageSettings.findOneAsync({});
   } catch (error) {
@@ -276,17 +277,17 @@ export async function refreshCloudStorageFromSettings() {
 }
 
 /** Returns the cached adapter ({ storage, bucketName, read, write }) or null. */
-export function getCloudAdapter(provider) {
+export function getCloudAdapter(provider: string) {
   return adapters[provider] || null;
 }
 
 /** True when the given provider has a usable, configured adapter. */
-export function isCloudConfigured(provider) {
+export function isCloudConfigured(provider: string) {
   return !!adapters[provider];
 }
 
 /** True for any storage name backed by the cloud abstraction. */
-export function isCloudStorageName(storageName) {
+export function isCloudStorageName(storageName: string) {
   return CLOUD_STORAGE_NAMES.includes(storageName);
 }
 
@@ -294,7 +295,7 @@ export function isCloudStorageName(storageName) {
  * Try to reach a provider with the given (possibly unsaved) config by listing
  * its bucket. Returns { ok, error }. Used by the "Test connection" button.
  */
-export async function testCloudConnection(provider, cfg) {
+export async function testCloudConnection(provider: string, cfg: CloudProviderConfig) {
   // Build the instance step by step so the actual reason is reported to the
   // admin instead of a single generic message.
   const AdapterClass = loadAdapterClass(provider);
@@ -333,4 +334,22 @@ export async function testCloudConnection(provider, cfg) {
   } catch (error) {
     return { ok: false, error: error.message || 'Connection failed' };
   }
+}
+
+// A provider's stored storageConfig.<provider> document (or a "Test connection"
+// payload). Its fields vary per backend (S3/Azure/GCS) and are defined by the
+// storage-abstraction adapter, so it is an arbitrary key -> value bag.
+type CloudProviderConfig = { [key: string]: any };
+
+// A storage-abstraction adapter constructor. The adapter packages ship no
+// exported types, so instances are `any`.
+type CloudAdapterClass = new (config: CloudProviderConfig) => any;
+
+// Cached cloud adapter entry. `storage` is the adapter instance (untyped, see
+// CloudAdapterClass); the rest is WeKan's own per-provider metadata.
+interface CloudAdapter {
+  storage: any;
+  bucketName: string;
+  read: boolean;
+  write: boolean;
 }
