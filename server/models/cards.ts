@@ -1221,7 +1221,9 @@ WebApp.handlers.put(
       await cardMove(req.userId, card, ['listId'], paramListId);
     }
     if (moveParams.isBoardMove) {
-      await Authentication.checkBoardWriteAccess(req.userId, newBoardId);
+      // isBoardMove is only true when newBoardId/newSwimlaneId/newListId are all
+      // present (see normalizeMoveParams), so newBoardId is a defined string here.
+      await Authentication.checkBoardWriteAccess(req.userId, newBoardId!);
       const destList = await ReactiveCache.getList({
         _id: newListId,
         boardId: newBoardId,

@@ -21,10 +21,9 @@
     "resolveJsonModule": true,
     "useUnknownInCatchVariables": false,
     "forceConsistentCasingInFileNames": true,
-    // Kept true during the incremental multi-session migration so partially
-    // converted states still resolve remaining `.js` imports. The FINAL
-    // cleanup session flips this to false and drives `tsc --noEmit` to zero.
-    "allowJs": true
+    // The incremental multi-session migration is complete: all app source is
+    // TypeScript, so `.js` files are no longer compiled by the type checker.
+    "allowJs": false
   },
   "include": [
     "client/**/*.ts",

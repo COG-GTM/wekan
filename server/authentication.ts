@@ -21,7 +21,7 @@ export const Authentication = {
 
   // This will only check if the user is logged in.
   // The authorization checks for the user will have to be done inside each API endpoint
-  checkLoggedIn(userId: string | undefined) {
+  checkLoggedIn(userId: string | null | undefined) {
     if (userId === undefined) {
       const error = new Meteor.Error('Unauthorized', 'Unauthorized');
       error.statusCode = 401;
@@ -31,7 +31,7 @@ export const Authentication = {
 
   // An admin should be authorized to access everything, so we use a separate check for admins
   // This throws an error if otherReq is false and the user is not an admin
-  async checkAdminOrCondition(userId: string | undefined, otherReq: boolean) {
+  async checkAdminOrCondition(userId: string | null | undefined, otherReq: boolean | null | undefined) {
     if (otherReq) return;
     const admin = await ReactiveCache.getUser({ _id: userId, isAdmin: true });
     if (admin === undefined) {
@@ -51,7 +51,7 @@ export const Authentication = {
   },
 
   // Helper function. Will throw an error if the user does not have write access to the board (excludes read-only users).
-  async checkBoardWriteAccess(userId: string | undefined, boardId: string) {
+  async checkBoardWriteAccess(userId: string | null | undefined, boardId: string) {
     Authentication.checkLoggedIn(userId);
     const board = await ReactiveCache.getBoard(boardId);
     Authentication.checkBoardExists(board);
