@@ -111,14 +111,14 @@ test('root <html> template carries a reactive dir attribute', () => {
 });
 
 test('client keeps document dir in sync with the language', () => {
-  const src = read('client/lib/i18n.js');
+  const src = read('client/lib/i18n.ts');
   assert.ok(
     /document\.documentElement\.dir\s*=/.test(src),
-    'client/lib/i18n.js does not set document.documentElement.dir',
+    'client/lib/i18n.ts does not set document.documentElement.dir',
   );
   assert.ok(
     /getLanguageDirection\s*\(/.test(src),
-    'client/lib/i18n.js should derive dir from getLanguageDirection()',
+    'client/lib/i18n.ts should derive dir from getLanguageDirection()',
   );
 });
 
