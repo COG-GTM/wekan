@@ -5,7 +5,7 @@
  * standalone via `node tests/rtl.test.js` and under Mocha) that lock in the RTL
  * behaviour added for Arabic/Persian/Hebrew/etc.:
  *
- *   1. The set of languages flagged `rtl: true` in imports/i18n/languages.js is
+ *   1. The set of languages flagged `rtl: true` in imports/i18n/languages.ts is
  *      exactly the expected set (a guard against an accidental flag flip).
  *   2. The direction helper logic (mirrors TAPi18n.getLanguageDirection) maps
  *      each language to 'rtl' / 'ltr' correctly.
@@ -28,9 +28,9 @@ const path = require('path');
 const repoRoot = path.resolve(__dirname, '..');
 const read = rel => fs.readFileSync(path.join(repoRoot, rel), 'utf8');
 
-// --- Parse the rtl flags straight out of languages.js -----------------------
+// --- Parse the rtl flags straight out of languages.ts -----------------------
 function parseRtlFlags() {
-  const src = read('imports/i18n/languages.js');
+  const src = read('imports/i18n/languages.ts');
   const flags = {};
   // Each entry looks like: tag: "ar-EG", ... rtl: true,
   const re = /tag:\s*"([^"]+)"[\s\S]*?rtl:\s*(true|false)/g;
@@ -71,7 +71,7 @@ const EXPECTED_RTL = [
   'yi', // Yiddish
 ];
 
-test('languages.js flags exactly the expected RTL languages', () => {
+test('languages.ts flags exactly the expected RTL languages', () => {
   const flags = parseRtlFlags();
   assert.ok(Object.keys(flags).length > 100, 'should parse the whole language table');
 
@@ -96,10 +96,10 @@ test('direction helper maps rtl flag to the html dir value', () => {
   assert.strictEqual(directionFor(flags['does-not-exist']), 'ltr');
 });
 
-test('tap.js exposes isRTL + getLanguageDirection', () => {
-  const src = read('imports/i18n/tap.js');
-  assert.ok(/isRTL\s*\(/.test(src), 'isRTL() missing from tap.js');
-  assert.ok(/getLanguageDirection\s*\(/.test(src), 'getLanguageDirection() missing from tap.js');
+test('tap.ts exposes isRTL + getLanguageDirection', () => {
+  const src = read('imports/i18n/tap.ts');
+  assert.ok(/isRTL\s*\(/.test(src), 'isRTL() missing from tap.ts');
+  assert.ok(/getLanguageDirection\s*\(/.test(src), 'getLanguageDirection() missing from tap.ts');
 });
 
 test('root <html> template carries a reactive dir attribute', () => {
@@ -111,14 +111,14 @@ test('root <html> template carries a reactive dir attribute', () => {
 });
 
 test('client keeps document dir in sync with the language', () => {
-  const src = read('client/lib/i18n.js');
+  const src = read('client/lib/i18n.ts');
   assert.ok(
     /document\.documentElement\.dir\s*=/.test(src),
-    'client/lib/i18n.js does not set document.documentElement.dir',
+    'client/lib/i18n.ts does not set document.documentElement.dir',
   );
   assert.ok(
     /getLanguageDirection\s*\(/.test(src),
-    'client/lib/i18n.js should derive dir from getLanguageDirection()',
+    'client/lib/i18n.ts should derive dir from getLanguageDirection()',
   );
 });
 

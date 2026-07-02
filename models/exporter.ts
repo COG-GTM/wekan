@@ -1,0 +1,440 @@
+import { ReactiveCache } from '/imports/reactiveCache';
+const Papa = require('papaparse');
+import { TAPi18n } from '/imports/i18n';
+import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
+import { 
+  formatDateTime, 
+  formatDate, 
+  formatTime, 
+  getISOWeek, 
+  isValidDate, 
+  isBefore, 
+  isAfter, 
+  isSame, 
+  add, 
+  subtract, 
+  startOf, 
+  endOf, 
+  format, 
+  parseDate, 
+  now, 
+  createDate, 
+  fromNow, 
+  calendar 
+} from '/imports/lib/dateUtils';
+
+//const stringify = require('csv-stringify');
+
+//const stringify = require('csv-stringify');
+
+// exporter maybe is broken since Gridfs introduced, add fs and path
+export class Exporter {
+  _boardId: string;
+  _attachmentId?: string;
+  _excludeAttachments: boolean;
+
+  constructor(boardId: string, attachmentId?: string, options: { excludeAttachments?: boolean } = {}) {
+    this._boardId = boardId;
+    this._attachmentId = attachmentId;
+    // #5870: when true, board export omits the base64-encoded attachment file
+    // data (metadata is still exported). This lets very large boards export
+    // without overflowing V8's max string length in JSON.stringify or loading
+    // every attachment buffer into memory at once. Default false (full export).
+    this._excludeAttachments = options.excludeAttachments === true;
+  }
+
+  async build() {
+    const fs = Npm.require('fs');
+    const os = Npm.require('os');
+    const path = Npm.require('path');
+
+    const byBoard = { boardId: this._boardId };
+    // Attachments store the board id under `meta.boardId`, unlike lists,
+    // swimlanes, cards and rules which keep a flat `boardId`.
+    const byBoardAttachment = { 'meta.boardId': this._boardId };
+    const byBoardNoLinked = {
+      boardId: this._boardId,
+      linkedId: { $in: ['', null] },
+    };
+    // we do not want to retrieve boardId in related elements
+    const noBoardId = {
+      fields: {
+        boardId: 0,
+      },
+    };
+    // `result` is the aggregated wekan-board export payload; it collects many
+    // differently-shaped collection documents, so it is an open `any` map.
+    const result: { [key: string]: any } = {
+      _format: 'wekan-board-1.0.0',
+    };
+    Object.assign(
+      result,
+      await ReactiveCache.getBoard(this._boardId, {
+        fields: {
+          stars: 0,
+        },
+      }),
+    );
+
+    // [Old] for attachments we only export IDs and absolute url to original doc
+    // [New] Encode attachment to base64
+
+    // `doc` is an attachment document (dynamic ostrio:files shape), hence `any`.
+    const getBase64Data = function (doc: any, callback: (err: any, res: any) => void) {
+      let buffer = Buffer.allocUnsafe(0);
+      buffer.fill(0);
+
+      // callback has the form function (err, res) {}
+      const tmpFile = path.join(
+        os.tmpdir(),
+        `tmpexport${process.pid}${Math.random()}`,
+      );
+      const tmpWriteable = fs.createWriteStream(tmpFile);
+      const readStream = fs.createReadStream(doc.versions.original.path);
+      readStream.on('data', function (chunk: any) {
+        buffer = Buffer.concat([buffer, chunk]);
+      });
+
+      readStream.on('error', function () {
+        callback(null, null);
+      });
+      readStream.on('end', function () {
+        // done
+        fs.unlink(tmpFile, () => {
+          //ignored
+        });
+
+        callback(null, buffer.toString('base64'));
+      });
+      readStream.pipe(tmpWriteable);
+    };
+    const getBase64DataAsync = (doc: any) => new Promise((resolve, reject) => {
+      getBase64Data(doc, (err, res) => err ? reject(err) : resolve(res));
+    });
+    const byBoardAndAttachment = this._attachmentId
+      ? { 'meta.boardId': this._boardId, _id: this._attachmentId }
+      : byBoardAttachment;
+    const attachmentDocs = await ReactiveCache.getAttachments(byBoardAndAttachment);
+    result.attachments = [];
+    for (const attachment of attachmentDocs) {
+      const attachmentExport: { [key: string]: any } = {
+        _id: attachment._id,
+        cardId: attachment.meta.cardId,
+        // `source` distinguishes board-level backgrounds ('board-background')
+        // from card attachments on import.
+        source: attachment.meta.source,
+        //url: FlowRouter.url(attachment.url()),
+        name: attachment.name,
+        type: attachment.type,
+      };
+      // #5870: only base64-encode the file when not excluding attachments. The
+      // single-attachment path below always includes the file (used to export
+      // one attachment), so it is unaffected by this board-level option.
+      if (!this._excludeAttachments || this._attachmentId) {
+        attachmentExport.file = await getBase64DataAsync(attachment);
+      }
+      result.attachments.push(attachmentExport);
+    }
+    //When has a especific valid attachment return the single element
+    if (this._attachmentId) {
+      return result.attachments.length > 0 ? result.attachments[0] : {};
+    }
+
+    result.lists = await ReactiveCache.getLists(byBoard, noBoardId);
+    result.cards = await ReactiveCache.getCards(byBoardNoLinked, noBoardId);
+    result.swimlanes = await ReactiveCache.getSwimlanes(byBoard, noBoardId);
+    result.customFields = await ReactiveCache.getCustomFields(
+      { boardIds: this._boardId },
+      { fields: { boardIds: 0 } },
+    );
+    const cardIds = result.cards.map((card: any) => card._id);
+    result.comments = await ReactiveCache.getCardComments(
+      { cardId: { $in: cardIds } },
+      noBoardId,
+    );
+    result.activities = await ReactiveCache.getActivities(
+      {
+        $or: [{ boardId: this._boardId }, { cardId: { $in: cardIds } }],
+      },
+      noBoardId,
+    );
+    result.rules = await ReactiveCache.getRules(byBoard, noBoardId);
+    result.checklists = [];
+    result.checklistItems = [];
+    result.subtaskItems = [];
+    result.triggers = [];
+    result.actions = [];
+    for (const card of result.cards) {
+      result.checklists.push(
+        ...await ReactiveCache.getChecklists({
+          cardId: card._id,
+        }),
+      );
+      result.checklistItems.push(
+        ...await ReactiveCache.getChecklistItems({
+          cardId: card._id,
+        }),
+      );
+      result.subtaskItems.push(
+        ...await ReactiveCache.getCards({
+          parentId: card._id,
+        }),
+      );
+    }
+    for (const rule of result.rules) {
+      result.triggers.push(
+        ...await ReactiveCache.getTriggers(
+          {
+            _id: rule.triggerId,
+          },
+          noBoardId,
+        ),
+      );
+      result.actions.push(
+        ...await ReactiveCache.getActions(
+          {
+            _id: rule.actionId,
+          },
+          noBoardId,
+        ),
+      );
+    }
+
+    // we also have to export some user data - as the other elements only
+    // include id but we have to be careful:
+    // 1- only exports users that are linked somehow to that board
+    // 2- do not export any sensitive information
+    // `users` maps userId -> true for every user referenced by the board.
+    const users: { [key: string]: any } = {};
+    result.members.forEach((member: any) => {
+      users[member.userId] = true;
+    });
+    result.lists.forEach((list: any) => {
+      users[list.userId] = true;
+    });
+    result.cards.forEach((card: any) => {
+      users[card.userId] = true;
+      if (card.members) {
+        card.members.forEach((memberId: any) => {
+          users[memberId] = true;
+        });
+      }
+    });
+    result.comments.forEach((comment: any) => {
+      users[comment.userId] = true;
+    });
+    result.activities.forEach((activity: any) => {
+      users[activity.userId] = true;
+    });
+    result.checklists.forEach((checklist: any) => {
+      users[checklist.userId] = true;
+    });
+    const byUserIds = {
+      _id: {
+        $in: Object.getOwnPropertyNames(users),
+      },
+    };
+    // we use whitelist to be sure we do not expose inadvertently
+    // some secret fields that gets added to User later.
+    const userFields = {
+      fields: {
+        _id: 1,
+        username: 1,
+        'profile.fullname': 1,
+        'profile.initials': 1,
+        'profile.avatarUrl': 1,
+      },
+    };
+    result.users = (await ReactiveCache.getUsers(byUserIds, userFields))
+      .map((user: any) => {
+        // user avatar is stored as a relative url, we export absolute
+        if ((user.profile || {}).avatarUrl) {
+          user.profile.avatarUrl = FlowRouter.url(user.profile.avatarUrl);
+        }
+        return user;
+      });
+    return result;
+  }
+
+  async buildCsv(userDelimiter = ',', userLanguage='en') {
+    const result = await this.build();
+    const columnHeaders: any[] = [];
+    const cardRows: any[] = [];
+
+    const papaconfig = {
+      quotes: true,
+      quoteChar: '"',
+      escapeChar: '"',
+      delimiter: userDelimiter,
+      header: true,
+      newline: "\r\n",
+      skipEmptyLines: false,
+      escapeFormulae: true,
+    };
+
+    columnHeaders.push(
+      TAPi18n.__('title','',userLanguage),
+      TAPi18n.__('description','',userLanguage),
+      TAPi18n.__('list','',userLanguage),
+      TAPi18n.__('swimlane','',userLanguage),
+      TAPi18n.__('owner','',userLanguage),
+      TAPi18n.__('requested-by','',userLanguage),
+      TAPi18n.__('assigned-by','',userLanguage),
+      TAPi18n.__('members','',userLanguage),
+      TAPi18n.__('assignee','',userLanguage),
+      TAPi18n.__('labels','',userLanguage),
+      TAPi18n.__('card-start','',userLanguage),
+      TAPi18n.__('card-due','',userLanguage),
+      TAPi18n.__('card-end','',userLanguage),
+      TAPi18n.__('overtime-hours','',userLanguage),
+      TAPi18n.__('spent-time-hours','',userLanguage),
+      TAPi18n.__('createdAt','',userLanguage),
+      TAPi18n.__('last-modified-at','',userLanguage),
+      TAPi18n.__('last-activity','',userLanguage),
+      TAPi18n.__('voting','',userLanguage),
+      TAPi18n.__('archived','',userLanguage),
+    );
+    const customFieldMap: { [key: string]: any } = {};
+    let i = 0;
+    result.customFields.forEach((customField: any) => {
+      customFieldMap[customField._id] = {
+        position: i,
+        type: customField.type,
+      };
+      if (customField.type === 'dropdown') {
+        let options = '';
+        customField.settings.dropdownItems.forEach((item: any) => {
+          options = options === '' ? item.name : `${`${options}/${item.name}`}`;
+        });
+        columnHeaders.push(
+          `CustomField-${customField.name}-${customField.type}-${options}`,
+        );
+      } else if (customField.type === 'currency') {
+        columnHeaders.push(
+          `CustomField-${customField.name}-${customField.type}-${customField.settings.currencyCode}`,
+        );
+      } else {
+        columnHeaders.push(
+          `CustomField-${customField.name}-${customField.type}`,
+        );
+      }
+      i++;
+    });
+    //cardRows.push([[columnHeaders]]);
+    cardRows.push(columnHeaders);
+
+    result.cards.forEach((card: any) => {
+      const currentRow: any[] = [];
+      currentRow.push(card.title);
+      currentRow.push(card.description);
+      currentRow.push(
+        result.lists.find(({ _id }: any) => _id === card.listId).title,
+      );
+      currentRow.push(
+        result.swimlanes.find(({ _id }: any) => _id === card.swimlaneId).title,
+      );
+      currentRow.push(
+        result.users.find(({ _id }: any) => _id === card.userId).username,
+      );
+      currentRow.push(card.requestedBy ? card.requestedBy : ' ');
+      currentRow.push(card.assignedBy ? card.assignedBy : ' ');
+      let usernames = '';
+      card.members.forEach((memberId: any) => {
+        const user = result.users.find(({ _id }: any) => _id === memberId);
+        usernames = `${usernames + user.username} `;
+      });
+      currentRow.push(usernames.trim());
+      let assignees = '';
+      card.assignees.forEach((assigneeId: any) => {
+        const user = result.users.find(({ _id }: any) => _id === assigneeId);
+        assignees = `${assignees + user.username} `;
+      });
+      currentRow.push(assignees.trim());
+      let labels = '';
+      card.labelIds.forEach((labelId: any) => {
+        const label = result.labels.find(({ _id }: any) => _id === labelId);
+        labels = `${labels + label.name}-${label.color} `;
+      });
+      currentRow.push(labels.trim());
+      currentRow.push(card.startAt ? new Date(card.startAt).toISOString() : ' ');
+      currentRow.push(card.dueAt ? new Date(card.dueAt).toISOString() : ' ');
+      currentRow.push(card.endAt ? new Date(card.endAt).toISOString() : ' ');
+      currentRow.push(card.isOvertime ? 'true' : 'false');
+      currentRow.push(card.spentTime);
+      currentRow.push(card.createdAt ? new Date(card.createdAt).toISOString() : ' ');
+      currentRow.push(card.modifiedAt ? new Date(card.modifiedAt).toISOString() : ' ');
+      currentRow.push(
+        card.dateLastActivity ? new Date(card.dateLastActivity).toISOString() : ' ',
+      );
+      if (card.vote && card.vote.question !== '') {
+        let positiveVoters = '';
+        let negativeVoters = '';
+        card.vote.positive.forEach((userId: any) => {
+          const user = result.users.find(({ _id }: any) => _id === userId);
+          positiveVoters = `${positiveVoters + user.username} `;
+        });
+        card.vote.negative.forEach((userId: any) => {
+          const user = result.users.find(({ _id }: any) => _id === userId);
+          negativeVoters = `${negativeVoters + user.username} `;
+        });
+        const votingResult = `${
+          card.vote.public
+            ? `yes-${
+                card.vote.positive.length
+              }-${positiveVoters.trimRight()}-no-${
+                card.vote.negative.length
+              }-${negativeVoters.trimRight()}`
+            : `yes-${card.vote.positive.length}-no-${card.vote.negative.length}`
+        }`;
+        currentRow.push(`${card.vote.question}-${votingResult}`);
+      } else {
+        currentRow.push(' ');
+      }
+      currentRow.push(card.archived ? 'true' : 'false');
+      //Custom fields
+      const customFieldValuesToPush = new Array(result.customFields.length);
+      card.customFields.forEach((field: any) => {
+        if (field.value !== null) {
+          if (customFieldMap[field._id].type === 'date') {
+            customFieldValuesToPush[customFieldMap[field._id].position] =
+              new Date(field.value).toISOString();
+          } else if (customFieldMap[field._id].type === 'dropdown') {
+            const dropdownOptions = result.customFields.find(
+              ({ _id }: any) => _id === field._id,
+            ).settings.dropdownItems;
+            const fieldObj = dropdownOptions.find(
+              ({ _id }: any) => _id === field.value,
+            );
+            const fieldValue = (fieldObj && fieldObj.name) || null;
+            customFieldValuesToPush[customFieldMap[field._id].position] =
+              fieldValue;
+          } else {
+            customFieldValuesToPush[customFieldMap[field._id].position] =
+              field.value;
+          }
+        }
+      });
+      for (
+        let valueIndex = 0;
+        valueIndex < customFieldValuesToPush.length;
+        valueIndex++
+      ) {
+        if (!(valueIndex in customFieldValuesToPush)) {
+          currentRow.push(' ');
+        } else {
+          currentRow.push(customFieldValuesToPush[valueIndex]);
+        }
+      }
+      //cardRows.push([[currentRow]]);
+      cardRows.push(currentRow);
+    });
+
+    return Papa.unparse(cardRows, papaconfig);
+  }
+
+  // `user` is a user document (dynamic shape), hence `any`.
+  async canExport(user: any) {
+    const board = await ReactiveCache.getBoard(this._boardId);
+    return board && board.isVisibleBy(user);
+  }
+}

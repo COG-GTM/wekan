@@ -1,0 +1,490 @@
+import { Meteor } from 'meteor/meteor';
+import { check } from 'meteor/check';
+import { Accounts } from 'meteor/accounts-base';
+import { Email } from 'meteor/email';
+import { ServiceConfiguration } from 'meteor/service-configuration';
+import { WebApp } from 'meteor/webapp';
+import Settings from '/models/settings';
+import InvitationCodes from '/models/invitationCodes';
+import EmailLocalization from '/server/lib/emailLocalization';
+import { ensureIndex } from '/server/lib/mongoStartup';
+import { Authentication } from '/server/authentication';
+import { sendJsonResult } from '/server/apiMiddleware';
+
+const getReactiveCache = () => require('/imports/reactiveCache').ReactiveCache;
+const getTAPi18n = () => require('/imports/i18n').TAPi18n;
+const { SimpleSchema } = require('/imports/simpleSchema');
+
+const isSandstorm =
+  Meteor.settings && Meteor.settings.public && Meteor.settings.public.sandstorm;
+
+function getRandomNum(min: number, max: number) {
+  const range = max - min;
+  const rand = Math.random();
+  return min + Math.round(rand * range);
+}
+
+function getEnvVar(name: string) {
+  const value = process.env[name];
+  if (value) {
+    return value;
+  }
+  // Pre-existing runtime misuse: Meteor.Error expects (error, reason, details)
+  // but wekan passes a single array here; cast to `any` to preserve behavior.
+  throw new Meteor.Error([
+    'var-not-exist',
+    `The environment variable ${name} does not exist`,
+  ] as any);
+}
+
+function loadOidcConfig(service: string) {
+  check(service, String);
+  return ServiceConfiguration.configurations.findOneAsync({ service });
+}
+
+async function sendInvitationEmail(_id: string) {
+  const icode = await getReactiveCache().getInvitationCode(_id);
+  const author = await getReactiveCache().getCurrentUser();
+  try {
+    const authorUser = await getReactiveCache().getUser(icode.authorId);
+    const fullName = authorUser?.profile?.fullname || '';
+
+    const params = {
+      email: icode.email,
+      inviter:
+        fullName !== ''
+          ? `${fullName} (${authorUser.username} )`
+          : authorUser.username,
+      user: icode.email.split('@')[0],
+      icode: icode.code,
+      // FlowRouter is client-only; on the server it has no routes and yields a
+      // generic link. The sign-up route is the static path '/sign-up'.
+      url: Meteor.absoluteUrl('sign-up'),
+    };
+    const lang = author.getLanguage();
+    await EmailLocalization.sendEmail({
+      to: icode.email,
+      from: Accounts.emailTemplates.from,
+      subject: 'email-invite-register-subject',
+      text: 'email-invite-register-text',
+      params,
+      language: lang,
+    });
+  } catch (e) {
+    await InvitationCodes.removeAsync(_id);
+    throw new Meteor.Error('email-fail', e.message);
+  }
+}
+
+// `currentUser` is a Wekan user model instance (dynamic helper surface), hence `any`.
+async function isNonAdminAllowedToSendMail(currentUser: any) {
+  const currSett = await getReactiveCache().getCurrentSetting();
+  let isAllowed = false;
+  if (
+    currSett &&
+    currSett.disableRegistration &&
+    currSett.mailDomainName !== undefined &&
+    currSett.mailDomainName !== ''
+  ) {
+    for (let i = 0; i < currentUser.emails.length; i++) {
+      if (currentUser.emails[i].address.endsWith(currSett.mailDomainName)) {
+        isAllowed = true;
+        break;
+      }
+    }
+  }
+  return isAllowed;
+}
+
+function isLdapEnabled() {
+  // The `=== true` (boolean) branch is a pre-existing dead comparison (the env
+  // var is a string); the `as any` cast preserves it without a runtime change.
+  return process.env.LDAP_ENABLE === 'true' || (process.env.LDAP_ENABLE as any) === true;
+}
+
+function isOauth2Enabled() {
+  return (
+    process.env.OAUTH2_ENABLED === 'true' ||
+    // Pre-existing dead comparison (env string vs boolean); cast preserves it.
+    (process.env.OAUTH2_ENABLED as any) === true
+  );
+}
+
+function isCasEnabled() {
+  // Pre-existing dead comparison (env string vs boolean); cast preserves it.
+  return process.env.CAS_ENABLED === 'true' || (process.env.CAS_ENABLED as any) === true;
+}
+
+function isApiEnabled() {
+  // Pre-existing dead comparison (env string vs boolean); cast preserves it.
+  return process.env.WITH_API === 'true' || (process.env.WITH_API as any) === true;
+}
+
+Meteor.startup(async () => {
+  await ensureIndex(Settings, { modifiedAt: -1 });
+  const setting = await getReactiveCache().getCurrentSetting();
+  if (!setting) {
+    const now = new Date();
+    // ROOT_URL is always set at startup and the URL always matches, so assert
+    // both are non-null to satisfy the typed process.env / match() signatures.
+    const domain = (process.env.ROOT_URL as string).match(/\/\/(?:www\.)?(.*)?(?:\/)?/)![1];
+    const from = `Boards Support <support@${domain}>`;
+    const defaultSetting = {
+      disableRegistration: false,
+      mailServer: {
+        username: '',
+        password: '',
+        host: '',
+        port: '',
+        enableTLS: false,
+        from,
+      },
+      createdAt: now,
+      modifiedAt: now,
+      displayAuthenticationMethod: true,
+      defaultAuthenticationMethod: 'password',
+    };
+    await Settings.insertAsync(defaultSetting);
+  }
+  if (isSandstorm) {
+    const newSetting = await getReactiveCache().getCurrentSetting();
+    if (!process.env.MAIL_URL && newSetting.mailUrl()) {
+      process.env.MAIL_URL = newSetting.mailUrl();
+    }
+    Accounts.emailTemplates.from = process.env.MAIL_FROM
+      ? process.env.MAIL_FROM
+      : newSetting.mailServer.from;
+  } else {
+    // MAIL_FROM is an optional env string assigned to the typed `from` field;
+    // cast preserves the original (possibly-undefined) assignment.
+    Accounts.emailTemplates.from = process.env.MAIL_FROM as string;
+  }
+});
+
+if (isSandstorm) {
+  Settings.after.update((userId: string, doc: any, fieldNames: string[]) => {
+    if (fieldNames.includes('mailServer') && doc.mailServer.host) {
+      const protocol = doc.mailServer.enableTLS ? 'smtps://' : 'smtp://';
+      if (!doc.mailServer.username && !doc.mailServer.password) {
+        process.env.MAIL_URL = `${protocol}${doc.mailServer.host}:${doc.mailServer.port}/`;
+      } else {
+        process.env.MAIL_URL = `${protocol}${doc.mailServer.username}:${encodeURIComponent(
+          doc.mailServer.password,
+        )}@${doc.mailServer.host}:${doc.mailServer.port}/`;
+      }
+      Accounts.emailTemplates.from = doc.mailServer.from;
+    }
+  });
+}
+
+Meteor.methods({
+  async sendInvitation(emails, boards) {
+    let rc = 0;
+    check(emails, [String]);
+    check(boards, [String]);
+
+    const user = await getReactiveCache().getCurrentUser();
+    if (!user.isAdmin && !(await isNonAdminAllowedToSendMail(user))) {
+      rc = -1;
+      throw new Meteor.Error('not-allowed');
+    }
+
+    for (const email of emails) {
+      if (email && SimpleSchema.RegEx.Email.test(email)) {
+        const userExist = await getReactiveCache().getUser({ email });
+        if (userExist) {
+          rc = -1;
+          throw new Meteor.Error(
+            'user-exist',
+            `The user with the email ${email} has already an account.`,
+          );
+        }
+
+        const invitation = await getReactiveCache().getInvitationCode({ email });
+        if (invitation) {
+          await InvitationCodes.updateAsync(invitation, {
+            $set: { boardsToBeInvited: boards },
+          });
+          await sendInvitationEmail(invitation._id);
+        } else {
+          const code = getRandomNum(100000, 999999);
+          const _id = await InvitationCodes.insertAsync({
+            code,
+            email,
+            boardsToBeInvited: boards,
+            createdAt: new Date(),
+            authorId: this.userId,
+          });
+          if (_id) {
+            await sendInvitationEmail(_id);
+          } else {
+            rc = -1;
+            throw new Meteor.Error(
+              'invitation-generated-fail',
+              'Failed to create invitation code',
+            );
+          }
+        }
+      }
+    }
+    return rc;
+  },
+
+  async sendSMTPTestEmail() {
+    if (!this.userId) {
+      throw new Meteor.Error('invalid-user');
+    }
+    const user = await getReactiveCache().getCurrentUser();
+    // Sending an SMTP test (and surfacing the server's SMTP error messages) is
+    // an admin-only diagnostic, matching the client gating (`unless currentUser.isAdmin`).
+    if (!user || !user.isAdmin) {
+      throw new Meteor.Error('error-notAuthorized');
+    }
+    if (!user.emails || !user.emails[0] || !user.emails[0].address) {
+      throw new Meteor.Error('email-invalid');
+    }
+    this.unblock();
+    const lang = user.getLanguage();
+    try {
+      await Email.sendAsync({
+        to: user.emails[0].address,
+        from: Accounts.emailTemplates.from,
+        subject: getTAPi18n().__('email-smtp-test-subject', { lng: lang }),
+        text: getTAPi18n().__('email-smtp-test-text', { lng: lang }),
+      });
+    } catch ({ message }) {
+      throw new Meteor.Error(
+        'email-fail',
+        `${getTAPi18n().__('email-fail-text', { lng: lang })}: ${message}`,
+        message,
+      );
+    }
+    return {
+      message: 'email-sent',
+      email: user.emails[0].address,
+    };
+  },
+
+  async getCustomUI() {
+    const setting = await getReactiveCache().getCurrentSetting();
+    if (!setting.productName) {
+      return {
+        productName: '',
+      };
+    }
+    return {
+      productName: `${setting.productName}`,
+    };
+  },
+
+  async isDisableRegistration() {
+    const setting = await getReactiveCache().getCurrentSetting();
+    return setting.disableRegistration === true;
+  },
+
+  async isDisableForgotPassword() {
+    const setting = await getReactiveCache().getCurrentSetting();
+    return setting.disableForgotPassword === true;
+  },
+
+  getMatomoConf() {
+    return {
+      address: getEnvVar('MATOMO_ADDRESS'),
+      siteId: getEnvVar('MATOMO_SITE_ID'),
+      doNotTrack: process.env.MATOMO_DO_NOT_TRACK || false,
+      withUserName: process.env.MATOMO_WITH_USERNAME || false,
+    };
+  },
+
+  _isLdapEnabled() {
+    return isLdapEnabled();
+  },
+
+  _isOauth2Enabled() {
+    return isOauth2Enabled();
+  },
+
+  _isCasEnabled() {
+    return isCasEnabled();
+  },
+
+  _isApiEnabled() {
+    return isApiEnabled();
+  },
+
+  getAuthenticationsEnabled() {
+    return {
+      ldap: isLdapEnabled(),
+      oauth2: isOauth2Enabled(),
+      cas: isCasEnabled(),
+    };
+  },
+
+  getOauthServerUrl() {
+    return process.env.OAUTH2_SERVER_URL;
+  },
+
+  getOauthDashboardUrl() {
+    return process.env.DASHBOARD_URL;
+  },
+
+  // OIDC RP-initiated logout (https://openid.net/specs/openid-connect-rpinitiated-1_0.html).
+  // When OAUTH2_LOGOUT_ENDPOINT is set (e.g. Keycloak's
+  // /realms/<realm>/protocol/openid-connect/logout), build the end_session URL so
+  // logout terminates the identity provider session and returns the user to Wekan
+  // via post_logout_redirect_uri, instead of dumping them on the provider's home
+  // page (which errors for non-admin users). See issue #6158.
+  getOauthLogoutUrl() {
+    const endpoint = process.env.OAUTH2_LOGOUT_ENDPOINT;
+    if (!endpoint) return '';
+    const serverUrl = (process.env.OAUTH2_SERVER_URL || '').replace(/\/$/, '');
+    const base = /^https?:\/\//.test(endpoint) ? endpoint : serverUrl + endpoint;
+    const params = [
+      'post_logout_redirect_uri=' + encodeURIComponent(Meteor.absoluteUrl()),
+    ];
+    if (process.env.OAUTH2_CLIENT_ID) {
+      params.push('client_id=' + encodeURIComponent(process.env.OAUTH2_CLIENT_ID));
+    }
+    return base + (base.includes('?') ? '&' : '?') + params.join('&');
+  },
+
+  getDefaultAuthenticationMethod() {
+    return process.env.DEFAULT_AUTHENTICATION_METHOD;
+  },
+
+  isPasswordLoginEnabled() {
+    return !(process.env.PASSWORD_LOGIN_ENABLED === 'false');
+  },
+
+  isOidcRedirectionEnabled() {
+    return (
+      process.env.OIDC_REDIRECTION_ENABLED === 'true' &&
+      Object.keys(loadOidcConfig('oidc')).length > 0
+    );
+  },
+
+  async getServiceConfiguration(service) {
+    const config = await loadOidcConfig(service);
+    if (!config) return null;
+    // Never expose the client secret to the caller
+    const { secret, ...publicConfig } = config;
+    return publicConfig;
+  },
+});
+
+// GlobalAdmin REST API for the Admin Panel global settings.
+//
+// The fields a global admin may read and write over REST. Deliberately excludes
+// `mailServer` (it holds SMTP credentials) so the REST API never exposes or
+// overwrites secrets; SMTP stays admin-panel / env only.
+const REST_SETTINGS_FIELDS = [
+  'disableRegistration',
+  'disableForgotPassword',
+  'productName',
+  'displayAuthenticationMethod',
+  'defaultAuthenticationMethod',
+  'spinnerName',
+  'hideLogo',
+  'hideCardCounterList',
+  'hideBoardMemberList',
+  'customLoginLogoImageUrl',
+  'customLoginLogoLinkUrl',
+  'customHelpLinkUrl',
+  'textBelowCustomLoginLogo',
+  'automaticLinkedUrlSchemes',
+  'customTopLeftCornerLogoImageUrl',
+  'customTopLeftCornerLogoLinkUrl',
+  'customTopLeftCornerLogoHeight',
+  'oidcBtnText',
+  'mailDomainName',
+  'legalNotice',
+  'customHeadEnabled',
+  'customHeadMetaTags',
+  'customHeadLinkTags',
+  'customManifestEnabled',
+  'customManifestContent',
+  'customAssetLinksEnabled',
+  'customAssetLinksContent',
+  'accessibilityPageEnabled',
+  'accessibilityTitle',
+  'accessibilityContent',
+  'supportPopupText',
+  'supportPageEnabled',
+  'supportPagePublic',
+  'supportTitle',
+  'supportPageText',
+];
+
+// `doc` is a raw settings Mongo document (dynamic shape) and `out` collects a
+// dynamic subset of its fields, so both values are `any`.
+function pickSettingsFields(doc: any) {
+  const out: { [key: string]: any } = { _id: doc && doc._id };
+  if (doc) {
+    REST_SETTINGS_FIELDS.forEach(field => {
+      if (doc[field] !== undefined) {
+        out[field] = doc[field];
+      }
+    });
+  }
+  return out;
+}
+
+/**
+ * @operation get_global_settings
+ * @tag Settings
+ *
+ * @summary Get the global Admin Panel settings
+ *
+ * @description Only the global admin can call this. SMTP/mail-server
+ * credentials are never returned.
+ *
+ * @return_type Settings
+ */
+WebApp.handlers.get('/api/settings', async function(req, res) {
+  try {
+    await Authentication.checkUserId(req.userId);
+    const setting = await Settings.findOneAsync({});
+    sendJsonResult(res, { code: 200, data: pickSettingsFields(setting) });
+  } catch (error) {
+    sendJsonResult(res, { code: 200, data: error });
+  }
+});
+
+/**
+ * @operation update_global_settings
+ * @tag Settings
+ *
+ * @summary Update the global Admin Panel settings
+ *
+ * @description Only the global admin can call this. The request body is an
+ * object whose keys are settings fields to update (see get_global_settings for
+ * the list). Unknown keys and `mailServer` are ignored.
+ *
+ * @param {Object} settings the settings fields to set
+ * @return_type Settings
+ */
+WebApp.handlers.put('/api/settings', async function(req, res) {
+  try {
+    await Authentication.checkUserId(req.userId);
+    const setting = await Settings.findOneAsync({});
+    if (!setting) {
+      sendJsonResult(res, { code: 404, data: { error: 'Settings not found' } });
+      return;
+    }
+    const body = req.body || {};
+    // Dynamic subset of request-body fields to persist (values are `any`).
+    const $set: { [key: string]: any } = {};
+    REST_SETTINGS_FIELDS.forEach(field => {
+      if (body[field] !== undefined) {
+        $set[field] = body[field];
+      }
+    });
+    if (Object.keys($set).length > 0) {
+      await Settings.updateAsync(setting._id, { $set });
+    }
+    const updated = await Settings.findOneAsync({});
+    sendJsonResult(res, { code: 200, data: pickSettingsFields(updated) });
+  } catch (error) {
+    sendJsonResult(res, { code: 200, data: error });
+  }
+});

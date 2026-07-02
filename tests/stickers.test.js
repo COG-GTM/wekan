@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 
 const src = fs.readFileSync(
-  path.join(__dirname, '..', 'models', 'metadata', 'stickers.js'),
+  path.join(__dirname, '..', 'models', 'metadata', 'stickers.ts'),
   'utf8',
 );
 

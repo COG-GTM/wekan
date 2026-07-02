@@ -1,0 +1,426 @@
+import { ReactiveCache } from '/imports/reactiveCache';
+import { Meteor } from 'meteor/meteor';
+import { MongoInternals } from 'meteor/mongo';
+import { check } from 'meteor/check';
+import { isFileValid } from './fileValidation';
+import { isSvgFile, sanitizeSvgFileSync } from './lib/sanitizeSvg';
+import { createBucket } from './lib/grid/createBucket';
+import fs from 'fs';
+import path from 'path';
+import { AttachmentStoreStrategyFilesystem, AttachmentStoreStrategyGridFs, AttachmentStoreStrategyCloud } from '/models/lib/attachmentStoreStrategy';
+import FileStoreStrategyFactory, { moveToStorage, rename, STORAGE_NAME_FILESYSTEM, STORAGE_NAME_GRIDFS } from '/models/lib/fileStoreStrategy';
+import { refreshCloudStorageFromSettings } from '/models/lib/cloudStorage';
+import { getAttachmentWithBackwardCompatibility, getAttachmentsWithBackwardCompatibility } from './lib/attachmentBackwardCompatibility';
+import AttachmentStorageSettings from './attachmentStorageSettings';
+import Attachments, { normalizeRemovedFiles } from './attachments';
+import Boards from '/models/boards';
+import { allowIsBoardMember } from '/server/lib/utils';
+import { ensureIndex } from '/server/lib/mongoStartup';
+
+// ---------------------------------------------------------------------------
+// Server-only configuration
+// ---------------------------------------------------------------------------
+
+let attachmentUploadExternalProgram: string | undefined;
+let attachmentUploadMimeTypes: string[] = [];
+let attachmentUploadSize = 0;
+
+function parseNonNegativeInt(value: string, fallback = 0) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+async function getAttachmentUploadMaxBytes() {
+  try {
+    const settings = await AttachmentStorageSettings.findOneAsync({});
+    const configuredLimit = settings?.limitSettings?.attachmentsUploadMaxBytes;
+    if (Number.isFinite(configuredLimit) && configuredLimit >= 0) {
+      return configuredLimit;
+    }
+
+    // Backward compatibility: respect existing uploadSettings.maxFileSize if present.
+    const legacySettingLimit = settings?.uploadSettings?.maxFileSize;
+    if (Number.isFinite(legacySettingLimit) && legacySettingLimit >= 0) {
+      return legacySettingLimit;
+    }
+  } catch (error) {
+    if (process.env.DEBUG === 'true') {
+      console.warn('Could not load attachment upload limit from settings:', error);
+    }
+  }
+
+  return attachmentUploadSize;
+}
+
+const attachmentBucket = createBucket('attachments');
+
+// Compute storage path:
+// - Docker (WRITABLE_PATH=/data): /data/files/attachments
+// - Snap (WRITABLE_PATH=$SNAP_COMMON/files): $SNAP_COMMON/files/attachments
+const basePath = process.env.WRITABLE_PATH || process.cwd();
+const endsWithFiles = basePath.endsWith('/files') || basePath.endsWith('\\files');
+const storagePath = endsWithFiles
+  ? path.join(basePath, 'attachments')
+  : path.join(basePath, 'files', 'attachments');
+
+if (process.env.ATTACHMENTS_UPLOAD_MIME_TYPES) {
+  attachmentUploadMimeTypes = process.env.ATTACHMENTS_UPLOAD_MIME_TYPES.split(',');
+  attachmentUploadMimeTypes = attachmentUploadMimeTypes.map((value: string) => value.trim());
+}
+
+if (process.env.ATTACHMENTS_UPLOAD_MAX_SIZE) {
+  attachmentUploadSize = parseNonNegativeInt(process.env.ATTACHMENTS_UPLOAD_MAX_SIZE, 0);
+}
+
+if (process.env.ATTACHMENTS_UPLOAD_EXTERNAL_PROGRAM) {
+  attachmentUploadExternalProgram = process.env.ATTACHMENTS_UPLOAD_EXTERNAL_PROGRAM;
+
+  if (!attachmentUploadExternalProgram.includes("{file}")) {
+    attachmentUploadExternalProgram = undefined;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// File store strategy factory
+// ---------------------------------------------------------------------------
+
+export const fileStoreStrategyFactory = new FileStoreStrategyFactory(
+  AttachmentStoreStrategyFilesystem, storagePath,
+  AttachmentStoreStrategyGridFs, attachmentBucket,
+  AttachmentStoreStrategyCloud,
+  Attachments,
+);
+
+// ---------------------------------------------------------------------------
+// Assign server-only FilesCollection callbacks
+// ---------------------------------------------------------------------------
+
+Attachments.storagePath = function () {
+  return fileStoreStrategyFactory.storagePath;
+};
+
+// `fileObj` is an ostrio:files upload document (dynamic), hence `any`.
+Attachments.onAfterUpload = async function (this: any, fileObj: any) {
+  // Sanitize SVG uploads in place before they are validated or moved to any
+  // storage backend. This strips scripts, event handlers, javascript: URIs and
+  // XML DOCTYPE/ENTITY (XML loop) constructs, so SVG images can be uploaded
+  // safely instead of being rejected. Runs for every upload regardless of the
+  // configured storage backend.
+  if (isSvgFile(fileObj.type, fileObj.name)) {
+    let svgSanitized = false;
+    Object.keys(fileObj.versions).forEach((versionName: string) => {
+      const version = fileObj.versions[versionName];
+      const newSize = sanitizeSvgFileSync(version && version.path);
+      if (newSize !== null) {
+        version.size = newSize;
+        svgSanitized = true;
+      }
+    });
+    if (svgSanitized) {
+      try {
+        await Attachments.updateAsync(
+          { _id: fileObj._id },
+          { $set: { versions: fileObj.versions } },
+        );
+      } catch (error) {
+        console.error('[onAfterUpload] Failed to persist sanitized SVG versions:', error);
+      }
+    }
+  }
+
+  // Get default storage backend from settings
+  let defaultStorage = STORAGE_NAME_FILESYSTEM;
+  try {
+    const settings = await AttachmentStorageSettings.findOneAsync({});
+    if (settings) {
+      defaultStorage = settings.getDefaultStorage();
+    }
+  } catch (error) {
+    console.warn('Could not get attachment storage settings, using default:', error);
+  }
+
+  // Set initial storage to filesystem (temporary)
+  Object.keys(fileObj.versions).forEach((versionName: string) => {
+    fileObj.versions[versionName].storage = STORAGE_NAME_FILESYSTEM;
+  });
+
+  this._now = new Date();
+  await Attachments.updateAsync({ _id: fileObj._id }, { $set: { "versions": fileObj.versions, "uploadedAtOstrio": this._now } });
+
+  // Use selected storage backend or copy storage if specified
+  let storageDestination = fileObj.meta.copyStorage || defaultStorage;
+
+  // Only migrate if the destination is different from filesystem
+  if (storageDestination !== STORAGE_NAME_FILESYSTEM) {
+    const fileObjId = fileObj._id;
+    // Note: Meteor.call('validateAttachmentAndMoveToStorage', ...) cannot be used here
+    // because server-side calls have this.userId=null, triggering not-authorized.
+    // Call the validation and migration logic directly instead.
+    Meteor.defer(async () => {
+      try {
+        const currentFileObj = await ReactiveCache.getAttachment(fileObjId);
+        if (!currentFileObj) return;
+
+        const effectiveUploadMaxBytes = await getAttachmentUploadMaxBytes();
+        const isValid = await isFileValid(currentFileObj, attachmentUploadMimeTypes, effectiveUploadMaxBytes, attachmentUploadExternalProgram);
+        if (!isValid) {
+          await Attachments.removeAsync(fileObjId);
+          return;
+        }
+
+        const fileObjAfterValidation = await ReactiveCache.getAttachment(fileObjId);
+        if (fileObjAfterValidation) {
+          moveToStorage(fileObjAfterValidation, storageDestination, fileStoreStrategyFactory);
+        }
+      } catch (error) {
+        console.error('[onAfterUpload] Error during validation and storage migration:', error);
+      }
+    });
+  }
+};
+
+// ostrio:files download interception callback; args are dynamic, hence `any`.
+Attachments.interceptDownload = function (this: any, http: any, fileObj: any, versionName: string) {
+  const ret = fileStoreStrategyFactory.getFileStrategy(fileObj, versionName).interceptDownload(http, this.cacheControl);
+  return ret;
+};
+
+// `filesInput` may be an array, cursor, doc, id or selector, hence `any`.
+Attachments.onAfterRemove = function (filesInput: any) {
+  const files = normalizeRemovedFiles(filesInput);
+
+  files.forEach((fileObj: any) => {
+    if (!fileObj || !fileObj.versions) {
+      return;
+    }
+
+    Object.keys(fileObj.versions).forEach((versionName: string) => {
+      fileStoreStrategyFactory.getFileStrategy(fileObj, versionName).onAfterRemove();
+    });
+  });
+};
+
+// We authorize the attachment download either:
+// - if the board is public, everyone (even unconnected) can download it
+// - if the board is private, only board members can download it
+// Note: ostrio:files v3.x uses `await this.protected.call(...)` in _checkAccess,
+// so this function can be async and use findOneAsync for Meteor 3.x compatibility.
+// `fileObj` is an ostrio:files document (dynamic); `this` is the ostrio access
+// context carrying userId, hence both `any`.
+Attachments.protected = async function (this: any, fileObj: any) {
+  // file may have been deleted already again after upload validation failed
+  if (!fileObj) {
+    return false;
+  }
+  const board = await Boards.findOneAsync(fileObj.meta.boardId);
+  if (!board) {
+    return false;
+  }
+  if (board.isPublic()) {
+    return true;
+  }
+  return board.hasMember(this.userId);
+};
+
+// ---------------------------------------------------------------------------
+// Backward compatibility methods (override client stubs)
+// ---------------------------------------------------------------------------
+
+Attachments.getAttachmentWithBackwardCompatibility = getAttachmentWithBackwardCompatibility;
+Attachments.getAttachmentsWithBackwardCompatibility = getAttachmentsWithBackwardCompatibility;
+
+// ---------------------------------------------------------------------------
+// Meteor methods
+// ---------------------------------------------------------------------------
+
+Meteor.methods({
+  // Validate image URL to prevent SVG-based DoS attacks
+  validateImageUrl(imageUrl) {
+    check(imageUrl, String);
+
+    if (!imageUrl) {
+      return { valid: false, reason: 'Empty URL' };
+    }
+
+    // Block SVG files and data URIs
+    if (imageUrl.endsWith('.svg') || imageUrl.startsWith('data:image/svg')) {
+      if (process.env.DEBUG === 'true') {
+        console.warn('Blocked potentially malicious SVG image URL:', imageUrl);
+      }
+      return { valid: false, reason: 'SVG images are blocked for security reasons' };
+    }
+
+    // Block data URIs that could contain malicious content
+    if (imageUrl.startsWith('data:')) {
+      if (process.env.DEBUG === 'true') {
+        console.warn('Blocked data URI image URL:', imageUrl);
+      }
+      return { valid: false, reason: 'Data URIs are blocked for security reasons' };
+    }
+
+    // Validate URL format
+    try {
+      const url = new URL(imageUrl);
+      // Only allow http and https protocols
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        return { valid: false, reason: 'Only HTTP and HTTPS protocols are allowed' };
+      }
+    } catch (e) {
+      return { valid: false, reason: 'Invalid URL format' };
+    }
+
+    return { valid: true };
+  },
+  async moveAttachmentToStorage(fileObjId, storageDestination) {
+    check(fileObjId, String);
+    check(storageDestination, String);
+
+    if (!this.userId) {
+      throw new Meteor.Error('not-authorized', 'You must be logged in.');
+    }
+
+    const user = await ReactiveCache.getUser(this.userId);
+    if (!user || !user.isAdmin) {
+      throw new Meteor.Error('not-authorized', 'Admin access required.');
+    }
+
+    const fileObj = await ReactiveCache.getAttachment(fileObjId);
+    if (!fileObj) {
+      throw new Meteor.Error('attachment-not-found', 'Attachment not found');
+    }
+
+    const board = await ReactiveCache.getBoard(fileObj.meta?.boardId);
+    if (!board || !board.isVisibleBy({ _id: this.userId })) {
+      throw new Meteor.Error('not-authorized', 'You do not have access to this board.');
+    }
+
+    // Allowlist storage destinations
+    const allowedDestinations = ['fs', 'gridfs', 's3', 'azure', 'gcs'];
+    if (!allowedDestinations.includes(storageDestination)) {
+      throw new Meteor.Error('invalid-storage-destination', 'Invalid storage destination');
+    }
+
+    moveToStorage(fileObj, storageDestination, fileStoreStrategyFactory);
+  },
+  async renameAttachment(fileObjId, newName) {
+    check(fileObjId, String);
+    check(newName, String);
+
+    const currentUserId = this.userId;
+    if (!currentUserId) {
+      throw new Meteor.Error('not-authorized', 'User must be logged in');
+    }
+
+    const fileObj = await ReactiveCache.getAttachment(fileObjId);
+    if (!fileObj) {
+      throw new Meteor.Error('file-not-found', 'Attachment not found');
+    }
+
+    // Verify the user has permission to modify this attachment
+    const board = await ReactiveCache.getBoard(fileObj.meta?.boardId);
+    if (!board) {
+      throw new Meteor.Error('board-not-found', 'Board not found');
+    }
+
+    if (!allowIsBoardMember(currentUserId, board)) {
+      if (process.env.DEBUG === 'true') {
+        console.warn(`Blocked unauthorized attachment rename attempt: user ${currentUserId} tried to rename attachment ${fileObjId} in board ${fileObj.meta?.boardId}`);
+      }
+      throw new Meteor.Error('not-authorized', 'You do not have permission to modify this attachment');
+    }
+
+    rename(fileObj, newName, fileStoreStrategyFactory);
+  },
+  async validateAttachment(fileObjId) {
+    check(fileObjId, String);
+
+    if (!this.userId) {
+      throw new Meteor.Error('not-authorized', 'You must be logged in.');
+    }
+
+    const fileObj = await ReactiveCache.getAttachment(fileObjId);
+    if (!fileObj) {
+      throw new Meteor.Error('attachment-not-found', 'Attachment not found');
+    }
+
+    const board = await ReactiveCache.getBoard(fileObj.meta?.boardId);
+    if (!board || !board.isVisibleBy({ _id: this.userId })) {
+      throw new Meteor.Error('not-authorized', 'You do not have access to this board.');
+    }
+
+    const effectiveUploadMaxBytes = await getAttachmentUploadMaxBytes();
+    const isValid = await isFileValid(fileObj, attachmentUploadMimeTypes, effectiveUploadMaxBytes, attachmentUploadExternalProgram);
+
+    if (!isValid) {
+      await Attachments.removeAsync(fileObjId);
+    }
+  },
+  async validateAttachmentAndMoveToStorage(fileObjId, storageDestination) {
+    check(fileObjId, String);
+    check(storageDestination, String);
+
+    if (!this.userId) {
+      throw new Meteor.Error('not-authorized', 'You must be logged in.');
+    }
+
+    const user = await ReactiveCache.getUser(this.userId);
+    if (!user || !user.isAdmin) {
+      throw new Meteor.Error('not-authorized', 'Admin access required.');
+    }
+
+    const fileObj = await ReactiveCache.getAttachment(fileObjId);
+    if (!fileObj) {
+      throw new Meteor.Error('attachment-not-found', 'Attachment not found');
+    }
+
+    const board = await ReactiveCache.getBoard(fileObj.meta?.boardId);
+    if (!board || !board.isVisibleBy({ _id: this.userId })) {
+      throw new Meteor.Error('not-authorized', 'You do not have access to this board.');
+    }
+
+    // Allowlist storage destinations
+    const allowedDestinations = ['fs', 'gridfs', 's3', 'azure', 'gcs'];
+    if (!allowedDestinations.includes(storageDestination)) {
+      throw new Meteor.Error('invalid-storage-destination', 'Invalid storage destination');
+    }
+
+    await Meteor.callAsync('validateAttachment', fileObjId);
+
+    const fileObjAfter = await ReactiveCache.getAttachment(fileObjId);
+
+    if (fileObjAfter) {
+      Meteor.defer(() => Meteor.call('moveAttachmentToStorage', fileObjId, storageDestination));
+    }
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Startup
+// ---------------------------------------------------------------------------
+
+Meteor.startup(async () => {
+  await ensureIndex(Attachments, { 'meta.cardId': 1 });
+
+  // Ensure standard GridFS index on attachments.chunks for efficient chunk lookups.
+  // Without this, queries like find({files_id: ObjectId}) do full collection scans.
+  const db = MongoInternals.defaultRemoteCollectionDriver().mongo.db;
+  const chunksCollection = db.collection('attachments.chunks');
+  try {
+    await chunksCollection.createIndex({ files_id: 1, n: 1 }, { unique: true });
+  } catch (e) {
+    // Index already exists, which is fine — skip the error.
+    if (e.code !== 86) throw e;
+  }
+
+  const sp = fileStoreStrategyFactory.storagePath;
+  if (!fs.existsSync(sp)) {
+    console.log("create storagePath because it doesn't exist: " + sp);
+    fs.mkdirSync(sp, { recursive: true });
+  }
+
+  // Build the configured cloud storage adapters (S3/Azure/GCS) from settings.
+  await refreshCloudStorageFromSettings();
+});

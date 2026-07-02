@@ -1,0 +1,246 @@
+import { Meteor } from 'meteor/meteor';
+import { Mongo } from 'meteor/mongo';
+import { ReactiveCache } from '/imports/reactiveCache';
+import Activities from '/models/activities';
+const { SimpleSchema }: { SimpleSchema: SimpleSchemaStatic } = require('/imports/simpleSchema');
+
+const ChecklistItems = new Mongo.Collection('checklistItems');
+
+/**
+ * An item in a checklist
+ */
+ChecklistItems.attachSchema(
+  new SimpleSchema({
+    title: {
+      /**
+       * the text of the item
+       */
+      type: String,
+    },
+    sort: {
+      /**
+       * the sorting field of the item
+       */
+      type: Number,
+    },
+    isFinished: {
+      /**
+       * Is the item checked?
+       */
+      type: Boolean,
+      defaultValue: false,
+    },
+    checklistId: {
+      /**
+       * the checklist ID the item is attached to
+       */
+      type: String,
+    },
+    cardId: {
+      /**
+       * the card ID the item is attached to
+       */
+      type: String,
+    },
+    boardId: {
+      /**
+       * The ID of the board the item's card is on. Denormalized from the card
+       * so the board publication can publish checklist items with a single
+       * reactive cursor filtered by boardId. Kept in sync on insert, on the
+       * item / its checklist moving to another card, and when the card moves to
+       * another board.
+       */
+      type: String,
+      optional: true,
+    },
+    createdAt: {
+      type: Date,
+      optional: true,
+      // eslint-disable-next-line consistent-return
+      autoValue() {
+        if (this.isInsert) {
+          return new Date();
+        } else if (this.isUpsert) {
+          return { $setOnInsert: new Date() };
+        } else {
+          this.unset();
+        }
+      },
+    },
+    modifiedAt: {
+      type: Date,
+      // eslint-disable-next-line consistent-return
+      autoValue() {
+        if (this.isInsert || this.isUpsert || this.isUpdate) {
+          return new Date();
+        } else {
+          this.unset();
+        }
+      },
+    },
+  }),
+);
+
+ChecklistItems.before.insert((userId, doc) => {
+  if (!doc.userId) {
+    doc.userId = userId;
+  }
+});
+
+ChecklistItems.helpers({
+  async setTitle(title: string) {
+    return await ChecklistItems.updateAsync(this._id, { $set: { title } });
+  },
+  async check() {
+    return await ChecklistItems.updateAsync(this._id, { $set: { isFinished: true } });
+  },
+  async uncheck() {
+    return await ChecklistItems.updateAsync(this._id, { $set: { isFinished: false } });
+  },
+  async toggleItem() {
+    return await ChecklistItems.updateAsync(this._id, { $set: { isFinished: !this.isFinished } });
+  },
+  async move(checklistId: string, sortIndex: number) {
+    const checklist = await ReactiveCache.getChecklist(checklistId);
+    const cardId = checklist.cardId;
+    return await ChecklistItems.updateAsync(this._id, {
+      $set: { cardId, checklistId, sort: sortIndex },
+    });
+  },
+});
+
+// Activities helper
+// `doc` is a checklist-item document (dynamic Mongo shape), hence `any`.
+export async function itemCreation(userId: string, doc: any) {
+  const card = await ReactiveCache.getCard(doc.cardId);
+  if (!card) {
+    console.warn('[itemCreation] Card not found for cardId:', doc.cardId, '— skipping activity insert.');
+    return;
+  }
+  const boardId = card.boardId;
+  await Activities.insertAsync({
+    userId,
+    activityType: 'addChecklistItem',
+    cardId: doc.cardId,
+    boardId,
+    checklistId: doc.checklistId,
+    checklistItemId: doc._id,
+    checklistItemName: doc.title,
+    listId: card.listId,
+    swimlaneId: card.swimlaneId,
+  });
+}
+
+export async function itemRemover(userId: string, doc: any) {
+  await Activities.removeAsync({
+    checklistItemId: doc._id,
+  });
+}
+
+export async function publishCheckActivity(userId: string, doc: any) {
+  const card = await ReactiveCache.getCard(doc.cardId);
+  if (!card) {
+    console.warn('[publishCheckActivity] Card not found for cardId:', doc.cardId, '— skipping activity insert.');
+    return;
+  }
+  const boardId = card.boardId;
+  let activityType;
+  if (doc.isFinished) {
+    activityType = 'checkedItem';
+  } else {
+    activityType = 'uncheckedItem';
+  }
+  const act = {
+    userId,
+    activityType,
+    cardId: doc.cardId,
+    boardId,
+    checklistId: doc.checklistId,
+    checklistItemId: doc._id,
+    checklistItemName: doc.title,
+    listId: card.listId,
+    swimlaneId: card.swimlaneId,
+  };
+  await Activities.insertAsync(act);
+}
+
+// `fieldNames` is accepted (and ignored) so the collection-hook callers can pass
+// the mutated field list through without an arity mismatch.
+export async function publishChekListCompleted(userId: string, doc: any, fieldNames?: string[]) {
+  const card = await ReactiveCache.getCard(doc.cardId);
+  if (!card) {
+    console.warn('[publishChekListCompleted] Card not found for cardId:', doc.cardId, '— skipping activity insert.');
+    return;
+  }
+  const boardId = card.boardId;
+  const checklistId = doc.checklistId;
+  const checkList = await ReactiveCache.getChecklist(checklistId);
+  if (!checkList) {
+    console.warn('[publishChekListCompleted] Checklist not found for checklistId:', checklistId, '— skipping activity insert.');
+    return;
+  }
+  const checklistItems = await ReactiveCache.getChecklistItems({ checklistId });
+  const isChecklistFinished = checkList.hideAllChecklistItems ||
+    (checklistItems.length > 0 && checklistItems.length === checklistItems.filter((i: any) => i.isFinished).length);
+  if (isChecklistFinished) {
+    const act = {
+      userId,
+      activityType: 'completeChecklist',
+      cardId: doc.cardId,
+      boardId,
+      checklistId: doc.checklistId,
+      checklistName: checkList.title,
+      listId: card.listId,
+      swimlaneId: card.swimlaneId,
+    };
+    await Activities.insertAsync(act);
+  }
+}
+
+// `fieldNames` is accepted (and ignored) so the collection-hook callers can pass
+// the mutated field list through without an arity mismatch.
+export async function publishChekListUncompleted(userId: string, doc: any, fieldNames?: string[]) {
+  const card = await ReactiveCache.getCard(doc.cardId);
+  if (!card) {
+    console.warn('[publishChekListUncompleted] Card not found for cardId:', doc.cardId, '— skipping activity insert.');
+    return;
+  }
+  const boardId = card.boardId;
+  const checklistId = doc.checklistId;
+  const checkList = await ReactiveCache.getChecklist(checklistId);
+  if (!checkList) {
+    console.warn('[publishChekListUncompleted] Checklist not found for checklistId:', checklistId, '— skipping activity insert.');
+    return;
+  }
+  // BUGS in IFTTT Rules: https://github.com/wekan/wekan/issues/1972
+  //       Currently in checklist all are set as uncompleted/not checked,
+  //       IFTTT Rule does not move card to other list.
+  //       If following line is negated/changed to:
+  //         if(!isChecklistFinished){
+  //       then unchecking of any checkbox will move card to other list,
+  //       even when all checkboxes are not yet unchecked.
+  //       What is correct code for only moving when all in list is unchecked?
+  // TIPS: Finding  files, ignoring some directories with grep -v:
+  //         cd wekan
+  //         find . | xargs grep 'count' -sl | grep -v .meteor | grep -v node_modules | grep -v .build
+  //       Maybe something related here?
+  //         wekan/client/components/rules/triggers/checklistTriggers.js
+  const uncheckItems = await ReactiveCache.getChecklistItems({ checklistId });
+  const isChecklistFinished = checkList.hideAllChecklistItems ||
+    (uncheckItems.length > 0 && uncheckItems.length === uncheckItems.filter((i: any) => i.isFinished).length);
+  if (isChecklistFinished) {
+    const act = {
+      userId,
+      activityType: 'uncompleteChecklist',
+      cardId: doc.cardId,
+      boardId,
+      checklistId: doc.checklistId,
+      checklistName: checkList.title,
+      listId: card.listId,
+      swimlaneId: card.swimlaneId,
+    };
+    await Activities.insertAsync(act);
+  }
+}
+
+export default ChecklistItems;

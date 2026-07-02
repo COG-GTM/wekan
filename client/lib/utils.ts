@@ -1,0 +1,1114 @@
+import { ReactiveCache } from '/imports/reactiveCache';
+import { Meteor } from 'meteor/meteor';
+import { Blaze } from 'meteor/blaze';
+import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
+import { Tracker } from 'meteor/tracker';
+import { findWhere, where, uniqBy, groupBy, indexBy, debounce, once } from '/imports/lib/collectionHelpers';
+import Settings from '/models/settings';
+import Users from '/models/users';
+
+// The public (logged-out) collapsed-state helpers are attached to the Users
+// collection at runtime in models/users.ts via `(Users as any).xxx = ...`, so
+// they are not present on the typed collection. Mirror that boundary here.
+const UsersPublic: UsersPublicStatics = Users as any;
+
+export const Utils = {
+  async setBackgroundImage(url: string) {
+    const currentBoard = Utils.getCurrentBoard();
+    if (currentBoard.backgroundImageURL !== undefined) {
+      $(".board-wrapper").css({"background":"url(" + currentBoard.backgroundImageURL + ")","background-size":"cover"});
+      $(".swimlane,.swimlane .list,.swimlane .list .list-body,.swimlane .list:first-child .list-body").css({"background-color":"transparent"});
+      $(".minicard").css({"opacity": "0.9"});
+    } else if (currentBoard["background-color"]) {
+      await currentBoard.setColor(currentBoard["background-color"]);
+    }
+  },
+  /** returns the current board id
+   * <li> returns the current board id or the board id of the popup card if set
+   */
+  getCurrentBoardId() {
+    let popupCardBoardId = Session.get('popupCardBoardId');
+    let currentBoard = Session.get('currentBoard');
+    let ret = currentBoard;
+    if (popupCardBoardId) {
+      ret = popupCardBoardId;
+    }
+    return ret;
+  },
+  getCurrentCardId(ignorePopupCard?: boolean) {
+    let ret = Session.get('currentCard');
+    if (!ret && !ignorePopupCard) {
+      ret = Utils.getPopupCardId();
+    }
+    return ret;
+  },
+  getPopupCardId() {
+    const ret = Session.get('popupCardId');
+    return ret;
+  },
+  getCurrentListId() {
+    const ret = Session.get('currentList');
+    return ret;
+  },
+  /** returns the current board
+   * <li> returns the current board or the board of the popup card if set
+   */
+  getCurrentBoard() {
+    const boardId = Utils.getCurrentBoardId();
+    const ret = ReactiveCache.getBoard(boardId);
+    return ret;
+  },
+  getCurrentCard(ignorePopupCard?: boolean) {
+    const cardId = Utils.getCurrentCardId(ignorePopupCard);
+    if (!cardId) {
+      return null;
+    }
+    const ret = ReactiveCache.getCard(cardId);
+    return ret;
+  },
+
+  // Zoom and mobile mode utilities
+  getZoomLevel() {
+    const user = ReactiveCache.getCurrentUser();
+    if (user && user.profile && user.profile.zoomLevel !== undefined) {
+      return user.profile.zoomLevel;
+    }
+    // For non-logged-in users, check localStorage
+    const stored = localStorage.getItem('wekan-zoom-level');
+    return stored ? parseFloat(stored) : 1.0;
+  },
+
+  setZoomLevel(level: number) {
+    const user = ReactiveCache.getCurrentUser();
+    if (user) {
+      // Update user profile
+      user.setZoomLevel(level);
+    } else {
+      // Store in localStorage for non-logged-in users
+      localStorage.setItem('wekan-zoom-level', level.toString());
+    }
+    Utils.applyZoomLevel(level);
+
+    // Trigger reactive updates for UI components
+    Session.set('wekan-zoom-level', level);
+  },
+
+  getMobileMode() {
+    // Check localStorage first - user's explicit preference takes priority
+    const stored = localStorage.getItem('wekan-mobile-mode');
+    if (stored !== null) {
+      return stored === 'true';
+    }
+
+    // Then check user profile
+    const user = ReactiveCache.getCurrentUser();
+    if (user && user.profile && user.profile.mobileMode !== undefined) {
+      return user.profile.mobileMode;
+    }
+
+    // No explicit preference: detect from the VIEWPORT, not the user-agent.
+    // UA string parsing is unreliable across the many mobile browsers (Firefox,
+    // Chrome, Safari, postmarketOS, Ubuntu Touch Morph, ...) and is exactly the
+    // kind of fragile detection that bites projects — cf. Meteor #12421, where
+    // Mobile Safari version parsing was wrong. matchMedia width/pointer queries
+    // are well-supported and, importantly, match the CSS `@media (max-width:
+    // 800px)` breakpoint, so the body.mobile-mode class and the responsive CSS
+    // agree. A narrow screen, or a coarse (touch) pointer on a not-wide screen,
+    // gets mobile mode; wide desktop windows (fine pointer) stay desktop.
+    // NOTE: requires the width=device-width viewport meta (see
+    // server/lib/customHeadRender.js); without it window.innerWidth reports ~980
+    // on phones and this would never trigger.
+    const mq = (q: string) =>
+      typeof window !== 'undefined' && window.matchMedia && window.matchMedia(q).matches;
+    const narrow = mq('(max-width: 800px)');
+    const coarse = mq('(pointer: coarse)');
+    return Boolean(narrow || (coarse && window.innerWidth <= 1024));
+  },
+
+  setMobileMode(enabled: boolean) {
+    const user = ReactiveCache.getCurrentUser();
+    if (user) {
+      // Update user profile
+      user.setMobileMode(enabled);
+    }
+    // Always store in localStorage for persistence across sessions
+    localStorage.setItem('wekan-mobile-mode', enabled.toString());
+    Utils.applyMobileMode(enabled);
+    // Trigger reactive updates for UI components
+    Session.set('wekan-mobile-mode', enabled);
+    // Re-apply zoom level to ensure proper rendering
+    const zoomLevel = Utils.getZoomLevel();
+    Utils.applyZoomLevel(zoomLevel);
+  },
+
+  getCardZoom() {
+    const user = ReactiveCache.getCurrentUser();
+    if (user && user.profile && user.profile.cardZoom !== undefined) {
+      return user.profile.cardZoom;
+    }
+    const stored = localStorage.getItem('wekan-card-zoom');
+    return stored ? parseFloat(stored) : 1.0;
+  },
+
+  setCardZoom(level: number) {
+    const user = ReactiveCache.getCurrentUser();
+    if (user) {
+      user.setCardZoom(level);
+    }
+    localStorage.setItem('wekan-card-zoom', level.toString());
+    Utils.applyCardZoom(level);
+    Session.set('wekan-card-zoom', level);
+  },
+
+  applyCardZoom(level: number) {
+    const cardDetails = document.querySelector<HTMLElement>('.card-details');
+    if (cardDetails) {
+      cardDetails.style.fontSize = `${level}em`;
+    }
+  },
+
+  applyZoomLevel(level: number) {
+    const boardWrapper = document.querySelector<HTMLElement>('.board-wrapper');
+    const body = document.body;
+    const isMobileMode = body.classList.contains('mobile-mode');
+
+    if (boardWrapper) {
+      if (isMobileMode) {
+        // On mobile mode, only apply zoom to text and icons, not the entire layout
+        // Remove any existing transform from board-wrapper
+        boardWrapper.style.transform = '';
+        boardWrapper.style.transformOrigin = '';
+
+        // Apply zoom to text and icon elements instead
+        const textElements = boardWrapper.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6, p, span, div, .minicard, .list-header-name, .board-header-btn, .fa, .icon');
+        textElements.forEach(element => {
+          element.style.transform = `scale(${level})`;
+          element.style.transformOrigin = 'center';
+        });
+
+        // Reset board-canvas height
+        const boardCanvas = document.querySelector<HTMLElement>('.board-canvas');
+        if (boardCanvas) {
+          boardCanvas.style.height = '';
+        }
+      } else {
+        // Desktop mode: apply zoom to entire board-wrapper as before.
+        // At 100% do NOT set transform: scale(1): any transform makes the
+        // board-wrapper the containing block + stacking context for its
+        // position:fixed descendants (the opened/dragged card), which traps the
+        // card inside the board area below the page header bars. Clearing it at
+        // 100% lets the opened card overlay the top bars.
+        if (level === 1) {
+          boardWrapper.style.transform = '';
+          boardWrapper.style.transformOrigin = '';
+        } else {
+          boardWrapper.style.transform = `scale(${level})`;
+          boardWrapper.style.transformOrigin = 'top left';
+        }
+
+        // If zoom is 50% or lower, make board wrapper full width like content
+        if (level <= 0.5) {
+          boardWrapper.style.width = '100%';
+          boardWrapper.style.maxWidth = '100%';
+          boardWrapper.style.margin = '0';
+        } else {
+          // Reset to normal width for higher zoom levels
+          boardWrapper.style.width = '';
+          boardWrapper.style.maxWidth = '';
+          boardWrapper.style.margin = '';
+        }
+
+        // Adjust container height to prevent scroll issues
+        const boardCanvas = document.querySelector<HTMLElement>('.board-canvas');
+        if (boardCanvas) {
+          boardCanvas.style.height = `${100 / level}%`;
+
+          // For high zoom levels (200%+), enable both horizontal and vertical scrolling
+          if (level >= 2.0) {
+            boardCanvas.style.overflowX = 'auto';
+            boardCanvas.style.overflowY = 'auto';
+            // Ensure the content area can scroll both horizontally and vertically
+            const content = document.querySelector<HTMLElement>('#content');
+            if (content) {
+              content.style.overflowX = 'auto';
+              content.style.overflowY = 'auto';
+            }
+          } else {
+            // Reset overflow for normal zoom levels
+            boardCanvas.style.overflowX = '';
+            boardCanvas.style.overflowY = '';
+            const content = document.querySelector<HTMLElement>('#content');
+            if (content) {
+              content.style.overflowX = '';
+              content.style.overflowY = '';
+            }
+          }
+        }
+      }
+    }
+  },
+
+  applyMobileMode(enabled: boolean) {
+    const body = document.body;
+    if (enabled) {
+      body.classList.add('mobile-mode');
+      body.classList.remove('desktop-mode');
+    } else {
+      body.classList.add('desktop-mode');
+      body.classList.remove('mobile-mode');
+    }
+  },
+
+  initializeUserSettings() {
+    // Apply saved settings on page load
+    const zoomLevel = Utils.getZoomLevel();
+    const mobileMode = Utils.getMobileMode();
+    Utils.applyZoomLevel(zoomLevel);
+    Utils.applyMobileMode(mobileMode);
+
+    // #6419: keep mobile-mode in sync with the viewport (resize / orientation /
+    // responsive testing) when the user has NOT explicitly chosen a mode. Bound
+    // once. An explicit toggle (localStorage or profile) must stick, so we skip
+    // auto-switching in that case.
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      !(Utils as UtilsInternal)._mobileModeAutoBound
+    ) {
+      (Utils as UtilsInternal)._mobileModeAutoBound = true;
+      const reapply = () => {
+        const stored = localStorage.getItem('wekan-mobile-mode');
+        const user = ReactiveCache.getCurrentUser();
+        const explicit =
+          stored !== null ||
+          (user && user.profile && user.profile.mobileMode !== undefined);
+        if (!explicit) {
+          Utils.applyMobileMode(Utils.getMobileMode());
+        }
+      };
+      window.matchMedia('(max-width: 800px)').addEventListener('change', reapply);
+      window.matchMedia('(pointer: coarse)').addEventListener('change', reapply);
+    }
+  },
+  getCurrentList() {
+    const listId = this.getCurrentListId();
+    let ret = null;
+    if (listId) {
+      ret = ReactiveCache.getList(listId);
+    }
+    return ret;
+  },
+  getPopupCard() {
+    const cardId = Utils.getPopupCardId();
+    const ret = ReactiveCache.getCard(cardId);
+    return ret;
+  },
+  canModifyCard() {
+    const currentUser = ReactiveCache.getCurrentUser();
+    const ret = (
+      currentUser &&
+      currentUser.isBoardMember() &&
+      !currentUser.isCommentOnly() &&
+      !currentUser.isWorker() &&
+      !currentUser.isReadOnly() &&
+      !currentUser.isReadAssignedOnly()
+    );
+    return ret;
+  },
+  canMoveCard() {
+    const currentUser = ReactiveCache.getCurrentUser();
+    const ret = (
+      currentUser &&
+      currentUser.isBoardMember() &&
+      !currentUser.isCommentOnly() &&
+      !currentUser.isReadOnly() &&
+      !currentUser.isReadAssignedOnly()
+    );
+    return ret;
+  },
+  canModifyBoard() {
+    const currentUser = ReactiveCache.getCurrentUser();
+    const ret = (
+      currentUser &&
+      currentUser.isBoardMember() &&
+      !currentUser.isCommentOnly() &&
+      !currentUser.isReadOnly() &&
+      !currentUser.isReadAssignedOnly()
+    );
+    return ret;
+  },
+  reload() {
+    // we move all window.location.reload calls into this function
+    // so we can disable it when running tests.
+    // This is because we are not allowed to override location.reload but
+    // we can override Utils.reload to prevent reload during tests.
+    window.location.reload();
+  },
+  setBoardView(view: string) {
+    const currentUser = ReactiveCache.getCurrentUser();
+
+    if (currentUser) {
+      // Update localStorage first
+      window.localStorage.setItem('boardView', view);
+
+      // Update user profile via Meteor method
+      Meteor.call('setBoardView', view, (error?: Meteor.Error | Error) => {
+        if (error) {
+          console.error('[setBoardView] Update failed:', error);
+        } else {
+          // Reload to apply the view change
+          Utils.reload();
+        }
+      });
+    } else if (view === 'board-view-swimlanes') {
+      window.localStorage.setItem('boardView', 'board-view-swimlanes'); //true
+      Utils.reload();
+    } else if (view === 'board-view-lists') {
+      window.localStorage.setItem('boardView', 'board-view-lists'); //true
+      Utils.reload();
+    } else if (view === 'board-view-cal') {
+      window.localStorage.setItem('boardView', 'board-view-cal'); //true
+      Utils.reload();
+    } else if (view === 'board-view-gantt') {
+      window.localStorage.setItem('boardView', 'board-view-gantt'); //true
+      Utils.reload();
+    } else if (view === 'board-view-table') {
+      window.localStorage.setItem('boardView', 'board-view-table'); //true
+      Utils.reload();
+    } else {
+      window.localStorage.setItem('boardView', 'board-view-swimlanes'); //true
+      Utils.reload();
+    }
+  },
+
+  unsetBoardView() {
+    window.localStorage.removeItem('boardView');
+    window.localStorage.removeItem('collapseSwimlane');
+  },
+
+  boardView() {
+    const currentUser = ReactiveCache.getCurrentUser();
+    if (currentUser) {
+      return (currentUser.profile || {}).boardView;
+    } else if (
+      window.localStorage.getItem('boardView') === 'board-view-swimlanes'
+    ) {
+      return 'board-view-swimlanes';
+    } else if (
+      window.localStorage.getItem('boardView') === 'board-view-lists'
+    ) {
+      return 'board-view-lists';
+    } else if (window.localStorage.getItem('boardView') === 'board-view-cal') {
+      return 'board-view-cal';
+    } else if (window.localStorage.getItem('boardView') === 'board-view-gantt') {
+      return 'board-view-gantt';
+    } else if (
+      window.localStorage.getItem('boardView') === 'board-view-table'
+    ) {
+      return 'board-view-table';
+    } else {
+      window.localStorage.setItem('boardView', 'board-view-swimlanes'); //true
+      Utils.reload();
+      return 'board-view-swimlanes';
+    }
+  },
+
+  getListCollapseState(list: CollapsibleEntity) {
+    if (!list) return false;
+    const key = `collapsedList-${list._id}`;
+    const sessionVal = Session.get(key);
+    if (typeof sessionVal === 'boolean') {
+      return sessionVal;
+    }
+
+    const user = ReactiveCache.getCurrentUser();
+    let stored = null;
+    if (user && user.getCollapsedListFromStorage) {
+      stored = user.getCollapsedListFromStorage(list.boardId, list._id);
+    } else if (UsersPublic.getPublicCollapsedList) {
+      stored = UsersPublic.getPublicCollapsedList(list.boardId, list._id);
+    }
+
+    if (typeof stored === 'boolean') {
+      Session.setDefault(key, stored);
+      return stored;
+    }
+
+    const fallback = typeof list.collapsed === 'boolean' ? list.collapsed : false;
+    Session.setDefault(key, fallback);
+    return fallback;
+  },
+
+  setListCollapseState(list: CollapsibleEntity, collapsed: boolean) {
+    if (!list) return;
+    const key = `collapsedList-${list._id}`;
+    Session.set(key, !!collapsed);
+    const user = ReactiveCache.getCurrentUser();
+    if (user) {
+      Meteor.call('setListCollapsedState', list.boardId, list._id, !!collapsed);
+    } else if (UsersPublic.setPublicCollapsedList) {
+      UsersPublic.setPublicCollapsedList(list.boardId, list._id, !!collapsed);
+    }
+  },
+
+  getSwimlaneCollapseState(swimlane: CollapsibleEntity) {
+    if (!swimlane) return false;
+    const key = `collapsedSwimlane-${swimlane._id}`;
+    const sessionVal = Session.get(key);
+    if (typeof sessionVal === 'boolean') {
+      return sessionVal;
+    }
+
+    const user = ReactiveCache.getCurrentUser();
+    let stored = null;
+    if (user && user.getCollapsedSwimlaneFromStorage) {
+      stored = user.getCollapsedSwimlaneFromStorage(
+        swimlane.boardId,
+        swimlane._id,
+      );
+    } else if (UsersPublic.getPublicCollapsedSwimlane) {
+      stored = UsersPublic.getPublicCollapsedSwimlane(swimlane.boardId, swimlane._id);
+    }
+
+    if (typeof stored === 'boolean') {
+      Session.setDefault(key, stored);
+      return stored;
+    }
+
+    const fallback = typeof swimlane.collapsed === 'boolean' ? swimlane.collapsed : false;
+    Session.setDefault(key, fallback);
+    return fallback;
+  },
+
+  setSwimlaneCollapseState(swimlane: CollapsibleEntity, collapsed: boolean) {
+    if (!swimlane) return;
+    const key = `collapsedSwimlane-${swimlane._id}`;
+    Session.set(key, !!collapsed);
+    const user = ReactiveCache.getCurrentUser();
+    if (user) {
+      Meteor.call('setSwimlaneCollapsedState', swimlane.boardId, swimlane._id, !!collapsed);
+    } else if (UsersPublic.setPublicCollapsedSwimlane) {
+      UsersPublic.setPublicCollapsedSwimlane(swimlane.boardId, swimlane._id, !!collapsed);
+    }
+  },
+
+  myCardsSort() {
+    let sort = window.localStorage.getItem('myCardsSort');
+
+    if (!sort || !['board', 'dueAt'].includes(sort)) {
+      sort = 'board';
+    }
+
+    return sort;
+  },
+
+  myCardsSortToggle() {
+    if (this.myCardsSort() === 'board') {
+      this.setMyCardsSort('dueAt');
+    } else {
+      this.setMyCardsSort('board');
+    }
+  },
+
+  setMyCardsSort(sort: string) {
+    window.localStorage.setItem('myCardsSort', sort);
+    Utils.reload();
+  },
+
+  archivedBoardIds() {
+    const ret = ReactiveCache.getBoards({ archived: false }).map((board: { _id: string }) => board._id);
+    return ret;
+  },
+
+  dueCardsView() {
+    let view = window.localStorage.getItem('dueCardsView');
+
+    if (!view || !['me', 'all'].includes(view)) {
+      view = 'me';
+    }
+
+    return view;
+  },
+
+  setDueCardsView(view: string) {
+    window.localStorage.setItem('dueCardsView', view);
+    Utils.reload();
+  },
+
+  // #global search "my cards / all cards" toggle. Reactive (Session) so the
+  // search re-runs immediately without a full page reload; persisted in
+  // localStorage. Defaults to 'all' (search everything).
+  globalSearchView() {
+    const view =
+      Session.get('globalSearchView') ||
+      window.localStorage.getItem('globalSearchView');
+    return view && ['me', 'all'].includes(view) ? view : 'all';
+  },
+
+  setGlobalSearchView(view: string) {
+    const next = ['me', 'all'].includes(view) ? view : 'all';
+    window.localStorage.setItem('globalSearchView', next);
+    Session.set('globalSearchView', next);
+  },
+
+  myCardsView() {
+    let view = window.localStorage.getItem('myCardsView');
+
+    if (!view || !['boards', 'table'].includes(view)) {
+      view = 'boards';
+    }
+
+    return view;
+  },
+
+  setMyCardsView(view: string) {
+    window.localStorage.setItem('myCardsView', view);
+    Utils.reload();
+  },
+
+  // XXX We should remove these two methods
+  goBoardId(_id: string) {
+    const board = ReactiveCache.getBoard(_id);
+    return (
+      board &&
+      FlowRouter.go('board', {
+        id: board._id,
+        slug: board.slug,
+      })
+    );
+  },
+
+  goCardId(_id: string) {
+    const card = ReactiveCache.getCard(_id);
+    const board = ReactiveCache.getBoard(card.boardId);
+    return (
+      board &&
+      FlowRouter.go('card', {
+        cardId: card._id,
+        boardId: board._id,
+        slug: board.slug,
+        swimlaneId: card.swimlaneId,
+        listId: card.listId,
+      })
+    );
+  },
+  getCommonAttachmentMetaFrom(card: AttachmentMetaCard) {
+    const meta: AttachmentMeta = {};
+    if (card.isLinkedCard()) {
+      meta.boardId = ReactiveCache.getCard(card.linkedId).boardId;
+      meta.cardId = card.linkedId;
+    } else {
+      meta.boardId = card.boardId;
+      meta.swimlaneId = card.swimlaneId;
+      meta.listId = card.listId;
+      meta.cardId = card._id;
+    }
+    return meta;
+  },
+  // Collection helpers (replacing underscore.js)
+  findWhere,
+  where,
+  uniqBy,
+  groupBy,
+  indexBy,
+  debounce,
+  once,
+
+  MAX_IMAGE_PIXEL: Meteor.settings.public.MAX_IMAGE_PIXEL,
+  COMPRESS_RATIO: Meteor.settings.public.IMAGE_COMPRESS_RATIO,
+  shrinkImage(options: ShrinkImageOptions) {
+    // shrink image to certain size
+    const dataurl = options.dataurl,
+      callback = options.callback,
+      toBlob = options.toBlob;
+    let canvas: HTMLCanvasElement | null = document.createElement('canvas'),
+      image: HTMLImageElement | null = document.createElement('img');
+    const maxSize = options.maxSize || 1024;
+    const ratio = options.ratio || 1.0;
+    const next = function (result: string | boolean | Blob | null) {
+      image = null;
+      canvas = null;
+      if (typeof callback === 'function') {
+        callback(result);
+      }
+    };
+    image.onload = function () {
+      const img = this as HTMLImageElement;
+      let width = img.width,
+        height = img.height;
+      let changed = false;
+      if (width > height) {
+        if (width > maxSize) {
+          height *= maxSize / width;
+          width = maxSize;
+          changed = true;
+        }
+      } else if (height > maxSize) {
+        width *= maxSize / height;
+        height = maxSize;
+        changed = true;
+      }
+      canvas!.width = width;
+      canvas!.height = height;
+      canvas!.getContext('2d')!.drawImage(img, 0, 0, width, height);
+      if (changed === true) {
+        const type = 'image/jpeg';
+        if (toBlob) {
+          canvas!.toBlob(next, type, ratio);
+        } else {
+          next(canvas!.toDataURL(type, ratio));
+        }
+      } else {
+        next(changed);
+      }
+    };
+    image.onerror = function () {
+      next(false);
+    };
+    image.src = dataurl;
+  },
+  capitalize(string: string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+  },
+
+  windowResizeDep: new Tracker.Dependency(),
+  // in fact, what we really care is screen size
+  // large mobile device like iPad or android Pad has a big screen, it should also behave like a desktop
+  // in a small window (even on desktop), Wekan run in compact mode.
+  // we can easily debug with a small window of desktop browser. :-)
+  isMiniScreen() {
+    this.windowResizeDep.depend();
+    // Also depend on mobile mode changes to make this reactive
+    Session.get('wekan-mobile-mode');
+
+    // Show mobile view when:
+    // 1. Screen width is 800px or less (matches CSS media queries)
+    // 2. Mobile phones in portrait mode
+    // 3. iPad in very small screens (≤ 600px)
+    // 4. All iPhone models by default (including largest models), but respect user preference
+    const isSmallScreen = window.innerWidth <= 800;
+    const isVerySmallScreen = window.innerWidth <= 600;
+    const isPortrait = window.innerWidth < window.innerHeight || window.matchMedia("(orientation: portrait)").matches;
+    const isMobilePhone = /Mobile|Android|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && !/iPad/i.test(navigator.userAgent);
+    const isIPhone = /iPhone|iPod/i.test(navigator.userAgent);
+    const isIPad = /iPad/i.test(navigator.userAgent);
+    const isUbuntuTouch = /Ubuntu/i.test(navigator.userAgent);
+
+    // Check if user has explicitly set mobile mode preference
+    const userMobileMode = this.getMobileMode();
+
+    // For iPhone: default to mobile view, but respect user's mobile mode toggle preference
+    // This ensures all iPhone models (including iPhone 15 Pro Max, 14 Pro Max, etc.) start with mobile view
+    // but users can still switch to desktop mode if they prefer
+    if (isIPhone) {
+      // If user has explicitly set a preference, respect it
+      if (userMobileMode !== null && userMobileMode !== undefined) {
+        return userMobileMode;
+      }
+      // Otherwise, default to mobile view for iPhones
+      return true;
+    } else if (isMobilePhone) {
+      return isPortrait; // Other mobile phones: portrait = mobile, landscape = desktop
+    } else if (isIPad) {
+      return isVerySmallScreen; // iPad: only very small screens get mobile view
+    } else if (isUbuntuTouch) {
+      // Ubuntu Touch: smartphones (≤ 600px) behave like mobile phones, tablets (> 600px) like iPad
+      if (isVerySmallScreen) {
+        return isPortrait; // Ubuntu Touch smartphone: portrait = mobile, landscape = desktop
+      } else {
+        return isVerySmallScreen; // Ubuntu Touch tablet: only very small screens get mobile view
+      }
+    } else {
+      return isSmallScreen; // Desktop: based on 800px screen width
+    }
+  },
+
+  isTouchScreen() {
+    // NEW TOUCH DEVICE DETECTION:
+    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Browser_detection_using_the_user_agent
+    // Cast to a shape where the touch-detection properties are OPTIONAL so the
+    // legacy feature-detection branches (msMaxTouchPoints / UA fallback) are not
+    // treated as dead code by narrowing on Navigator's required maxTouchPoints.
+    const nav = navigator as {
+      maxTouchPoints?: number;
+      msMaxTouchPoints?: number;
+      userAgent: string;
+    };
+    var hasTouchScreen = false;
+    if ("maxTouchPoints" in nav) {
+      hasTouchScreen = nav.maxTouchPoints! > 0;
+    } else if ("msMaxTouchPoints" in nav) {
+      hasTouchScreen = nav.msMaxTouchPoints! > 0;
+    } else {
+      var mQ = typeof window.matchMedia === 'function' && matchMedia("(pointer:coarse)");
+      if (mQ && mQ.media === "(pointer:coarse)") {
+        hasTouchScreen = !!mQ.matches;
+      } else if ('orientation' in window) {
+        hasTouchScreen = true; // deprecated, but good fallback
+      } else {
+        // Only as a last resort, fall back to user agent sniffing
+        var UA = nav.userAgent;
+        hasTouchScreen = (
+          /\b(BlackBerry|webOS|iPhone|IEMobile)\b/i.test(UA) ||
+          /\b(Android|Windows Phone|iPad|iPod)\b/i.test(UA)
+        );
+      }
+    }
+    return hasTouchScreen;
+  },
+
+  // returns if desktop drag handles are enabled
+  isShowDesktopDragHandles() {
+    const currentUser = Meteor.user() as (Meteor.User & UserDragHandleMethods) | null;
+    if (currentUser) {
+      return currentUser.hasShowDesktopDragHandles();
+    } else {
+      // For non-logged-in users, check localStorage
+      return window.localStorage.getItem('showDesktopDragHandles') === 'true';
+    }
+  },
+
+  // returns if mini screen or desktop drag handles
+  isTouchScreenOrShowDesktopDragHandles() {
+    return Utils.isTouchScreen() || Utils.isShowDesktopDragHandles();
+  },
+
+  calculateIndexData(
+    prevData: SortIndexData | null | undefined,
+    nextData: SortIndexData | null | undefined,
+    nItems = 1,
+  ) {
+    let base, increment;
+    // If we drop the card to an empty column
+    if (!prevData && !nextData) {
+      base = 0;
+      increment = 1;
+      // If we drop the card in the first position
+    } else if (!prevData) {
+      const nextSortIndex = nextData!.sort;
+      const ceil = Math.ceil(nextSortIndex - 1);
+      if (ceil < nextSortIndex) {
+        increment = nextSortIndex - ceil;
+        base = nextSortIndex - increment;
+      } else {
+        base = nextData!.sort - 1;
+        increment = -1;
+      }
+      // If we drop the card in the last position
+    } else if (!nextData) {
+      const prevSortIndex = prevData!.sort;
+      const floor = Math.floor(prevSortIndex + 1);
+      if (floor > prevSortIndex) {
+        increment = prevSortIndex - floor;
+        base = prevSortIndex - increment;
+      } else {
+        base = prevData!.sort + 1;
+        increment = 1;
+      }
+    }
+    // In the general case take the average of the previous and next element
+    // sort indexes.
+    else {
+      const prevSortIndex = prevData!.sort;
+      const nextSortIndex = nextData!.sort;
+      if (nItems == 1 ) {
+        if (prevSortIndex < 0 ) {
+          const ceil = Math.ceil(nextSortIndex - 1);
+          if (ceil < nextSortIndex && ceil > prevSortIndex) {
+            increment = ceil - prevSortIndex;
+          }
+        } else {
+          const floor = Math.floor(nextSortIndex - 1);
+          if (floor < nextSortIndex && floor > prevSortIndex) {
+            increment = floor - prevSortIndex;
+          }
+        }
+      }
+      if (!increment) {
+        increment = (nextSortIndex - prevSortIndex) / (nItems + 1);
+      }
+      if (!base) {
+        base = prevSortIndex + increment;
+      }
+    }
+    // XXX Return a generator that yield values instead of a base with a
+    // increment number.
+    return {
+      base,
+      increment,
+    };
+  },
+
+  // Determine the new sort index
+  calculateIndex(
+    prevCardDomElement: HTMLElement | null | undefined,
+    nextCardDomElement: HTMLElement | null | undefined,
+    nCards = 1,
+  ) {
+    let prevData: SortIndexData | null = null;
+    let nextData: SortIndexData | null = null;
+    if (prevCardDomElement) {
+      prevData = Blaze.getData(prevCardDomElement) as SortIndexData
+    }
+    if (nextCardDomElement) {
+      nextData = Blaze.getData(nextCardDomElement) as SortIndexData;
+    }
+    const ret = Utils.calculateIndexData(prevData, nextData, nCards);
+    return ret;
+  },
+
+  manageCustomUI() {
+    // Subscribe to custom UI settings (published from server)
+    Meteor.subscribe('customUI');
+    // Reactive helper will be called when Settings data changes
+    Tracker.autorun(() => {
+      const settings = Settings.findOne({});
+      if (settings) {
+        Utils.setCustomUI(settings);
+      }
+    });
+  },
+
+  setCustomUI(data: { productName?: string } | null | undefined) {
+    const productName = (data && data.productName) ? data.productName : 'Wekan';
+    const currentBoard = Utils.getCurrentBoard();
+    if (currentBoard) {
+      document.title = `${currentBoard.title} - ${productName}`;
+    } else {
+      document.title = productName;
+    }
+  },
+
+  setMatomo(data: MatomoData) {
+    window._paq = window._paq || [];
+    window._paq.push(['setDoNotTrack', data.doNotTrack]);
+    if (data.withUserName) {
+      window._paq.push(['setUserId', ReactiveCache.getCurrentUser().username]);
+    }
+    window._paq.push(['trackPageView']);
+    window._paq.push(['enableLinkTracking']);
+
+    (function () {
+      window._paq.push(['setTrackerUrl', `${data.address}piwik.php`]);
+      window._paq.push(['setSiteId', data.siteId]);
+
+      const script = document.createElement('script');
+      Object.assign(script, {
+        id: 'scriptMatomo',
+        type: 'text/javascript',
+        async: 'true',
+        defer: 'true',
+        src: `${data.address}piwik.js`,
+      });
+
+      const s = document.getElementsByTagName('script')[0];
+      s.parentNode!.insertBefore(script, s);
+    })();
+
+    Session.set('matomo', true);
+  },
+
+  manageMatomo() {
+    // Subscribe to Matomo configuration (published from server)
+    Meteor.subscribe('matomoConfig');
+    // Reactive helper will be called when Settings data changes
+    Tracker.autorun(() => {
+      const matomo = Session.get('matomo');
+      if (matomo === undefined) {
+        const settings = Settings.findOne({});
+        if (settings && settings.matomoURL && settings.matomoSiteId) {
+          const matomoConfig = {
+            address: settings.matomoURL,
+            siteId: settings.matomoSiteId,
+            doNotTrack: settings.matomoDoNotTrack || false,
+            withUserName: settings.matomoWithUserName || false
+          };
+          Utils.setMatomo(matomoConfig);
+        } else {
+          Session.set('matomo', false);
+        }
+      } else if (matomo) {
+        window._paq = window._paq || [];
+        window._paq.push(['trackPageView']);
+      }
+    });
+  },
+
+  getTriggerActionDesc(event: JQuery.TriggeredEvent, tempInstance: Blaze.TemplateInstance) {
+    const jqueryEl = tempInstance.$(event.currentTarget.parentNode);
+    const triggerEls = jqueryEl.find('.trigger-content').children();
+    let finalString = '';
+    for (let i = 0; i < triggerEls.length; i++) {
+      const element = tempInstance.$(triggerEls[i]);
+      if (element.hasClass('trigger-text')) {
+        finalString += element.text().toLowerCase();
+      } else if (element.hasClass('user-details')) {
+        let username = element.find('input').val();
+        if (username === undefined || username === '') {
+          username = '*';
+        }
+        finalString += `${element
+          .find('.trigger-text')
+          .text()
+          .toLowerCase()} ${username}`;
+      } else if (element.find('select').length > 0) {
+        finalString += element
+          .find('select option:selected')
+          .text()
+          .toLowerCase();
+      } else if (element.find('input').length > 0) {
+        let inputvalue = element.find('input').val();
+        if (inputvalue === undefined || inputvalue === '') {
+          inputvalue = '*';
+        }
+        finalString += inputvalue;
+      }
+      // Add space
+      if (i !== length - 1) {
+        finalString += ' ';
+      }
+    }
+    return finalString;
+  },
+
+  fallbackCopyTextToClipboard(text: string) {
+    var textArea = document.createElement("textarea");
+    textArea.value = text;
+
+    // Avoid scrolling to bottom
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+      document.execCommand('copy');
+      return Promise.resolve(true);
+    } catch (e) {
+      return Promise.reject(false);
+    } finally {
+      document.body.removeChild(textArea);
+    }
+  },
+
+  /** copy the text to the clipboard
+   * @see https://stackoverflow.com/questions/400212/how-do-i-copy-to-the-clipboard-in-javascript/30810322#30810322
+   * @param string copy this text to the clipboard
+   * @return Promise
+   */
+  copyTextToClipboard(text: string) {
+    let ret;
+    if (navigator.clipboard) {
+      ret = navigator.clipboard.writeText(text).then(function () {
+      }, function (err) {
+        console.error('Async: Could not copy text: ', err);
+      });
+    } else {
+      ret = Utils.fallbackCopyTextToClipboard(text);
+    }
+    return ret;
+  },
+
+  /** show the "copied!" message
+   * @param promise the promise of Utils.copyTextToClipboard
+   * @param $tooltip jQuery tooltip element
+   */
+  showCopied(promise: Promise<boolean | void> | null | undefined, $tooltip: JQuery) {
+    if (promise) {
+      promise.then(() => {
+        $tooltip.show(100);
+        setTimeout(() => $tooltip.hide(100), 1000);
+      }, (err) => {
+        console.error("error: ", err);
+      });
+    }
+  },
+};
+
+// A simple tracker dependency that we invalidate every time the window is
+// resized. This is used to reactively re-calculate the popup position in case
+// of a window resize. This is the equivalent of a "Signal" in some other
+// programming environments (eg, elm).
+$(window).on('resize', () => Utils.windowResizeDep.changed());
+
+// A dynamic flag set once on Utils to bind the mobile-mode viewport listener.
+interface UtilsInternal {
+  _mobileModeAutoBound?: boolean;
+}
+
+// Public (logged-out) collapsed-state helpers attached to the Users collection
+// at runtime in models/users.ts. Optional because they only exist for anonymous
+// users and are feature-detected before use.
+interface UsersPublicStatics {
+  getPublicCollapsedList?: (boardId: string, listId: string) => boolean | null;
+  setPublicCollapsedList?: (
+    boardId: string,
+    listId: string,
+    collapsed: boolean,
+  ) => boolean;
+  getPublicCollapsedSwimlane?: (
+    boardId: string,
+    swimlaneId: string,
+  ) => boolean | null;
+  setPublicCollapsedSwimlane?: (
+    boardId: string,
+    swimlaneId: string,
+    collapsed: boolean,
+  ) => boolean;
+}
+
+// A board/list/swimlane whose collapsed state can be persisted.
+interface CollapsibleEntity {
+  _id: string;
+  boardId: string;
+  collapsed?: boolean;
+}
+
+// The card surface used by getCommonAttachmentMetaFrom().
+interface AttachmentMetaCard {
+  _id: string;
+  boardId: string;
+  swimlaneId?: string;
+  listId?: string;
+  linkedId?: string;
+  isLinkedCard: () => boolean;
+}
+
+// Attachment metadata copied from a card.
+interface AttachmentMeta {
+  boardId?: string;
+  cardId?: string;
+  swimlaneId?: string;
+  listId?: string;
+}
+
+// Options for Utils.shrinkImage().
+interface ShrinkImageOptions {
+  dataurl: string;
+  callback?: (result: string | boolean | Blob | null) => void;
+  toBlob?: boolean;
+  maxSize?: number;
+  ratio?: number;
+}
+
+// Matomo (Piwik) analytics configuration.
+interface MatomoData {
+  address: string;
+  siteId: string | number;
+  doNotTrack: boolean;
+  withUserName?: boolean;
+}
+
+// Previous/next sort anchors used by calculateIndexData().
+interface SortIndexData {
+  sort: number;
+}
+
+// User-document helper (defined via Users.helpers in models/users.ts) that is
+// not part of the base Meteor.User type.
+interface UserDragHandleMethods {
+  hasShowDesktopDragHandles: () => boolean;
+}

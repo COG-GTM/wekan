@@ -12,7 +12,7 @@ const {
   MAX_FILENAME_BYTES,
   truncateFilenameToBytes,
   sanitizeFilename,
-} = require('../models/lib/filenameSanitizer');
+} = require('../models/lib/filenameSanitizer.ts');
 
 const bytes = s => Buffer.byteLength(s, 'utf8');
 const isValidUtf8 = s => Buffer.from(s, 'utf8').toString('utf8') === s;

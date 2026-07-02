@@ -11,7 +11,7 @@
 // `normalizeDigits()` converts those to ASCII before parsing; `isValidDate()`
 // and the rest of dateUtils run every string through it.
 //
-// dateUtils.js is an ES module (used by the Meteor client/server bundle), so we
+// dateUtils.ts is an ES module (used by the Meteor client/server bundle), so we
 // load it with a dynamic import() from this CommonJS test wrapper.
 
 const assert = require('assert');
@@ -26,7 +26,7 @@ function test(name, fn) {
 
 (async () => {
   const { normalizeDigits, isValidDate } = await import(
-    '../imports/lib/dateUtils.js'
+    '../imports/lib/dateUtils.ts'
   );
 
   // --- Positive: non-Latin digits normalize to ASCII --------------------------

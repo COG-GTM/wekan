@@ -1,0 +1,62 @@
+import { Blaze } from 'meteor/blaze';
+import { CSSEvents } from '/client/lib/cssEvents';
+import { isMobileViewportNow } from '/client/lib/responsiveUtils';
+
+Popup.template.events({
+  'click .js-back-view'() {
+    Popup.back();
+  },
+  'click .js-close-pop-over'() {
+    Popup.close();
+  },
+  // this: any — confirm popups store the action on their dynamic data context.
+  'click .js-confirm'(this: any) {
+    this.__afterConfirmAction.call(this);
+  },
+  // #5942: On mobile/touch, tapping inside the card-detail sub-popups (assign
+  // user / set due date) made the popup DISAPPEAR. The document-level
+  // click-outside handler (EscapeActions in client/lib/popup.js) closes the
+  // popup, and on touch some freshly-rendered children (avatars, native date
+  // inputs) generated events that were not recognised as "inside the popup",
+  // closing it before the tap could register. Stop touch/pointer events that
+  // originate inside the popup from bubbling to that document handler so the
+  // popup stays open and usable on mobile. Scoped to mobile viewports so the
+  // desktop click-outside-to-close behaviour is untouched.
+  'touchstart .pop-over, pointerdown .pop-over'(evt: JQuery.TriggeredEvent) {
+    if (isMobileViewportNow()) {
+      evt.stopPropagation();
+    }
+  },
+  // This handler intends to solve a pretty tricky bug with our popup
+  // transition. The transition is implemented using a large container
+  // (.content-container) that is moved on the x-axis (from 0 to n*PopupSize)
+  // inside a wrapper (.container-wrapper) with a hidden overflow. The problem
+  // is that sometimes the wrapper is scrolled -- even if there are no
+  // scrollbars. This happen for instance when the newly opened popup has some
+  // focused field, the browser will automatically scroll the wrapper, resulting
+  // in moving the whole popup container outside of the popup wrapper. To
+  // disable this behavior we have to manually reset the scrollLeft position
+  // whenever it is modified.
+  'scroll .content-wrapper'(evt: JQuery.TriggeredEvent) {
+    (evt.currentTarget as HTMLElement).scrollLeft = 0;
+  },
+});
+
+// When a popup content is removed (ie, when the user press the "back" button),
+// we need to wait for the container translation to end before removing the
+// actual DOM element. For that purpose we use the undocumented `_uihooks` API.
+Popup.template.onRendered(function (this: Blaze.TemplateInstance) {
+  const container = this.find('.content-container');
+  if (!container) {
+    return;
+  }
+  // _uihooks is Blaze's undocumented per-element lifecycle hook API.
+  (container as any)._uihooks = {
+    removeElement(node: HTMLElement) {
+      $(node).addClass('no-height');
+      $(container).one(CSSEvents.transitionend as string, () => {
+        node.parentNode!.removeChild(node);
+      });
+    },
+  };
+});
