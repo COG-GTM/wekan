@@ -171,8 +171,11 @@ export class Exporter {
       }
       return groups;
     };
-    const [allChecklists, allChecklistItems, allSubtaskItems] = await Promise.all([
-      ReactiveCache.getChecklists({ cardId: { $in: cardIds } }),
+    // Checklists are read before their items, as in the old loop.
+    const allChecklists = await ReactiveCache.getChecklists({
+      cardId: { $in: cardIds },
+    });
+    const [allChecklistItems, allSubtaskItems] = await Promise.all([
       ReactiveCache.getChecklistItems({ cardId: { $in: cardIds } }),
       ReactiveCache.getCards({ parentId: { $in: cardIds } }),
     ]);
