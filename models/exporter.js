@@ -157,22 +157,32 @@ export class Exporter {
     result.subtaskItems = [];
     result.triggers = [];
     result.actions = [];
-    for (const card of result.cards) {
-      result.checklists.push(
-        ...await ReactiveCache.getChecklists({
-          cardId: card._id,
-        }),
-      );
-      result.checklistItems.push(
-        ...await ReactiveCache.getChecklistItems({
-          cardId: card._id,
-        }),
-      );
-      result.subtaskItems.push(
-        ...await ReactiveCache.getCards({
-          parentId: card._id,
-        }),
-      );
+    // One $in query per collection instead of three queries per card, then
+    // regrouped so the output keeps the per-card order of the old loop.
+    const groupByKey = (docs, key) => {
+      const groups = new Map();
+      for (const doc of docs) {
+        const group = groups.get(doc[key]);
+        if (group) {
+          group.push(doc);
+        } else {
+          groups.set(doc[key], [doc]);
+        }
+      }
+      return groups;
+    };
+    const [allChecklists, allChecklistItems, allSubtaskItems] = await Promise.all([
+      ReactiveCache.getChecklists({ cardId: { $in: cardIds } }),
+      ReactiveCache.getChecklistItems({ cardId: { $in: cardIds } }),
+      ReactiveCache.getCards({ parentId: { $in: cardIds } }),
+    ]);
+    const checklistsByCard = groupByKey(allChecklists, 'cardId');
+    const checklistItemsByCard = groupByKey(allChecklistItems, 'cardId');
+    const subtaskItemsByParent = groupByKey(allSubtaskItems, 'parentId');
+    for (const cardId of cardIds) {
+      result.checklists.push(...(checklistsByCard.get(cardId) || []));
+      result.checklistItems.push(...(checklistItemsByCard.get(cardId) || []));
+      result.subtaskItems.push(...(subtaskItemsByParent.get(cardId) || []));
     }
     for (const rule of result.rules) {
       result.triggers.push(
